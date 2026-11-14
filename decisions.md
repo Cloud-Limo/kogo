@@ -22,6 +22,11 @@ Each entry: what was decided, why, and what would reopen it.
 - **Fragment-typed function parameters are out.** They turn functions into templates. In
   cusoon2 this means `bookingNotice` becomes one statement per notice and each effect table
   gets its own statements.
+- **The API is typed RPC; there is no GraphQL** (15 Nov 2026). An operation is a function, and
+  its input and answer types generate the TypeScript client, so the schema is derived from
+  signatures and never declared twice. cusoon2's GraphQL layer is not ported; it moves to its
+  typed RPC first. Accepted cost: no client-chosen field selection, so each screen's answer is
+  its own type.
 
 ## Taken in the v0 spec, not yet discussed
 

@@ -111,6 +111,20 @@ func TestSignatures(t *testing.T) {
 	}
 }
 
+// A session that does not return the parse tree must not pass every
+// column as nullable: that would hide the loss.
+func TestNoParseTreeIsAFailure(t *testing.T) {
+	c := connect(t)
+	if _, err := c.conn.Exec(context.Background(), "set client_min_messages = warning"); err != nil {
+		t.Fatal(err)
+	}
+	st, err := c.Check(context.Background(), `select legal_name from business`)
+	var e *Error
+	if err == nil || errors.As(err, &e) || !strings.Contains(err.Error(), "no parse tree") {
+		t.Errorf("got %v, %v; want a failure to check, not a fault in the literal", st, err)
+	}
+}
+
 func TestErrors(t *testing.T) {
 	c := connect(t)
 	// Each literal is wrong at the text between « and », which the test removes.

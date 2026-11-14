@@ -45,12 +45,16 @@ Each entry: what was decided, why, and what would reopen it.
   the analysed tree as a notice. In it Postgres marks every column reference with the outer
   joins and grouping sets that can null it (`varnullingrels`), which is section 10.5's rule
   computed by Postgres, not by us. Nothing is written to the database. Not taken: reading the
-  plan as sqlx does (the plan is the planner's choice, not the statement's meaning: it drops
-  and reorders joins, and a column that passes through a subquery scan reads as non-null when
-  it is not); a cgo parser (build speed, and its raw tree has no names resolved, so we would
+  plan as sqlx does. A spike of it over eight statements (not kept) called two columns non-null
+  that can be null, a left-joined column selected through a materialized CTE and a `rollup`
+  column, and each fix would be a rule of ours about plans. It got one right that the tree
+  does not: a `where` that excludes the null rows, which the planner turns into an inner join.
+  Also not taken: a cgo parser (build speed, and its raw tree has no names resolved, so we would
   redo the analysis); our own parser (principle 4). Costs: the tree is an undocumented text
   format tied to the major version, so the checker refuses Postgres before 18 (17 does not mark
   grouping sets, 15 has no marks); and each check also writes the tree to the server's log.
+  A statement that comes back without a tree stops the check with an error: passing every
+  column as nullable would hide that the session, through a pooler say, lost its settings.
   Where it stops is spec 10.5: a reference is followed through a subquery in `from` and a
   `group by`, and no further. Reopen when a Postgres release changes the tree (`TestSignatures`
   fails) or when `"name!"` on CTE columns becomes a habit (following a CTE is about 15 lines).

@@ -84,11 +84,13 @@ func (r *reader) value() *node {
 }
 
 // params records the number of each parameter the tree refers to.
+// Kind 0 is a parameter of the statement; Postgres numbers its own,
+// as for a row compared with a subquery, from 1 as well.
 func (n *node) params(seen map[int]bool) {
 	if n == nil {
 		return
 	}
-	if n.tag == "PARAM" {
+	if n.tag == "PARAM" && n.num("paramkind") == 0 {
 		seen[n.num("paramid")] = true
 	}
 	for _, f := range n.fields {

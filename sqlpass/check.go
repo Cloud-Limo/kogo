@@ -99,6 +99,10 @@ func (c *Checker) Check(ctx context.Context, literal string) (*Statement, error)
 		return nil, err
 	}
 	query := parseTree(c.tree) // before a catalog query replaces it
+	if query.tag != "QUERY" {
+		return nil, errors.New("Postgres sent no parse tree for the statement, so what can be null is unknown: " +
+			"connect to it directly, since a pooler can drop the session's debug_print_parse and client_min_messages")
+	}
 	seen := map[int]bool{}
 	query.params(seen)
 	for i, p := range params {

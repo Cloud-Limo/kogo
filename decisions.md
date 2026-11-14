@@ -112,6 +112,13 @@ Each entry: what was decided, why, and what would reopen it.
   uses it, and it means the same as in Kotlin.
 - **Escapes are Kotlin's** (`\t \b \n \r \' \" \\ \$ \uXXXX`), and raw strings have none.
   A `$` that begins no template is text, as in Kotlin.
+- **A surrogate escape is half of a pair, and the pair is one character.** Kotlin allows a
+  lone half; a Go string is UTF-8 and cannot hold one, so the lexer refuses it rather than
+  emit U+FFFD. A pair is two UTF-16 units, so it is not a `Char`. Reopen if Go output ever
+  needs raw UTF-16.
+- **`data`, `enum`, `sealed` and the refused modifiers are names unless a declaration
+  follows**, as in Kotlin: `data.size` and `value to key` are expressions. A word followed
+  by `in`, `is`, `to`, `until` or `as`, or by a line end in a body, is not a modifier.
 - **What Kotlin has and the spec does not is refused with a message that names the
   replacement.** Section 14's rows that syntax can see have codes `kotlin-<row>`
   (`kotlin-not-null-assertion`, `kotlin-try`, ...); so do `public` and `protected`, which

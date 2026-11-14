@@ -208,6 +208,8 @@ the parser.
   or `->`, it opens a block.
 - `"..."` strings and `Char` literals (`'a'`) have Kotlin's escapes:
   `\t \b \n \r \' \" \\ \$` and `\uXXXX`. A raw string has none.
+  A surrogate is written as a pair, `"\uD83D\uDE00"`, which only a string
+  holds; half of one is refused.
   A `$` that does not begin a template is text. Templates nest:
   `"${if (a) "x" else "y"}"`.
 - A list (arguments, parameters, type arguments, `when` conditions) may

@@ -10,10 +10,12 @@ import (
 // returns as an *Error.
 func Parse(name string, src []byte) (f *File, err error) {
 	defer func() {
-		if e, ok := recover().(*Error); ok {
+		if r := recover(); r != nil {
+			e, ok := r.(*Error)
+			if !ok {
+				panic(r)
+			}
 			f, err = nil, e
-		} else if e != nil {
-			panic(e)
 		}
 	}()
 	s := newSource(name, string(src))
@@ -218,10 +220,11 @@ var refused = map[string][3]string{
 }
 
 // modifier reports whether the word at hand is a modifier: a word
-// followed by another word or an annotation.
+// followed by an annotation, or by a word that is not an infix
+// operator (in, is, to, until, as).
 func (p *parser) modifier() bool {
 	next := p.peek(1)
-	return p.tok.kind == tIdent && (next.kind == tIdent || next.text == "@")
+	return p.tok.kind == tIdent && (next.text == "@" || next.kind == tIdent && precedence[next.text] == 0 && next.text != "as")
 }
 
 func (p *parser) modifiers() Modifiers {
@@ -460,13 +463,20 @@ func (p *parser) classDecl(d *ClassDecl) *ClassDecl {
 		}
 		p.want("{")
 		p.nested(false, func() {
-			p.list("}", func() {
+			for !p.at("}") && !p.at(";") {
 				pos, name := p.ident()
 				d.Entries = append(d.Entries, &Ident{pos, name})
-				if p.at("(") || p.at("{") || p.at(";") {
+				if p.at("(") || p.at("{") {
 					p.fail(p.tok.pos, "syntax", "an enum is constants only: no constructor and no body")
 				}
-			})
+				if !p.got(",") {
+					break
+				}
+			}
+			if p.got(";") && !p.at("}") { // a ; after the constants starts a body
+				p.fail(p.tok.pos, "syntax", "an enum is constants only: no constructor and no body")
+			}
+			p.want("}")
 		})
 		return d
 	case "annotation class":
@@ -488,9 +498,9 @@ func (p *parser) classDecl(d *ClassDecl) *ClassDecl {
 				}
 			}
 		}
-		if !p.at("{") {
-			return d
-		}
+	}
+	if !p.at("{") {
+		return d
 	}
 	abstract := d.Kind != "data class" && d.Kind != "data object"
 	p.want("{")
@@ -619,10 +629,10 @@ func (p *parser) stmt() Stmt {
 		p.fail(pos, "syntax", "there is no do-while: write a while loop")
 	case p.at("@"):
 		p.notKogo(pos, "annotation", "an annotation in a function body", "a marker goes on a top-level declaration or a constructor")
-	case p.modifier() && refused[p.tok.text][0] != "":
+	case p.modifier() && !p.peek(1).nl && refused[p.tok.text][0] != "":
 		r := refused[p.tok.text]
 		p.notKogo(pos, r[0], r[1], r[2])
-	case p.at("data") || p.at("enum") || p.at("sealed") || p.at("interface") || p.at("typealias"):
+	case p.typeDeclAhead():
 		p.fail(pos, "syntax", "a type is declared at the top level of a file")
 	}
 	x := p.expr()
@@ -636,6 +646,16 @@ func (p *parser) stmt() Stmt {
 		return a
 	}
 	return x
+}
+
+// typeDeclAhead reports whether a type's declaration begins here.
+// data, enum and sealed are names unless a declaration's word follows.
+func (p *parser) typeDeclAhead() bool {
+	next := p.peek(1).text
+	return p.at("interface") || p.at("typealias") ||
+		p.at("data") && (next == "class" || next == "object") ||
+		p.at("enum") && next == "class" ||
+		p.at("sealed") && (next == "interface" || next == "class")
 }
 
 // header reads the ( expr ) of an if, a while or a when.
@@ -850,6 +870,7 @@ func (p *parser) sql() *SQL {
 	t := p.tok
 	p.next()
 	s := &SQL{Pos: t.pos, Text: t.value, TextPos: t.textPos}
+	p.f.SQL = append(p.f.SQL, s) // before any literal in its ${}
 	for _, part := range t.parts {
 		sp := &SQLParam{Pos: part.pos, Name: part.name}
 		if part.expr {
@@ -857,7 +878,6 @@ func (p *parser) sql() *SQL {
 		}
 		s.Params = append(s.Params, sp)
 	}
-	p.f.SQL = append(p.f.SQL, s)
 	return s
 }
 
@@ -956,8 +976,7 @@ func (p *parser) primary() Expr {
 func (p *parser) lambda() *Lambda {
 	l := &Lambda{Pos: p.want("{")}
 	p.nested(false, func() {
-		p.try(func() {
-			var params []*LambdaParam
+		if p.paramsAhead() {
 			p.nested(true, func() {
 				for !p.at("->") {
 					lp := &LambdaParam{Pos: p.tok.pos}
@@ -969,18 +988,43 @@ func (p *parser) lambda() *Lambda {
 							lp.Type = p.typ()
 						}
 					}
-					params = append(params, lp)
+					l.Params = append(l.Params, lp)
 					if !p.got(",") {
 						break
 					}
 				}
 				p.want("->")
 			})
-			l.Params = params
-		})
+		}
 		l.Body = &Block{l.Pos, p.stmts()}
 	})
 	return l
+}
+
+// paramsAhead reports whether a lambda's parameters come next: names
+// and destructurings then ->, or a name then :, which only a parameter
+// begins with. It decides before any type is read, so that a fault in
+// a parameter's type is reported as itself.
+func (p *parser) paramsAhead() bool {
+	i, ok := p.i, false
+	p.try(func() {
+		p.nested(true, func() {
+			for {
+				if p.at("(") {
+					p.names()
+				} else if p.ident(); p.at(":") {
+					ok = true
+					return
+				}
+				if !p.got(",") {
+					break
+				}
+			}
+			ok = p.at("->")
+		})
+	})
+	p.i, p.tok = i, p.toks[i]
+	return ok
 }
 
 func (p *parser) ifExpr() *If {

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -206,9 +207,13 @@ func (l *lexer) space() bool {
 
 // number reads 1, 1L, 1.0 or 10_000.
 func (l *lexer) number(t *token) {
+	bad := func() { fail(l.source, t.pos, "number-syntax", "write a number as 1, 1L, 1.0 or 10_000") }
 	digits := func() {
 		for l.off < l.end && (l.text[l.off] >= '0' && l.text[l.off] <= '9' || l.text[l.off] == '_') {
 			l.off++
+		}
+		if l.text[l.off-1] == '_' {
+			bad()
 		}
 	}
 	start := l.off
@@ -224,13 +229,14 @@ func (l *lexer) number(t *token) {
 		l.off++
 		t.lit = "Long"
 	}
-	if c, _ := utf8.DecodeRuneInString(l.text[l.off:l.end]); isLetter(c) || unicode.IsDigit(c) || l.text[l.off-1] == '_' {
-		fail(l.source, t.pos, "number-syntax", "write a number as 1, 1L, 1.0 or 10_000")
+	if c, _ := utf8.DecodeRuneInString(l.text[l.off:l.end]); isLetter(c) || unicode.IsDigit(c) {
+		bad()
 	}
 }
 
 // escape reads the escape at l.off, a backslash: \t \b \n \r \' \" \\
-// \$ and \uXXXX, as in Kotlin.
+// \$ and \uXXXX, as in Kotlin. A surrogate is written as a pair, which
+// gives one rune: Go text cannot hold half of one.
 func (l *lexer) escape(b *strings.Builder) {
 	rest := l.text[l.off:l.end]
 	if len(rest) >= 2 {
@@ -239,15 +245,30 @@ func (l *lexer) escape(b *strings.Builder) {
 			l.off += 2
 			return
 		}
-		if len(rest) >= 6 && rest[1] == 'u' {
-			if r, err := strconv.ParseUint(rest[2:6], 16, 16); err == nil && !strings.ContainsAny(rest[2:6], "+-_") {
-				b.WriteRune(rune(r))
-				l.off += 6
-				return
+		if r, ok := unit(rest); ok {
+			n := 6
+			if utf16.IsSurrogate(r) {
+				lo, ok := unit(rest[6:])
+				if r = utf16.DecodeRune(r, lo); !ok || r == unicode.ReplacementChar {
+					fail(l.source, l.pos(l.off), "string-escape", `\uD800 to \uDFFF are halves of a pair, written together in a string: "\uD83D\uDE00"`)
+				}
+				n = 12
 			}
+			b.WriteRune(r)
+			l.off += n
+			return
 		}
 	}
 	fail(l.source, l.pos(l.off), "string-escape", `the escapes are \t \b \n \r \' \" \\ \$ and \uXXXX`)
+}
+
+// unit reads the \uXXXX that s begins with, if it does.
+func unit(s string) (rune, bool) {
+	if len(s) < 6 || s[:2] != `\u` || strings.ContainsAny(s[2:6], "+-_") {
+		return 0, false
+	}
+	r, err := strconv.ParseUint(s[2:6], 16, 16)
+	return rune(r), err == nil
 }
 
 // char reads 'c' or an escape: one UTF-16 code unit.
@@ -260,7 +281,7 @@ func (l *lexer) char(t *token) {
 		b.WriteRune(c)
 		l.off += size
 	}
-	if b.Len() == 0 || l.off >= l.end || l.text[l.off] != '\'' {
+	if r, _ := utf8.DecodeRuneInString(b.String()); b.Len() == 0 || r > 0xFFFF || l.off >= l.end || l.text[l.off] != '\'' {
 		fail(l.source, t.pos, "char-syntax", "a Char is one character in single quotes, as 'a' or '\\n'")
 	}
 	l.off++

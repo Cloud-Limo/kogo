@@ -130,6 +130,8 @@ func TestDeclarations(t *testing.T) {
 		{`sealed interface S<out T> { data object N : S<Nothing> }`,
 			`[(ClassDecl "sealed interface" S [(TypeParam Out T)] [(ClassDecl "data object" N [(NamedType S [(NamedType Nothing)])])])]`},
 		{"enum class E { a, b, }", `[(ClassDecl "enum class" E [(Ident a) (Ident b)])]`},
+		{"enum class E { a, b; }", `[(ClassDecl "enum class" E [(Ident a) (Ident b)])]`},
+		{"sealed interface S\ndata object N : S", `[(ClassDecl "sealed interface" S) (ClassDecl "data object" N [(NamedType S)])]`},
 		{"interface I<K> {\n    val label: String\n    fun card(key: K): Card\n}",
 			`[(ClassDecl interface I [(TypeParam K)] [(ValDecl label (NamedType String)) (FunDecl card [(Param key (NamedType K))] (NamedType Card))])]`},
 		{"typealias Cents = Long", `[(TypeAlias Cents (NamedType Long))]`},
@@ -193,6 +195,7 @@ func TestExpressions(t *testing.T) {
 		{`"${if (a) "x" else "y"}"`, `[(StringLit [(If (Ident a) (Block [(StringLit [(Literal String x)])]) (Block [(StringLit [(Literal String y)])]))])]`},
 		{`"$n: ${f { "${it}}" }}$"`, `[(StringLit [(Ident n) (Literal String ": ") (Call (Ident f) [(Arg (Lambda (Block [(StringLit [(Ident it) (Literal String })])])))]) (Literal String $)])]`},
 		{`"\t\$xA\\"`, `[(StringLit [(Literal String "\t$xA\\")])]`},
+		{`"\uD83D\uDE00"`, "[(StringLit [(Literal String \U0001F600)])]"},
 		{"\"\"\"a\\n $b\"\"\"\"", `[(StringLit Raw [(Literal String "a\\n ") (Ident b) (Literal String "\"")])]`},
 	}, stmts)
 }
@@ -208,6 +211,10 @@ func TestStatements(t *testing.T) {
 		{"when (x) {\n    is A.B, in 0..9 -> 1\n    c -> if (d) 2\n    else -> { 3 }\n}",
 			`[(When (Ident x) [(Branch [(Cond is (NamedType A.B)) (Cond in (Binary .. (Literal Int 0) (Literal Int 9)))] (Block [(Literal Int 1)])) (Branch [(Cond (Ident c))] (Block [(If (Ident d) (Block [(Literal Int 2)]))])) (Branch (Block [(Literal Int 3)]))])]`},
 		{"when { a -> 1; else -> 2 }", `[(When [(Branch [(Cond (Ident a))] (Block [(Literal Int 1)])) (Branch (Block [(Literal Int 2)]))])]`},
+		// data, enum, sealed and the refused modifiers are names where
+		// no declaration follows.
+		{"data.size\nvalue to key\nopen in s\nf { data -> data }\nfinal\ng()",
+			`[(Select (Ident data) size) (Binary to (Ident value) (Ident key)) (Binary in (Ident open) (Ident s)) (Call (Ident f) [(Arg (Lambda [(LambdaParam data)] (Block [(Ident data)])))]) (Ident final) (Call (Ident g))]`},
 		{"fun g(x: Int = 1): Int {\n    return x\n}", `[(FunDecl g [(Param x (NamedType Int) (Literal Int 1))] (NamedType Int) (Block [(Jump return (Ident x))]))]`},
 	}, stmts)
 }
@@ -223,5 +230,11 @@ func TestSQL(t *testing.T) {
 	}
 	if s.Line != 2 || s.Column != 23 || s.TextPos.Offset != 38 || s.Params[1].Column != 40 {
 		t.Errorf("literal at %d:%d, text at %d, ${ at column %d", s.Line, s.Column, s.TextPos.Offset, s.Params[1].Column)
+	}
+
+	// A literal inside another's ${} comes after it, in source order.
+	f = parse(t, "fun f() = tx.query<R>(sql\"select ${tx.querySingle<Int>(sql\"select 1\")}\")")
+	if len(f.SQL) != 2 || f.SQL[0].Text != "select ${tx.querySingle<Int>(sql\"select 1\")}" || f.SQL[1].Text != "select 1" {
+		t.Errorf("literals out of order: %s", show(f.SQL))
 	}
 }

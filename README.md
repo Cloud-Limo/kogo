@@ -9,7 +9,7 @@ against the real schema at build time.
 - `decisions.md`: what was decided and why.
 - `doc/design.md`: principles and how it compiles.
 
-Built so far: the SQL pass (`sqlpass`) and its command.
+Built so far: the parser (`syntax`), and the SQL pass (`sqlpass`) with its command.
 
 ```
 mise exec -- go build -o bin/kogo-sql ./cmd/kogo-sql

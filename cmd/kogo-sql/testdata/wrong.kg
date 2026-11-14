@@ -1,4 +1,4 @@
-// Five statements Postgres rejects, and a literal that never closes.
+// Five statements Postgres rejects.
 package wrong
 
 fun misspeltColumn(tx: Tx, id: Uuid): String? =
@@ -23,7 +23,8 @@ fun mismatchedJoin(tx: Tx, personId: Uuid): List<Uuid> =
 fun lessThanNumber(tx: Tx): List<Uuid> =
     tx.query<Uuid>(sql"select id from business where legal_name < 42")
 
-fun unclosed(tx: Tx): Int = tx.execute(sql"delete from invite)
+// Not literals: tx.execute(sql"delete from nowhere") in a comment,
+val inString = "tx.execute(sql\"delete from nowhere\")"
 
-// Not a literal: the quote ends a longer word.
+// and a quote that ends a longer word.
 val dialect = "postgresql"

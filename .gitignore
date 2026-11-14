@@ -2,3 +2,4 @@
 /.mise.local.toml
 *.test
 *.out
+/cmd/kogo-sql/emitted*/

@@ -287,7 +287,11 @@ fun suppliersOf(tx: Tx, operatorId: ID): List<SupplierRow> =
 ### 10.1 The literal
 
 - `$name` and `${expr}` inside `sql"""` are bound parameters, never text.
-  The value is sent to Postgres separately from the statement.
+  The value is sent to Postgres separately from the statement. A name
+  written twice is one parameter; an expression is evaluated and bound
+  each time it is written. `$1` is an error; any other `$` is SQL text.
+- A statement that fits on one line may be written `sql"..."`. Neither
+  form has escapes.
 - A `sql"""` literal may only appear as the argument of one of the five
   calls below. It is not a `String`, cannot be stored, concatenated or
   built at run time. There are no SQL fragments in v0.
@@ -345,7 +349,9 @@ data class.
 | a domain | its base type's mapping |
 
 A parameter's Kogo type must map to the type Postgres infers for it. When
-Postgres cannot infer one, cast it: `$active::boolean`.
+Postgres cannot infer one, cast it: `$active::boolean`. A parameter or a
+result column of a type that is not in the table is a compile error: cast
+it in the statement.
 
 ### 10.5 Nullability
 
@@ -353,6 +359,10 @@ Postgres cannot infer one, cast it: `$active::boolean`.
   `NOT NULL` column of a table that is not on the nullable side of an
   outer join. Every other column (expressions, aggregates, outer-joined
   columns) is nullable.
+- The reference may pass through a subquery in `from` or a `group by`.
+  A column of a CTE, a view or a `union` is nullable, and so is one
+  nulled by a grouping set. A `where` that excludes the null rows of an
+  outer join does not make its columns non-null.
 - Override by naming the column `as "name!"` (assert non-null; a null at
   run time panics) or `as "name?"` (force nullable).
 - A non-null column may fill a `T?` property. A nullable column filling a

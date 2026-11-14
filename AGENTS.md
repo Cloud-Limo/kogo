@@ -37,9 +37,19 @@ is building it because he wants to; do not argue whether it is practical.
   `mise -C ~/Dev/cusoon2 run linear-pickup DEV-NNN` (also `linear-comment`
   and `linear-file`); `$LINEAR_API_KEY` is already in the shell.
   "Pickup DEV-NNN" is that one command: read its output and start.
-- One branch per issue, `dev-NNN-short-name`, off `main`. There is no
-  remote yet: commit, post the handoff comment (Landed / Verified /
-  Decided / Next step / Gotcha) and stop. Greg reviews and merges.
+- One branch per issue, `dev-NNN-short-name`, off `main`. Commit, push
+  with `git push -u origin HEAD`, open a PR into `main` with `gh pr
+  create`, post the handoff comment (Landed / Verified / Decided / Next
+  step / Gotcha) on the issue with the PR's link and on the PR with `gh
+  pr comment`, and stop. Greg reviews and merges; answer review with
+  further commits. Never rebase or force-push a pushed branch: the
+  review holds its shas.
+- A PR description is three parts and nothing else: one or two
+  sentences of what it does, verb first, carrying "Fixes DEV-NNN"; one
+  or two of why, in plain words; bullets for the major pieces only.
+  What and why are the issue's, updated where the work diverged.
+  Verification goes in the handoff comment, not the description. When
+  more work lands on the branch, rewrite the description; don't append.
 - Commit subject <= 50 chars, body lines <= 72, with a short body saying
   why. No AI attribution anywhere.
 - Go is pinned in `.mise.toml`; run it as `mise exec -- go ...`. Prefer

@@ -55,6 +55,7 @@ is building it because he wants to; do not argue whether it is practical.
 - Go is pinned in `.mise.toml`; run it as `mise exec -- go ...`. Prefer
   a dependency release at least seven days old.
 - Postgres 18 runs in this VM; `sudo -n -u postgres psql` is the
-  superuser. Tests use their own database and a schema kept in this repo.
+  superuser. Tests use their own database and a schema kept in this repo:
+  `mise run testdb` creates it, then `mise exec -- go test ./...`.
   cusoon2's databases (`cusoon`, `cusoon_b`) are read-only to you:
   describe statements against them, never write or migrate them.

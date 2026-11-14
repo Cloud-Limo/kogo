@@ -9,4 +9,13 @@ against the real schema at build time.
 - `decisions.md`: what was decided and why.
 - `doc/design.md`: principles and how it compiles.
 
-Nothing is built yet. The first component is the SQL pass.
+Built so far: the SQL pass (`sqlpass`) and its command.
+
+```
+mise exec -- go build -o bin/kogo-sql ./cmd/kogo-sql
+DATABASE_URL=postgres://kogo:kogo@127.0.0.1/kogo_test bin/kogo-sql check examples
+```
+
+`check` prints each `sql"""` literal's signature, or its error, as one JSON
+object a line; `emit <dir> <package>` prints a Go function per literal. It
+needs Postgres 18. `mise run testdb` creates the database the tests use.

@@ -1,0 +1,27 @@
+package example
+
+enum class InviteKind { in_house, outside }
+
+data class Invite(
+    val id: Uuid,
+    val businessId: Uuid,
+    val kind: InviteKind,
+    val personId: Uuid,
+    val invitedBy: Uuid,
+    val createdAt: Instant,
+    val driverSharePercent: Int?,
+)
+
+fun upsertInvite(tx: Tx, businessId: Uuid, kind: InviteKind, personId: Uuid, invitedBy: Uuid, share: Int?): Invite {
+    val id = newId()
+    return tx.querySingle<Invite>(sql"""
+        insert into invite (id, business_id, kind, person_id, invited_by, driver_share_percent)
+        values ($id, $businessId, $kind, $personId, $invitedBy, $share)
+        on conflict (business_id, person_id) do update
+            set kind = excluded.kind,
+                invited_by = excluded.invited_by,
+                driver_share_percent = excluded.driver_share_percent,
+                created_at = now()
+        returning *
+    """)
+}

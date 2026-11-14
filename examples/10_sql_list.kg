@@ -1,0 +1,13 @@
+// A checked query. $operatorId is a bound parameter, not text.
+package example
+
+data class SupplierRow(val id: Uuid, val legalName: String, val driverSharePercent: Int)
+
+fun suppliersOf(tx: Tx, operatorId: Uuid): List<SupplierRow> =
+    tx.query<SupplierRow>(sql"""
+        select b.id, b.legal_name, sa.driver_share_percent
+        from supply_agreement sa
+        join business b on b.id = sa.supplier_id
+        where sa.operator_id = $operatorId
+        order by b.legal_name
+    """)

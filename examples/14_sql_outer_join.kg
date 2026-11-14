@@ -1,0 +1,15 @@
+// A nested data class filled by column prefix; nullable on the outer side.
+package example
+
+data class Storefront(val id: Uuid, val slug: String)
+
+data class Administered(val id: Uuid, val legalName: String, val storefront: Storefront?)
+
+fun administered(tx: Tx, personId: Uuid): List<Administered> =
+    tx.query<Administered>(sql"""
+        select b.id, b.legal_name, t.id as storefront_id, t.slug as storefront_slug
+        from business b
+        join admin_grant g on g.business_id = b.id and g.person_id = $personId
+        left join tenant t on t.business_id = b.id
+        order by b.legal_name
+    """)

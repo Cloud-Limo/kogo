@@ -1,0 +1,4 @@
+/bin/
+/.mise.local.toml
+*.test
+*.out

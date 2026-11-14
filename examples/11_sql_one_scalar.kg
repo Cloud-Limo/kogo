@@ -1,0 +1,14 @@
+// queryOne gives R?; a one-column statement gives a scalar. abn is a
+// nullable column, so the scalar is String? and the result String?.
+package example
+
+fun abnOf(tx: Tx, businessId: Uuid): String? =
+    tx.queryOne<String?>(sql"select abn from business where id = $businessId")
+
+fun legalName(tx: Tx, businessId: Uuid): String =
+    tx.querySingle<String>(sql"select legal_name from business where id = $businessId")
+
+fun administers(tx: Tx, personId: Uuid, businessId: Uuid): Boolean =
+    tx.exists(sql"""
+        select 1 from admin_grant where person_id = $personId and business_id = $businessId
+    """)

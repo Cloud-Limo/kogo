@@ -1,0 +1,17 @@
+// select * into the table's data class from schema.kg.
+package example
+
+// As `kogo schema` writes it:
+data class Business(
+    val id: Uuid,
+    val slug: String,
+    val legalName: String,
+    val createdAt: Instant,
+    val abn: String?,
+    val abnCheckedAt: Instant?,
+    val payid: String?,
+    val payidName: String?,
+)
+
+fun businessBySlug(tx: Tx, slug: String): Business? =
+    tx.queryOne<Business>(sql"select * from business where slug = $slug")

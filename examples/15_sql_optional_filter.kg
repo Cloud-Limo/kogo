@@ -1,0 +1,13 @@
+// What jOOQ did with a conditional Condition: one static statement.
+package example
+
+data class LinkedDriver(val name: String, val email: String, val active: Boolean)
+
+fun linkedDrivers(tx: Tx, active: Boolean?): List<LinkedDriver> =
+    tx.query<LinkedDriver>(sql"""
+        select p.name, p.email, td.active
+        from person p
+        join tenant_driver td on td.driver_id = p.id
+        where ($active::boolean is null or td.active = $active)
+        order by p.name
+    """)

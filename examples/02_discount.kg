@@ -1,0 +1,19 @@
+// From cusoon2 invoice/ledger.kt: fixed-point money and a data class.
+package cusoon.invoice
+
+import cusoon.pricing.Cents
+
+fun discountedCents(amount: Cents, discountPercent: Double): Cents =
+    (amount * 10000 - (amount * discountPercent * 100.0).toLong()) / 10000
+
+data class Discount(val description: String, val amount: Cents, val struck: Boolean)
+
+data class DiscountStack(val discounts: List<Discount>, val total: Cents)
+
+fun stack(amounts: List<Cents>, percent: Double, label: String): DiscountStack {
+    fun nett(p: Double): Cents = amounts.sumOf { discountedCents(it, p) }
+    val discounts =
+        listOf(Discount(label, nett(percent) - amounts.sum(), struck = false))
+            .filter { it.amount != 0L }
+    return DiscountStack(discounts, nett(percent))
+}

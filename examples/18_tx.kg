@@ -1,0 +1,24 @@
+// A transaction that fails as a value: a Left or a panic rolls it back.
+package example
+
+sealed interface AcceptError {
+    data object NoInvite : AcceptError
+    data object NoShare : AcceptError
+}
+
+data class PendingInvite(val businessId: Uuid, val driverSharePercent: Int?)
+
+fun accept(db: Db, inviteId: Uuid, supplierId: Uuid): Either<AcceptError, Unit> =
+    db.tx(serializable = true) { tx ->
+        val invite =
+            tx.queryOne<PendingInvite>(sql"""
+                select business_id, driver_share_percent from invite where id = $inviteId
+            """) ?: raise(AcceptError.NoInvite)
+        val share = ensureNotNull(invite.driverSharePercent) { AcceptError.NoShare }
+        tx.execute(sql"""
+            update supply_agreement set driver_share_percent = $share
+            where operator_id = ${invite.businessId} and supplier_id = $supplierId
+        """)
+        tx.execute(sql"delete from invite where id = $inviteId")
+        Unit
+    }

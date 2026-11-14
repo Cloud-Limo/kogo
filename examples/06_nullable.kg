@@ -1,0 +1,14 @@
+// Absence without !!.
+package example
+
+data class Person(val name: String, val mobile: String?)
+
+fun contact(person: Person?): String {
+    val p = person ?: return "nobody"
+    val mobile = p.mobile?.trim()?.takeIf { it.isNotEmpty() }
+    return if (mobile != null) "${p.name} on $mobile" else p.name
+}
+
+// A null here is a bug, so it panics with a reason.
+fun mobileOf(person: Person): String =
+    requireNotNull(person.mobile) { "person ${person.name} has no mobile" }

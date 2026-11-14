@@ -1,0 +1,9 @@
+package example
+
+enum class InvoiceStatus { draft, issued, paid, void }
+
+fun canPay(status: InvoiceStatus): Boolean =
+    when (status) {
+        InvoiceStatus.issued -> true
+        InvoiceStatus.draft, InvoiceStatus.paid, InvoiceStatus.void -> false
+    }

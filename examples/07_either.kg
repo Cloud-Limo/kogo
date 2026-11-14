@@ -1,0 +1,30 @@
+// Spelling 1: Either values, either { }, bind, ensure, raise.
+package example
+
+sealed interface SignupError {
+    data class BadEmail(val email: String) : SignupError
+    data object TooYoung : SignupError
+}
+
+fun checkedEmail(text: String): Either<SignupError, String> = either {
+    val email = text.trim().lowercase()
+    ensure(email.contains("@")) { SignupError.BadEmail(text) }
+    email
+}
+
+fun signup(email: String, age: Int): Either<SignupError, String> = either {
+    val checked = checkedEmail(email).bind()
+    if (age < 18) raise(SignupError.TooYoung)
+    checked
+}
+
+fun message(result: Either<SignupError, String>): String =
+    result.fold(
+        { e ->
+            when (e) {
+                is SignupError.BadEmail -> "${e.email} is not an email address."
+                SignupError.TooYoung -> "You must be 18."
+            }
+        },
+        { email -> "Welcome, $email." },
+    )

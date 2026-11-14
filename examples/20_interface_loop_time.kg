@@ -1,0 +1,36 @@
+// An interface, a generic function, a loop with a local var, and time with a named zone.
+package example
+
+import kogo.time.Clock
+import kogo.time.LocalDate
+import kogo.time.ZoneId
+
+interface Card {
+    val label: String
+    fun fee(distance: Long): Long
+}
+
+data class FlatCard(override val label: String, val cents: Long) : Card {
+    override fun fee(distance: Long): Long = cents
+}
+
+fun <T> firstFree(candidates: List<T>, taken: (T) -> Boolean): T? {
+    for (c in candidates) {
+        if (!taken(c)) return c
+    }
+    return null
+}
+
+// Kotlin's generateSequence(1) { it + 1 }.first { ... } as a loop.
+fun freeSlug(base: String, taken: (String) -> Boolean): String {
+    var n = 1
+    var slug = base
+    while (taken(slug)) {
+        n += 1
+        slug = "$base-$n"
+    }
+    return slug
+}
+
+fun todayIn(clock: Clock, zoneName: String): LocalDate =
+    clock.now().atZone(ZoneId.of(zoneName)).toLocalDate()

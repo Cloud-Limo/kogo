@@ -1,0 +1,17 @@
+// Converting the error type between layers: mapLeft on a value, withError on a block.
+package example
+
+sealed interface StoreError {
+    data object Missing : StoreError
+}
+
+fun load(id: Int): Either<StoreError, String> =
+    if (id == 1) "one".right() else StoreError.Missing.left()
+
+fun Raise<StoreError>.loadOrRaise(id: Int): String = load(id).bind()
+
+fun title(id: Int): Either<String, String> = either {
+    val a = load(id).mapLeft { "No item $id." }.bind()
+    val b = withError({ e: StoreError -> "No item ${id + 1}." }) { loadOrRaise(id + 1) }
+    "$a and $b"
+}

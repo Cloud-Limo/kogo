@@ -1,0 +1,22 @@
+// A marker: only a file that opts in may make a HeldBusiness or read by bare id.
+@file:OptIn(UnscopedRead::class)
+
+package example
+
+@RequiresOptIn
+annotation class UnscopedRead
+
+data class Business(val id: Uuid, val legalName: String)
+
+data class HeldBusiness @UnscopedRead constructor(val business: Business)
+
+@UnscopedRead
+fun business(tx: Tx, id: Uuid): Business? =
+    tx.queryOne<Business>(sql"select id, legal_name from business where id = $id")
+
+// Unmarked, so any file may call it: it only answers for a business some gate held.
+fun legalNameOf(held: HeldBusiness): String = held.business.legalName
+
+// This file opted in at the top, so it may build one.
+@UnscopedRead
+fun hold(tx: Tx, id: Uuid): HeldBusiness? = business(tx, id)?.let { HeldBusiness(it) }

@@ -1,0 +1,16 @@
+// From cusoon2 model/supplier.kt. The Kotlin used toMutableList(); Kogo has
+// no mutable collections, so the first digit is adjusted with mapIndexed.
+package cusoon.model
+
+fun isValidAbn(abn: String): Boolean {
+    if (!Regex("[0-9]{11}").matches(abn)) return false
+    val weights = listOf(10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19)
+    val digits = abn.map { it.digitToInt() }.mapIndexed { i, d -> if (i == 0) d - 1 else d }
+    return digits.zip(weights).sumOf { (d, w) -> d * w } % 89 == 0
+}
+
+fun formatAbn(abn: String): String =
+    if (abn.length == 11)
+        "${abn.substring(0, 2)} ${abn.substring(2, 5)} " +
+            "${abn.substring(5, 8)} ${abn.substring(8)}"
+    else abn

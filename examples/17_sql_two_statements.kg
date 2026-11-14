@@ -1,0 +1,14 @@
+// A choice of statement is an if/else over two literals: no fragments.
+package example
+
+data class Invoice(val id: Uuid, val number: String, val totalCents: Long?)
+
+fun invoice(tx: Tx, id: Uuid, forUpdate: Boolean): Invoice? =
+    if (forUpdate)
+        tx.queryOne<Invoice>(sql"select id, number, total_cents from invoice where id = $id for update")
+    else
+        tx.queryOne<Invoice>(sql"select id, number, total_cents from invoice where id = $id")
+
+// An aggregate is nullable unless asserted: "n!" says count(*) is never null.
+fun paidCount(tx: Tx): Long =
+    tx.querySingle<Long>(sql"""select count(*) as "n!" from invoice where status = 'paid'""")

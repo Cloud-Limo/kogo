@@ -1,0 +1,22 @@
+// From cusoon2 model/pay.kt, unchanged apart from imports.
+package cusoon.model
+
+import cusoon.invoice.discountedCents
+import cusoon.pricing.Cents
+
+fun jobWorth(booking: Booking, extras: List<BookingExtraCharge>, card: Boolean): Cents? =
+    booking.price?.let { price ->
+        val total = price.amount + extras.sumOf { it.amount }
+        if (card) discountedCents(total, autoChargeDiscount) else total
+    }
+
+fun shareOf(cents: Cents, percent: Int): Cents = cents * percent / 100
+
+fun supplierPay(worth: Cents?, sharePercent: Int, fixedPayCents: Cents?): Cents? =
+    fixedPayCents ?: worth?.let { shareOf(it, sharePercent) }
+
+fun Booking.supplierPay(extras: List<BookingExtraCharge>): Cents? {
+    val share = sharePercentWhenGiven ?: return null
+    val card = hadCardWhenGiven == true && stripeCardId != null
+    return supplierPay(jobWorth(this, extras, card), share, fixedPayCents)
+}

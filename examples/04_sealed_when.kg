@@ -1,0 +1,13 @@
+// A sealed interface and an exhaustive when. Removing a branch is a compile error.
+package example
+
+sealed interface Outcome<out T> {
+    data class Ok<T>(val value: T) : Outcome<T>
+    data class Refused(val message: String) : Outcome<Nothing>
+}
+
+fun describe(outcome: Outcome<Int>): String =
+    when (outcome) {
+        is Outcome.Ok -> "ok ${outcome.value}"
+        is Outcome.Refused -> "refused: ${outcome.message}"
+    }

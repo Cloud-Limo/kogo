@@ -1,0 +1,12 @@
+// execute gives the rows affected; a list binds to = any(...).
+package example
+
+fun accountFees(tx: Tx, invoiceIds: List<Uuid>, reference: String, at: Instant) {
+    val updated =
+        tx.execute(sql"""
+            update invoice
+            set platform_fee_accounted_at = $at, platform_fee_reference = $reference
+            where id = any($invoiceIds) and platform_fee_accounted_at is null
+        """)
+    check(updated == invoiceIds.size) { "The eligible fees changed before they were recorded" }
+}

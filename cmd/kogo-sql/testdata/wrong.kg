@@ -1,4 +1,4 @@
-// Four statements Postgres rejects, and a literal that never closes.
+// Five statements Postgres rejects, and a literal that never closes.
 package wrong
 
 fun misspeltColumn(tx: Tx, id: Uuid): String? =
@@ -19,6 +19,9 @@ fun mismatchedJoin(tx: Tx, personId: Uuid): List<Uuid> =
         from business b
         join admin_grant g on g.person_id = $personId and g.business_id = b.slug
     """)
+
+fun lessThanNumber(tx: Tx): List<Uuid> =
+    tx.query<Uuid>(sql"select id from business where legal_name < 42")
 
 fun unclosed(tx: Tx): Int = tx.execute(sql"delete from invite)
 

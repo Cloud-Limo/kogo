@@ -47,7 +47,7 @@ var goName = regexp.MustCompile(`^[A-Z][A-Za-z0-9]*$`)
 func Emit(pkg string, funcs []Func) ([]byte, error) {
 	var body bytes.Buffer
 	types := "" // every Go type used, to know what to import
-	goType := func(t Type, nullable bool) string {
+	use := func(t Type, nullable bool) string {
 		g := goType(t, nullable)
 		types += g + " "
 		return g
@@ -55,7 +55,7 @@ func Emit(pkg string, funcs []Func) ([]byte, error) {
 	for _, f := range funcs {
 		args, call := "", ""
 		for i, p := range f.Stmt.Params {
-			args += fmt.Sprintf(", p%d %s", i+1, goType(p.Type, true))
+			args += fmt.Sprintf(", p%d %s", i+1, use(p.Type, true))
 			call += fmt.Sprintf(", p%d", i+1)
 		}
 		if len(f.Stmt.Columns) == 0 {
@@ -74,8 +74,11 @@ func %s(ctx context.Context, tx pgx.Tx%s) (int64, error) {
 			if !goName.MatchString(field) || used[field] {
 				field = fmt.Sprintf("Column%d", i+1)
 			}
+			for used[field] { // a column may be named column2
+				field += "_"
+			}
 			used[field] = true
-			fmt.Fprintf(&body, "\t%s %s\n", field, goType(c.Type, c.Nullable))
+			fmt.Fprintf(&body, "\t%s %s\n", field, use(c.Type, c.Nullable))
 		}
 		fmt.Fprintf(&body, `}
 

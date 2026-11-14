@@ -50,7 +50,12 @@ func rewrite(literal string) (string, []Param, []edit, error) {
 					"${ needs a closing } and no braces inside: bind the value to a val and write $name"}
 			}
 			j += end + 2
-			params = append(params, Param{Source: strings.TrimSpace(literal[i+2 : j-1]), Offset: i})
+			source := strings.TrimSpace(literal[i+2 : j-1])
+			if source == "" {
+				return "", nil, nil, &Error{i, "sql-parameter-syntax",
+					"${} needs an expression between the braces, as in ${row.id}"}
+			}
+			params = append(params, Param{Source: source, Offset: i})
 			n = len(params)
 		case isNameByte(c) && (c < '0' || c > '9'):
 			for j < len(literal) && isNameByte(literal[j]) {

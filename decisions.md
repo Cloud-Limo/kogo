@@ -60,7 +60,8 @@ Each entry: what was decided, why, and what would reopen it.
   the parser reads it. There is no way to write the text `$name`, and so no tagged dollar
   quoting.
 - **The emitted Go is a shape for the emitter to replace.** One function per literal over a
-  `pgx.Tx`, returning `([]Row, error)` or the rows affected. The row count rules of the five
+  `pgx.Tx`, returning `([]Row, error)` or the rows affected, named `Q<path>L<line>C<column>`
+  with `_2`, `_3` added when two paths map to one Go name. The row count rules of the five
   calls and turning an error into a panic belong to the emitter, which knows the call. Every
   scalar parameter is a pointer, since without the checker nothing says which arguments are
   `T?`. `Uuid` is `[16]byte`, `Decimal`, `LocalDate`, `LocalTime` and `Duration` are pgx's
@@ -73,7 +74,16 @@ Each entry: what was decided, why, and what would reopen it.
   that reads no Kogo, so it also finds a literal inside a comment or a string.
 - **Errors** are one JSON object a line with a code such as `sql-rejected`; the command exits
   0 when all pass, 1 when a literal fails and 2 when it could not run. Postgres's message is
-  kept, with its hint and SQLSTATE, and `$1` spelt as the literal spells it.
+  kept, with its detail, hint and SQLSTATE, and `$1` spelt as the literal spells it.
+- **A parameter Postgres does not see is found by preparing again.** A `$name` inside a quoted
+  string or a comment is not a parameter to Postgres, which then refuses the statement as
+  unable to type it, the same refusal as for a parameter it sees but cannot type. Each
+  parameter so refused is declared `text` and the statement prepared again; the parse tree
+  then shows whether the parameter is referred to. Postgres raises that refusal only once the
+  rest of the statement is sound, so a different refusal on the second try means the declared
+  type was used and the parameter seen. Not taken: lexing the SQL for quotes and comments
+  (dollar quoting, `E''` strings and nested comments are Postgres's to know, principle 1).
+  Reopen if the extra round trip, one per such parameter, shows in check time.
 
 ## Spec gaps found by the leakage ports, unresolved
 

@@ -91,8 +91,7 @@ func (c *Checker) Check(ctx context.Context, literal string) (*Statement, error)
 	if err != nil {
 		return nil, err
 	}
-	c.tree = ""
-	sd, err := c.conn.PgConn().Prepare(ctx, "", sql, nil)
+	sd, untyped, err := c.prepare(ctx, sql, len(params))
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		return nil, rejected(pgErr, sql, params, edits)
@@ -100,10 +99,16 @@ func (c *Checker) Check(ctx context.Context, literal string) (*Statement, error)
 		return nil, err
 	}
 	query := parseTree(c.tree) // before a catalog query replaces it
-	if seen := len(sd.ParamOIDs); seen < len(params) {
-		p := params[seen]
-		return nil, &Error{p.Offset, "sql-parameter-syntax", fmt.Sprintf(
-			"Postgres does not see %s as a parameter: it is inside a quoted string or a comment", spelling(p))}
+	seen := map[int]bool{}
+	query.params(seen)
+	for i, p := range params {
+		if !seen[i+1] {
+			return nil, &Error{p.Offset, "sql-parameter-syntax", fmt.Sprintf(
+				"Postgres does not see %s as a parameter: it is inside a quoted string or a comment", spelling(p))}
+		}
+	}
+	if untyped != nil {
+		return nil, rejected(untyped, sql, params, edits)
 	}
 	for i := range params {
 		if params[i].Type, err = c.typeOf(ctx, sd.ParamOIDs[i]); err != nil {
@@ -133,6 +138,41 @@ func (c *Checker) Check(ctx context.Context, literal string) (*Statement, error)
 	return st, nil
 }
 
+// prepare asks Postgres to prepare a statement of n parameters.
+// Postgres cannot type a parameter it does not see, as one inside a
+// quoted string, so each one it cannot type is declared text and the
+// statement prepared again, for the parse tree to tell an unseen
+// parameter from an untyped one. Postgres raises that refusal only
+// once the rest of the statement is sound, so a later refusal is due
+// to the declared type and the parameter was seen. untyped is the
+// first such refusal, to report when the parameter was seen.
+func (c *Checker) prepare(ctx context.Context, sql string, n int) (
+	sd *pgconn.StatementDescription, untyped *pgconn.PgError, err error) {
+	oids := make([]uint32, n) // 0: Postgres infers the type
+	for {
+		c.tree = ""
+		sd, err = c.conn.PgConn().Prepare(ctx, "", sql, oids)
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) {
+			return sd, untyped, err
+		}
+		k := 0
+		if pgErr.Code == "42P18" { // indeterminate datatype
+			k, _ = strconv.Atoi(strings.TrimPrefix(numbered.FindString(pgErr.Message), "$"))
+		}
+		if k < 1 || k > n || oids[k-1] != 0 {
+			if untyped != nil {
+				pgErr = untyped
+			}
+			return nil, nil, pgErr
+		}
+		if untyped == nil {
+			untyped = pgErr
+		}
+		oids[k-1] = 25 // text
+	}
+}
+
 func spelling(p Param) string {
 	if strings.IndexFunc(p.Source, func(r rune) bool { return r > 127 || !isNameByte(byte(r)) }) < 0 {
 		return "$" + p.Source
@@ -146,8 +186,10 @@ var numbered = regexp.MustCompile(`\$\d+`)
 // names, with the parameters spelt as the literal spells them.
 func rejected(e *pgconn.PgError, sql string, params []Param, edits []edit) *Error {
 	msg := e.Message
-	if e.Hint != "" {
-		msg += ". " + e.Hint
+	for _, more := range []string{e.Detail, e.Hint} {
+		if more != "" {
+			msg = strings.TrimSuffix(msg, ".") + ". " + more
+		}
 	}
 	code := "sql-rejected"
 	if e.Code == "42P18" { // indeterminate datatype
@@ -158,6 +200,9 @@ func rejected(e *pgconn.PgError, sql string, params []Param, edits []edit) *Erro
 		if chars++; chars == int(e.Position) {
 			at = origin(edits, i)
 		}
+	}
+	if int(e.Position) == chars+1 { // just past the end, as for "at end of input"
+		at = origin(edits, len(sql))
 	}
 	msg = numbered.ReplaceAllStringFunc(msg, func(s string) string {
 		n, _ := strconv.Atoi(s[1:])

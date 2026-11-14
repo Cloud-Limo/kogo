@@ -83,6 +83,22 @@ func (r *reader) value() *node {
 	return &node{atom: t}
 }
 
+// params records the number of each parameter the tree refers to.
+func (n *node) params(seen map[int]bool) {
+	if n == nil {
+		return
+	}
+	if n.tag == "PARAM" {
+		seen[n.num("paramid")] = true
+	}
+	for _, f := range n.fields {
+		f.params(seen)
+	}
+	for _, v := range n.list {
+		v.params(seen)
+	}
+}
+
 func (n *node) field(name string) *node {
 	if n == nil {
 		return nil

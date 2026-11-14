@@ -81,9 +81,13 @@ func TestWrongStatements(t *testing.T) {
 		`10:26 sql-rejected operator does not exist: text = integer`,
 		`14:84 sql-rejected invalid input value for enum invoice_status: "payed"`,
 		`20:73 sql-rejected operator does not exist: uuid = citext`,
-		`23:40 sql-unterminated this sql literal has no closing quote`,
+		`24:65 sql-rejected operator does not exist: text < integer`,
+		`26:40 sql-unterminated this sql literal has no closing quote`,
 	}
 	_, lines, code := kogoSQL(t, "check", "testdata")
+	if !strings.Contains(lines[4], "text < integer") {
+		t.Errorf("a message is escaped: %s", lines[4])
+	}
 	if code != 1 || len(lines) != len(want) {
 		t.Fatalf("exit %d with %d lines, want 1 with %d:\n%s", code, len(lines), len(want), strings.Join(lines, "\n"))
 	}
@@ -133,5 +137,17 @@ paid invoices: 1
 `
 	if err != nil || string(out) != want {
 		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)
+	}
+}
+
+func TestFuncNamesAreDistinct(t *testing.T) {
+	used := map[string]bool{}
+	seen := map[string]bool{}
+	for _, file := range []string{"a-b", "a_b", "sub/x", "sub_x"} {
+		name := funcName(file, 3, 10, used)
+		if seen[name] {
+			t.Errorf("%s is named %s, as another file's literal is", file, name)
+		}
+		seen[name] = true
 	}
 }

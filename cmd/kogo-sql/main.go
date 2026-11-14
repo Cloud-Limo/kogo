@@ -46,9 +46,32 @@ type named struct {
 	Type string `json:"type"` // as Kogo writes it: List<Uuid>, String?
 }
 
+// encoder writes JSON as it reads: List<Uuid>, not List\u003cUuid\u003e.
+func encoder(w io.Writer) *json.Encoder {
+	e := json.NewEncoder(w)
+	e.SetEscapeHTML(false)
+	return e
+}
+
+var nonWord, wordByte = regexp.MustCompile(`\W`), regexp.MustCompile(`\w`)
+
+// funcName names the Go function of the literal at line and column of
+// a file, rel being its path from the directory without .kg. Mapping
+// the path to a Go name can make two files' names alike; used holds
+// the names given, and a name already given gets a number added.
+func funcName(rel string, line, column int, used map[string]bool) string {
+	base := fmt.Sprintf("Q%sL%dC%d", nonWord.ReplaceAllString(rel, "_"), line, column)
+	name := base
+	for n := 2; used[name]; n++ {
+		name = fmt.Sprintf("%s_%d", base, n)
+	}
+	used[name] = true
+	return name
+}
+
 func run(args []string, stdout, stderr io.Writer) int {
 	fatal := func(code string, err error) int {
-		json.NewEncoder(stderr).Encode(diagnostic{Code: code, Message: err.Error()})
+		encoder(stderr).Encode(diagnostic{Code: code, Message: err.Error()})
 		return 2
 	}
 	emit := len(args) == 3 && args[0] == "emit"
@@ -62,40 +85,41 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	defer checker.Close(ctx)
 
-	out, faults := json.NewEncoder(stdout), json.NewEncoder(stdout)
+	out, faults := encoder(stdout), encoder(stdout)
 	if emit {
-		faults = json.NewEncoder(stderr)
+		faults = encoder(stderr)
 	}
-	out.SetEscapeHTML(false) // List<Uuid>, not List\u003cUuid\u003e
 	var funcs []sqlpass.Func
+	names := map[string]bool{}
 	failed := false
 	err = filepath.WalkDir(args[1], func(file string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(file, ".kg") {
 			return err
 		}
 		bytes, err := os.ReadFile(file)
+		if err != nil {
+			return err
+		}
 		src := string(bytes)
 		for _, lit := range find(src) {
-			var st *sqlpass.Statement
-			if err == nil {
-				st, err = checker.Check(ctx, lit.body)
-			}
 			line, column := position(src, lit.at)
-			var fault *sqlpass.Error
-			switch {
-			case lit.open:
+			if lit.open {
 				failed = true
 				faults.Encode(diagnostic{file, line, column, "sql-unterminated", "this sql literal has no closing quote"})
+				continue
+			}
+			st, err := checker.Check(ctx, lit.body)
+			var fault *sqlpass.Error
+			switch {
 			case errors.As(err, &fault):
-				failed, err = true, nil
+				failed = true
 				line, column = position(src, lit.text+fault.Offset)
 				faults.Encode(diagnostic{file, line, column, fault.Code, fault.Message})
 			case err != nil:
 				return err
 			case emit:
-				name, _ := filepath.Rel(args[1], strings.TrimSuffix(file, ".kg"))
-				name = regexp.MustCompile(`\W`).ReplaceAllString(name, "_")
-				funcs = append(funcs, sqlpass.Func{Name: fmt.Sprintf("Q%sL%dC%d", name, line, column), Stmt: st})
+				rel, _ := filepath.Rel(args[1], strings.TrimSuffix(file, ".kg"))
+				funcs = append(funcs, sqlpass.Func{Name: funcName(rel, line, column, names), Stmt: st})
 			default:
 				sig := signature{file, line, column, []named{}, []named{}}
 				for _, p := range st.Params {
@@ -111,7 +135,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 				out.Encode(sig)
 			}
 		}
-		return err
+		return nil
 	})
 	if err != nil {
 		return fatal("sql-check", err)
@@ -148,7 +172,7 @@ func find(src string) []literal {
 		}
 		at += i
 		i = at + len(`sql"`)
-		if at > 0 && regexp.MustCompile(`\w`).MatchString(src[at-1:at]) {
+		if at > 0 && wordByte.MatchString(src[at-1:at]) {
 			continue // the end of a longer name
 		}
 		quote := `"`

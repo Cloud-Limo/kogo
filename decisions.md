@@ -47,6 +47,40 @@ Each entry: what was decided, why, and what would reopen it.
   `select exists(...)` refuses `insert ... returning` and changes `for update`. pgx still
   drains the remaining rows, so Postgres produces them all: write `limit 1` where there may
   be many. Reopen if that cost shows up in a port.
+- **Outer-join nullability is read from Postgres's own parse tree** (15 Nov 2026). The
+  checker's session sets
+  `debug_print_parse` and `client_min_messages = log`, so preparing a statement also returns
+  the analysed tree as a notice. In it Postgres marks every column reference with the outer
+  joins and grouping sets that can null it (`varnullingrels`), which is section 10.5's rule
+  computed by Postgres, not by us. Nothing is written to the database. Not taken: reading the
+  plan as sqlx does. A spike of it over eight statements (not kept) called two columns non-null
+  that can be null, a left-joined column selected through a materialized CTE and a `rollup`
+  column, and each fix would be a rule of ours about plans. It got one right that the tree
+  does not: a `where` that excludes the null rows, which the planner turns into an inner join.
+  Also not taken: a cgo parser (build speed, and its raw tree has no names resolved, so we would
+  redo the analysis); our own parser (principle 4). Costs: the tree is an undocumented text
+  format tied to the major version, so the checker refuses Postgres before 18 (17 does not mark
+  grouping sets, 15 has no marks); and each check also writes the tree to the server's log.
+  A statement that comes back without a tree stops the check with an error: passing every
+  column as nullable would hide that the session, through a pooler say, lost its settings.
+  Where it stops is spec 10.5: a reference is followed through a subquery in `from` and a
+  `group by`, and no further. Reopen when a Postgres release changes the tree (`TestSignatures`
+  fails) or when `"name!"` on CTE columns becomes a habit (following a CTE is about 15 lines).
+- **The module stays `module kogo` for now** (15 Nov 2026). Everything planned builds on
+  one machine, where a local override reaches it, and the rename to the remote's path is a
+  search and replace. The emitter keeps the import path of the prelude's Go in one place,
+  so the rename is one line there. Not taken: renaming at once, which collides with the
+  branches in flight. Reopen when emitted Go must build where a local override cannot
+  reach (CI, another machine), or when the repo's home changes.
+- **An application may have binding files of its own** (15 Nov 2026), in a directory it
+  names to the compiler; the Go behind them lives with the application. Only the prelude
+  may declare a binding today, and a Stripe client cannot go there (principle 8). Not
+  taken: every binding in the prelude; or none for applications, with outbound calls
+  written in Kogo over a general HTTP handle, which means signing, JSON and retries in a
+  language built for none of them. Accepted cost: a binding is Go the checker cannot see
+  into, so a careless one can bring in the hidden state section 7 rules out. Not built:
+  no example makes an outbound call. Build it with the handle design for outbound calls
+  (see the gaps below) when a port first needs one.
 - **The prelude's signatures are Kogo declarations, read by the checker like any other
   source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
@@ -188,24 +222,6 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken building the SQL pass (DEV-818), not yet discussed
 
-- **Outer-join nullability is read from Postgres's own parse tree.** The checker's session sets
-  `debug_print_parse` and `client_min_messages = log`, so preparing a statement also returns
-  the analysed tree as a notice. In it Postgres marks every column reference with the outer
-  joins and grouping sets that can null it (`varnullingrels`), which is section 10.5's rule
-  computed by Postgres, not by us. Nothing is written to the database. Not taken: reading the
-  plan as sqlx does. A spike of it over eight statements (not kept) called two columns non-null
-  that can be null, a left-joined column selected through a materialized CTE and a `rollup`
-  column, and each fix would be a rule of ours about plans. It got one right that the tree
-  does not: a `where` that excludes the null rows, which the planner turns into an inner join.
-  Also not taken: a cgo parser (build speed, and its raw tree has no names resolved, so we would
-  redo the analysis); our own parser (principle 4). Costs: the tree is an undocumented text
-  format tied to the major version, so the checker refuses Postgres before 18 (17 does not mark
-  grouping sets, 15 has no marks); and each check also writes the tree to the server's log.
-  A statement that comes back without a tree stops the check with an error: passing every
-  column as nullable would hide that the session, through a pooler say, lost its settings.
-  Where it stops is spec 10.5: a reference is followed through a subquery in `from` and a
-  `group by`, and no further. Reopen when a Postgres release changes the tree (`TestSignatures`
-  fails) or when `"name!"` on CTE columns becomes a habit (following a CTE is about 15 lines).
 - **A name is one parameter, an expression one per occurrence.** `$active` twice is `$1` twice,
   so Postgres types it once and the cast in 10.6's idiom is optional; `${newId()}` twice is
   two values, as a string template would evaluate it. `${...}` may not contain braces: the
@@ -451,5 +467,8 @@ Each entry: what was decided, why, and what would reopen it.
 - No mapping for composite types (`charge`).
 - `db.tx` cannot finish and roll back (the fees dry run).
 - No typed way to turn a named constraint violation into an expected failure.
+- Outbound calls have no design: section 13 binds HTTP as a global, section 7 says such
+  calls arrive as parameters, and the request's context rides in handles. An application's
+  own binding files wait on it.
 - `Console`, `Decimal` and the text form of dates and instants have no stated members; the
   prelude's declarations (spec 13) are where they will be stated.

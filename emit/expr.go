@@ -433,7 +433,7 @@ func (e *emitter) call(at syntax.Node, c *check.Call, recv *operand, rt check.Ty
 		switch {
 		case len(c.Args[i]) > 0 || pd != nil && pd.Vararg:
 		case f.Kind == check.Constructor:
-			ops = append(ops, operand{code: e.value(pd.Default, pt), late: true})
+			ops = append(ops, operand{code: e.atCall(f.TypeParams, c.TypeArgs, func() string { return e.value(pd.Default, pt) }), late: true})
 		default: // the fun gives its parameter the default
 			ops = append(ops, operand{code: "nil"})
 		}
@@ -466,6 +466,24 @@ func (e *emitter) call(at syntax.Node, c *check.Call, recv *operand, rt check.Ty
 		}
 	}
 	return e.ordered(ops, result, build), result
+}
+
+// atCall gives the Go that write makes of a declaration's own code
+// written at a call of it, such as a constructor's default: each of
+// its type parameters names the Go type of the call's type argument.
+func (e *emitter) atCall(tps []*check.TypeParam, args []check.Type, write func() string) string {
+	for i, tp := range tps {
+		name, ok := e.fn.names[tp]
+		e.fn.names[tp] = e.typ(args[i])
+		defer func() {
+			if ok {
+				e.fn.names[tp] = name
+			} else {
+				delete(e.fn.names, tp)
+			}
+		}()
+	}
+	return write()
 }
 
 // copied writes x.copy(...): the value, with each property that the

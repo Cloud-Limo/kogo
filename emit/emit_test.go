@@ -523,6 +523,33 @@ fun sums(): String {
 `)
 }
 
+// A constructor's default is written at the call, with the call's
+// type arguments for the class's type parameters.
+func TestGenericDefault(t *testing.T) {
+	expect(t, [][2]string{
+		{"t.Page1()", "Page(items=[], n=2)"},
+		{"t.Page2()", "Page(items=[a], n=0)"},
+	}, `package t
+
+data class Page<T>(val items: List<T> = listOf(), val n: Int = 0)
+
+fun page1(): Page<String> = Page(n = 2)
+fun page2(): Page<String> = Page(listOf("a"))
+`)
+}
+
+// A type parameter without a Go name in scope is the emitter's own
+// mistake: it stops, rather than write a type with no name.
+func TestForeignTypeParam(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("a type parameter with no Go name gave a type")
+		}
+	}()
+	e := &emitter{fn: &scope{names: map[any]string{}, used: map[string]bool{}}}
+	t.Error(e.typ(&check.TypeParam{Name: "T"}))
+}
+
 // A panic's trace names the Kogo file and line (principle 5): the
 // line of a statement, and the line of a call that is further down
 // than the statement begins.

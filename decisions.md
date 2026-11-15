@@ -642,6 +642,10 @@ Each entry: what was decided, why, and what would reopen it.
   `NaN` and `0.0` is not equal to `-0.0`. Between two expressions of type `Double` it is
   Go's `==`, which is IEEE's, as in Kotlin. A function is equal to nothing, itself
   included, where Kotlin compares references: Go cannot.
+- **A constructor's default is written at the call with the call's type arguments**: for
+  as long as it is written, each type parameter of the class names the Go type of its
+  argument. A type parameter with no Go name where it is written stops the emitter: it is
+  the emitter's mistake, never Go with a name missing.
 - **Evaluation order.** Go orders calls left to right and nothing else, so what must be
   ordered is a call: a read of a local `var` (`rt.Val`), since a lambda called later in
   the expression may assign it, and `/` and `%` (`rt.Div`, `rt.Rem`), which panic. A

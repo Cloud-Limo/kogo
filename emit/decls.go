@@ -138,6 +138,7 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 			md := m.Decl.(*syntax.FunDecl)
 			if md.TypeParams != nil || slices.ContainsFunc(md.Params, func(p *syntax.Param) bool { return p.Default != nil }) {
 				e.notYet(md, "an interface's fun with type parameters or a default value", "pass the value, or make it a top-level fun")
+				continue
 			}
 			var ps []check.Type
 			for _, p := range m.Params {

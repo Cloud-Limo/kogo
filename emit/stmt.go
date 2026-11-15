@@ -97,6 +97,7 @@ func (e *emitter) stmt(s syntax.Stmt) {
 		f := e.info.Funcs[s]
 		if s.TypeParams != nil {
 			e.notYet(s, "a local fun with type parameters", "declare it at the top level")
+			return
 		}
 		name := e.local(f, f.Name)
 		params, defaults := e.params(s, f)

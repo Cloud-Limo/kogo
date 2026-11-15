@@ -30,7 +30,11 @@ func (e *emitter) typ(t check.Type) string {
 		}
 		return "*" + e.typ(t.Elem)
 	case *check.TypeParam:
-		return e.fn.names[t]
+		name, ok := e.fn.names[t]
+		if !ok {
+			panic("emit: the type parameter " + t.Name + " has no Go name here")
+		}
+		return name
 	case *check.FuncType:
 		return "func(" + e.typs(t.Params) + ") " + e.typ(t.Result)
 	case *check.Named:

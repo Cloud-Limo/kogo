@@ -128,7 +128,7 @@ func constant(x syntax.Expr) bool {
 // function called on the spot, whose branches return.
 func (e *emitter) wrap(x syntax.Expr) string {
 	t := e.info.Types[x]
-	body := e.capture(func() {
+	body := e.inner(func() {
 		e.into(x, dest{ret, "", t})
 		e.w(`panic("unreachable")`)
 	})
@@ -238,7 +238,7 @@ func (e *emitter) lambda(l *syntax.Lambda) string {
 			destructured = append(destructured, func() { e.parts(vars, t, ft.Params[i]) })
 		}
 	}
-	body := e.capture(func() {
+	body := e.inner(func() {
 		for _, declare := range destructured {
 			declare()
 		}
@@ -400,7 +400,7 @@ func (e *emitter) ordered(ops []operand, result check.Type, build func(codes []s
 		return build(codes)
 	}
 	slices.SortFunc(written, func(i, j int) int { return first(ops[i].x).Offset - first(ops[j].x).Offset })
-	body := e.capture(func() {
+	body := e.inner(func() {
 		for _, i := range written {
 			t := e.temp()
 			e.w("%s := %s", t, codes[i])
@@ -563,7 +563,7 @@ func (e *emitter) copied(c *check.Call, recv string, t check.Type) string {
 		}
 	}
 	slices.SortFunc(args, func(a, b syntax.Expr) int { return first(a).Offset - first(b).Offset })
-	body := e.capture(func() {
+	body := e.inner(func() {
 		e.w("%s := %s", tmp, recv)
 		for _, a := range args {
 			e.w("%s.%s = %s", tmp, export(field[a].Name), e.value(a, check.Subst(field[a].Type, n.Decl.Params, n.Args)))

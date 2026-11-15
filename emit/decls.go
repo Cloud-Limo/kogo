@@ -26,16 +26,16 @@ func (e *emitter) decl(d syntax.Decl) {
 			recv = "this_ " + e.typ(f.Receiver) + ", "
 		}
 		params, defaults := e.params(d, f)
-		e.w("func %s%s(%s%s) %s {", e.names[f], tps, recv, params, e.typ(f.Result))
+		e.open("func %s%s(%s%s) %s {", e.names[f], tps, recv, params, e.typ(f.Result))
 		e.body(d, f, defaults)
 	case *syntax.ValDecl:
 		if f := e.info.Funcs[d]; f != nil { // an extension val
 			tps, _ := e.typeParams(f.TypeParams)
-			e.w("func %s%s(this_ %s) %s {", e.names[f], tps, e.typ(f.Receiver), e.typ(f.Result))
+			e.open("func %s%s(this_ %s) %s {", e.names[f], tps, e.typ(f.Receiver), e.typ(f.Result))
 			e.this, e.result = f.Receiver, f.Result
 			e.into(d.Getter, dest{ret, "", f.Result})
 			e.end(f.Result)
-			e.w("}")
+			e.shut("}")
 		} else if v := e.info.Vars[d][0]; true {
 			e.w("var %s %s = %s", e.names[v], e.typ(v.Type), e.value(d.Value, v.Type))
 		}
@@ -61,11 +61,11 @@ func (e *emitter) params(d *syntax.FunDecl, f *check.Func) (params string, defau
 			if arg, ok := late[i]; ok {
 				name := e.local(v, v.Name)
 				e.w("var %s %s", name, e.typ(v.Type))
-				e.w("if %s != nil {", arg)
+				e.open("if %s != nil {", arg)
 				e.w("%s = *%s", name, arg)
-				e.w("} else {")
+				e.turn("} else {")
 				e.into(d.Params[i].Default, dest{set, name, v.Type})
-				e.w("}")
+				e.shut("}")
 			}
 		}
 	}
@@ -90,7 +90,7 @@ func (e *emitter) body(d *syntax.FunDecl, f *check.Func, defaults func()) {
 		e.block(d.Body, dest{})
 	}
 	e.end(f.Result)
-	e.w("}")
+	e.shut("}")
 }
 
 // end writes the last statement of a Go function. Go need not agree
@@ -129,7 +129,7 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 		if td.Supers != nil || out && len(td.Props)+len(td.Methods) > 0 {
 			e.notYet(d, "an interface that implements another, or has members and an out type parameter", "declare the members on each data class")
 		}
-		e.w("type %s%s interface {", name, tps)
+		e.open("type %s%s interface {", name, tps)
 		for _, v := range td.Props {
 			e.w("%s() %s", claim(v.Decl, "Get"+export(v.Name)), e.typ(v.Type))
 		}
@@ -140,7 +140,7 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 			}
 			e.w("%s(%s) %s", claim(m.Decl, export(m.Name)), e.typs(ps), e.typ(m.Result))
 		}
-		e.w("}")
+		e.shut("}")
 	case "enum class":
 		e.w("type %s string", name)
 		var all []string
@@ -154,12 +154,12 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 		if d.Kind == "data object" {
 			simple += ",object"
 		}
-		e.w("type %s%s struct {", name, tps)
+		e.open("type %s%s struct {", name, tps)
 		e.w("_ struct{} `kogo:%q`", simple)
 		for _, v := range td.Props {
 			e.w("%s %s `kogo:%q`", claim(v.Decl, export(v.Name)), e.typ(v.Type), v.Name)
 		}
-		e.w("}")
+		e.shut("}")
 		recv := fmt.Sprintf("func (this_ %s%s) ", name, args)
 		getters := map[string]bool{} // one for a val that two interfaces declare
 		for _, s := range td.Supers {
@@ -176,7 +176,7 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 			md := m.Decl.(*syntax.FunDecl)
 			back := e.enter(md)
 			params, defaults := e.params(md, m)
-			e.w("%s%s(%s) %s {", recv, claim(md, export(m.Name)), params, e.typ(m.Result))
+			e.open("%s%s(%s) %s {", recv, claim(md, export(m.Name)), params, e.typ(m.Result))
 			e.body(md, m, defaults)
 			back()
 		}

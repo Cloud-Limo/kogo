@@ -44,6 +44,7 @@ type File struct {
 	Decls   []Decl
 	APIs    []*API // the api lists
 	SQL     []*SQL // every sql literal of the file, in source order
+	Lines   int    // the line the source ends on
 }
 
 // An API is an api list, api name { f, g }: the funs it names as

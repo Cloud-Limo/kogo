@@ -3,8 +3,10 @@
 // expected failures, section 9, SQL and transactions, sections 7
 // and 10, and the table of each api list, section 15.
 //
-// Nobody reads the Go. Each line of it is preceded by a //line
-// directive, so that a Go panic's trace names the Kogo file and line.
+// Nobody reads the Go. Each line of it begins with a /*line*/
+// directive, so that a Go panic's trace names the Kogo file and line,
+// padded so that the code starts at one column, and is indented a tab
+// for each block or closure it is in.
 package emit
 
 import (
@@ -30,14 +32,16 @@ const (
 
 // Emit gives the Go for a checked program: one file for each Kogo
 // package, a.b's at a/b/kogo.go under the directory whose import path
-// is root. It gives errors and no files when the program holds what
-// is not emitted yet, or two declarations that Go cannot tell apart.
-func Emit(info *check.Info, prelude, program []*syntax.File, root string) (map[string][]byte, []*syntax.Error) {
-	_, files, errs := emitAll(info, prelude, program, root)
+// is root and whose path is out: the line directives name each source
+// relative to the directory of the file. It gives errors and no files
+// when the program holds what is not emitted yet, or two declarations
+// that Go cannot tell apart.
+func Emit(info *check.Info, prelude, program []*syntax.File, root, out string) (map[string][]byte, []*syntax.Error) {
+	_, files, errs := emitAll(info, prelude, program, root, out)
 	return files, errs
 }
 
-func emitAll(info *check.Info, prelude, program []*syntax.File, root string) (*emitter, map[string][]byte, []*syntax.Error) {
+func emitAll(info *check.Info, prelude, program []*syntax.File, root, outDir string) (*emitter, map[string][]byte, []*syntax.Error) {
 	e := &emitter{
 		info: info, root: root, names: map[any]string{}, bound: map[string]bool{},
 		nullable: map[*check.TypeParam]bool{}, scanned: map[*check.Func]bool{},
@@ -66,12 +70,20 @@ func emitAll(info *check.Info, prelude, program []*syntax.File, root string) (*e
 		files[pkg] = append(files[pkg], f)
 	}
 	out := map[string][]byte{}
+	outDir, _ = filepath.Abs(outDir)
 	for _, pkg := range pkgs {
-		e.pkg, e.imports = pkg, map[string]string{}
+		dir := strings.ReplaceAll(pkg, ".", "/")
+		e.pkg, e.imports, e.width = pkg, map[string]string{}, 0
+		paths := map[*syntax.File]string{}
+		for _, f := range files[pkg] {
+			abs, _ := filepath.Abs(f.Name)
+			rel, _ := filepath.Rel(filepath.Join(outDir, dir), abs)
+			paths[f] = filepath.ToSlash(rel)
+			e.width = max(e.width, len(fmt.Sprintf("/*line %s:%d*/ ", paths[f], f.Lines)))
+		}
 		body := e.capture(func() {
 			for _, f := range files[pkg] {
-				e.file = f
-				e.path, _ = filepath.Abs(f.Name)
+				e.file, e.path = f, paths[f]
 				for _, d := range f.Decls {
 					e.decl(d)
 				}
@@ -80,7 +92,6 @@ func emitAll(info *check.Info, prelude, program []*syntax.File, root string) (*e
 				}
 			}
 		})
-		dir := strings.ReplaceAll(pkg, ".", "/")
 		name := pkg[strings.LastIndexByte(pkg, '.')+1:]
 		if token.IsKeyword(name) || name == "main" {
 			name += "_kg"
@@ -127,8 +138,10 @@ type emitter struct {
 	pkg     string            // the Kogo package being written
 	imports map[string]string // the alias of each Go package it imports
 	file    *syntax.File
-	path    string      // the file, as a //line directive names it
+	path    string      // the file, as a line directive names it
+	width   int         // the width of the directives and their padding
 	line    int         // the source line of the statement at hand
+	depth   int         // the blocks and closures the Go at hand is in
 	at      syntax.Node // the statement at hand
 	out     *strings.Builder
 	last    string // the line of Go written last
@@ -197,19 +210,45 @@ func first(n syntax.Node) syntax.Pos {
 	return n.At()
 }
 
-// dir is the //line directive that every line of Go begins with.
+// dir is what every line of Go begins with: its line directive,
+// padded to the file's width, and a tab for each level it is in.
 func (e *emitter) dir() string {
+	tabs := strings.Repeat("\t", e.depth)
 	if e.line == 0 {
-		return ""
+		return tabs
 	}
-	return fmt.Sprintf("//line %s:%d\n", e.path, e.line)
+	d := fmt.Sprintf("/*line %s:%d*/", e.path, e.line)
+	return d + strings.Repeat(" ", max(e.width-len(d), 1)) + tabs
 }
 
 // w writes one line of Go.
 func (e *emitter) w(format string, args ...any) {
-	e.out.WriteString(e.dir())
 	e.last = fmt.Sprintf(format, args...)
-	e.out.WriteString(e.last + "\n")
+	e.out.WriteString(e.dir() + e.last + "\n")
+}
+
+// open writes a line that opens a block, and shut one that closes it.
+// turn writes one that does both, as } else { and a case.
+func (e *emitter) open(format string, args ...any) {
+	e.w(format, args...)
+	e.depth++
+}
+
+func (e *emitter) shut(format string, args ...any) {
+	e.depth--
+	e.w(format, args...)
+}
+
+func (e *emitter) turn(format string, args ...any) {
+	e.shut(format, args...)
+	e.depth++
+}
+
+// inner gives the Go that work writes a level in: a closure's body.
+func (e *emitter) inner(work func()) string {
+	e.depth++
+	defer func() { e.depth-- }()
+	return e.capture(work)
 }
 
 // capture gives the Go that work writes.

@@ -99,7 +99,7 @@ func (e *emitter) stmt(s syntax.Stmt) {
 		params, defaults := e.params(s, f)
 		e.w("var %s func(%s) %s", name, params, e.typ(f.Result))
 		e.w("_ = %s", name)
-		e.w("%s = func(%s) %s {", name, params, e.typ(f.Result))
+		e.open("%s = func(%s) %s {", name, params, e.typ(f.Result))
 		e.body(s, f, defaults)
 	case *syntax.Assign:
 		v := e.info.Uses[s.Target].(*check.Var)
@@ -146,7 +146,7 @@ func (e *emitter) stmt(s syntax.Stmt) {
 func (e *emitter) loop(head string, body func()) {
 	l := &loop{label: "L" + e.temp()}
 	e.loops = append(e.loops, l)
-	text := e.capture(body)
+	text := e.inner(body)
 	e.loops = e.loops[:len(e.loops)-1]
 	if l.used {
 		e.w("%s:", l.label)
@@ -174,19 +174,19 @@ func (e *emitter) into(x syntax.Expr, d dest) {
 		}
 		return
 	case *syntax.If:
-		e.w("if %s {", e.expr(x.Cond))
+		e.open("if %s {", e.expr(x.Cond))
 		if x.Else == nil { // a statement, whatever d is: its value is Unit
 			e.block(x.Then, dest{})
-			e.w("}")
+			e.shut("}")
 			if d.kind != drop {
 				e.put(d, e.rt()+".Unit{}", nil)
 			}
 			return
 		}
 		e.block(x.Then, d)
-		e.w("} else {")
+		e.turn("} else {")
 		e.block(x.Else, d)
-		e.w("}")
+		e.shut("}")
 		return
 	case *syntax.When:
 		e.when(x, d)
@@ -222,15 +222,15 @@ func (e *emitter) elvis(x *syntax.Binary, d dest) {
 		return
 	}
 	t := e.temp()
-	e.w("if %s := %s; %s != nil {", t, e.expr(x.X), t)
+	e.open("if %s := %s; %s != nil {", t, e.expr(x.X), t)
 	if _, null := d.typ.(*check.Nullable); null {
 		e.put(d, t, n)
 	} else if d.kind != drop {
 		e.put(d, "(*"+t+")", n.Elem)
 	}
-	e.w("} else {")
+	e.turn("} else {")
 	e.into(x.Y, d)
-	e.w("}")
+	e.shut("}")
 }
 
 // safe writes recv?.member toward d. rest gives the Go for the member
@@ -243,14 +243,14 @@ func (e *emitter) safe(recv syntax.Expr, d dest, rest func(*operand, check.Type)
 		return
 	}
 	t := e.temp()
-	e.w("if %s := %s; %s != nil {", t, e.expr(recv), t)
+	e.open("if %s := %s; %s != nil {", t, e.expr(recv), t)
 	code, typ := rest(&operand{code: "(*" + t + ")"}, n.Elem)
 	e.put(d, code, typ)
 	if d.kind != drop {
-		e.w("} else {")
+		e.turn("} else {")
 		e.put(d, "("+e.typ(d.typ)+")(nil)", nil)
 	}
-	e.w("}")
+	e.shut("}")
 }
 
 // when writes a when toward d as one Go switch over conditions: an
@@ -259,15 +259,16 @@ func (e *emitter) safe(recv syntax.Expr, d dest, rest func(*operand, check.Type)
 func (e *emitter) when(x *syntax.When, d dest) {
 	subject := ""
 	var st check.Type
-	e.w("{")
+	e.open("{")
 	if x.Subject != nil {
 		subject, st = e.temp(), e.info.Types[x.Subject]
 		e.w("%s := %s", subject, e.expr(x.Subject))
 		e.w("_ = %s", subject)
 	}
-	e.w("switch {")
+	e.open("switch {")
 	for _, b := range x.Branches {
 		back := e.enter(b)
+		e.depth-- // a case and its conditions are at the switch's level
 		var conds []string
 		for _, c := range b.Conds {
 			switch {
@@ -286,9 +287,10 @@ func (e *emitter) when(x *syntax.When, d dest) {
 		} else {
 			e.w("case %s:", strings.Join(conds, " || "))
 		}
+		e.depth++
 		e.block(b.Body, d)
 		back()
 	}
-	e.w("}")
-	e.w("}")
+	e.shut("}")
+	e.shut("}")
 }

@@ -65,3 +65,24 @@ func TestPlusDaysRange(t *testing.T) {
 		}()
 	}
 }
+
+// A day starts at its earliest instant in the zone, as java.time's
+// does, also where midnight is skipped or comes twice.
+func TestAtStartOfDay(t *testing.T) {
+	for _, c := range []struct {
+		zone string
+		day  LocalDate
+		want string
+	}{
+		{"Australia/Sydney", LocalDate{2026, 11, 16}, "2026-11-15T13:00:00Z"},
+		{"America/Santiago", LocalDate{2022, 9, 11}, "2022-09-11T04:00:00Z"}, // midnight skipped
+		{"America/Havana", LocalDate{2022, 3, 13}, "2022-03-13T05:00:00Z"},   // midnight skipped
+		{"America/Havana", LocalDate{2022, 11, 6}, "2022-11-06T04:00:00Z"},   // midnight twice
+		{"Africa/Tunis", LocalDate{1977, 9, 24}, "1977-09-23T22:00:00Z"},     // midnight twice, Go takes the second
+		{"UTC", LocalDate{1969, 12, 31}, "1969-12-31T00:00:00Z"},
+	} {
+		if got := rt.ToString(LocalDate_AtStartOfDay(c.day, ZoneId_Of(c.zone))); got != c.want {
+			t.Errorf("%v.atStartOfDay(%s) is %s, want %s", c.day, c.zone, got, c.want)
+		}
+	}
+}

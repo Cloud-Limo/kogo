@@ -13,10 +13,12 @@ package kogo
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -64,6 +66,9 @@ func ListOfNotNull[T any](elements ...*T) List[T] {
 	return out
 }
 
+// EmptyList is never nil, as nothing the prelude builds is.
+func EmptyList[T any]() List[T] { return List[T]{} }
+
 func List_Size[T any](this List[T]) int32 { return int32(len(this)) }
 
 func List_Filter[T any](this List[T], predicate func(T) bool) List[T] {
@@ -78,6 +83,33 @@ func List_Filter[T any](this List[T], predicate func(T) bool) List[T] {
 
 // List_Get is list[i]; an index outside the list is a bug.
 func List_Get[T any](this List[T], index int32) T { return this[index] }
+
+func List_IsNotEmpty[T any](this List[T]) bool { return len(this) > 0 }
+
+func List_FirstOrNull[T any](this List[T]) *T {
+	if len(this) == 0 {
+		return nil
+	}
+	return &this[0]
+}
+
+// List_SingleOrNull is null for an empty list and for one of two or
+// more elements.
+func List_SingleOrNull[T any](this List[T]) *T {
+	if len(this) != 1 {
+		return nil
+	}
+	return &this[0]
+}
+
+func List_ForEach[T any](this List[T], action func(T) rt.Unit) rt.Unit {
+	for _, x := range this {
+		action(x)
+	}
+	return rt.Unit{}
+}
+
+func List_ToSet[T any](this List[T]) Set[T] { return SetOf(this...) }
 
 func List_Map[T, R any](this List[T], transform func(T) R) List[R] {
 	return List_widen(this, transform)
@@ -188,8 +220,37 @@ func isWhitespace(r rune) bool {
 	return unicode.Is(unicode.Z, r) || r >= 0x09 && r <= 0x0D || r >= 0x1C && r <= 0x1F
 }
 
-func String_Trim(this string) string          { return strings.TrimFunc(this, isWhitespace) }
-func String_Lowercase(this string) string     { return strings.ToLower(this) }
+func String_Trim_fun(this string) string { return strings.TrimFunc(this, isWhitespace) }
+
+func String_Trim_Char(this string, char rt.Char) string {
+	return strings.TrimFunc(this, func(r rune) bool { return rune(char) == r })
+}
+
+func String_IsBlank(this string) bool    { return strings.TrimFunc(this, isWhitespace) == "" }
+func String_IsNotBlank(this string) bool { return !String_IsBlank(this) }
+
+func String_IfEmpty(this string, defaultValue func() string) string {
+	if this == "" {
+		return defaultValue()
+	}
+	return this
+}
+
+func String_StartsWith(this, prefix string) bool { return strings.HasPrefix(this, prefix) }
+
+// String_FilterNot keeps the UTF-16 units that predicate refuses.
+func String_FilterNot(this string, predicate func(rt.Char) bool) string {
+	var kept []uint16
+	for _, u := range units(this) {
+		if !predicate(rt.Char(u)) {
+			kept = append(kept, u)
+		}
+	}
+	return string(utf16.Decode(kept))
+}
+
+func String_Lowercase(this string) string { return strings.ToLower(this) }
+
 func String_Contains(this, other string) bool { return strings.Contains(this, other) }
 func String_IsNotEmpty(this string) bool      { return this != "" }
 func String_Substring_Int(this string, startIndex int32) string {
@@ -218,23 +279,103 @@ func Char_DigitToInt(this rt.Char) int32 {
 	panic("Char " + this.String() + " is not a decimal digit")
 }
 
+func Char_IsWhitespace(this rt.Char) bool { return isWhitespace(rune(this)) }
+
 // A Regex is RE2, as Go's is; two of one pattern are equal.
 type Regex struct {
-	Pattern string
-	whole   *regexp.Regexp
+	Pattern   string
+	whole, re *regexp.Regexp
 }
 
 func (r Regex) String() string { return r.Pattern }
 
 // Regex_String is the fun Regex(pattern), named apart from the type.
 func Regex_String(pattern string) Regex {
-	return Regex{pattern, regexp.MustCompile(`\A(?:` + pattern + `)\z`)}
+	return Regex{pattern, regexp.MustCompile(`\A(?:` + pattern + `)\z`), regexp.MustCompile(pattern)}
 }
 
 func Regex_Matches(this Regex, input string) bool { return this.whole.MatchString(input) }
 
+// String_Replace reads replacement as Java does: $n is
+// group n, ${name} a named group, and a backslash takes the character
+// after it as it is. Go's own expansion differs in each.
+func String_Replace(this string, regex Regex, replacement string) string {
+	var b strings.Builder
+	last := 0
+	for _, m := range regex.re.FindAllStringSubmatchIndex(this, -1) {
+		b.WriteString(this[last:m[0]])
+		expand(&b, regex.re, replacement, this, m)
+		last = m[1]
+	}
+	b.WriteString(this[last:])
+	return b.String()
+}
+
+func expand(b *strings.Builder, re *regexp.Regexp, replacement, s string, m []int) {
+	group := func(n int) {
+		if m[2*n] >= 0 {
+			b.WriteString(s[m[2*n]:m[2*n+1]])
+		}
+	}
+	for i := 0; i < len(replacement); i++ {
+		switch c := replacement[i]; {
+		case c == '\\' && i+1 < len(replacement):
+			i++
+			b.WriteByte(replacement[i])
+		case c == '\\':
+			panic("character to be escaped is missing")
+		case c != '$':
+			b.WriteByte(c)
+		case i+1 < len(replacement) && replacement[i+1] == '{':
+			end := strings.IndexByte(replacement[i:], '}')
+			n := -1
+			if end > 0 {
+				n = re.SubexpIndex(replacement[i+2 : i+end])
+			}
+			if n < 0 {
+				panic("no group in " + strconv.Quote(replacement) + " at " + strconv.Itoa(i))
+			}
+			group(n)
+			i += end
+		case i+1 < len(replacement) && '0' <= replacement[i+1] && replacement[i+1] <= '9':
+			// As Java: the first digit, then each next digit while the
+			// number still names a group.
+			i++
+			n := int(replacement[i] - '0')
+			if n > re.NumSubexp() {
+				panic("no group " + strconv.Itoa(n))
+			}
+			for i+1 < len(replacement) && '0' <= replacement[i+1] && replacement[i+1] <= '9' {
+				next := n*10 + int(replacement[i+1]-'0')
+				if next > re.NumSubexp() {
+					break
+				}
+				n, i = next, i+1
+			}
+			group(n)
+		default:
+			panic("illegal group reference in " + strconv.Quote(replacement))
+		}
+	}
+}
+
 func Int_ToLong(this int32) int64      { return int64(this) }
 func Long_ToDouble(this int64) float64 { return float64(this) }
+
+// A Decimal is a numeric as Postgres wrote it, exactly: "1.50" keeps
+// its scale, and so is not equal to "1.5", as in Java.
+type Decimal struct{ Text string }
+
+func (d Decimal) String() string { return d.Text }
+
+// Decimal_ToDouble is the closest Double, as Java's is.
+func Decimal_ToDouble(this Decimal) float64 {
+	f, err := strconv.ParseFloat(this.Text, 64)
+	if err != nil && !errors.Is(err, strconv.ErrRange) {
+		panic("not a numeric: " + this.Text)
+	}
+	return f
+}
 
 func Long_CoerceAtLeast(this, minimumValue int64) int64 { return max(this, minimumValue) }
 func Long_CoerceAtMost(this, maximumValue int64) int64  { return min(this, maximumValue) }
@@ -268,6 +409,8 @@ func Double_ToInt(this float64) int32 {
 
 func T_Let[T, R any](this T, block func(T) R) R { return block(this) }
 
+func A_To[A, B any](this A, that B) Pair[A, B] { return Pair[A, B]{this, that} }
+
 func T_TakeIf[T any](this T, predicate func(T) bool) *T {
 	if predicate(this) {
 		return &this
@@ -280,6 +423,10 @@ func RequireNotNull[T any](value *T, lazyMessage func() string) T {
 		panic(lazyMessage())
 	}
 	return *value
+}
+
+func CheckNotNull[T any](value *T, lazyMessage func() string) T {
+	return RequireNotNull(value, lazyMessage)
 }
 
 func Require(value bool, lazyMessage func() string) rt.Unit { return Check(value, lazyMessage) }

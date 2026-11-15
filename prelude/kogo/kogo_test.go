@@ -4,6 +4,7 @@ import (
 	"math"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 	"unicode"
@@ -39,7 +40,7 @@ func TestStringUnits(t *testing.T) {
 // Where Kotlin and Go differ, the prelude follows Kotlin.
 func TestAsKotlin(t *testing.T) {
 	// U+0085 is whitespace to Go and not to Kotlin; U+001F the other way.
-	if got := String_Trim("\u001F  a b\t\n\u0085"); got != "a b\t\n\u0085" {
+	if got := String_Trim_fun("\u001F  a b\t\n\u0085"); got != "a b\t\n\u0085" {
 		t.Errorf("trim gives %q", got)
 	}
 	for _, c := range []struct {
@@ -218,4 +219,71 @@ func TestEither(t *testing.T) {
 			t.Errorf("got %s, want %s", c[0], c[1])
 		}
 	}
+}
+
+// What the stage-1 ports call, each giving what Kotlin 2.4 gives.
+func TestPortCalls(t *testing.T) {
+	re := func(p string) Regex { return Regex_String(p) }
+	ws := func(c rt.Char) bool { return Char_IsWhitespace(c) }
+	for _, c := range [][2]string{
+		{String_Replace("a1b22", re(`([a-z])(\d+)`), `<$2\$1>`), "<1$1><22$1>"},
+		{String_Replace("a1b22", re(`(?P<l>[a-z])(\d+)`), `${l}$12`), "aa2bb2"},
+		{String_Replace("Airport Carz Pty Ltd", re(`\bpty\.?\s+ltd\.?$`), ""), "Airport Carz Pty Ltd"},
+		{String_Replace("airport carz pty ltd", re(`\bpty\.?\s+ltd\.?$`), ""), "airport carz "},
+		{String_Trim_Char("--a-b--", '-'), "a-b"},
+		{String_IfEmpty("", func() string { return "e" }) + String_IfEmpty("x", func() string { return "e" }), "ex"},
+		{String_FilterNot("1 2\t3", ws) + String_FilterNot("a😀b", func(c rt.Char) bool { return c == 'b' }), "123a😀"},
+		{rt.ToString(List_SingleOrNull(EmptyList[int32]())) + rt.ToString(List_SingleOrNull(ListOf[int32](1, 2))), "nullnull"},
+		{rt.ToString(List_SingleOrNull(ListOf[int32](3))) + rt.ToString(List_FirstOrNull(ListOf[int32](4, 5))), "34"},
+		{rt.ToString(List_FirstOrNull(EmptyList[int32]())), "null"},
+		{rt.ToString(List_ToSet(ListOf[int32](2, 1, 2, 3))), "[2, 1, 3]"},
+		{rt.ToString(A_To[int32, string](1, "a")), "(1, a)"},
+		{rt.ToString(Decimal{"1.50"}) + " " + rt.ToString(Decimal_ToDouble(Decimal{"1.50"})), "1.50 1.5"},
+		// Go's regexp skips an empty match just after a match, where
+		// Kotlin's gives "-a--c-" (spec.md 12).
+		{String_Replace("abc", re("b*"), "-"), "-a-c-"},
+	} {
+		if c[0] != c[1] {
+			t.Errorf("got %q, want %q", c[0], c[1])
+		}
+	}
+	if !String_IsBlank("  \t") || !String_IsBlank("") || String_IsBlank("\u0085") || !String_IsNotBlank("a ") {
+		t.Error("isBlank is not Kotlin's: whitespace is Unicode's separators and Java's controls")
+	}
+	if !String_StartsWith("+61 4", "+") || String_StartsWith("61", "+") || !List_IsNotEmpty(ListOf(1)) || List_IsNotEmpty(EmptyList[int]()) {
+		t.Error("startsWith or isNotEmpty")
+	}
+	if EmptyList[int]() == nil || !math.IsInf(Decimal_ToDouble(Decimal{"1e400"}), 1) {
+		t.Error("emptyList is nil, or a numeric past Double is not Infinity")
+	}
+	if rt.Equal(Decimal{"1.50"}, Decimal{"1.5"}) || !rt.Equal(Decimal{"1.50"}, Decimal{"1.50"}) {
+		t.Error("a Decimal's == is not Java's, which counts the scale")
+	}
+	var seen []int32
+	List_ForEach(ListOf[int32](1, 2), func(x int32) rt.Unit { seen = append(seen, x); return rt.Unit{} })
+	if !slices.Equal(seen, []int32{1, 2}) {
+		t.Errorf("forEach saw %v", seen)
+	}
+	if got := CheckNotNull(rt.Ptr("x"), func() string { return "" }); got != "x" {
+		t.Errorf("checkNotNull gives %q", got)
+	}
+	for _, c := range []struct{ replacement, panic string }{
+		{"$9", "no group 9"}, {"$x", "illegal group reference"}, {`x\`, "character to be escaped is missing"},
+		{"${y}", "no group"}, {"${l", "no group"},
+	} {
+		func() {
+			defer func() {
+				if p, _ := recover().(string); !strings.Contains(strings.ToLower(p), c.panic) {
+					t.Errorf("replace with %q panics with %q, want %q", c.replacement, p, c.panic)
+				}
+			}()
+			String_Replace("ab", re("(?P<l>a)"), c.replacement)
+		}()
+	}
+	defer func() {
+		if recover() == nil {
+			t.Error("checkNotNull(null) does not panic")
+		}
+	}()
+	CheckNotNull[int](nil, func() string { return "gone" })
 }

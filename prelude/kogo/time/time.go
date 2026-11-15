@@ -104,3 +104,20 @@ func ZonedDateTime_ToLocalDate(this ZonedDateTime) LocalDate {
 	y, m, d := this.local().Date()
 	return LocalDate{int32(y), int32(m), int32(d)}
 }
+
+// LocalDate_AtStartOfDay is the earliest instant of the date in zone,
+// as java.time's: where a change of offset skips midnight, the time
+// the gap ends; where midnight comes twice, the first.
+func LocalDate_AtStartOfDay(this LocalDate, zone ZoneId) Instant {
+	y, m, d := int(this.Year), gotime.Month(this.Month), int(this.Day)
+	t := gotime.Date(y, m, d, 0, 0, 0, 0, zone.loc)
+	if ty, tm, td := t.Date(); ty != y || tm != m || td != d {
+		_, t = t.ZoneBounds()
+	} else if start, _ := t.ZoneBounds(); !start.IsZero() {
+		_, before := start.Add(-1).Zone()
+		if p := gotime.Date(y, m, d, 0, 0, 0, 0, gotime.FixedZone("", before)); p.Before(start) {
+			t = p
+		}
+	}
+	return Instant{t.Unix(), int32(t.Nanosecond())}
+}

@@ -1,0 +1,9 @@
+// Standard input and output, handed to a program as an effect (spec.md
+// 7): what Kotlin's println, print and readln do, as members.
+package kogo.io
+
+external class Console
+
+external fun Console.println(message: String)
+external fun Console.print(message: String)
+external fun Console.readln(): String

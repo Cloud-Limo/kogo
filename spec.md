@@ -689,7 +689,9 @@ a `Double`, a `String` or a `List`, every member is Kotlin's and means
 what Kotlin's means. Where a Kotlin program would reach into Java's
 library, for times or for printing a number, Kogo has a function or a
 type of its own in a package `kogo.<name>`, imported by name as
-`kogo.time` is. So a file's imports show what in it is not Kotlin's.
+`kogo.time` is, and so for input and output, where Kotlin's are
+global functions and Kogo's an effect (section 7). So a file's imports
+show what in it is not Kotlin's.
 `Uuid`, `newId` and `Decimal` are Kogo's own and need no import.
 
 **Collections** (immutable; "changing" one returns a new one).
@@ -727,18 +729,41 @@ all listed here:
 - `lowercase()` maps one character at a time: `"İ".lowercase()` is `"i"`
   where Kotlin's is `"i̇"`, two characters, and a final `Σ` becomes `σ`
   where Kotlin's is `ς`.
+- `replace(regex, text)` skips an empty match that starts where a match
+  ends: `"abc".replace(Regex("b*"), "-")` is `"-a-c-"` where Kotlin's is
+  `"-a--c-"`. The text is read as Kotlin reads it: `$1` and `${name}`
+  are groups, and a backslash takes the next character as it is.
+- `trim(char)` takes one `Char`, where Kotlin's takes any number.
+- A `Decimal` writes the digits Postgres sent, where Java's `BigDecimal`
+  writes an exponent for a small number: `0.0000001` is `1E-7` in
+  Kotlin.
 
 **Numbers.** `coerceAtLeast`, `coerceAtMost`, `coerceIn`, `abs`, `max`,
 `min`, `toInt`, `toLong`, `toDouble`, `toString`. A `Decimal` holds what
-Postgres sent, exactly: it has `toDouble`, `toString`, `==` and
-`< <= > >=`, and no arithmetic in v0.
+Postgres sent, exactly: it has `toDouble` (the closest `Double`),
+`toString` (Postgres's text, as `1.50`), `==` and `< <= > >=`, and no
+arithmetic in v0. Its `==` is Java's `equals`, which counts the scale:
+`1.50 == 1.5` is false.
 
 **Time** (`kogo.time`). `Instant`, `LocalDate` (`plusDays`, `year`,
 `monthValue`, `dayOfMonth`, `atStartOfDay(zone): Instant`), `LocalTime`,
 `ZoneId.of(name)`, `ZonedDateTime` (`instant.atZone(zone)`, `hour`,
 `minute`, `toLocalDate`, `plusSeconds`, `toInstant`), `Duration`
 (`ofDays`, `ofMinutes`, `ofSeconds`), `Clock.now()`. There is no default
-zone: every conversion names its zone.
+zone: every conversion names its zone. `atStartOfDay(zone)` is the
+day's earliest instant in the zone: where midnight is skipped, the end
+of the gap. Each writes itself as `java.time` does, in a template too:
+an `Instant` as `2026-11-15T14:30:00.120Z`, with the fraction in groups
+of three digits and none when it is zero; a `LocalDate` as
+`2026-11-15`; a `ZonedDateTime` as
+`2026-11-16T01:30:00.120+11:00[Australia/Sydney]`, without the seconds
+when they and the fraction are zero.
+
+**Input and output** (`kogo.io`). A `Console` is a program's standard
+input and output, passed to the function that uses it as `Db` is:
+`console.println(text)`, `console.print(text)` and `console.readln()`,
+which gives the next line without its line break and panics past the
+end of the input.
 
 **Text** (`kogo.text`). `plain(value: Double): String` writes a number
 as its shortest digits, with no exponent and no trailing `.0`: `5.0` is
@@ -828,5 +853,5 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `by lazy`, delegation | compute it once and pass it |
 | `vararg`, `*spread` | a `List` |
 | `inline`, `reified`, `operator`, `infix` | a plain function |
-| `println`, `readln` | a `Console` parameter |
+| `println`, `readln` | a `Console` parameter, from `kogo.io` |
 | value classes | `typealias`, in v0 |

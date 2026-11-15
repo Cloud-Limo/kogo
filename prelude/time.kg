@@ -15,3 +15,4 @@ external fun Clock.now(): Instant
 external fun Instant.atZone(zone: ZoneId): ZonedDateTime
 external fun ZonedDateTime.toLocalDate(): LocalDate
 external fun LocalDate.plusDays(daysToAdd: Long): LocalDate
+external fun LocalDate.atStartOfDay(zone: ZoneId): Instant

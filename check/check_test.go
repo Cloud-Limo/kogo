@@ -324,6 +324,8 @@ func TestCalls(t *testing.T) {
 		"fun g(a: Int): Int = a\nfun g(b: String): Int = 0\nfun f(): Int = g(b = \"\")",
 		"fun g(a: Long): Long = a\nfun g(a: String): Long = 0\nfun f(): Long = g(1) + g(-1)",
 		"fun f(xs: List<String>): Long = xs.sumOf { it.length } + xs.sumOf { 1L }",
+		// Types of one name in two packages are not the same type.
+		"package a\ndata class Foo(val n: Int)\n---\npackage b\ndata class Foo(val n: Int)\n---\npackage t\nimport a.Foo\nfun g(x: Foo): Int = 1\n---\npackage t\nimport b.Foo\nfun g(x: Foo): Int = 2",
 		"fun g(a: Long, b: Int = 2, c: () -> Int): Long = a + b + c()\nfun f(): Long = g(1) { 3 } + g(1, c = { 3 }) + g(a = 1, b = 2, c = { 3 })",
 		"fun Int.double(): Int = this * 2\nval Int.half: Int\n    get() = this / 2\nfun Int.f(): Int = double() + half + 1.double() + 2.half",
 		"fun f(xs: List<Int>): Int {\n    fun inner(n: Int): Int = if (n > 0) inner(n - 1) else xs.size\n    return inner(3)\n}",
@@ -357,6 +359,12 @@ func TestCalls(t *testing.T) {
 		{"fun <T> h(xs: List<T>): Int = 1\n‸fun <U> h(ys: List<U>): Int = 2", "duplicate", "fun <T> h(xs: List<T>): Int is already declared"},
 		{"val Int.half: Int\n    get() = this / 2\n---\npackage t\n‸val Int.half: Long\n    get() = 0", "duplicate", "val Int.half: Int is already declared"},
 		{"package kogo.x\nexternal fun Int.twice(): Int\n---\npackage kogo.y\nexternal ‸fun Int.twice(): Long", "duplicate", "fun Int.twice(): Int is already declared in package kogo.x"},
+		{"private fun g(a: Int): Int = a\n---\n‸fun g(a: Int): Long = 0", "duplicate", "fun g(a: Int): Int is already declared"},
+		{"fun <T, U> h(a: T, b: U): Int = 1\n‸fun <U, T> h(a: T, b: U): Int = 2", "duplicate", "fun <T, U> h(a: T, b: U): Int is already declared"},
+		{"interface I {\n    fun card(key: Int): Int\n    ‸fun card(k: Int): Long\n}", "duplicate", "fun card(key: Int): Int is already declared in I"},
+		{"data class P(val a: Int)\n‸fun P(b: Int): Int = b", "duplicate", "the constructor of P takes these parameter types: rename this fun"},
+		// A type that failed to read causes no second error.
+		{"typealias A = ‸Foo\nfun g(a: A): Int = 1\nfun g(b: A): Int = 2", "unknown-name", "Foo"},
 		{"fun f(xs: List<String>): Int = xs.‸sumOf { \"\" }", "no-overload", "no sumOf fits this call with (a lambda giving String)"},
 		{"fun g(a: Int): Int = a\nfun f(): Int = ‸g(1, 2)", "arguments", "g takes 1 arguments, and 2 are written: it is fun g(a: Int): Int"},
 		{"fun g(a: Int): Int = a\nfun f(): Int = ‸g(b = 1)", "arguments", "g has no parameter named b"},

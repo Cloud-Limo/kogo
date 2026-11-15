@@ -569,14 +569,29 @@ Each entry: what was decided, why, and what would reopen it.
 - **`out` is checked by Kotlin's whole rule**, not only a parameter's type (spec 3.2): a
   result or a `val` of type `(T) -> Unit` or `Map<T, Int>` lets the same `null` in, and
   the walk over positions costs the same. The fix the error gives is an extension fun.
-- **Two declarations of one name clash on their kind, receiver and parameter types**,
-  type parameters compared by position (spec 5.2). Parameter names do not separate them,
-  though a call could choose by name: Kotlin refuses the pair, and the emitter would have
-  to tell them apart in Go. Two `private` ones in different files do not clash, as a test
-  of section 2 already had; a fun and an extension `val` of one name do not either. Reopen
-  if the emitter cannot give private overloads in two files their own Go names.
+- **Two declarations of one name clash on their kind, receiver and parameter types**
+  (spec 5.2): a declared type by what it is, not its printed name, and a type parameter by
+  its first use there, so `fun <T, U> h(a: T, b: U)` and `fun <U, T> h(a: T, b: U)` clash.
+  Parameter names do not separate them, though a call could choose by name: Kotlin refuses
+  the pair, and the emitter would have to tell them apart in Go. Two `private` ones in
+  different files do not clash, as a test of section 2 already had; a fun and an extension
+  `val` of one name do not either. A type that failed to read clashes with nothing, so its
+  error is the only one. Reopen if the emitter cannot give private overloads in two files
+  their own Go names.
+- **An interface's funs clash among themselves, and a fun clashes with a constructor**
+  whose type has its name and whose parameter types it has. The second is reported at the
+  fun, before or after the type: the fun can be renamed without renaming the type.
+- **Bindings with a receiver clash across packages whatever their visibility.** A call
+  sees every one of them (spec 13), `internal` or not, so two internal ones of one shape in
+  different packages make the call ambiguous. The review of this PR said to let them pass;
+  that would move the error back to the call.
 - **A data object that cannot implement a `val` keeps the code `override`**, at the
   declaration as the other `override` errors are; only the fix changes.
+- **Not refused yet**: the receiver of a function type, `T.() -> R`, is a place a value
+  is taken, and an `out` type parameter there is not checked. No program can write one
+  (DEV-826; DEV-833 removes the last way in), so there is nothing to refuse. Reopen if
+  receiver function types return. Also `private` or `internal` on a binding with a
+  receiver, which is accepted and hides nothing.
 
 ## Spec gaps found by the leakage ports, unresolved
 

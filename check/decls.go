@@ -344,42 +344,115 @@ func external(d syntax.Decl) bool {
 }
 
 // overloads reports a fun or an extension val with the receiver and
-// parameter types of one declared before it beside it (spec.md 5.2):
-// no call could choose between them. Private ones in two files are
-// not beside each other.
+// parameter types of one declared before it (spec.md 5.2): no call
+// could choose between them. Two private ones in different files do
+// not meet; bindings meet whatever their visibility, as every call
+// sees them. A fun beside a constructor is reported at the fun, and
+// an interface's funs are compared among themselves.
 func (c *checker) overloads() {
 	groups := slices.Collect(maps.Values(c.members))
 	for _, p := range c.pkgs {
-		groups = slices.AppendSeq(groups, maps.Values(p.funcs))
+		for name, fs := range p.funcs {
+			if d := p.types[name]; d != nil && d.Ctor != nil {
+				fs = append([]*Func{d.Ctor}, fs...)
+			}
+			groups = append(groups, fs)
+		}
+		for _, d := range p.types {
+			if strings.HasSuffix(d.Kind, "interface") {
+				groups = slices.AppendSeq(groups, maps.Values(byName(d.Methods)))
+			}
+		}
 	}
 	for _, fs := range groups {
-		for i, f := range fs {
-			j := slices.IndexFunc(fs[:i], func(g *Func) bool {
-				return (f.file == g.file || f.visibility != "private" && g.visibility != "private") && shape(f) == shape(g)
+		seen := map[string][]*Func{}
+		for _, f := range fs {
+			s, ok := shape(f)
+			if !ok {
+				continue
+			}
+			i := slices.IndexFunc(seen[s], func(g *Func) bool {
+				return f.file == g.file || f.visibility != "private" || g.visibility != "private"
 			})
-			if j >= 0 {
-				c.file = f.file
-				c.errorf(f.Decl, "duplicate", "%s is already declared in package %s with this receiver and these parameter types: rename one", describe(fs[j], nil), fs[j].Pkg)
+			seen[s] = append(seen[s], f)
+			if i < 0 {
+				continue
+			}
+			g, where := seen[s][i], "package "+seen[s][i].Pkg
+			if g.Owner != nil {
+				where = g.Owner.Name
+			}
+			c.file = f.file
+			if g.Kind == Constructor {
+				c.errorf(f.Decl, "duplicate", "the constructor of %s takes these parameter types: rename this fun", g.Name)
+			} else {
+				c.errorf(f.Decl, "duplicate", "%s is already declared in %s with this receiver and these parameter types: rename one", describe(g, nil), where)
 			}
 		}
 	}
 }
 
-// shape gives what tells two functions of one name apart: their kind,
-// receiver and parameter types, their type parameters by position.
-func shape(f *Func) string {
-	b := binding{}
-	for i, p := range f.TypeParams {
-		b[p] = &TypeParam{Name: fmt.Sprint("#", i)}
+func byName(fs []*Func) map[string][]*Func {
+	out := map[string][]*Func{}
+	for _, f := range fs {
+		out[f.Name] = append(out[f.Name], f)
 	}
-	s := fmt.Sprint(f.Kind, " ")
+	return out
+}
+
+// shape gives what tells two functions of one name apart: whether
+// they are vals, their receiver and parameter types, each declared
+// type by its identity and each type parameter by its first use.
+// ok is false when one of those types failed to read.
+func shape(f *Func) (s string, ok bool) {
+	var b strings.Builder
+	used := map[*TypeParam]int{}
+	ok = true
+	var put func(Type)
+	put = func(t Type) {
+		switch t := t.(type) {
+		case *TypeParam:
+			n, found := used[t]
+			if !found {
+				n = len(used)
+				used[t] = n
+			}
+			fmt.Fprint(&b, "#", n)
+		case *Nullable:
+			put(t.Elem)
+			b.WriteString("?")
+		case *Named:
+			fmt.Fprintf(&b, "%p<", t.Decl)
+			for _, a := range t.Args {
+				put(a)
+				b.WriteString(",")
+			}
+			b.WriteString(">")
+		case *FuncType:
+			b.WriteString("(")
+			if t.Receiver != nil {
+				put(t.Receiver)
+				b.WriteString(".")
+			}
+			for _, p := range t.Params {
+				put(p)
+				b.WriteString(",")
+			}
+			b.WriteString(")->")
+			put(t.Result)
+		default:
+			ok = false
+		}
+	}
+	fmt.Fprint(&b, f.Kind == Getter, " ")
 	if f.Receiver != nil {
-		s += subst(f.Receiver, b).String()
+		put(f.Receiver)
 	}
 	for _, p := range f.Params {
-		s += ", " + subst(p.Type, b).String()
+		b.WriteString(", ")
+		put(p.Type)
 	}
-	return s
+	return b.String(), ok
 }
 
 func (c *checker) addFunc(f *Func, receiver bool) {

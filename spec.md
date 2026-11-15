@@ -269,10 +269,13 @@ the first.
 
 Two `fun`s, or two extension `val`s, of one name in one package whose
 receiver and parameter types are the same are an error at the second,
-since no call could choose between them. Parameter names, results and
-the names of type parameters do not tell them apart; two `private` ones
-in different files do not meet. Bindings with a receiver are one group
-across packages, as they are in scope everywhere.
+since no call could choose between them. So are two `fun`s of one name
+in an interface, and a `fun` named for a data class with its
+constructor's parameter types, reported at the `fun`. Parameter names,
+results, and the names and order of type parameters do not tell them
+apart; two `private` ones in different files do not meet. Bindings with
+a receiver are one group across packages, whatever their visibility, as
+they are in scope everywhere.
 
 One exception: when the candidates left differ only in what one lambda
 parameter returns, as the prelude's `sumOf` does for `Int`, `Long` and

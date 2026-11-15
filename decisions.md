@@ -756,11 +756,37 @@ Each entry: what was decided, why, and what would reopen it.
   receiver function types return. Also `private` or `internal` on a binding with a
   receiver, which is accepted and hides nothing.
 
+## Taken mapping composite types (DEV-837), not yet discussed
+
+- **A field keeps its column's `NOT NULL` only in a table's whole row**, `b`, followed
+  through a subquery or a `group by` as a column is. A column whose type is a table's row
+  type, a cast as `null::tenant` or a function's result has every field nullable, at any
+  depth: a table's constraints do not cover its row type stored elsewhere. The issue said
+  "a field of a table's row keeps its column's NOT NULL" without the distinction.
+- **Inside a composite, a field that may be null never fills a property that may not**,
+  even in a nullable data class. Postgres sends the absent side of an outer join as NULL,
+  not as a row of nulls (`(,)`), so unlike the prefix form, a null field is a row that is
+  there with a null in it. Reopen if the run-time reading (DEV-832) finds otherwise.
+- **A column of the property's name wins over the prefix form**: `business` fills
+  `val business: Business` whole, and `business_id` beside it is then unused. A scalar
+  column of that name is a type mismatch, not a reason to try the prefix.
+- **A nested data class with no column at all is one error**, saying to select the whole
+  row as `b as business`, and the unused columns are then not reported: under
+  `select b.*, t.*` they are the ones the whole row replaces, and an error for each would
+  bury the fix. Before, it was one error per property.
+- **Refused as `sql-unmapped-type`**: a parameter of a composite type, or one Postgres
+  infers as `record` (`where total = $total`), since there is no way to send a data class;
+  an array of a composite type, deferred with `array_agg(t)`; a composite type with no
+  fields, since no data class has none; one with a field outside 10.4, naming the field.
+  The `record` column keeps the code, with "select from a table, or name the columns".
+- **New codes `sql-field-missing` and `sql-field-unused`**. A field's type and
+  nullability keep `sql-column-type` and `sql-nullable`, said of "field f of column c",
+  without the cast or `"name!"` fix, which Postgres has not for a field.
+- **Not done: reading a composite at run time.** DEV-832 is not done, so the issue leaves
+  it out; `kogo-sql emit` writes no Go type for a composite column.
+
 ## Spec gaps found by the leakage ports, unresolved
 
-- A join returning two whole rows needs every column aliased by hand, and composite types
-  (`charge`) have no mapping. Agreed on 15 Nov 2026 and built in DEV-837: a composite type
-  fills a data class, and a whole row is selected as `b as business`.
 - Outbound calls are handles (above), but their timeouts and retries, workers, and an
   application's own binding files have no design.
 - `Console`, `Decimal` and the text form of dates and instants have no stated members; the

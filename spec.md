@@ -539,6 +539,12 @@ column.
   A nullable nested data class is `null` when all of its columns are null
   (the absent side of an outer join), so a column that may be null fills
   a property of it that may not.
+- A property that is a data class may instead be filled by the one column
+  of its name, of a composite type (10.4). A table's name or alias on its
+  own is its whole row, so whole rows are read from a join as
+  `select b as business, t as storefront from business b left join tenant t on t.business_id = b.id`
+  into `data class Listing(val business: Business, val storefront: Tenant?)`.
+  The prefix form is for chosen columns.
 - Reading a row builds `R` and each data class in it, so it is allowed
   only where each one's constructor may be called (sections 2 and 11).
 - A data class `R` is not written nullable, since a row is never null;
@@ -566,6 +572,16 @@ column.
 | an enum type | the enum of the same constants in `schema.kg` |
 | `T[]` | `List<T>`, or `List<T?>` |
 | a domain | its base type's mapping |
+| a composite type | a data class |
+
+A composite type is a table's row type or one made with `create type`.
+Its fields fill the data class's properties as columns fill a row's
+(10.3): field `legal_name` fills property `legalName`, every property
+must be filled and every field used, and each field's type maps to its
+property's. A parameter cannot be of a composite type, and an array of
+one has no Kogo type. The whole row of a subquery or a CTE, like
+`row(...)`, has the anonymous type `record`, which has none either:
+select from a table, or name the columns.
 
 A parameter's Kogo type must map to the type Postgres infers for it. When
 Postgres cannot infer one, cast it: `$active::boolean`. A parameter or a
@@ -575,15 +591,24 @@ it in the statement.
 ### 10.5 Nullability
 
 - A result column is non-null only when it is a plain reference to a
-  `NOT NULL` column of a table that is not on the nullable side of an
-  outer join. Every other column (expressions, aggregates, outer-joined
-  columns) is nullable.
+  `NOT NULL` column of a table, or to a table's whole row, that is not on
+  the nullable side of an outer join. Every other column (expressions,
+  aggregates, outer-joined columns) is nullable.
+- A composite value is null as a whole, never field by field: the whole
+  row of an outer-joined table is null where the table is absent. Where
+  it is there, a field that may be null fills only a `T?` property. A
+  field of a table's whole row is non-null where the table's column is
+  `NOT NULL`; every field of any other composite value (a column of a
+  composite type, a cast, a function's result) may be null, since
+  Postgres cannot declare a field of a type `NOT NULL`, and a table's
+  constraints do not cover its row type stored elsewhere.
 - The reference may pass through a subquery in `from` or a `group by`.
   A column of a CTE, a view or a `union` is nullable, and so is one
   nulled by a grouping set. A `where` that excludes the null rows of an
   outer join does not make its columns non-null.
 - Override by naming the column `as "name!"` (assert non-null; a null at
-  run time panics) or `as "name?"` (force nullable).
+  run time panics) or `as "name?"` (force nullable). A field has no
+  override: select it as a column of its own.
 - A non-null column may fill a `T?` property. A nullable column filling a
   `T` property is a compile error.
 - A parameter may always be `T?`; it is sent as SQL `NULL`.

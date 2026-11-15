@@ -159,29 +159,46 @@ func outputs(q *node) []*node {
 }
 
 // notNull reports whether expr, an expression of query q, is a plain
-// reference to a NOT NULL column that nothing in the query can null.
-// Postgres marks a reference with the outer joins and grouping sets
-// that null it (varnullingrels); a reference to a subquery's column
-// or a grouped column is followed to what it names.
+// reference to a NOT NULL column, or a table's whole row, that nothing
+// in the query can null.
 func (c *Checker) notNull(ctx context.Context, q, expr *node) (bool, error) {
-	if expr == nil || expr.tag != "VAR" || expr.num("varlevelsup") != 0 ||
-		expr.num("varreturningtype") != 0 || len(expr.field("varnullingrels").items()) != 1 {
+	rte, att := source(q, expr, true)
+	switch {
+	case rte == nil:
 		return false, nil
+	case att == 0: // a table's whole row, never null itself
+		return true, nil
+	}
+	return c.columnNotNull(ctx, rte.num("relid"), att)
+}
+
+// source follows expr, an expression of query q, to the table it
+// reads: the table's range table entry and the column's number, 0 for
+// the whole row; nil when expr is not a plain reference. A reference to
+// a subquery's column or a grouped column is followed to what it
+// names. When strict, a reference that an outer join, a grouping set
+// or returning's old or new can null is not followed: Postgres marks a
+// reference with the outer joins and grouping sets that null it
+// (varnullingrels).
+func source(q, expr *node, strict bool) (*node, int) {
+	if expr == nil || expr.tag != "VAR" || expr.num("varlevelsup") != 0 ||
+		strict && (expr.num("varreturningtype") != 0 || len(expr.field("varnullingrels").items()) != 1) {
+		return nil, 0
 	}
 	rtable, att := q.field("rtable").items(), expr.num("varattno")
-	if no := expr.num("varno"); no >= 1 && no <= len(rtable) && att >= 1 {
+	if no := expr.num("varno"); no >= 1 && no <= len(rtable) && att >= 0 {
 		switch rte := rtable[no-1]; rte.num("rtekind") {
 		case rteRelation:
-			return c.columnNotNull(ctx, rte.num("relid"), att)
+			return rte, att
 		case rteSubquery:
-			if sub := rte.field("subquery"); att <= len(outputs(sub)) {
-				return c.notNull(ctx, sub, outputs(sub)[att-1])
+			if sub := rte.field("subquery"); att >= 1 && att <= len(outputs(sub)) {
+				return source(sub, outputs(sub)[att-1], strict)
 			}
 		case rteGroup:
-			if exprs := rte.field("groupexprs").items(); att <= len(exprs) {
-				return c.notNull(ctx, q, exprs[att-1])
+			if exprs := rte.field("groupexprs").items(); att >= 1 && att <= len(exprs) {
+				return source(q, exprs[att-1], strict)
 			}
 		}
 	}
-	return false, nil
+	return nil, 0
 }

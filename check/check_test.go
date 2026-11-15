@@ -95,15 +95,35 @@ func run(t *testing.T, src string) (*Info, []*syntax.Error) {
 
 // signature answers for the SQL pass in the tests: a literal's text is
 // its own signature, as "$a: Int, ${b.c}: Kind{x y} -> id: Uuid, n:
-// List<Long>?", the parameters in the pass's order, a name once, and
-// Kind{x y} an enum of the constants x and y. A literal holding «
-// is refused there.
+// List<Long>?", the parameters in the pass's order, a name once,
+// Kind{x y} an enum of the constants x and y, and t(a: Int, b: Uuid?)
+// the composite type t of fields a and b. A literal holding « is
+// refused there.
 func signature(lit *syntax.SQL) (*sqlpass.Statement, error) {
 	if i := strings.Index(lit.Text, "«"); i >= 0 {
 		return nil, &sqlpass.Error{Offset: i, Code: "sql-rejected", Message: "Postgres refused this"}
 	}
+	// split cuts a list at the commas outside parentheses.
+	split := func(s string) (parts []string) {
+		depth, start := 0, 0
+		for i, r := range s {
+			switch {
+			case r == '(':
+				depth++
+			case r == ')':
+				depth--
+			case r == ',' && depth == 0:
+				parts, start = append(parts, s[start:i]), i+1
+			}
+		}
+		return append(parts, s[start:])
+	}
 	var typ func(string) sqlpass.Type
+	var columns func(string) []sqlpass.Column
 	typ = func(s string) sqlpass.Type {
+		if name, fields, ok := strings.Cut(s, "("); ok {
+			return sqlpass.Type{Name: name, Fields: columns(strings.TrimSuffix(fields, ")"))}
+		}
 		if elem, ok := strings.CutPrefix(s, "List<"); ok {
 			t := typ(strings.TrimSuffix(elem, ">"))
 			t.List = true
@@ -114,17 +134,21 @@ func signature(lit *syntax.SQL) (*sqlpass.Statement, error) {
 		}
 		return sqlpass.Type{Name: s}
 	}
-	params, columns, _ := strings.Cut(lit.Text, "->")
-	st := &sqlpass.Statement{SQL: lit.Text}
+	columns = func(s string) []sqlpass.Column {
+		cols := []sqlpass.Column{}
+		for _, col := range split(s) {
+			if name, t, ok := strings.Cut(strings.TrimSpace(col), ": "); ok {
+				base, null := strings.CutSuffix(t, "?")
+				cols = append(cols, sqlpass.Column{Name: name, Type: typ(base), Nullable: null})
+			}
+		}
+		return cols
+	}
+	params, cols, _ := strings.Cut(lit.Text, "->")
+	st := &sqlpass.Statement{SQL: lit.Text, Columns: columns(cols)}
 	for _, p := range strings.Split(params, ",") {
 		if source, t, ok := strings.Cut(strings.TrimSpace(p), ": "); ok {
 			st.Params = append(st.Params, sqlpass.Param{Source: source, Type: typ(t)})
-		}
-	}
-	for _, col := range strings.Split(columns, ",") {
-		if name, t, ok := strings.Cut(strings.TrimSpace(col), ": "); ok {
-			base, null := strings.CutSuffix(t, "?")
-			st.Columns = append(st.Columns, sqlpass.Column{Name: name, Type: typ(base), Nullable: null})
 		}
 	}
 	return st, nil
@@ -560,6 +584,15 @@ fun n(tx: Tx): Int = tx.execute(sql" -> v: Void")`,
 		`data class Tenant(val id: Uuid, val slug: String)
 data class Row(val id: Uuid, val tenant: Tenant?, val owner: Tenant)
 fun f(tx: Tx): List<Row> = tx.query<Row>(sql" -> id: Uuid, tenant_id: Uuid?, tenant_slug: String?, owner_id: Uuid, owner_slug: String")`,
+		// Whole rows of a join, one on the absent side, a column of a
+		// type made with create type, whose fields may be null, and a
+		// row holding one.
+		`data class Business(val id: Uuid, val legalName: String, val abn: String?)
+data class Tenant(val id: Uuid, val slug: String)
+data class Amount(val cents: Long?, val currency: String?)
+data class Quote(val id: Uuid, val deposit: Amount?)
+data class Listing(val business: Business, val storefront: Tenant?, val total: Amount, val quote: Quote)
+fun f(tx: Tx): List<Listing> = tx.query<Listing>(sql" -> business: business(id: Uuid, legal_name: String, abn: String?), storefront: tenant(slug: String, id: Uuid)?, total: amount(cents: Long?, currency: String?), quote: quote(id: Uuid, deposit: amount(cents: Long?, currency: String?)?)")`,
 		// A T? parameter, an enum by its constants, lists, a name
 		// written twice, a typealias and a type of kogo.time.
 		`import kogo.time.Instant
@@ -593,6 +626,22 @@ external class Instant`,
 		{"fun f(tx: Tx, id: String): Int = tx.execute(sql\"‸$id: Uuid, $id\")", "sql-parameter-type",
 			"$id is a String, and Postgres takes a Uuid there: pass a Uuid, or cast it in the statement, as $id::type"},
 		{"fun f(tx: Tx, ids: List<Int>): Int = tx.execute(sql\"‸${ids}: List<Long>\")", "sql-parameter-type", "${ids} is a List<Int>, and Postgres takes a List<Long> there"},
+		// A composite type's fields fill a data class as columns do.
+		{"data class B(val id: Uuid, val name: String)\ndata class Row(val business: B)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> business: business(id: Uuid)\")",
+			"sql-field-missing", "no field of column business fills B.name: business has no field name; name the property after one of its fields, or select columns"},
+		{"data class B(val id: Uuid)\ndata class Row(val business: B)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> business: business(id: Uuid, legal_name: String)\")",
+			"sql-field-unused", "field legal_name of column business fills no property of B: add a property legalName, or select the columns you want"},
+		{"data class B(val id: Long)\ndata class Row(val business: B)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> business: business(id: Uuid)\")",
+			"sql-column-type", "field id of column business is a Uuid, and fills B.id, a Long: make that a Uuid"},
+		{"data class A(val cents: Long)\ndata class Row(val total: A)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> total: amount(cents: Long?)\")",
+			"sql-nullable", "field cents of column total may be null, and fills A.cents, a Long: make that a Long?"},
+		{"data class T(val id: Uuid)\ndata class Row(val storefront: T)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> storefront: tenant(id: Uuid)?\")",
+			"sql-nullable", `column storefront may be null, and fills Row.storefront, a T: make that a T?, or if the column is never null, name it as "storefront!"`},
+		{"data class Row(val business: String)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> business: business(id: Uuid)\")",
+			"sql-column-type", "column business is a row of business, and fills Row.business, a String: make that a data class with a property for each of its fields"},
+		// select b.*, where the whole row was meant.
+		{"data class B(val id: Uuid, val legalName: String)\ndata class Row(val business: B)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> id: Uuid, legal_name: String\")",
+			"sql-column-missing", "no column fills Row.business, a B: select a table's whole row as business, as in select b as business"},
 		// Reading a row builds R and each data class in it, as their
 		// constructors do.
 		{"package a\nimport c.H\nfun f(tx: Tx): List<H> = tx.query<H>(‸sql\" -> b_n: Int\")\n---\npackage c\ndata class B internal constructor(val n: Int)\ndata class H(val b: B)",

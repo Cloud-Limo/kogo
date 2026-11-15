@@ -44,7 +44,8 @@ type Query struct {
 	// Paths holds, for each column of Stmt, the property it fills:
 	// the indexes of the properties from R down, as [2 0] for the
 	// first property of R's third. A scalar R is filled by its one
-	// column, whose path is empty.
+	// column, whose path is empty. A column of a composite type fills
+	// a data class, whose properties take the fields of their names.
 	Paths [][]int
 }
 
@@ -147,9 +148,12 @@ func (c *checker) row(lit *syntax.SQL, q *Query) {
 	case d != nil && null:
 		c.errorf(lit, "sql-columns", "a row is never null: write %s, not %s", d, q.Row)
 	case d != nil:
-		c.fill(lit, d, "", nil, false, cols, q.Paths)
+		// Where a data class had no column at all, the columns left
+		// over are likely its own, as b.* gives a business's: its error
+		// says what to select in their place.
+		missed := c.fill(lit, d, "", nil, false, cols, q.Paths)
 		for i, path := range q.Paths {
-			if path == nil {
+			if path == nil && !missed {
 				c.errorf(lit, "sql-column-unused", "column %s fills no property of %s: add a property %s, or leave the column out",
 					cols[i].Name, d, camel(cols[i].Name))
 			}
@@ -158,7 +162,7 @@ func (c *checker) row(lit *syntax.SQL, q *Query) {
 		c.errorf(lit, "sql-columns", "this statement gives %d columns, and a %s is one: read them into a data class with a property for each, or select one column", len(cols), q.Row)
 	default:
 		q.Paths[0] = []int{}
-		c.column(lit, cols[0], q.Row, false, "the result")
+		c.column(lit, cols[0], q.Row, false, "the result", "")
 	}
 }
 
@@ -172,51 +176,98 @@ func dataClass(t Type) *Named {
 
 // fill matches the columns to the properties of the data class d:
 // property legalName takes column legal_name, and a property that is
-// a data class takes the columns that begin with its name and an
-// underscore. prefix is what the columns of d begin with and path the
-// properties that lead to d from R. Inside a nullable data class, a
-// column that may be null fills a property that may not, since all of
-// them are null where it is absent.
-func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, absent bool, cols []sqlpass.Column, paths [][]int) {
+// a data class takes the column of its name, of a composite type, or
+// else the columns that begin with its name and an underscore. prefix
+// is what the columns of d begin with and path the properties that
+// lead to d from R. Inside a nullable data class, a column that may be
+// null fills a property that may not, since all of them are null where
+// it is absent. missed is whether some data class had no column at all.
+func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, absent bool, cols []sqlpass.Column, paths [][]int) (missed bool) {
 	c.builds(lit, d.Decl)
 	b := bind(d.Decl.Params, d.Args)
 	for i, p := range d.Decl.Props {
 		t, name, here := subst(p.Type, b), prefix+snake(p.Name), append(slices.Clip(path), i)
 		what := d.Decl.Name + "." + p.Name
-		if n := dataClass(t); n != nil && len(path) > 8 {
-			c.errorf(lit, "sql-columns", "%s holds data classes nested too deep to fill from columns", d)
-			return
-		} else if n != nil {
-			_, null := t.(*Nullable)
-			c.fill(lit, n, name+"_", here, absent || null, cols, paths)
-			continue
-		}
+		n := dataClass(t)
 		j := slices.IndexFunc(cols, func(col sqlpass.Column) bool { return col.Name == name })
 		switch {
+		case j < 0 && n != nil && !slices.ContainsFunc(cols, func(col sqlpass.Column) bool { return strings.HasPrefix(col.Name, name+"_") }):
+			c.errorf(lit, "sql-column-missing", "no column fills %s, a %s: select a table's whole row as %s, as in select b as %s, or columns with the prefix %s_",
+				what, t, name, name, name)
+			missed = true
+		case j < 0 && n != nil && len(path) > 8:
+			c.errorf(lit, "sql-columns", "%s holds data classes nested too deep to fill from columns", d)
+			return missed
+		case j < 0 && n != nil:
+			_, null := t.(*Nullable)
+			missed = c.fill(lit, n, name+"_", here, absent || null, cols, paths) || missed
 		case j < 0:
 			c.errorf(lit, "sql-column-missing", "no column fills %s: select one named %s, with as %s if need be", what, name, name)
 		case paths[j] != nil:
 			c.errorf(lit, "sql-column-missing", "column %s would fill two properties, %s among them: rename one of them", name, what)
 		default:
 			paths[j] = here
-			c.column(lit, cols[j], t, absent, what)
+			c.column(lit, cols[j], t, absent, what, "")
 		}
+	}
+	return missed
+}
+
+// column checks that a column, or a field of column of, can fill a
+// property, or the result, of type t: its type maps to t's, and it
+// is not null unless t is a T? or the column lies in a nullable data
+// class (spec.md 10.4, 10.5). A composite type fills a data class
+// field by field.
+func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent bool, what, of string) {
+	_, null := t.(*Nullable)
+	n := dataClass(t)
+	subject, cast, assert := "column "+col.Name, ", or cast the column in the statement", fmt.Sprintf(", or if the column is never null, name it as \"%s!\"", col.Name)
+	if of != "" { // Postgres takes neither a cast nor a name of a field
+		subject, cast, assert = "field "+col.Name+" of column "+of, "", ""
+	}
+	switch {
+	case t == unknown:
+	case col.Type.Fields != nil && n == nil:
+		c.errorf(lit, "sql-column-type", "%s is a row of %s, and fills %s, a %s: make that a data class with a property for each of its fields, or select them as columns",
+			subject, col.Type.Name, what, t)
+	case col.Type.Fields == nil && !c.maps(nonNull(t), col.Type):
+		c.errorf(lit, "sql-column-type", "%s is a %s, and fills %s, a %s: make that a %s%s",
+			subject, kogoName(col.Type), what, t, kogoName(col.Type), cast)
+	case col.Nullable && !null && !absent:
+		c.errorf(lit, "sql-nullable", "%s may be null, and fills %s, a %s: make that a %s?%s", subject, what, t, t, assert)
+	}
+	if col.Type.Fields != nil && n != nil {
+		if of != "" {
+			col.Name = of + "." + col.Name
+		}
+		c.fields(lit, col, n)
 	}
 }
 
-// column checks that a column can fill a property, or the result, of
-// type t: its type maps to t's, and it is not null unless t is a T?
-// or the column lies in a nullable data class (spec.md 10.4, 10.5).
-func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent bool, what string) {
-	_, null := t.(*Nullable)
-	switch {
-	case t == unknown:
-	case !c.maps(nonNull(t), col.Type):
-		c.errorf(lit, "sql-column-type", "column %s is a %s, and fills %s, a %s: make that a %s, or cast the column in the statement",
-			col.Name, kogoName(col.Type), what, t, kogoName(col.Type))
-	case col.Nullable && !null && !absent:
-		c.errorf(lit, "sql-nullable", "column %s may be null, and fills %s, a %s: make that a %s?, or if the column is never null, name it as \"%s!\"",
-			col.Name, what, t, t, col.Name)
+// fields matches the fields of col, of a composite type, to the
+// properties of the data class d by name, as fill matches columns. The
+// row is null as a whole, never field by field, so where it is there a
+// field that may be null fills only a property that may be.
+func (c *checker) fields(lit *syntax.SQL, col sqlpass.Column, d *Named) {
+	c.builds(lit, d.Decl)
+	b := bind(d.Decl.Params, d.Args)
+	used := make([]bool, len(col.Type.Fields))
+	for _, p := range d.Decl.Props {
+		name := snake(p.Name)
+		j := slices.IndexFunc(col.Type.Fields, func(f sqlpass.Column) bool { return f.Name == name })
+		if j < 0 {
+			c.errorf(lit, "sql-field-missing", "no field of column %s fills %s.%s: %s has no field %s; name the property after one of its fields, or select columns",
+				col.Name, d.Decl.Name, p.Name, col.Type.Name, name)
+			continue
+		}
+		used[j] = true
+		c.column(lit, col.Type.Fields[j], subst(p.Type, b), false, d.Decl.Name+"."+p.Name, col.Name)
+	}
+	for j, f := range col.Type.Fields {
+		if !used[j] {
+			c.errorf(lit, "sql-field-unused", "field %s of column %s fills no property of %s: add a property %s, or select the columns you want",
+				f.Name, col.Name, d, camel(f.Name))
+		}
 	}
 }
 

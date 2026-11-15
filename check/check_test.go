@@ -122,6 +122,9 @@ func TestNames(t *testing.T) {
 		{"package a\nfun f(s: ‸Stamp): Int = 1\n---\npackage kogo.time\nexternal class Stamp", "unknown-name", "add import kogo.time.Stamp"},
 		{"package a\nimport ‸b.g\n---\npackage c\nfun g(): Int = 1", "unknown-import", "no package b"},
 		{"package a\nimport ‸c.h\n---\npackage c\nfun g(): Int = 1", "unknown-import", "package c declares nothing named h"},
+		{"package a\nimport ‸kogo.time.seconds\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int", "member-import", "seconds is a member, in scope wherever a value of its receiver's type is: remove this import"},
+		// Section 13: an external object holds funs.
+		{"package kogo\nexternal object Zone {\n    ‸val utc: Long\n}", "external-object", "an external object holds funs only (spec.md 13): declare fun utc(): ... instead"},
 		{"package a\nimport ‸c.g\n---\npackage c\nprivate fun g(): Int = 1", "not-visible", "g is private to f2.kg: remove private"},
 		{"package a\nimport ‸c.g\n---\npackage c\ninternal fun g(): Int = 1", "not-visible", "g is internal to package c: remove internal"},
 		{"package a\nfun f(): Int = ‸g()\n---\npackage a\nprivate fun g(): Int = 1", "not-visible", "g is private to f2.kg"},

@@ -259,6 +259,8 @@ Each entry: what was decided, why, and what would reopen it.
   arguments" assumes it. Application code still takes a `List`.
 - **A binding with a receiver is a member, in scope with no import** (spec 13). Example 20
   calls `clock.now()` importing only `Clock`, as Kotlin code does of a class's members.
+  An import of one is an error that says to remove it, not "declares nothing named", which
+  would be false.
 - **A package is the files that share a package line** (spec 2); directories are not
   checked. `examples/` holds three packages in one directory.
 - **A range is not a value** (spec 6): `a..b` and `a until b` are written only after `in`.

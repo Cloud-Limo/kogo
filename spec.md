@@ -643,7 +643,7 @@ external fun List<Long>.sum(): Long
 - `external fun` and `external val` declare a function and a property
   with no body. Every member of an external class is declared this way,
   with the class as the receiver. One with a receiver is a member: it is
-  in scope wherever a value of that type is, with no import.
+  in scope wherever a value of that type is, and is never imported.
 - Three things are allowed in a binding and nowhere else: a nullable
   receiver, `out` on an external class's type parameter, and `vararg` on
   a parameter, which then takes any number of arguments.

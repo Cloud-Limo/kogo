@@ -205,6 +205,8 @@ func (c *checker) importAll(f *syntax.File) {
 		switch {
 		case from == nil:
 			c.errorf(imp, "unknown-import", "there is no package %s", imp.Name[:i])
+		case from.named(name) == nil && slices.ContainsFunc(c.members[name], func(f *Func) bool { return f.Pkg == from.name }):
+			c.errorf(imp, "member-import", "%s is a member, in scope wherever a value of its receiver's type is: remove this import", name)
 		case from.named(name) == nil:
 			c.errorf(imp, "unknown-import", "package %s declares nothing named %s", from.name, name)
 		case c.imports[f][name] != nil && c.imports[f][name] != from:
@@ -458,6 +460,10 @@ func (c *checker) class(td *TypeDecl) {
 	for _, m := range d.Body {
 		switch m := m.(type) {
 		case *syntax.ValDecl:
+			if d.Kind == "external object" {
+				c.errorf(m, "external-object", "an external object holds funs only (spec.md 13): declare fun %s(): ... instead", m.Name)
+				continue
+			}
 			v := &Var{Kind: Property, Name: m.Name, Type: c.declared(m), Owner: td, Decl: m}
 			td.Props = append(td.Props, v)
 			c.info.Vars[m] = []*Var{v}

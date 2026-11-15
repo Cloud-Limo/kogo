@@ -1422,8 +1422,14 @@ Each entry: what was decided, why, and what would reopen it.
   the fault is in the out directory, not in a source, so it names the stale file in `file`
   with no line or column. The walk is lexical, so the first such file is the same each run.
   Reopens if `kogo emit` grows a cleaning mode.
-- **A `kogo.go` that cannot be read past its header length counts as the user's**, not as an
-  error: only a file proven kogo's is refused.
+- **What under `<out>` cannot be opened or read counts as the user's**, not as an error: a
+  `kogo.go` that cannot be opened or read past its header's length, and a directory that
+  cannot be listed, which the walk passes over. Only a file shown to be kogo's is refused,
+  and only `<out>` itself failing to be read, other than its absence, stops emit with
+  `read`. Not taken: stopping on a directory of mode 000, such as a database's data
+  directory in a module root, which is the user's business.
+- **An `<out>` that is a link is followed before the walk**, as the write follows it, and
+  the stale file is named under `<out>` as given.
 
 ## Spec gaps found by the leakage ports, unresolved
 

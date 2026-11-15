@@ -34,6 +34,10 @@ The Go names its sources by paths relative to itself, so a panic's trace
 names the Kogo file and line on any machine. Move `<out>` or the sources
 relative to each other and traces name a path that is not there, with
 the line still right; emit again.
+`kogo emit` refuses, writing nothing, when `<out>` holds a `kogo.go` it
+wrote for a package the program no longer has, as after a rename: remove
+that file or emit into another directory. Every other file in `<out>`,
+such as your own `main.go`, is left alone.
 `kogo ts` checks them and then writes `<out>/<name>.ts` for each `api`
 list: its wire types and an interface of its operations (spec.md 15.6).
 

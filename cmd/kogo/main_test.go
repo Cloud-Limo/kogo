@@ -212,6 +212,46 @@ func TestEmitRefuses(t *testing.T) {
 	}
 }
 
+// A kogo.go that emit wrote for a package the program no longer has
+// stops the next emit, which writes nothing; the user's own files in
+// the out directory, a main.go and a go.mod, are left alone.
+func TestEmitRefusesStale(t *testing.T) {
+	dir, err := os.MkdirTemp(".", "emitted")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	for name, text := range map[string]string{"main.go": "package main\n\nfunc main() {}\n", "go.mod": "module emitted\n"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	src := t.TempDir()
+	emit := func(pkg string) (int, string, string) {
+		os.WriteFile(filepath.Join(src, "a.kg"), []byte("package "+pkg+"\n\nfun f(x: Int): Int = x\n"), 0o644)
+		var stdout, stderr bytes.Buffer
+		code := run([]string{"emit", src, dir}, &stdout, &stderr)
+		return code, stdout.String(), stderr.String()
+	}
+	if code, out, fatal := emit("app.old"); code != 0 || out != "" || fatal != "" {
+		t.Fatalf("first emit: exit %d, want 0\n%s%s", code, out, fatal)
+	}
+	if code, out, fatal := emit("app.old"); code != 0 || out != "" || fatal != "" {
+		t.Fatalf("emit again: exit %d, want 0\n%s%s", code, out, fatal)
+	}
+	stale := filepath.Join(dir, "app", "old", "kogo.go")
+	want := `{"file":"` + stale + `","line":0,"column":0,"code":"stale-output","message":"` + stale + ` was written by kogo emit for a package this program no longer has, and the Go under ` + dir + ` would build it beside the new: remove it, or emit into another directory"}
+`
+	code, out, fatal := emit("app.new")
+	if _, err := os.Stat(filepath.Join(dir, "app", "new")); code != 2 || out != "" || fatal != want || !os.IsNotExist(err) {
+		t.Errorf("after a rename: exit %d, want 2, with app/new written: %v\n got %s%s\nwant %s", code, err == nil, out, fatal, want)
+	}
+	os.Remove(stale)
+	if code, out, fatal := emit("app.new"); code != 0 || out != "" || fatal != "" {
+		t.Errorf("with the stale file removed: exit %d, want 0\n%s%s", code, out, fatal)
+	}
+}
+
 // kogo ts writes a file for each api list, the same bytes each time it
 // runs, and nothing for a program with errors.
 func TestTS(t *testing.T) {

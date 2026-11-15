@@ -85,6 +85,17 @@ Each entry: what was decided, why, and what would reopen it.
   `+`, `list[i]` and `to`, so the gain is expected, not yet shown. Reopen if an operator's
   meaning comes to depend on more than its receiver's and its argument's types, or if the
   emitted call costs at run time.
+- **A whole-number literal is an `Int` unless a declared type, a parameter or a return type
+  asks for a `Long`** (15 Nov 2026; spec 3 and 5.1), and that holds for an argument that
+  settles a type parameter and for one side of `?:` or `if` with nothing wanted: `val x =
+  cents ?: 0`, `firstOr(longs, 0)` and `val xs: List<Long> = listOf(1, 2)` are refused with
+  "write 0L", though Kotlin takes all three. One rule says what a literal is, and the author
+  of a stage-1 port already wrote `0L` three times in 262 lines from the spec alone. Not
+  taken: letting a literal follow a `Long` beside it (about 15 lines), which still leaves
+  `==` and `listOf(1, 2)` needing the `L`; and also settling a literal after the wanted
+  type (about 25), a fifth step in the order for type arguments. Both only accept more, so
+  either can be added later and break nothing. Reopen if ports show repeated rounds of
+  checking over this.
 - **Only a name narrows** (15 Nov 2026; spec 4): a local `val` or a parameter, by `!= null`,
   `== null` and `is`, through `&&`, `||` and `!`, and for the rest of a block when the other
   branch cannot finish. A name that narrows never changes, so nothing learned is ever
@@ -248,12 +259,6 @@ Each entry: what was decided, why, and what would reopen it.
   example or stage-1 port writes one elsewhere. Reopen when a port wants to pass one.
 - **The common type is the wider of two types when one fits the other** (spec 5.1), as well
   as the sealed interface of two variants. As first written, `Int` and `Int?` had none.
-- **A whole-number literal is an `Int` wherever no parameter or declared type asks for a
-  `Long`**, as section 3 says, and that includes an argument that settles a type parameter
-  and one side of `?:` or `if` with nothing wanted: `listOf(n, 0)`, `firstOr(longs, 0)` and
-  `val x = cents ?: 0` are refused with "write 0L". Kotlin takes all three. Not taken:
-  letting a literal follow a `Long` beside it, about 15 lines, which is a second rule for
-  what a literal is. Reopen if ports trip on it often.
 - **`==` needs one side to fit the other, `?` aside** (spec 3). This is the rule that makes
   `Int == Long` an error and lets `x == null` through.
 - **A nested variant is named in full, `Outcome.Ok`, everywhere** (spec 3.2), also inside

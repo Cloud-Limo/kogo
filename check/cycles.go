@@ -113,59 +113,126 @@ func (c *checker) cycles(program []*syntax.File) {
 
 // vals refuses a top-level val whose value refers, directly or through
 // the vals and funs it refers to, to itself or to a val declared below
-// it in its file (spec.md 6). Kotlin reads such a val before it holds
-// its value, or refuses it; Go orders the vals by what they refer to
-// and refuses a cycle. A cycle is told once, at its first val.
+// it in its file, and the files of a package whose vals use each other
+// (spec.md 6). Kotlin reads such a val before it holds its value, or
+// refuses it; Go orders the vals by what they refer to and refuses a
+// cycle. A cycle of vals is told once, at its first val; a cycle of
+// files at the val that leads out of its first file.
 func (c *checker) vals(program []*syntax.File) {
-	told := map[Object]bool{}
+	// The program's top-level vals, in order, and the file of each
+	// top-level val and fun: what Kotlin sets up a file's vals to use.
+	var vals []*Var
+	top := map[Object]*syntax.File{}
 	for _, f := range program {
-		c.file = f
 		for _, d := range f.Decls {
-			vs := c.info.Vars[d]
-			if len(vs) == 0 || told[vs[0]] {
-				continue
+			if fn := c.info.Funcs[d]; fn != nil {
+				top[fn] = f
 			}
-			g := vs[0]
-			// A search from g, keeping the way to each object reached.
-			way, queue := map[Object]Object{g: nil}, []Object{g}
-		search:
-			for len(queue) > 0 {
-				o := queue[0]
-				queue = queue[1:]
-				for _, r := range c.reads[o] {
-					if v, ok := r.(*Var); ok && v.file == f && v.Decl.At().Offset >= d.At().Offset {
-						c.badRead(g, v, o, way, told)
-						break search
-					}
-					if _, seen := way[r]; !seen {
-						way[r], queue = o, append(queue, r)
-					}
+			if vs := c.info.Vars[d]; len(vs) > 0 {
+				top[vs[0]], vals = f, append(vals, vs[0])
+			}
+		}
+	}
+	// A search from each val: the way to each object it reaches, those
+	// in the order reached, and the way back to itself, if any.
+	way, order, cycle := map[*Var]map[Object]Object{}, map[*Var][]Object{}, map[*Var][]string{}
+	for _, g := range vals {
+		way[g] = map[Object]Object{g: nil}
+		for queue := []Object{g}; len(queue) > 0; queue = queue[1:] {
+			for _, r := range c.reads[queue[0]] {
+				if _, back := cycle[g]; r == g && !back {
+					cycle[g] = trail(way[g], g, queue[0])
+				}
+				if _, seen := way[g][r]; !seen {
+					way[g][r], queue, order[g] = queue[0], append(queue, r), append(order[g], r)
 				}
 			}
 		}
 	}
+	type link struct {
+		g       *Var
+		r       Object
+		through []string
+	}
+	links, linked, told := map[*syntax.File][]*link{}, map[[2]*syntax.File]bool{}, map[*Var]bool{}
+	for _, g := range vals {
+		f := top[g]
+		c.file = f
+		through, onCycle := cycle[g]
+		if onCycle && !told[g] {
+			for _, v := range vals {
+				_, reached := way[g][v]
+				_, back := way[v][g]
+				told[v] = told[v] || reached && back
+			}
+			c.errorf(g.Decl, "val-order", "the value of %s refers to %s itself%s (spec.md 6): compute it without %s, or make one of these a fun", g.Name, g.Name, by(through), g.Name)
+		}
+		for _, r := range order[g] {
+			if v, ok := r.(*Var); ok && v.file == f && v.Decl.At().Offset > g.Decl.At().Offset {
+				if _, back := way[v][g]; !back {
+					c.errorf(g.Decl, "val-order", "the value of %s refers to %s%s, which is declared below it in this file (spec.md 6): declare %s above %s", g.Name, v.Name, by(trail(way[g], g, way[g][v])), v.Name, g.Name)
+					break
+				}
+			}
+		}
+		// A val on a cycle is refused already, so uses no file.
+		for _, r := range order[g] {
+			if to := top[r]; !onCycle && to != nil && to != f && to.Package.Name == f.Package.Name && !linked[[2]*syntax.File{f, to}] {
+				linked[[2]*syntax.File{f, to}] = true
+				links[f] = append(links[f], &link{g, r, trail(way[g], g, way[g][r])})
+			}
+		}
+	}
+	// The shortest cycle of files from each file on none told yet.
+	done := map[*syntax.File]bool{}
+	for _, f := range program {
+		var last *link
+		from := map[*syntax.File]*link{f: nil}
+		for queue := []*syntax.File{f}; len(queue) > 0 && last == nil && !done[f]; queue = queue[1:] {
+			for _, l := range links[queue[0]] {
+				if to := top[l.r]; to == f {
+					last = l
+					break
+				} else if _, seen := from[to]; !seen {
+					from[to], queue = l, append(queue, to)
+				}
+			}
+		}
+		if last == nil {
+			continue
+		}
+		var files, steps []string
+		first := last
+		for l := last; l != nil; first, l = l, from[top[l.g]] {
+			done[top[l.g]] = true
+			files = append([]string{top[l.g].Name}, files...)
+			steps = append([]string{fmt.Sprintf("%s refers to %s in %s%s", l.g.Name, name(l.r), top[l.r].Name, by(l.through))}, steps...)
+		}
+		c.file = f
+		c.errorf(first.g.Decl, "val-order", "the vals of %s use each other's files (spec.md 6): %s; Kotlin sets up a file's vals when it first uses the file, so one may be read before it holds its value: move these vals into one file, or make one of them a fun",
+			strings.Join(files, ", "), strings.Join(steps, "; "))
+	}
 }
 
-// badRead reports that g's value reaches v, through o and the way to it.
-func (c *checker) badRead(g, v *Var, o Object, way map[Object]Object, told map[Object]bool) {
-	var through []string
+// trail names the objects on the way from g to o, o last, g not.
+func trail(way map[Object]Object, g, o Object) []string {
+	var names []string
 	for ; o != g; o = way[o] {
-		if v == g {
-			told[o] = true
-		}
-		if f, ok := o.(*Func); ok {
-			through = append([]string{f.Name}, through...)
-		} else {
-			through = append([]string{o.(*Var).Name}, through...)
-		}
+		names = append([]string{name(o)}, names...)
 	}
-	by := ""
-	if through != nil {
-		by = ", through " + strings.Join(through, ", ")
+	return names
+}
+
+func name(o Object) string {
+	if f, ok := o.(*Func); ok {
+		return f.Name
 	}
-	if v == g {
-		c.errorf(g.Decl, "val-order", "the value of %s refers to %s itself%s (spec.md 6): compute it without %s, or make one of these a fun", g.Name, g.Name, by, g.Name)
-	} else {
-		c.errorf(g.Decl, "val-order", "the value of %s refers to %s%s, which is declared below it in this file (spec.md 6): declare %s above %s", g.Name, v.Name, by, v.Name, g.Name)
+	return o.(*Var).Name
+}
+
+func by(through []string) string {
+	if through == nil {
+		return ""
 	}
+	return ", through " + strings.Join(through, ", ")
 }

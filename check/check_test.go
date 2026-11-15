@@ -346,6 +346,8 @@ func TestTypes(t *testing.T) {
 		{"‸val n = 1", "val-type", "a top-level val states its type: val n: Type"},
 		{"data class P(val n: Int)\nfun f(p: P?): Int = p.‸n", "nullable", "this P? may be null: write ?.n, or test it for null first"},
 		{"fun big(): Int = ‸3000000000", "number-range", "past an Int's range, where Kotlin reads it as a Long (spec.md 3): write 3000000000L"},
+		{"fun big(): Double = ‸3000000000", "number-range", "write 3000000000L"},
+		{"fun big(x: Long): Boolean = x == ‸3000000000", "number-range", "write 3000000000L"},
 		{"val n: Int = ‸-2147483649", "number-range", "write -2147483649L"},
 		{"val n: Long = ‸9223372036854775808L", "number-range", "past a Long's range"},
 		{"val n: Long = ‸-9223372036854775808", "number-range", "even after a minus"},
@@ -480,6 +482,14 @@ func TestCalls(t *testing.T) {
 }
 
 // Section 6: statements and expressions.
+// A val on a cycle still has its own read of a val below told.
+func TestValOnCycleReadsBelow(t *testing.T) {
+	_, errs := run(t, "val a: Int = x\n---\npackage t\nval x: Int = a + y\nval y: Int = 1")
+	if len(errs) != 2 || !strings.Contains(errs[0].Message, "a refers to a itself, through x") || !strings.Contains(errs[1].Message, "declare y above x") {
+		t.Errorf("got %v, want a's cycle and x's read of y", errs)
+	}
+}
+
 func TestStatements(t *testing.T) {
 	passes(t,
 		"enum class E { a, b }\nfun f(e: E, c: Boolean, n: Int): Int = when (e) {\n    E.a -> when (c) {\n        true -> 1\n        false -> 2\n    }\n    E.b -> when (n) {\n        0, 1 -> 3\n        in 2..9 -> 4\n        else -> 5\n    }\n}",
@@ -495,6 +505,11 @@ func TestStatements(t *testing.T) {
 		"fun f(): Int {\n    fun g(x: Int): Int = x\n    return g(1)\n}",
 		// A val reads one above it, one in another file, or a fun.
 		"val a: Int = 1\nval b: Int = a + f()\nval c: Int = d\nfun f(): Int = a\n---\npackage t\nval d: Int = 1",
+		// A call through an interface is not followed, as in Go; a data
+		// class is not its file's, and a file may use one that uses it.
+		"interface I {\n    fun card(): Int\n}\ndata class P(val n: Int) : I {\n    override fun card(): Int = c\n}\nfun f(i: I): Int = i.card()\nval c: Int = f(P(1))",
+		"val a: Int = P(1).n\n---\npackage t\ndata class P(val n: Int)\nval c: Int = a",
+		"val a: Int = f()\n---\npackage t\nfun f(): Int = 1\nfun g(): Int = a",
 	)
 	refused(t, [][3]string{
 		{"enum class E { a, b, c }\nfun f(e: E): Int = ‸when (e) {\n    E.a -> 1\n}", "when-not-exhaustive", "this when over a E does not cover b, c: add a branch for each, or an else"},
@@ -532,6 +547,15 @@ func TestStatements(t *testing.T) {
 		{"‸val a: Int = f()\nfun f(): Int = g { b }\nfun g(h: () -> Int): Int = 1\nval b: Int = 1", "val-order", "refers to b, through f, which"},
 		{"‸val c: Int = g()\nfun g(): Int = c", "val-order", "the value of c refers to c itself, through g (spec.md 6): compute it without c, or make one of these a fun"},
 		{"‸val a: Int = b\n---\npackage t\nval b: Int = a", "val-order", "refers to a itself, through b"},
+		// A cycle in one file is told once, as a cycle.
+		{"‸val a: Int = b\nval b: Int = a", "val-order", "the value of a refers to a itself, through b"},
+		// A local fun's body is the body of the fun around it.
+		{"‸val c: Int = f()\nfun f(): Int {\n    fun g(): Int = c\n    return 1\n}", "val-order", "refers to c itself, through f, g"},
+		// An interface's fun called on a data class is its override.
+		{"interface I {\n    fun card(): Int\n    fun size(): Int\n}\ndata class P(val n: Int) : I {\n    override fun card(): Int = c\n    override fun size(): Int = card()\n}\n‸val c: Int = P(1).size()", "val-order", "refers to c itself, through size, card"},
+		// Files whose vals use each other, by a val or by a fun.
+		{"‸val a: Int = b\n---\npackage t\nval b: Int = 1\nval c: Int = a", "val-order", "the vals of f1.kg, f2.kg use each other's files (spec.md 6): a refers to b in f2.kg; c refers to a in f1.kg"},
+		{"‸val a: Int = f()\n---\npackage t\nfun f(): Int = 1\nval c: Int = g()\nfun g(): Int = a", "val-order", "a refers to f in f2.kg; c refers to a in f1.kg, through g"},
 	})
 }
 

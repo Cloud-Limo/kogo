@@ -74,6 +74,7 @@ func (c *checker) stmt(s syntax.Stmt, unit bool) Type {
 		c.signature(f, s, nil)
 		c.define(s, f)
 		c.body(f, s)
+		c.read(f) // what its body refers to, the fun around it does, as in Go
 	case *syntax.Assign:
 		c.assign(s)
 	case *syntax.For:

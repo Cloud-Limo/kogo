@@ -119,8 +119,30 @@ func (c *checker) expr(e syntax.Expr, want Type) Type {
 	c.read(c.info.Uses[e])
 	if call := c.info.Calls[e]; call != nil && call.Func != nil {
 		c.read(call.Func)
+		if call.Func.Kind == Method {
+			c.readOverride(call)
+		}
 	}
 	return t
+}
+
+// readOverride records that a call of an interface's fun on a data
+// class or a data object refers to that one's override: in Go it is a
+// call on the struct, which Go follows, not through the interface.
+func (c *checker) readOverride(call *Call) {
+	rt := c.this()
+	if call.Receiver != nil {
+		rt = c.info.Types[call.Receiver]
+	}
+	n, ok := nonNull(rt).(*Named)
+	if !ok || n.Decl.Kind != "data class" && n.Decl.Kind != "data object" {
+		return
+	}
+	for _, m := range n.Decl.Methods {
+		if m.Name == call.Func.Name {
+			c.read(m)
+		}
+	}
 }
 
 // read records that the val or the fun at hand refers to o, where o
@@ -128,7 +150,7 @@ func (c *checker) expr(e syntax.Expr, want Type) Type {
 func (c *checker) read(o Object) {
 	v, isVar := o.(*Var)
 	_, isFunc := o.(*Func)
-	if c.owner != nil && (isVar && v.Kind == Global || isFunc) {
+	if c.owner != nil && (isVar && v.Kind == Global || isFunc) && !slices.Contains(c.reads[c.owner], o) {
 		c.reads[c.owner] = append(c.reads[c.owner], o)
 	}
 }
@@ -156,8 +178,10 @@ func (c *checker) literal(at syntax.Node, l *syntax.Literal, minus string, want 
 	switch {
 	case err != nil || minus != "" && n == math.MinInt64:
 		c.errorf(at, "number-range", "%s%s is past a Long's range, as in Kotlin (spec.md 3): a whole number's digits are at most %d, even after a minus", minus, l.Value, math.MaxInt64)
+		return unknown // its one error
 	case is(t, tInt) && (n < math.MinInt32 || n > math.MaxInt32):
 		c.errorf(at, "number-range", "%s%s is past an Int's range, where Kotlin reads it as a Long (spec.md 3): write %s%sL", minus, l.Value, minus, l.Value)
+		return unknown
 	}
 	return t
 }

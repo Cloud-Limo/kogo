@@ -308,9 +308,19 @@ interface `fun` before an extension of the same name.
 - A top-level `val`'s value may not refer to the `val` itself, or to a
   `val` declared below it in its file, directly or through the `val`s
   and functions it refers to. A reference counts wherever it is
-  written, in a lambda too, whether or not it runs. Kotlin refuses a
-  direct read of a `val` below, and through a function reads it before
-  it holds its value: declare the one it reads above it.
+  written, in a lambda or a local function too, whether or not it
+  runs. A call of an interface's function on a data class or a data
+  object refers to that one's function; a call on a value of the
+  interface's type refers to none. Kotlin refuses a direct read of a
+  `val` below, and through a function reads it before it holds its
+  value: declare the one it reads above it.
+- Nor may two files of a package use each other through their `val`s,
+  directly or through other files. A file's `val`s use another file
+  where their values refer, as above, to a top-level function or `val`
+  declared in it. Kotlin sets up a file's `val`s when the file is first
+  used, so what such a `val` holds depends on which file a program uses
+  first; Go sets them up in one order. Move the `val`s into one file, or
+  make one of them a function.
 - `if`/`else` and `when` are expressions.
 - `when (x) { ... }` over a sealed interface, an enum or a `Boolean` must
   cover every case or have `else`; the compiler rejects a missing case.
@@ -904,6 +914,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `fun <T> f(...)` inside a function | declare it at the top level |
 | `val n = 3000000000`, a `Long` | `3000000000L` |
 | a top-level `val` that reads one below it through a function | declare the one it reads above it |
+| two files whose top-level `val`s use each other's files | move the `val`s into one file, or make one a fun |
 
 ## 15. Operations
 

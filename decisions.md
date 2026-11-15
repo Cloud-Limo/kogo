@@ -153,6 +153,19 @@ Each entry: what was decided, why, and what would reopen it.
   Java's everywhere. `Uuid`, `newId` and `Decimal` are Kogo's own with no import; none is
   a member of a Kotlin type, and they stay. Reopen if imports of `kogo.` functions come to
   crowd a file, or a function keeps reading worse than the member would.
+- **`Console` is `kogo.io.Console`, imported** (15 Nov 2026; spec 12 and 14). Kotlin's
+  `println` and `readln` are global functions; Kogo's are members of a handle passed in,
+  as section 7 has every effect, and the handle is Kogo's own, so the entry above puts it
+  in a `kogo.` package. The leakage2 port, written before, used it with no import and
+  gains one line. Not taken: `Console` beside `Uuid`, `newId` and `Decimal` in `kogo`, with
+  no import, which grows the list of exceptions to that entry.
+- **An enum label must be a name a constant can have** (15 Nov 2026, Greg; spec 10.4).
+  `cusoon_b`'s `booking_paid_by` has `paid_in car_income`, which no constant can spell. An
+  enum with such a label has no Kogo type: the label is renamed in Postgres, or the column
+  is cast to text and read as a `String`, and the checker says both. So `select *` cannot
+  fill the row of a table that has one until the label is renamed. Not taken: mapping such
+  a label to a name (a space to `_`), a second spelling to keep in step with the database,
+  which could make two labels one constant.
 - **A prelude declaration always lands with its Go and a test** (15 Nov 2026; spec 12 and
   13). `TestPrelude` compiles a use of every declaration against the Go behind it, and
   stays that strict: a declaration the checker accepts is one the emitter can write. Not
@@ -979,9 +992,27 @@ Each entry: what was decided, why, and what would reopen it.
   (`List.get`), `Int.toLong()` and `LocalDate.plusDays`, each in section 12.
 - **A `for` over a `Set` is still refused by the emitter**, as before; no call needs it.
 
+## Taken growing the prelude for the stage-1 ports (DEV-828), not yet discussed
+
+- **The ports are checked as copies, beside the originals**: `~/kogo-stage1/<port>/checked/`
+  holds round 1's files, corrected where a rule of the spec changed, and `missing_*.kg`, the
+  declarations they refer to and do not hold, with stand-in bodies (a program may not
+  write `external`). `round1/` is left as written, so a diff shows what each change cost.
+- **`trim(char: Char)` takes one character**, where Kotlin's takes `vararg chars`. With
+  `vararg`, `trim()` fits both declarations and the checker ranks neither, where Kotlin
+  prefers the one without `vararg`; a second character is refused, never misread. Reopen
+  when a port trims two characters, with Kotlin's ranking in the checker.
+- **`Decimal.toDouble` parses the text Postgres sent**, as closely as Java does; `NaN`
+  and `Infinity`, which a `Decimal` holds and a `BigDecimal` cannot, give `Double`'s.
+- **`replace(regex, text)` reads the text as Java does**, by hand: Go's own expansion
+  takes `$1x` as a group named `1x` and has no backslash escape. A reference to a group
+  that does not exist panics, as Java throws. The empty-match corner is in spec 12.
+- **`atStartOfDay` finds the gap's end itself**: Go's `time.Date` gives the day before
+  where midnight is skipped, and may give the second of two midnights.
+- **An enum column that does not fit an enum class names the labels and constants that
+  differ**, where it printed the class it wanted, which had the same name.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, workers, and an
   application's own binding files have no design.
-- `Console`, `Decimal` and the text form of dates and instants have no stated members; the
-  prelude's declarations (spec 13) are where they will be stated.

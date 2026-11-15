@@ -12,8 +12,14 @@ external class Decimal
 
 external fun <T> listOf(vararg elements: T): List<T>
 external fun <T> listOfNotNull(vararg elements: T?): List<T>
+external fun <T> emptyList(): List<T>
 external val <T> List<T>.size: Int
 external fun <T> List<T>.get(index: Int): T
+external fun <T> List<T>.isNotEmpty(): Boolean
+external fun <T> List<T>.firstOrNull(): T?
+external fun <T> List<T>.singleOrNull(): T?
+external fun <T> List<T>.forEach(action: (T) -> Unit)
+external fun <T> List<T>.toSet(): Set<T>
 external fun <T> List<T>.filter(predicate: (T) -> Boolean): List<T>
 external fun <T, R> List<T>.map(transform: (T) -> R): List<R>
 external fun <T, R> List<T>.mapIndexed(transform: (Int, T) -> R): List<R>
@@ -29,6 +35,13 @@ external fun <T> Set<T>.contains(element: T): Boolean
 external val String.length: Int
 external fun String.plus(other: String): String
 external fun String.trim(): String
+external fun String.trim(char: Char): String
+external fun String.isBlank(): Boolean
+external fun String.isNotBlank(): Boolean
+external fun String.ifEmpty(defaultValue: () -> String): String
+external fun String.startsWith(prefix: String): Boolean
+external fun String.replace(regex: Regex, replacement: String): String
+external fun String.filterNot(predicate: (Char) -> Boolean): String
 external fun String.lowercase(): String
 external fun String.contains(other: String): Boolean
 external fun String.isNotEmpty(): Boolean
@@ -36,6 +49,7 @@ external fun String.substring(startIndex: Int): String
 external fun String.substring(startIndex: Int, endIndex: Int): String
 external fun <R> String.map(transform: (Char) -> R): List<R>
 external fun Char.digitToInt(): Int
+external fun Char.isWhitespace(): Boolean
 
 external fun Regex(pattern: String): Regex
 external fun Regex.matches(input: String): Boolean
@@ -46,10 +60,13 @@ external fun Long.coerceAtLeast(minimumValue: Long): Long
 external fun Long.coerceAtMost(maximumValue: Long): Long
 external fun Double.toLong(): Long
 external fun Double.toInt(): Int
+external fun Decimal.toDouble(): Double
 
 external fun <T, R> T.let(block: (T) -> R): R
 external fun <T> T.takeIf(predicate: (T) -> Boolean): T?
+external fun <A, B> A.to(that: B): Pair<A, B>
 external fun <T> requireNotNull(value: T?, lazyMessage: () -> String): T
+external fun <T> checkNotNull(value: T?, lazyMessage: () -> String): T
 external fun require(value: Boolean, lazyMessage: () -> String)
 external fun check(value: Boolean, lazyMessage: () -> String)
 

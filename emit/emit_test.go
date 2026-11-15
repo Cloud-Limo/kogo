@@ -805,6 +805,29 @@ fun taken(stock: Long, amount: Long): Long {
 `)
 }
 
+// What the stage-1 ports call, through the Go each becomes.
+func TestPortCalls(t *testing.T) {
+	expect(t, [][2]string{
+		{`t.Handle(" Blue Heron Draft ")`, "blue-heron"},
+		{`t.Handle("!!")`, "untitled"},
+		{`t.Tally([]string{"a", " ", "b"})`, "(2, a b)"},
+	}, `package t
+
+fun handle(name: String): String =
+    name.trim().lowercase().replace(Regex("""\bdraft$"""), "").replace(Regex("[^a-z0-9]+"), "-").trim('-').ifEmpty { "untitled" }
+
+fun tally(words: List<String>): Pair<Int, String> {
+    var n = 0
+    var out = ""
+    words.filter { it.isNotBlank() }.forEach { w ->
+        n += 1
+        out = if (out.isNotEmpty()) "$out $w" else w
+    }
+    return n to out
+}
+`)
+}
+
 // What is not emitted yet is refused where it stands, never emitted
 // wrongly, and so are two declarations that Go cannot tell apart.
 func TestRefused(t *testing.T) {

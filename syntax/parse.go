@@ -114,6 +114,9 @@ func (p *parser) nested(in bool, f func()) {
 var keywords = strings.Fields(`as break class continue do else false for fun if in interface is
 	null object package return super this throw true try typealias typeof val var when while`)
 
+// Keyword reports whether s is one of Kotlin's hard keywords.
+func Keyword(s string) bool { return slices.Contains(keywords, s) }
+
 func (p *parser) ident() (Pos, string) {
 	t := p.tok
 	if t.kind != tIdent || slices.Contains(keywords, t.text) {

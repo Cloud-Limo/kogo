@@ -1137,12 +1137,18 @@ Each entry: what was decided, why, and what would reopen it.
   It makes each request's `Db` from the pool and the request's context, so a client that
   goes away cancels its statements, which panic: a 500 in the log.
 - **The log is `log/slog`**: per request a line `served` with `request` (a new `Uuid`),
-  `operation`, `outcome` (`ok`, `refused` or the status) and `time`; a line `rerun` with
+  `operation`, `outcome` (`ok`, `refused` or the status) and `duration`, since slog's
+  `time` is the line's own; a line `rerun` with
   its `cause`, `serialization failure` or `deadlock`; a line `panic` with `message` and
-  `trace`. A 400's problem is not logged; its body tells the caller.
+  `trace`. A 400's problem is not logged; its body tells the caller. A panic anywhere
+  in the request, its reading too, is a 500 with that line.
+- **`NewHandler` panics if the table lacks an enum's entries or a sealed interface's
+  variants that some input reaches**, by one walk over each input type, so a table the
+  emitter got wrong fails when the server starts, not on the first request to use it.
 - **`clientAddress` is the host of the connection's address.** Behind a proxy, `main`
   sets the request's `RemoteAddr` from the proxy's header before the handler sees it,
-  since only `main` knows which proxy to trust. A header's first value is its value.
+  since only `main` knows which proxy to trust. A header's first value is its value;
+  `header("Host")` is the request's host, which Go keeps out of its headers.
 - **Not handled**: a limit on the body's size, which `main` sets with Go's
   `http.MaxBytesHandler` (a body past it reads as not JSON, a 400); the request's
   `Content-Type`, which belongs with the CSRF checks.

@@ -39,6 +39,7 @@ type Who struct {
 	Header  *string  `kogo:"header"`
 	Cookie  *string  `kogo:"cookie"`
 	Missing *string  `kogo:"missing"`
+	Host    *string  `kogo:"host"`
 	Address string   `kogo:"address"`
 }
 
@@ -87,7 +88,7 @@ func login(db kogo.Db, _ env, _ Request, p Person) kogo.Either[string, rt.Unit] 
 
 func who(_ kogo.Db, _ env, r Request, _ rt.Unit) kogo.Either[string, Who] {
 	return kogo.Either_Right[Who]{Value: Who{Header: Request_Header(r, "x-who"), Cookie: Request_Cookie(r, "c"),
-		Missing: Request_Header(r, "x-none"), Address: Request_ClientAddress(r)}}
+		Missing: Request_Header(r, "x-none"), Host: Request_Header(r, "host"), Address: Request_ClientAddress(r)}}
 }
 
 var table = Table[env]{Operations: []Operation[env]{
@@ -131,7 +132,7 @@ func TestHandler(t *testing.T) {
 		{"POST", "add", `{"name":"panics"}`, `500 request `},
 		{"POST", "add", `{"name":"secret","more":1}`, `400 add: input.more is not a key of Person`},
 		{"POST", "login", `{"name":"kept"}`, `200 {"type":"refused","message":"secret refusal"}`},
-		{"POST", "who", `not read`, `200 {"type":"ok","value":{"header":"me","cookie":"crumb","missing":null,"address":"192.0.2.1"}}`},
+		{"POST", "who", `not read`, `200 {"type":"ok","value":{"header":"me","cookie":"crumb","missing":null,"host":"example.com","address":"192.0.2.1"}}`},
 		{"POST", "nothing", `{}`, `404 `},
 		{"GET", "add", ``, `405 `},
 	} {
@@ -165,6 +166,9 @@ func TestHandler(t *testing.T) {
 	for _, l := range lines() {
 		switch l["msg"] {
 		case "served":
+			if _, ok := l["duration"]; !ok {
+				t.Errorf("a served line has no duration: %v", l)
+			}
 			ids[l["request"]] = l["operation"].(string) + " " + l["outcome"].(string)
 		case "rerun":
 			reruns[l["request"]] = l["cause"].(string)

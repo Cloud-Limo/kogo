@@ -97,8 +97,10 @@ func (r reader) readBody(t reflect.Type, body io.Reader) (reflect.Value, error) 
 	if err := d.Decode(&j); err != nil {
 		return reflect.Value{}, bad("the input", "is not JSON")
 	}
-	if _, err := d.Token(); err != io.EOF {
+	if _, err := d.Token(); err == nil {
 		return reflect.Value{}, bad("the input", "holds more than one JSON value")
+	} else if err != io.EOF {
+		return reflect.Value{}, bad("the input", "is not JSON")
 	}
 	return r.read(t, j, "input")
 }
@@ -151,16 +153,16 @@ func (r reader) read(t reflect.Type, j any, at string) (reflect.Value, error) {
 	case (t == uuidType || t.Kind() == reflect.String) && !isString:
 		return v, bad(at, "is not a string")
 	case t == uuidType:
-		u, err := hex.DecodeString(strings.ReplaceAll(s, "-", ""))
-		if len(s) != 36 || s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-' || err != nil {
+		if len(s) != 36 || s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-' {
+			return v, bad(at, "is not a Uuid")
+		}
+		u, err := hex.DecodeString(s[:8] + s[9:13] + s[14:18] + s[19:23] + s[24:])
+		if err != nil {
 			return v, bad(at, "is not a Uuid")
 		}
 		v.Set(reflect.ValueOf(kogo.Uuid(u)))
 	case t.Kind() == reflect.String && t != reflect.TypeFor[string](): // an enum
-		names, ok := r.enums[t]
-		if !ok {
-			panic("the table holds no constants of the enum " + t.String())
-		} else if !slices.Contains(names, s) {
+		if names := r.enums[t]; !slices.Contains(names, s) {
 			return v, bad(at, "is not one of %s", strings.Join(names, ", "))
 		}
 		v.SetString(s)
@@ -182,14 +184,17 @@ func (r reader) read(t reflect.Type, j any, at string) (reflect.Value, error) {
 	case !isObject:
 		return v, bad(at, "is not an object")
 	case t.Kind() == reflect.Interface: // a sealed interface
-		variants, ok := r.variants[t]
-		tag, _ := m["type"].(string)
+		variants := r.variants[t]
+		x, present := m["type"]
+		tag, isTag := x.(string)
 		vt, known := variants[tag]
 		switch {
-		case !ok:
-			panic("the table holds no variants of the sealed interface " + t.String())
-		case m["type"] == nil:
+		case !present:
 			return v, bad(at+".type", "is missing")
+		case x == nil:
+			return v, bad(at+".type", "is null")
+		case !isTag:
+			return v, bad(at+".type", "is not a string")
 		case !known:
 			return v, bad(at+".type", "is not one of %s", strings.Join(slices.Sorted(maps.Keys(variants)), ", "))
 		}
@@ -209,6 +214,10 @@ func (r reader) read(t reflect.Type, j any, at string) (reflect.Value, error) {
 func (r reader) object(t reflect.Type, m map[string]any, at string, variant bool) (reflect.Value, error) {
 	v := reflect.New(t).Elem()
 	keys := map[string]bool{"type": variant}
+	n := 0 // the keys of m read, so that only m with more is sorted
+	if variant {
+		n = 1
+	}
 	for i := range t.NumField() {
 		if f := t.Field(i); f.Name != "_" {
 			key := f.Tag.Get("kogo")
@@ -222,7 +231,11 @@ func (r reader) object(t reflect.Type, m map[string]any, at string, variant bool
 			}
 			v.Field(i).Set(e)
 			keys[key] = true
+			n++
 		}
+	}
+	if len(m) == n {
+		return v, nil
 	}
 	for _, k := range slices.Sorted(maps.Keys(m)) {
 		if !keys[k] {
@@ -230,6 +243,43 @@ func (r reader) object(t reflect.Type, m map[string]any, at string, variant bool
 		}
 	}
 	return v, nil
+}
+
+// check panics if r lacks the constants of an enum or the variants of
+// a sealed interface that t reaches, or if t cannot cross the wire, so
+// that a table missing some fails when the server starts and read
+// never panics.
+func (r reader) check(t reflect.Type, seen map[reflect.Type]bool) {
+	if seen[t] {
+		return
+	}
+	seen[t] = true
+	switch {
+	case t == uuidType, t == reflect.TypeFor[string]():
+	case t.Kind() == reflect.Bool, t.Kind() == reflect.Int32, t.Kind() == reflect.Int64, t.Kind() == reflect.Float64:
+	case t.Kind() == reflect.String:
+		if _, ok := r.enums[t]; !ok {
+			panic("the table holds no constants of the enum " + t.String())
+		}
+	case t.Kind() == reflect.Pointer, t.Kind() == reflect.Slice:
+		r.check(t.Elem(), seen)
+	case t.Kind() == reflect.Interface:
+		variants, ok := r.variants[t]
+		if !ok {
+			panic("the table holds no variants of the sealed interface " + t.String())
+		}
+		for _, v := range variants {
+			r.check(v, seen)
+		}
+	case t.Kind() == reflect.Struct:
+		for i := range t.NumField() {
+			if f := t.Field(i); f.Name != "_" {
+				r.check(f.Type, seen)
+			}
+		}
+	default:
+		panic("no " + t.String() + " crosses the wire")
+	}
 }
 
 // write writes v as JSON; variant is whether v is a sealed interface's

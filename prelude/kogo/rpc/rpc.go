@@ -25,8 +25,11 @@ import (
 type Request struct{ r *http.Request }
 
 // Request_Header matches the header's name whatever its case, and
-// gives its first value.
+// gives its first value. Go keeps Host out of the headers.
 func Request_Header(this Request, name string) *string {
+	if strings.EqualFold(name, "Host") {
+		return &this.r.Host
+	}
 	if v := this.r.Header.Values(name); len(v) > 0 {
 		return &v[0]
 	}
@@ -50,12 +53,10 @@ func Request_ClientAddress(this Request) string {
 	return this.r.RemoteAddr
 }
 
-// An Operation is one row of a table: its name on the wire, its kind,
-// and its fun, which Tx and Db take with its Go type, so that Go
-// checks it.
+// An Operation is one row of a table: its name on the wire and its
+// fun, which Tx and Db take with its Go type, so that Go checks it.
 type Operation[Env any] struct {
 	Name  string
-	Tx    bool // whether the server runs it in a transaction
 	input reflect.Type
 	run   func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, []byte]
 }
@@ -66,7 +67,7 @@ type Operation[Env any] struct {
 // back. The answer is written inside it, so that one that has no JSON
 // rolls back too.
 func Tx[Env, I, A any](name string, f func(kogo.Tx, Env, Request, I) kogo.Either[string, A]) Operation[Env] {
-	return Operation[Env]{name, true, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, []byte] {
+	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, []byte] {
 		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) []byte {
 			return kogo.SerializableTx(db, again, func(tx kogo.Tx) []byte {
 				return answer(name, kogo.Either_Bind[string, A](f(tx, env, r, input.(I)), raise, func(s string) string { return s }))
@@ -78,7 +79,7 @@ func Tx[Env, I, A any](name string, f func(kogo.Tx, Env, Request, I) kogo.Either
 // Db is the row of an operation that takes a Db and runs in no
 // transaction of the server's.
 func Db[Env, I, A any](name string, f func(kogo.Db, Env, Request, I) kogo.Either[string, A]) Operation[Env] {
-	return Operation[Env]{name, false, reflect.TypeFor[I](), func(db kogo.Db, _ func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, []byte] {
+	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, _ func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, []byte] {
 		return kogo.Either_Map[string](f(db, env, r, input.(I)), func(a A) []byte { return answer(name, a) })
 	}}
 }
@@ -114,10 +115,12 @@ type Handler[Env any] struct {
 }
 
 // NewHandler serves t over pool with env, and logs to log. Its Limit
-// is 90 seconds.
+// is 90 seconds. It panics if t lacks an enum's entries or a sealed
+// interface's variants that an input reaches.
 func NewHandler[Env any](t Table[Env], pool *pgxpool.Pool, env Env, log *slog.Logger) *Handler[Env] {
 	h := &Handler[Env]{90 * time.Second, map[string]Operation[Env]{}, newReader(t.Enums, t.Sealed), pool, env, log}
 	for _, op := range t.Operations {
+		h.read.check(op.input, map[reflect.Type]bool{})
 		h.ops[op.Name] = op
 	}
 	return h
@@ -133,7 +136,7 @@ func (h *Handler[Env]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	id := kogo.NewId().String()
 	log := h.log.With("request", id, "operation", name)
 	outcome := h.serve(w, r, name, id, log, start)
-	log.Info("served", "outcome", outcome, "time", time.Since(start))
+	log.Info("served", "outcome", outcome, "duration", time.Since(start))
 }
 
 func (h *Handler[Env]) serve(w http.ResponseWriter, r *http.Request, name, id string, log *slog.Logger, start time.Time) (outcome string) {
@@ -143,6 +146,15 @@ func (h *Handler[Env]) serve(w http.ResponseWriter, r *http.Request, name, id st
 		w.Write([]byte(body))
 		return fmt.Sprint(status)
 	}
+	ranOut := false
+	defer func() {
+		if p := recover(); p != nil && ranOut {
+			outcome = text(http.StatusServiceUnavailable, "request "+id)
+		} else if p != nil {
+			log.Error("panic", "message", fmt.Sprint(p), "trace", string(debug.Stack()))
+			outcome = text(http.StatusInternalServerError, "request "+id)
+		}
+	}()
 	op, found := h.ops[name]
 	if !found {
 		return text(http.StatusNotFound, "")
@@ -157,15 +169,6 @@ func (h *Handler[Env]) serve(w http.ResponseWriter, r *http.Request, name, id st
 			return text(http.StatusBadRequest, name+": "+err.Error())
 		}
 	}
-	ranOut := false
-	defer func() {
-		if p := recover(); p != nil && ranOut {
-			outcome = text(http.StatusServiceUnavailable, "request "+id)
-		} else if p != nil {
-			log.Error("panic", "message", fmt.Sprint(p), "trace", string(debug.Stack()))
-			outcome = text(http.StatusInternalServerError, "request "+id)
-		}
-	}()
 	again := func(conflict *pgconn.PgError) bool {
 		if ranOut = time.Since(start) >= h.Limit; !ranOut {
 			log.Info("rerun", "cause", map[string]string{"40001": "serialization failure", "40P01": "deadlock"}[conflict.Code])

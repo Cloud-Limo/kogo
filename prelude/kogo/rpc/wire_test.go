@@ -114,9 +114,12 @@ func TestStrict(t *testing.T) {
 		{`0.1`, `1e400`, "input.rate does not fit a Double"},
 		{`"a \"b\""`, `5`, "input.notes is not a string"},
 		{`0195a3c4-5b6d`, `0195a3c45-b6d`, "input.id is not a Uuid"},
+		{`3e4f5a6b`, `3e4f5a--`, "input.id is not a Uuid"},
 		{`"Confirmed"`, `"Secret"`, "input.state is not one of Offered, Confirmed"},
 		{`"type":"Card"`, `"type":"Secret"`, "input.pay.type is not one of Card, Cash"},
 		{`"type":"Card",`, ``, "input.pay.type is missing"},
+		{`"type":"Card"`, `"type":null`, "input.pay.type is null"},
+		{`"type":"Card"`, `"type":5`, "input.pay.type is not a string"},
 		{`{"type":"Cash"}`, `{"type":"Cash","secret":1}`, "input.stops[1].back.secret is not a key of Cash"},
 		{`"name":"y"`, `"name":null`, "input.stops[1].name is null"},
 		{`"tip":7`, `"tip":[7]`, "input.tip is not a number"},
@@ -125,11 +128,34 @@ func TestStrict(t *testing.T) {
 		{`"nothing":{}`, `"nothing":[]`, "input.nothing is not an object"},
 		{`{"done"`, `[{"done"`, "the input is not JSON"},
 		{`"nothing":{}}`, `"nothing":{}} {}`, "the input holds more than one JSON value"},
+		{`"nothing":{}}`, `"nothing":{}} x`, "the input is not JSON"},
 	} {
 		text := strings.Replace(job, c[0], c[1], 1)
 		if _, err := read(text); err == nil || !strings.HasPrefix(err.Error(), c[2]) || strings.Contains(err.Error(), "Secret") {
 			t.Errorf("%s is refused with %v, want %s", text, err, c[2])
 		}
+	}
+}
+
+// A table that lacks an enum's entries or a sealed interface's
+// variants that an input reaches fails when the server starts.
+func TestCheck(t *testing.T) {
+	job := Db("job", func(kogo.Db, env, Request, Job) kogo.Either[string, rt.Unit] { return nil })
+	for _, c := range []struct {
+		t    Table[env]
+		want string
+	}{
+		{Table[env]{[]Operation[env]{job}, nil, []Sealed{Variants[Pay](Pay_Card{}, Pay_Cash{})}}, "the table holds no constants of the enum rpc.State"},
+		{Table[env]{[]Operation[env]{job}, []any{State_entries}, nil}, "the table holds no variants of the sealed interface rpc.Pay"},
+	} {
+		func() {
+			defer func() {
+				if p, _ := recover().(string); p != c.want {
+					t.Errorf("panics with %q, want %q", p, c.want)
+				}
+			}()
+			NewHandler(c.t, nil, env{}, nil)
+		}()
 	}
 }
 

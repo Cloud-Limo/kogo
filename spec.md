@@ -585,6 +585,11 @@ one has no Kogo type. The whole row of a subquery or a CTE, like
 `row(...)`, has the anonymous type `record`, which has none either:
 select from a table, or name the columns.
 
+Each label of an enum type must be a name a constant can have: a letter
+or `_`, then letters, digits and `_`. An enum with any other label, one
+holding a space or a hyphen, has no Kogo type: rename the label in
+Postgres, or cast the column to text and read it as a `String`.
+
 A parameter's Kogo type must map to the type Postgres infers for it. When
 Postgres cannot infer one, cast it: `$active::boolean`. A parameter or a
 result column of a type that is not in the table is a compile error: cast

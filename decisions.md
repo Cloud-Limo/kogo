@@ -159,6 +159,13 @@ Each entry: what was decided, why, and what would reopen it.
   in a `kogo.` package. The leakage2 port, written before, used it with no import and
   gains one line. Not taken: `Console` beside `Uuid`, `newId` and `Decimal` in `kogo`, with
   no import, which grows the list of exceptions to that entry.
+- **An enum label must be a name a constant can have** (15 Nov 2026, Greg; spec 10.4).
+  `cusoon_b`'s `booking_paid_by` has `paid_in car_income`, which no constant can spell. An
+  enum with such a label has no Kogo type: the label is renamed in Postgres, or the column
+  is cast to text and read as a `String`, and the checker says both. So `select *` cannot
+  fill the row of a table that has one until the label is renamed. Not taken: mapping such
+  a label to a name (a space to `_`), a second spelling to keep in step with the database,
+  which could make two labels one constant.
 - **A prelude declaration always lands with its Go and a test** (15 Nov 2026; spec 12 and
   13). `TestPrelude` compiles a use of every declaration against the Go behind it, and
   stays that strict: a declaration the checker accepts is one the emitter can write. Not
@@ -910,8 +917,3 @@ Each entry: what was decided, why, and what would reopen it.
 
 - Outbound calls are handles (above), but their timeouts and retries, workers, and an
   application's own binding files have no design.
-- An enum whose label cannot name a constant (cusoon_b's `booking_paid_by` has
-  `paid_in car_income`) has no Kogo type: its column is cast to text and read as a
-  `String`, so `select *` cannot fill the row of a table that has one, and `kogo schema`
-  has nothing to write for it. The checker says so (DEV-828). Reopen with a mapping of
-  such a label to a name, if a port meets another.

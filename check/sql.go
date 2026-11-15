@@ -365,9 +365,9 @@ func enumDiff(pt sqlpass.Type, d *TypeDecl, cast bool) string {
 	}
 	fix := "make the constants of " + d.Name + " its labels"
 	if unnamed != nil && !cast {
-		fix = strings.Join(unnamed, ", ") + " cannot name a constant: select columns in place of this composite"
+		fix = strings.Join(unnamed, ", ") + " cannot name a constant (spec.md 10.4): rename it in Postgres"
 	} else if unnamed != nil {
-		fix = fmt.Sprintf("%s cannot name a constant, so cast the column to text and read it as a String", strings.Join(unnamed, ", "))
+		fix = fmt.Sprintf("%s cannot name a constant (spec.md 10.4): rename it in Postgres, or cast the column to text and read it as a String", strings.Join(unnamed, ", "))
 	}
 	return strings.Join(says, ", and ") + ": " + fix
 }

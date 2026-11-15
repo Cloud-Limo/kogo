@@ -1,0 +1,52 @@
+// Operations (spec.md 15): an api list, served over HTTP. A Tx
+// operation runs in one transaction, which a refusal rolls back; a Db
+// operation opens its own, and one it has committed stays.
+package example.ops
+
+import kogo.rpc.Request
+
+api ops { invoices, setStatus, lookUp }
+
+data class OpsEnv(val maxLooks: Int)
+
+enum class InvoiceStatus { draft, sent, paid }
+
+data class InvoiceView(val number: String, val status: InvoiceStatus, val totalCents: Long?)
+
+data class StatusChange(val number: String, val status: InvoiceStatus)
+
+data class LookUp(val number: String)
+
+fun invoices(tx: Tx, env: OpsEnv, request: Request, input: Unit): Either<String, List<InvoiceView>> = either {
+    tx.query<InvoiceView>(sql"select number, status, total_cents from invoice order by number")
+}
+
+// The status is written before it is checked: the refusal undoes it.
+fun setStatus(tx: Tx, env: OpsEnv, request: Request, input: StatusChange): Either<String, InvoiceView> = either {
+    val invoice = tx.queryOne<InvoiceView>(sql"""
+        update invoice set status = ${input.status} where number = ${input.number}
+        returning number, status, total_cents
+    """) ?: raise("There is no invoice ${input.number}.")
+    ensure(invoice.status == InvoiceStatus.draft || invoice.totalCents != null) {
+        "Invoice ${invoice.number} has no total, so it stays a draft."
+    }
+    invoice
+}
+
+// Each look is counted in a transaction of its own, which stays when
+// the look is refused, so that numbers cannot be guessed one by one.
+fun lookUp(db: Db, env: OpsEnv, request: Request, input: LookUp): Either<String, InvoiceView> = either {
+    val looks = db.tx { tx ->
+        tx.querySingle<Int>(sql"""
+            insert into look (address, count) values (${request.clientAddress}, 1)
+            on conflict (address) do update set count = look.count + 1
+            returning count
+        """)
+    }.bind()
+    ensure(looks <= env.maxLooks) { "Too many looks. Try again later." }
+    db.tx { tx ->
+        tx.queryOne<InvoiceView>(sql"""
+            select number, status, total_cents from invoice where number = ${input.number}
+        """) ?: raise("There is no invoice ${input.number}.")
+    }.bind()
+}

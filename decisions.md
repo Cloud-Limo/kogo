@@ -1259,6 +1259,21 @@ Each entry: what was decided, why, and what would reopen it.
   takes one; and the wire types the list reaches in the order first reached. A type is
   read once for each list, which ends a type that holds itself.
 
+## Taken emitting the table of an api list (DEV-851), not yet discussed
+
+- **A list's table is named by the naming rule, as a top-level name of its package**:
+  `api ops` is `Ops`, and where another declaration of the package is `Ops` too, a type or
+  a fun, the table is `Ops_api`, as a val would be `Ops_val`. The driver of an
+  application reads it by that name; nothing on the wire does.
+- **The table holds the entries of every enum the list's operations reach**, the answers'
+  too, from the checker's one list of wire types. The server needs only the inputs'; an
+  answer's enum costs a slice it never reads. Not taken: a walk over the inputs alone, in
+  the checker or the emitter, for no change in what is served.
+- **Example 22 counts looks in a table of its own, `look`, added to the test schema**: a
+  count that stays after a refusal needs a row to keep it, and no table of the schema
+  held one. The example is package `example.ops`, so that its `InvoiceStatus`, whose
+  constants are the Postgres labels, is not example 05's.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, workers, and an

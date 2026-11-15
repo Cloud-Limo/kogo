@@ -1,7 +1,7 @@
 // Package emit writes Go from a checked Kogo program: doc/design.md,
 // "The emitter". It writes pure code, spec.md sections 2 to 6,
-// expected failures, section 9, and SQL and transactions, sections 7
-// and 10.
+// expected failures, section 9, SQL and transactions, sections 7
+// and 10, and the table of each api list, section 15.
 //
 // Nobody reads the Go. Each line of it is preceded by a //line
 // directive, so that a Go panic's trace names the Kogo file and line.
@@ -74,6 +74,9 @@ func emitAll(info *check.Info, prelude, program []*syntax.File, root string) (*e
 				e.path, _ = filepath.Abs(f.Name)
 				for _, d := range f.Decls {
 					e.decl(d)
+				}
+				for _, d := range f.APIs {
+					e.table(d)
 				}
 			}
 		})

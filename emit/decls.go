@@ -187,3 +187,28 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 		}
 	}
 }
+
+// table writes an api list's rpc.Table: each operation's name on the
+// wire and its fun, in the list's order, and the entries of each enum
+// the operations reach, by which the server reads an input's enum.
+func (e *emitter) table(d *syntax.API) {
+	defer e.enter(d)()
+	a := e.info.APIs[d]
+	rpc := func(name string) string { return e.qualify("kogo.rpc", name) }
+	var ops, enums []string
+	for _, op := range a.Ops {
+		kind := "Db"
+		if op.Tx {
+			kind = "Tx"
+		}
+		ops = append(ops, fmt.Sprintf("%s(%q, %s)", rpc(kind), op.Func.Name, e.qualify(op.Func.Pkg, e.names[op.Func])))
+	}
+	for _, t := range a.Types {
+		if t.Kind == "enum class" {
+			enums = append(enums, e.qualify(t.Pkg, e.names[t]+"_entries"))
+		}
+	}
+	env := e.typ(a.Env)
+	e.w("var %s = %s[%s]{Operations: []%s[%s]{%s}, Enums: []any{%s}}",
+		e.names[d], rpc("Table"), env, rpc("Operation"), env, strings.Join(ops, ", "), strings.Join(enums, ", "))
+}

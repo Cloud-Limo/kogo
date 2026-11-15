@@ -16,7 +16,8 @@ import (
 // receiver follows the receiver's type: Booking_SupplierPay. Where
 // two declarations of a package come out the same, each fun among
 // them is spelled in full, with its receiver's type arguments and its
-// parameters' types, and each val adds _val; a type keeps its name.
+// parameters' types, each val adds _val and each api list's table
+// _api; a type keeps its name.
 
 // export gives a Kogo name as a Go name that other packages can use
 // and that no local has: it begins with an upper-case letter and does
@@ -155,6 +156,9 @@ func (e *emitter) name(files []*syntax.File) {
 					add(vs[0], d, d.Mods.Visibility, export(d.Name), export(d.Name)+"_val")
 				}
 			}
+		}
+		for _, d := range f.APIs {
+			add(d, d, "", export(d.Name), export(d.Name)+"_api")
 		}
 	}
 	for _, pkg := range pkgs {

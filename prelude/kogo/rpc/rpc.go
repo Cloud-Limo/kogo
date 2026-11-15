@@ -93,7 +93,8 @@ func answer[A any](op string, a A) []byte {
 }
 
 // A Table is what the emitter writes for an api list: its operations
-// and each enum's entries (Name_entries) that its inputs reach.
+// and each enum's entries (Name_entries) that they reach, which must
+// cover those their inputs reach.
 type Table[Env any] struct {
 	Operations []Operation[Env]
 	Enums      []any

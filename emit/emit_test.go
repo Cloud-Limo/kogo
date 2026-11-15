@@ -933,3 +933,31 @@ func TestPrelude(t *testing.T) {
 		t.Errorf("the Go that uses every declaration of the prelude does not compile:\n%s", out)
 	}
 }
+
+// Each api list is a table in its package: its operations in order,
+// by their names on the wire, an imported one among them, and the
+// entries of each enum they reach. A table whose name a type has
+// takes _api.
+func TestTables(t *testing.T) {
+	expect(t, [][2]string{
+		{"fmt.Sprint([]string{t.Ops.Operations[0].Name, t.Ops.Operations[1].Name}, t.Ops.Enums)", "[me f] [[Alone Shared] [Open Done]]"},
+		{"fmt.Sprint([]string{t.Other_api.Operations[0].Name}, t.Other_api.Enums)", "[g] [[S M]]"},
+	}, `package t
+import kogo.rpc.Request
+import u.g
+api ops { me, f }
+api other { g }
+data class Env(val n: Int)
+data class Other(val n: Int)
+data class Ask(val kind: Kind)
+enum class Kind { Alone, Shared }
+enum class State { Open, Done }
+fun me(tx: Tx, env: Env, request: Request, input: Unit): Either<String, Unit> = either { }
+fun f(db: Db, env: Env, request: Request, input: Ask): Either<String, State> = either { raise("no") }
+`, `package u
+import kogo.rpc.Request
+data class Env(val s: String)
+enum class Size { S, M }
+fun g(tx: Tx, env: Env, request: Request, input: List<Size?>): Either<String, Unit> = either { }
+`)
+}

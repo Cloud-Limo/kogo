@@ -6,18 +6,23 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"net/http/httptest"
+	"strings"
 
 	"ROOT/cusoon/invoice"
 	"ROOT/cusoon/model"
 	"ROOT/example"
 	"ROOT/example/markers"
+	"ROOT/example/ops"
 	"kogo/internal/testdb"
 	"kogo/prelude/kogo"
+	"kogo/prelude/kogo/rpc"
 	ktime "kogo/prelude/kogo/time"
 	"kogo/rt"
 )
 
-// The rows that examples 10 to 19 and 21 read.
+// The rows that examples 10 to 19, 21 and 22 read.
 const seed = `
 insert into business (id, slug, legal_name, created_at, abn) values
     ('00000000-0000-0000-0000-000000000001', 'acme', 'Acme Pty Ltd', '2026-01-02 03:04:05+00', '51824753556'),
@@ -120,7 +125,7 @@ func main() {
 	show("today in Sydney", example.TodayIn(clock, "Australia/Sydney"))
 	show("today in New York", example.TodayIn(clock, "America/New_York"))
 
-	// 10 to 19 and 21: SQL, against a schema of its own in the test
+	// 10 to 19, 21 and 22: SQL, against a schema of its own in the test
 	// database, through a Db made as a server would make one.
 	ctx := context.Background()
 	pool, drop := testdb.Open(ctx, "../../testdata/schema.sql")
@@ -181,4 +186,23 @@ func main() {
 	show("accept", example.Accept(db, first.Id, bolt))
 	show("accept again", example.Accept(db, first.Id, bolt))
 	show("suppliers after", in(db, func(tx kogo.Tx) []example.SupplierRow { return example.SuppliersOf(tx, acme) }))
+
+	// 22: the table of an api list, served as main serves it, each
+	// request from one address.
+	h := rpc.NewHandler(ops.Ops, pool, ops.OpsEnv{MaxLooks: 2}, slog.New(slog.DiscardHandler))
+	post := func(what, op, body string) {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("POST", "/"+op, strings.NewReader(body)))
+		fmt.Println(strings.TrimSpace(fmt.Sprintf("%s: %d %s", what, w.Code, w.Body)))
+	}
+	post("invoices", "invoices", "")
+	post("paid with no total", "setStatus", `{"number": "INV-2", "status": "paid"}`)
+	post("invoices after the refusal", "invoices", "")
+	post("back to a draft", "setStatus", `{"number": "INV-2", "status": "draft"}`)
+	post("no status", "setStatus", `{"number": "INV-2"}`)
+	post("not a status", "setStatus", `{"number": "INV-2", "status": "void"}`)
+	post("no such operation", "cancel", "{}")
+	post("look up a missing invoice", "lookUp", `{"number": "INV-9"}`)
+	post("look up", "lookUp", `{"number": "INV-1"}`)
+	post("look up a third time", "lookUp", `{"number": "INV-1"}`)
 }

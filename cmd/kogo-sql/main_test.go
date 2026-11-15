@@ -47,6 +47,10 @@ func TestCheckExamples(t *testing.T) {
 		"18_tx.kg:22:20 (inviteId: Uuid) -> ",
 		"19_markers.kg:15:27 (id: Uuid) -> id: Uuid, legal_name: String",
 		"21_sql_void.kg:6:16 (key: Long) -> ",
+		"22_api.kg:21:27 () -> number: String, status: InvoiceStatus, total_cents: Long?",
+		"22_api.kg:26:44 (input.status: InvoiceStatus, input.number: String) -> number: String, status: InvoiceStatus, total_cents: Long?",
+		"22_api.kg:40:29 (request.clientAddress: String) -> count: Int",
+		"22_api.kg:48:34 (input.number: String) -> number: String, status: InvoiceStatus, total_cents: Long?",
 	}
 	lines, code := kogoSQL(t, "check", "../../examples")
 	if code != 0 || len(lines) != len(want) {

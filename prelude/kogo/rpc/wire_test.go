@@ -22,21 +22,10 @@ const (
 
 var State_entries = []State{State_Offered, State_Confirmed}
 
-type Pay interface{}
-
-type Pay_Card struct {
-	_     struct{} `kogo:"Card"`
-	Last4 string   `kogo:"last4"`
-}
-
-type Pay_Cash struct {
-	_ struct{} `kogo:"Cash,object"`
-}
-
 type Stop struct {
 	_    struct{} `kogo:"Stop"`
 	Name string   `kogo:"name"`
-	Back *Pay     `kogo:"back"`
+	Back *Stop    `kogo:"back"`
 }
 
 type Job struct {
@@ -48,22 +37,20 @@ type Job struct {
 	Notes   string    `kogo:"notes"`
 	Id      kogo.Uuid `kogo:"id"`
 	State   State     `kogo:"state"`
-	Pay     Pay       `kogo:"pay"`
 	Stops   []Stop    `kogo:"stops"`
 	Tip     *int32    `kogo:"tip"`
 	Nothing rt.Unit   `kogo:"nothing"`
 }
 
-var wire = newReader([]any{State_entries}, []Sealed{Variants[Pay](Pay_Card{}, Pay_Cash{})})
+var wire = newReader([]any{State_entries})
 
 const job = `{"done":true,"number":-2147483648,"cents":-9007199254740991,"rate":0.1,"notes":"a \"b\"",` +
-	`"id":"0195a3c4-5b6d-7e8f-9a0b-1c2d3e4f5a6b","state":"Confirmed","pay":{"type":"Card","last4":"4242"},` +
-	`"stops":[{"name":"x","back":null},{"name":"y","back":{"type":"Cash"}}],"tip":7,"nothing":{}}`
+	`"id":"0195a3c4-5b6d-7e8f-9a0b-1c2d3e4f5a6b","state":"Confirmed",` +
+	`"stops":[{"name":"x","back":null},{"name":"y","back":{"name":"z","back":null}}],"tip":7,"nothing":{}}`
 
-var cash Pay = Pay_Cash{}
 var jobValue = Job{Done: true, Number: math.MinInt32, Cents: -maxLong, Rate: 0.1, Notes: `a "b"`,
 	Id:    kogo.Uuid{0x01, 0x95, 0xa3, 0xc4, 0x5b, 0x6d, 0x7e, 0x8f, 0x9a, 0x0b, 0x1c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b},
-	State: State_Confirmed, Pay: Pay_Card{Last4: "4242"}, Stops: []Stop{{Name: "x"}, {Name: "y", Back: &cash}},
+	State: State_Confirmed, Stops: []Stop{{Name: "x"}, {Name: "y", Back: &Stop{Name: "z"}}},
 	Tip: rt.Ptr[int32](7)}
 
 func read(text string) (Job, error) {
@@ -74,8 +61,8 @@ func read(text string) (Job, error) {
 	return v.Interface().(Job), nil
 }
 
-// Each row of the table reads and writes, a sealed value with its
-// type and Unit as {} among them, and the largest Int and Long too.
+// Each row of the table reads and writes, Unit as {} among them, and
+// the largest Int and Long too.
 func TestWire(t *testing.T) {
 	for text, want := range map[string]Job{
 		job: jobValue,
@@ -103,7 +90,6 @@ func TestStrict(t *testing.T) {
 	for _, c := range [][3]string{
 		{`"done":true,`, ``, "input.done is missing"},
 		{`"tip":7`, `"tip":7,"secret":1`, "input.secret is not a key of Job"},
-		{`"tip":7`, `"tip":7,"type":"Job"`, "input.type is not a key of Job"},
 		{`"done":true`, `"done":1`, "input.done is not true or false"},
 		{`-2147483648`, `"-1"`, "input.number is not a number"},
 		{`-2147483648`, `1.0`, "input.number is not a whole number"},
@@ -116,11 +102,7 @@ func TestStrict(t *testing.T) {
 		{`0195a3c4-5b6d`, `0195a3c45-b6d`, "input.id is not a Uuid"},
 		{`3e4f5a6b`, `3e4f5a--`, "input.id is not a Uuid"},
 		{`"Confirmed"`, `"Secret"`, "input.state is not one of Offered, Confirmed"},
-		{`"type":"Card"`, `"type":"Secret"`, "input.pay.type is not one of Card, Cash"},
-		{`"type":"Card",`, ``, "input.pay.type is missing"},
-		{`"type":"Card"`, `"type":null`, "input.pay.type is null"},
-		{`"type":"Card"`, `"type":5`, "input.pay.type is not a string"},
-		{`{"type":"Cash"}`, `{"type":"Cash","secret":1}`, "input.stops[1].back.secret is not a key of Cash"},
+		{`"name":"z"`, `"name":"z","secret":1`, "input.stops[1].back.secret is not a key of Stop"},
 		{`"name":"y"`, `"name":null`, "input.stops[1].name is null"},
 		{`"tip":7`, `"tip":[7]`, "input.tip is not a number"},
 		{`"stops":[`, `"stops":{},"s":[`, "input.stops is not an array"},
@@ -137,16 +119,15 @@ func TestStrict(t *testing.T) {
 	}
 }
 
-// A table that lacks an enum's entries or a sealed interface's
-// variants that an input reaches fails when the server starts.
+// A table that lacks an enum's entries that an input reaches fails
+// when the server starts.
 func TestCheck(t *testing.T) {
 	job := Db("job", func(kogo.Db, env, Request, Job) kogo.Either[string, rt.Unit] { return nil })
 	for _, c := range []struct {
 		t    Table[env]
 		want string
 	}{
-		{Table[env]{[]Operation[env]{job}, nil, []Sealed{Variants[Pay](Pay_Card{}, Pay_Cash{})}}, "the table holds no constants of the enum rpc.State"},
-		{Table[env]{[]Operation[env]{job}, []any{State_entries}, nil}, "the table holds no variants of the sealed interface rpc.Pay"},
+		{Table[env]{[]Operation[env]{job}, nil}, "the table holds no constants of the enum rpc.State"},
 	} {
 		func() {
 			defer func() {
@@ -180,7 +161,7 @@ func TestUnwritable(t *testing.T) {
 				}
 			}()
 			var b bytes.Buffer
-			write(&b, reflect.ValueOf(j), "op", "value", false)
+			write(&b, reflect.ValueOf(j), "op", "value")
 		}()
 	}
 }

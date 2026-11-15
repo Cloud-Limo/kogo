@@ -220,19 +220,24 @@ Each entry: what was decided, why, and what would reopen it.
   list names, a step the reader does not see, which for a `Db` operation would need a
   transaction of its own. An application that wants the context calls its builder on its
   first line. Accepted cost: four parameters on every operation.
-- **The wire carries what cusoon2 sends today, and sealed interfaces** (15 Nov 2026;
-  spec 15.4): `Boolean`, `Int`, `Long`, `Double`, `String`, `Uuid`, enums, data classes,
-  `List`, `T?` and `Unit`; names as written, nothing optional, and strict reading, a
-  missing, unknown or mistyped key being a 400. cusoon2's 20 operations send 35 data
-  classes with 107 fields: 53 `String`, 14 ids, 13 data classes or enums, 12 `Int`, 7
-  lists, 4 `Boolean`, 3 `Long`, 1 `Double`; 22 may be null. Sealed interfaces were added
-  on Greg's question of what they are good for: cusoon2's `AcceptInviteInput` has two
-  nullable fields whose three valid combinations are stated in a comment, and a sealed
-  input lets TypeScript refuse the fourth and `when` cover the three. The tag is a key
-  `type` holding the variant's name, since Kogo has no annotation to name one. Not taken:
-  dates and times, which cusoon2 sends as text it has formatted; maps. Each can be added
-  and break nothing. Forced, not chosen: a `Double` that is `NaN` or an infinity has no
-  JSON, so an answer holding one panics.
+- **The wire carries what cusoon2 sends today** (15 Nov 2026; spec 15.4): `Boolean`,
+  `Int`, `Long`, `Double`, `String`, `Uuid`, enums, data classes, `List`, `T?` and `Unit`;
+  names as written, nothing optional, and strict reading, a missing, unknown or mistyped
+  key being a 400. cusoon2's 20 operations send 35 data classes with 107 fields: 53
+  `String`, 14 ids, 13 data classes or enums, 12 `Int`, 7 lists, 4 `Boolean`, 3 `Long`, 1
+  `Double`; 22 may be null. Sealed interfaces were added on Greg's question of what they
+  are good for, and taken off again the same day (DEV-855): cusoon2's `AcceptInviteInput`
+  has two nullable fields whose three valid combinations are stated in a comment, which a
+  sealed input would let TypeScript and `when` hold, but no operation sends one. They cost
+  about 115 lines of code and 40 of tests in the checker and the server, more in the
+  emitter's table and `kogo ts` once written, and rules of their own: the `type` key, a
+  `data object` alone, a property named `type`, and whether a variant sent alone carries
+  `type`. A sealed interface or a variant on the wire is a compile error that asks for a
+  data class with an enum. Adding them back breaks no program; taking them out once used
+  would. Reopen when an operation's input has field combinations that only a comment
+  states. Not taken: dates and times, which cusoon2 sends as text it has formatted; maps.
+  Each can be added and break nothing. Forced, not chosen: a `Double` that is `NaN` or an
+  infinity has no JSON, so an answer holding one panics.
 - **A `Long` crosses as a number, within what JavaScript holds exactly** (15 Nov 2026;
   spec 15.4). JavaScript read `9007199254740993` from JSON as `9007199254740992`, with no
   error (run in node). cusoon2 sends a `Long` as a number unguarded; its three are cents,
@@ -243,7 +248,7 @@ Each entry: what was decided, why, and what would reopen it.
 - **A refusal is words: every operation returns `Either<String, A>`** (15 Nov 2026; spec
   15.2), as all 20 of cusoon2's do, and every page handles a refusal one way. An operation
   that must tell the page which of several things happened says so in its answer, which
-  may be a sealed type and commits. Not taken: any wire type as the refusal, which lets a
+  may hold an enum, and commits. Not taken: any wire type as the refusal, which lets a
   page branch on a refusal that rolled back, and lets an internal error type onto the
   wire. Widening later breaks no operation, though the answer's object gains a key.
 - **`kogo ts` writes the types and the table of operations, and no client** (15 Nov 2026;
@@ -1142,9 +1147,9 @@ Each entry: what was decided, why, and what would reopen it.
 - **A table is a Go value built by two generic constructors**, `rpc.Tx(name, f)` and
   `rpc.Db(name, f)`, so Go checks each fun's four parameters and its `Either`; the input
   and answer types come with `f`. Besides the operations it holds each enum's entries,
-  the `Name_entries` slice the emitter already writes, and each sealed interface's
-  `rpc.Variants[I](V1{}, V2{})`. Not taken: a reader and writer emitted for each type,
-  which the design refused; names in a string table, which Go would not check.
+  the `Name_entries` slice the emitter already writes. Not taken: a reader and writer
+  emitted for each type, which the design refused; names in a string table, which Go
+  would not check.
 - **An `Int` or a `Long` is read only as digits** (spec 15.4): `1.0` and `1e3` are refused
   as not whole, though each is a whole number. `JSON.stringify` writes every whole number a
   `Long` can carry as digits, so only a client of another language meets this. Reading
@@ -1157,10 +1162,9 @@ Each entry: what was decided, why, and what would reopen it.
   and as `JSON.parse` does. A body holding a second value after the first is a 400.
 - **The 400's body is text: the operation, the key's path and what is wrong**, as
   `updateJob: input.stops[1].state is not one of Offered, Confirmed`. A path, not a bare
-  key, since one name may stand at many places. An enum's constants and a sealed
-  interface's variants are listed; the value never is. The 500's and 503's body is
-  `request <id>`, the id the log holds; the 404's and 405's are empty, with `Allow: POST`
-  on a 405.
+  key, since one name may stand at many places. An enum's constants are listed; the value
+  never is. The 500's and 503's body is `request <id>`, the id the log holds; the 404's
+  and 405's are empty, with `Allow: POST` on a 405.
 - **The answer is written inside the transaction**, so an answer with no JSON, a `NaN`
   or a `Long` past the limit, rolls back as any other panic does.
 - **The reruns' limit is checked before each rerun, from when the request arrived**: an
@@ -1177,9 +1181,9 @@ Each entry: what was decided, why, and what would reopen it.
   its `cause`, `serialization failure` or `deadlock`; a line `panic` with `message` and
   `trace`. A 400's problem is not logged; its body tells the caller. A panic anywhere
   in the request, its reading too, is a 500 with that line.
-- **`NewHandler` panics if the table lacks an enum's entries or a sealed interface's
-  variants that some input reaches**, by one walk over each input type, so a table the
-  emitter got wrong fails when the server starts, not on the first request to use it.
+- **`NewHandler` panics if the table lacks an enum's entries that some input reaches**,
+  by one walk over each input type, so a table the emitter got wrong fails when the
+  server starts, not on the first request to use it.
 - **`clientAddress` is the host of the connection's address.** Behind a proxy, `main`
   sets the request's `RemoteAddr` from the proxy's header before the handler sees it,
   since only `main` knows which proxy to trust. A header's first value is its value;
@@ -1230,11 +1234,11 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken checking api lists (DEV-849), not yet discussed
 
-- **A data class on the wire has no type parameters, as a sealed interface has none**
-  (spec 15.4). cusoon2's generator refuses a generic class other than `List` and its own
-  `Outcome` (`rpc/typescript.kt`), and its operations send none. Allowing one would have
-  the checker read each use of the type apart, and `kogo ts` write generic types. Reopen
-  when an application wants one page type over several kinds of item.
+- **A data class on the wire has no type parameters** (spec 15.4). cusoon2's generator
+  refuses a generic class other than `List` and its own `Outcome` (`rpc/typescript.kt`),
+  and its operations send none. Allowing one would have the checker read each use of the
+  type apart, and `kogo ts` write generic types. Reopen when an application wants one page
+  type over several kinds of item.
 - **`Unit` crosses only as the whole input or answer** (spec 15.2 and 15.4), where it
   means none; a property of type `Unit` has nothing to send.
 - **A name in a list is one fun's** (spec 15.1): where two funs of the name are in scope
@@ -1252,9 +1256,8 @@ Each entry: what was decided, why, and what would reopen it.
   `Unit`: the list is checked before bodies, when an unwritten result still reads as
   `Unit`.
 - **The facts give the environment once for a list**, not on each operation, since a list
-  takes one; and the wire types the list reaches in the order first reached, a sealed
-  interface before its variants, moved ahead of one that was reached on its own first. A
-  type is read once for each list, which ends a type that holds itself.
+  takes one; and the wire types the list reaches in the order first reached. A type is
+  read once for each list, which ends a type that holds itself.
 
 ## Spec gaps found by the leakage ports, unresolved
 

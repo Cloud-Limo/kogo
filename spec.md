@@ -1007,7 +1007,6 @@ Inputs and answers are JSON.
 | `Uuid` | a string, as `toString()` writes it | `string` |
 | an enum | its constant's name | `"Offered" \| "Confirmed"` |
 | a data class | an object with a key for each property, under its name | an object type |
-| a sealed interface | its variant's object, with a key `type` that holds the variant's name | a union of object types |
 | `List<T>` | an array | `T[]` |
 | `T?` | `null`, or `T` | `T \| null` |
 | `Unit` | `{}` | `Record<string, never>` |
@@ -1015,12 +1014,10 @@ Inputs and answers are JSON.
 - Any other type in an input or an answer is a compile error: a `Map`,
   a `Set`, a `Pair`, a `Decimal`, a type of `kogo.time`, a function, an
   external class. Send text that the server has formatted.
+- A sealed interface, or a variant of one, is a compile error too: send
+  a data class, with an enum that says which case it is.
 - `Unit` stands only as the whole input or the whole answer.
-- A data class or a sealed interface on the wire has no type
-  parameters, and no variant of a sealed interface has a property
-  named `type`. A nested variant goes by its own
-  name, `ForBusiness` for `AcceptInvite.ForBusiness`, and a
-  `data object` is `{"type": "Name"}`.
+- A data class on the wire has no type parameters.
 - Two wire types of one name in one list are a compile error, and so
   is one named `Outcome`, the answer's own type in TypeScript.
 - Nothing is optional: a property that may be `null` is still a key.

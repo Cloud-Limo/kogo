@@ -18,65 +18,38 @@ import (
 
 // JSON as spec.md 15.4 has it, by one walk over the Go types the
 // emitter writes: a data class is a struct tagged with its Kogo names
-// (kogo/rt), T? a pointer, a List a slice, an enum a named string, a
-// sealed interface a Go interface, Unit an empty struct. Go's
-// reflection lists neither an enum's constants nor a sealed
-// interface's variants, so a table carries those.
+// (kogo/rt), T? a pointer, a List a slice, an enum a named string,
+// Unit an empty struct. Go's reflection does not list an enum's
+// constants, so a table carries those.
 
 const maxLong = 1<<53 - 1 // the whole numbers JavaScript holds exactly
 
 var uuidType = reflect.TypeFor[kogo.Uuid]()
 
-// A Sealed is one sealed interface's variants.
-type Sealed struct {
-	of       reflect.Type
-	variants []reflect.Type
-}
-
-// Variants gives the variants of the sealed interface I, from one
-// value of each.
-func Variants[I any](variants ...I) Sealed {
-	s := Sealed{of: reflect.TypeFor[I]()}
-	for _, v := range variants {
-		s.variants = append(s.variants, reflect.TypeOf(v))
-	}
-	return s
-}
-
-// A reader reads input strictly. It knows each enum's constants and
-// each sealed interface's variants by name.
+// A reader reads input strictly. It knows each enum's constants.
 type reader struct {
-	enums    map[reflect.Type][]string
-	variants map[reflect.Type]map[string]reflect.Type
+	enums map[reflect.Type][]string
 }
 
 // newReader takes each enum's entries as the emitter writes them, a
-// slice of its constants, and each sealed interface's variants.
-func newReader(enums []any, sealed []Sealed) reader {
-	r := reader{map[reflect.Type][]string{}, map[reflect.Type]map[string]reflect.Type{}}
+// slice of its constants.
+func newReader(enums []any) reader {
+	r := reader{map[reflect.Type][]string{}}
 	for _, entries := range enums {
 		v := reflect.ValueOf(entries)
 		for i := range v.Len() {
 			r.enums[v.Type().Elem()] = append(r.enums[v.Type().Elem()], v.Index(i).String())
 		}
 	}
-	for _, s := range sealed {
-		r.variants[s.of] = map[string]reflect.Type{}
-		for _, v := range s.variants {
-			r.variants[s.of][name(v)] = v
-		}
-	}
 	return r
 }
 
-// name is a data class's or a data object's simple Kogo name, from its
-// tag.
+// name is a data class's simple Kogo name, from its tag.
 func name(t reflect.Type) string {
 	if t.NumField() == 0 {
 		return "Unit"
 	}
-	n, _, _ := strings.Cut(t.Field(0).Tag.Get("kogo"), ",")
-	return n
+	return t.Field(0).Tag.Get("kogo")
 }
 
 func quote(s string) string {
@@ -183,41 +156,19 @@ func (r reader) read(t reflect.Type, j any, at string) (reflect.Value, error) {
 		}
 	case !isObject:
 		return v, bad(at, "is not an object")
-	case t.Kind() == reflect.Interface: // a sealed interface
-		variants := r.variants[t]
-		x, present := m["type"]
-		tag, isTag := x.(string)
-		vt, known := variants[tag]
-		switch {
-		case !present:
-			return v, bad(at+".type", "is missing")
-		case x == nil:
-			return v, bad(at+".type", "is null")
-		case !isTag:
-			return v, bad(at+".type", "is not a string")
-		case !known:
-			return v, bad(at+".type", "is not one of %s", strings.Join(slices.Sorted(maps.Keys(variants)), ", "))
-		}
-		e, err := r.object(vt, m, at, true)
-		v.Set(e)
-		return v, err
-	case t.Kind() == reflect.Struct: // a data class, a data object or Unit
-		return r.object(t, m, at, false)
+	case t.Kind() == reflect.Struct: // a data class or Unit
+		return r.object(t, m, at)
 	default:
 		panic("no " + t.String() + " crosses the wire")
 	}
 	return v, nil
 }
 
-// object reads a struct from the keys of m: each property's, and type
-// too where the struct is a sealed interface's variant.
-func (r reader) object(t reflect.Type, m map[string]any, at string, variant bool) (reflect.Value, error) {
+// object reads a struct from the keys of m, one for each property.
+func (r reader) object(t reflect.Type, m map[string]any, at string) (reflect.Value, error) {
 	v := reflect.New(t).Elem()
-	keys := map[string]bool{"type": variant}
+	keys := map[string]bool{}
 	n := 0 // the keys of m read, so that only m with more is sorted
-	if variant {
-		n = 1
-	}
 	for i := range t.NumField() {
 		if f := t.Field(i); f.Name != "_" {
 			key := f.Tag.Get("kogo")
@@ -245,10 +196,9 @@ func (r reader) object(t reflect.Type, m map[string]any, at string, variant bool
 	return v, nil
 }
 
-// check panics if r lacks the constants of an enum or the variants of
-// a sealed interface that t reaches, or if t cannot cross the wire, so
-// that a table missing some fails when the server starts and read
-// never panics.
+// check panics if r lacks the constants of an enum that t reaches, or
+// if t cannot cross the wire, so that a table missing some fails when
+// the server starts and read never panics.
 func (r reader) check(t reflect.Type, seen map[reflect.Type]bool) {
 	if seen[t] {
 		return
@@ -263,14 +213,6 @@ func (r reader) check(t reflect.Type, seen map[reflect.Type]bool) {
 		}
 	case t.Kind() == reflect.Pointer, t.Kind() == reflect.Slice:
 		r.check(t.Elem(), seen)
-	case t.Kind() == reflect.Interface:
-		variants, ok := r.variants[t]
-		if !ok {
-			panic("the table holds no variants of the sealed interface " + t.String())
-		}
-		for _, v := range variants {
-			r.check(v, seen)
-		}
 	case t.Kind() == reflect.Struct:
 		for i := range t.NumField() {
 			if f := t.Field(i); f.Name != "_" {
@@ -282,19 +224,18 @@ func (r reader) check(t reflect.Type, seen map[reflect.Type]bool) {
 	}
 }
 
-// write writes v as JSON; variant is whether v is a sealed interface's
-// variant, which writes its name under type. A Long past what
+// write writes v as JSON. A Long past what
 // JavaScript holds exactly, and a Double that is NaN or an infinity,
 // have no JSON and are a bug: a panic that names where in the answer
 // of op it is.
-func write(b *bytes.Buffer, v reflect.Value, op, at string, variant bool) {
+func write(b *bytes.Buffer, v reflect.Value, op, at string) {
 	bug := func(what string) { panic(fmt.Sprintf("the answer of %s holds %s at %s", op, what, at)) }
 	switch v.Kind() {
-	case reflect.Pointer, reflect.Interface:
+	case reflect.Pointer:
 		if v.IsNil() {
 			b.WriteString("null")
 		} else {
-			write(b, v.Elem(), op, at, v.Kind() == reflect.Interface)
+			write(b, v.Elem(), op, at)
 		}
 	case reflect.Bool:
 		b.WriteString(strconv.FormatBool(v.Bool()))
@@ -319,19 +260,15 @@ func write(b *bytes.Buffer, v reflect.Value, op, at string, variant bool) {
 			if i > 0 {
 				b.WriteByte(',')
 			}
-			write(b, v.Index(i), op, fmt.Sprintf("%s[%d]", at, i), false)
+			write(b, v.Index(i), op, fmt.Sprintf("%s[%d]", at, i))
 		}
 		b.WriteByte(']')
 	case reflect.Struct:
 		sep := "{"
-		if variant {
-			b.WriteString(sep + `"type":` + quote(name(v.Type())))
-			sep = ","
-		}
 		for i := range v.NumField() {
 			if f := v.Type().Field(i); f.Name != "_" {
 				b.WriteString(sep + quote(f.Tag.Get("kogo")) + ":")
-				write(b, v.Field(i), op, at+"."+f.Tag.Get("kogo"), false)
+				write(b, v.Field(i), op, at+"."+f.Tag.Get("kogo"))
 				sep = ","
 			}
 		}

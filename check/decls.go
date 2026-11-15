@@ -4,6 +4,7 @@ import (
 	"cmp"
 	_ "embed"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -52,6 +53,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 	for i := 0; i < len(c.sigs); i++ {
 		c.sigs[i]()
 	}
+	c.overloads()
 	for i := 0; i < len(c.bodies); i++ {
 		c.bodies[i]()
 	}
@@ -155,17 +157,18 @@ func (c *checker) errorf(at syntax.Node, code, format string, args ...any) Type 
 	return unknown
 }
 
-// Kotlin's scope functions that section 6 leaves out.
-var notKogo = map[string]string{
-	"apply": "name the value and call it", "run": "name the value and call it", "with": "name the value and call it",
-	"takeUnless": "use takeIf and turn the test around",
+// Kotlin's scope functions that section 6 leaves out, and Arrow's
+// withError, which section 9 does: each name's code and fix.
+var notKogo = map[string][2]string{
+	"apply": {"kotlin-scope-function", "name the value and call it"}, "run": {"kotlin-scope-function", "name the value and call it"},
+	"with": {"kotlin-scope-function", "name the value and call it"}, "takeUnless": {"kotlin-scope-function", "use takeIf and turn the test around"},
+	"withError": {"with-error", "convert the failure of a block with either<E2, A> { ... }.mapLeft { e -> ... }.bind()"},
 }
 
-// missing reports a name that nothing in scope declares.
+// missing reports a name that nothing in scope declares. One that
+// is Kotlin's and not Kogo's is refused only where no package of the
+// program declares it.
 func (c *checker) missing(at syntax.Node, name string) Type {
-	if fix := notKogo[name]; fix != "" {
-		return c.errorf(at, "kotlin-scope-function", "%s is not Kogo: %s", name, fix)
-	}
 	var homes []string
 	for _, p := range c.pkgs {
 		if p.named(name) != nil {
@@ -174,6 +177,9 @@ func (c *checker) missing(at syntax.Node, name string) Type {
 	}
 	if slices.Sort(homes); homes != nil {
 		return c.errorf(at, "unknown-name", "%s is not in scope: add import %s", name, strings.Join(homes, " or import "))
+	}
+	if r, ok := notKogo[name]; ok {
+		return c.errorf(at, r[0], "%s is not Kogo: %s", name, r[1])
 	}
 	return c.errorf(at, "unknown-name", "nothing named %s is declared here, in package %s or in the prelude", name, c.pkg.name)
 }
@@ -350,6 +356,118 @@ func external(d syntax.Decl) bool {
 	return false
 }
 
+// overloads reports a fun or an extension val with the receiver and
+// parameter types of one declared before it (spec.md 5.2): no call
+// could choose between them. Two private ones in different files do
+// not meet; bindings meet whatever their visibility, as every call
+// sees them. A fun beside a constructor is reported at the fun, and
+// an interface's funs are compared among themselves.
+func (c *checker) overloads() {
+	groups := slices.Collect(maps.Values(c.members))
+	for _, p := range c.pkgs {
+		for name, fs := range p.funcs {
+			if d := p.types[name]; d != nil && d.Ctor != nil {
+				fs = append([]*Func{d.Ctor}, fs...)
+			}
+			groups = append(groups, fs)
+		}
+		for _, d := range p.types {
+			if strings.HasSuffix(d.Kind, "interface") {
+				groups = slices.AppendSeq(groups, maps.Values(byName(d.Methods)))
+			}
+		}
+	}
+	for _, fs := range groups {
+		seen := map[string][]*Func{}
+		for _, f := range fs {
+			s, ok := shape(f)
+			if !ok {
+				continue
+			}
+			i := slices.IndexFunc(seen[s], func(g *Func) bool {
+				return f.file == g.file || f.visibility != "private" || g.visibility != "private"
+			})
+			seen[s] = append(seen[s], f)
+			if i < 0 {
+				continue
+			}
+			g, where := seen[s][i], "package "+seen[s][i].Pkg
+			if g.Owner != nil {
+				where = g.Owner.Name
+			}
+			c.file = f.file
+			if g.Kind == Constructor {
+				c.errorf(f.Decl, "duplicate", "the constructor of %s takes these parameter types: rename this fun", g.Name)
+			} else {
+				c.errorf(f.Decl, "duplicate", "%s is already declared in %s with this receiver and these parameter types: rename one", describe(g, nil), where)
+			}
+		}
+	}
+}
+
+func byName(fs []*Func) map[string][]*Func {
+	out := map[string][]*Func{}
+	for _, f := range fs {
+		out[f.Name] = append(out[f.Name], f)
+	}
+	return out
+}
+
+// shape gives what tells two functions of one name apart: whether
+// they are vals, their receiver and parameter types, each declared
+// type by its identity and each type parameter by its first use.
+// ok is false when one of those types failed to read.
+func shape(f *Func) (s string, ok bool) {
+	var b strings.Builder
+	used := map[*TypeParam]int{}
+	ok = true
+	var put func(Type)
+	put = func(t Type) {
+		switch t := t.(type) {
+		case *TypeParam:
+			n, found := used[t]
+			if !found {
+				n = len(used)
+				used[t] = n
+			}
+			fmt.Fprint(&b, "#", n)
+		case *Nullable:
+			put(t.Elem)
+			b.WriteString("?")
+		case *Named:
+			fmt.Fprintf(&b, "%p<", t.Decl)
+			for _, a := range t.Args {
+				put(a)
+				b.WriteString(",")
+			}
+			b.WriteString(">")
+		case *FuncType:
+			b.WriteString("(")
+			if t.Receiver != nil {
+				put(t.Receiver)
+				b.WriteString(".")
+			}
+			for _, p := range t.Params {
+				put(p)
+				b.WriteString(",")
+			}
+			b.WriteString(")->")
+			put(t.Result)
+		default:
+			ok = false
+		}
+	}
+	fmt.Fprint(&b, f.Kind == Getter, " ")
+	if f.Receiver != nil {
+		put(f.Receiver)
+	}
+	for _, p := range f.Params {
+		b.WriteString(", ")
+		put(p.Type)
+	}
+	return b.String(), ok
+}
+
 func (c *checker) addFunc(f *Func, receiver bool) {
 	c.info.Funcs[f.Decl] = f
 	if f.External && receiver {
@@ -402,7 +520,7 @@ func (c *checker) signature(f *Func, d *syntax.FunDecl, owner *TypeDecl) {
 	c.open(f.TypeParams)
 	defer c.pop()
 	if d.Receiver != nil {
-		f.Receiver = c.receiver(d.Receiver)
+		f.Receiver = c.typ(d.Receiver)
 	}
 	for _, p := range d.Params {
 		v := &Var{Kind: Param, Name: p.Name, Type: c.typ(p.Type), Decl: p}
@@ -415,14 +533,19 @@ func (c *checker) signature(f *Func, d *syntax.FunDecl, owner *TypeDecl) {
 	c.failing(d, f)
 }
 
-// body checks a fun's default values and its body. A fun whose
-// receiver is Raise<E> has no this: its body is a raise scope for E.
+// body checks a fun's default values and its body. Where its receiver
+// is a Raise<E>, refused, what it raises says no more.
 func (c *checker) body(f *Func, d *syntax.FunDecl) {
 	c.open(f.TypeParams)
 	defer c.pop()
-	raise := c.raised(f.Receiver)
-	if f.Receiver != nil && raise == nil {
+	var raise Type
+	if f.Receiver != nil {
 		c.define(d, &Var{Kind: Param, Name: "this", Type: f.Receiver})
+	}
+	if n, ok := d.Receiver.(*syntax.NamedType); ok && f.Receiver == unknown {
+		if t, _ := c.findType(n.Name); t != nil && t == c.prelude("Raise") {
+			raise = unknown
+		}
 	}
 	for i, p := range d.Params {
 		if p.Default != nil {
@@ -487,6 +610,11 @@ func (c *checker) class(td *TypeDecl) {
 			td.Entries = append(td.Entries, &Var{Kind: Entry, Name: e.Name, Type: self(td), Owner: td, Decl: e})
 		}
 	}
+	variance := func(at syntax.Node, t Type, out bool, name string) {
+		if p := misplaced(t, out); p != nil {
+			c.errorf(at, "variance", "%s is out in %s, so a %s gives a %s back and takes none (spec.md 3.2): remove out, or make %s an extension of %s", p, td.Name, td.Name, p, name, self(td))
+		}
+	}
 	for _, m := range d.Body {
 		switch m := m.(type) {
 		case *syntax.ValDecl:
@@ -495,6 +623,7 @@ func (c *checker) class(td *TypeDecl) {
 				continue
 			}
 			v := &Var{Kind: Property, Name: m.Name, Type: c.declared(m), Owner: td, Decl: m}
+			variance(m, v.Type, true, m.Name)
 			td.Props = append(td.Props, v)
 			c.info.Vars[m] = []*Var{v}
 		case *syntax.FunDecl:
@@ -505,6 +634,10 @@ func (c *checker) class(td *TypeDecl) {
 			}
 			c.info.Funcs[m] = f
 			c.signature(f, m, td)
+			for i, p := range f.Params {
+				variance(m.Params[i], p.Type, false, m.Name)
+			}
+			variance(m, f.Result, true, m.Name)
 			td.Methods = append(td.Methods, f)
 			c.later(&c.bodies, func() { c.body(f, m) })
 		}
@@ -533,7 +666,11 @@ func (c *checker) conform(td *TypeDecl) {
 				return v.Name == p.Name && v.Decl.(*syntax.Param).Override && fits(v.Type, want)
 			})
 			if i < 0 {
-				c.errorf(td.Decl, "override", "%s implements %s: give its constructor override val %s: %s", td.Name, s, p.Name, want)
+				fix := fmt.Sprintf("give its constructor override val %s: %s", p.Name, want)
+				if td.Kind == "data object" {
+					fix = fmt.Sprintf("a data object has no constructor to give val %s: make %s a data class, or %s a fun in %s", p.Name, td.Name, p.Name, s.Decl.Name)
+				}
+				c.errorf(td.Decl, "override", "%s implements %s: %s", td.Name, s, fix)
 				continue
 			}
 			used[td.Props[i]] = true
@@ -561,6 +698,38 @@ func (c *checker) conform(td *TypeDecl) {
 			c.errorf(f.Decl, "override", "no interface of %s declares %s: a data class holds only its interfaces' funs", td.Name, describe(f, nil))
 		}
 	}
+}
+
+// misplaced gives an out type parameter that t has where a value is
+// taken rather than given back, or nil. out says which t is in: true
+// for a result or a val, false for a parameter.
+func misplaced(t Type, out bool) *TypeParam {
+	switch t := t.(type) {
+	case *TypeParam:
+		if t.Out && !out {
+			return t
+		}
+	case *Nullable:
+		return misplaced(t.Elem, out)
+	case *Named:
+		for i, a := range t.Args {
+			p := misplaced(a, out)
+			if p == nil && !t.Decl.Params[i].Out {
+				p = misplaced(a, !out)
+			}
+			if p != nil {
+				return p
+			}
+		}
+	case *FuncType:
+		for _, p := range t.Params {
+			if tp := misplaced(p, !out); tp != nil {
+				return tp
+			}
+		}
+		return misplaced(t.Result, out)
+	}
+	return nil
 }
 
 // describe prints a function as it is declared, without its receiver
@@ -602,7 +771,7 @@ func (c *checker) typ1(t syntax.Type) Type {
 		}
 		f := &FuncType{Result: c.typ(t.Result)}
 		if t.Receiver != nil {
-			f.Receiver = c.receiver(t.Receiver)
+			f.Receiver = c.typ(t.Receiver)
 		}
 		for _, p := range t.Params {
 			f.Params = append(f.Params, c.typ(p))
@@ -623,8 +792,9 @@ func (c *checker) typ1(t syntax.Type) Type {
 		if len(args) != len(params) {
 			return c.errorf(t, "type-arguments", "%s takes %d type arguments, and %d are written here", t.Name, len(params), len(args))
 		}
-		if r = subst(r, bind(params, args)); c.raised(r) != nil {
-			return c.errorf(t, "raise-receiver", "%s is written only as the receiver of a fun: fun %s.name(...): A", r, r)
+		r = subst(r, bind(params, args))
+		if e := c.raised(r); e != nil && c.file != c.core {
+			return c.errorf(t, "raise-receiver", "%s is not written in a program (spec.md 9): return an Either<%s, A> from either<%s, A> { ... }, and bind it where it is called", r, e, e)
 		}
 		if t.Nullable {
 			r = nullable(r)

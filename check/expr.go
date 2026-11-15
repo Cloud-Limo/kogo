@@ -288,7 +288,7 @@ func (c *checker) ident(e *syntax.Ident) Type {
 		return c.errorf(e, "not-a-value", "%s is a local fun: call it, or pass a lambda that does", e.Name)
 	}
 	if e.Name == "this" {
-		return c.errorf(e, "unknown-name", "there is no this here: an extension and a data class's fun have one, and a fun Raise<E>.name() has none")
+		return c.errorf(e, "unknown-name", "there is no this here: an extension and a data class's fun have one")
 	}
 	if this := c.this(); this != nil {
 		if t, ok := c.member(e, nil, this, e.Name); ok {

@@ -31,11 +31,11 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			if rt = c.this(); rt != nil {
 				cands = c.methods(rt, name)
 			}
-			// this's interface fun comes before an extension, but
-			// not before a fun called on the raise scope.
+			// this's interface fun comes before an extension, but in a
+			// raise scope not before the core's forms (spec.md 9).
 			member := cands != nil
 			for _, f := range c.funcs(name) {
-				if f.Kind == Fun && !c.otherTx(f) && (!member || f.Receiver == nil || c.raise != nil && c.raised(f.Receiver) != nil) {
+				if f.Kind == Fun && !c.otherTx(f) && (!member || f.Receiver == nil || c.form(f)) {
 					cands = append(cands, f)
 				}
 			}
@@ -77,7 +77,14 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 		if safe {
 			rt = nonNull(rt)
 		}
-		if cands = c.methods(rt, name); cands == nil {
+		cands = c.methods(rt, name)
+		// In Kotlin, this inside either { } is the Raise, and
+		// this.raise(...) the scope's form (spec.md 9).
+		if x, ok := recv.(*syntax.Ident); ok && x.Name == "this" && cands != nil && slices.ContainsFunc(c.funcs(name), c.form) {
+			c.loose(e.Args, nil)
+			return c.errorf(fun, "ambiguous-call", "in Kotlin this.%s inside either { } is the raise scope's %s, not %s's: rename %s's %s", name, name, rt, rt, name)
+		}
+		if cands == nil {
 			for _, f := range c.funcs(name) {
 				if f.Kind == Fun && f.Receiver != nil && !c.otherTx(f) {
 					cands = append(cands, f)
@@ -138,7 +145,7 @@ func (c *checker) noFunc(at syntax.Node, name string, rt Type, member bool) Type
 	}
 	d, _ := c.findType(name)
 	switch {
-	case member && notKogo[name] == "":
+	case member && notKogo[name][0] == "":
 		return c.errorf(at, "unknown-name", "a %s has no function %s", rt, name)
 	case member || d == nil:
 		return c.missing(at, name)
@@ -304,6 +311,9 @@ func (c *checker) resolve(at, where syntax.Node, name string, cands []*Func, rec
 		for _, k := range left {
 			fs = append(fs, k.f)
 		}
+		if slices.ContainsFunc(fs, c.form) && slices.ContainsFunc(fs, func(f *Func) bool { return f.Kind == Method }) {
+			return c.errorf(where, "ambiguous-call", "both the raise scope's %s and %s's fit this call, and nothing ranks them: rename %s's %s", name, rt, rt, name)
+		}
 		return c.errorf(where, "ambiguous-call", "%d declarations of %s fit this call and nothing ranks them: rename one of %s", len(left), name, sigs(fs))
 	case bare:
 		c.loose(args, typed)
@@ -448,12 +458,6 @@ func wholeLiteral(e syntax.Expr) bool {
 // a lambda fits any parameter of a function type.
 func (c *checker) accepts(k candidate, typed map[syntax.Expr]Type) bool {
 	if tp, _ := settle(k, typed); tp != nil {
-		return false
-	}
-	// The raise scope is the receiver of a fun called on it, and fits
-	// when the fun's E does (spec.md 9). A lone candidate keeps its
-	// raise-type error, which says how to convert the failure.
-	if r := c.raised(k.f.Receiver); r != nil && c.raise != nil && !fits(subst(r, k.b), c.raise) {
 		return false
 	}
 	for i, p := range k.f.Params {

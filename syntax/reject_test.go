@@ -54,6 +54,8 @@ func TestSection14(t *testing.T) {
 		{"‸operator fun Int.plus(o: Int) = 1", "kotlin-inline", "plain function"},
 		{"‸infix fun Int.p(o: Int) = 1", "kotlin-inline", "plain function"},
 		{"‸value class Id(val v: Uuid)", "kotlin-value-class", "typealias"},
+		{"‸context(Raise<String>)\nfun f(): Int = raise(\"no\")", "kotlin-context", "return an Either and bind it"},
+		{"fun f() {\n    ‸context(Raise<String>)\n    fun g(): Int = raise(\"no\")\n}", "kotlin-context", "return an Either and bind it"},
 	} {
 		e, line, column := fault(t, c.src)
 		if e.Line != line || e.Column != column || e.Code != c.code || !strings.Contains(e.Message, c.instead) {

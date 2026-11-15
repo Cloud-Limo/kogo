@@ -148,17 +148,18 @@ func (c *checker) errorf(at syntax.Node, code, format string, args ...any) Type 
 	return unknown
 }
 
-// Kotlin's scope functions that section 6 leaves out.
-var notKogo = map[string]string{
-	"apply": "name the value and call it", "run": "name the value and call it", "with": "name the value and call it",
-	"takeUnless": "use takeIf and turn the test around",
+// Kotlin's scope functions that section 6 leaves out, and Arrow's
+// withError, which section 9 does: each name's code and fix.
+var notKogo = map[string][2]string{
+	"apply": {"kotlin-scope-function", "name the value and call it"}, "run": {"kotlin-scope-function", "name the value and call it"},
+	"with": {"kotlin-scope-function", "name the value and call it"}, "takeUnless": {"kotlin-scope-function", "use takeIf and turn the test around"},
+	"withError": {"with-error", "convert the failure of a block with either<E2, A> { ... }.mapLeft { e -> ... }.bind()"},
 }
 
-// missing reports a name that nothing in scope declares.
+// missing reports a name that nothing in scope declares. One that
+// is Kotlin's and not Kogo's is refused only where no package of the
+// program declares it.
 func (c *checker) missing(at syntax.Node, name string) Type {
-	if fix := notKogo[name]; fix != "" {
-		return c.errorf(at, "kotlin-scope-function", "%s is not Kogo: %s", name, fix)
-	}
 	var homes []string
 	for _, p := range c.pkgs {
 		if p.named(name) != nil {
@@ -167,6 +168,9 @@ func (c *checker) missing(at syntax.Node, name string) Type {
 	}
 	if slices.Sort(homes); homes != nil {
 		return c.errorf(at, "unknown-name", "%s is not in scope: add import %s", name, strings.Join(homes, " or import "))
+	}
+	if r, ok := notKogo[name]; ok {
+		return c.errorf(at, r[0], "%s is not Kogo: %s", name, r[1])
 	}
 	return c.errorf(at, "unknown-name", "nothing named %s is declared here, in package %s or in the prelude", name, c.pkg.name)
 }
@@ -506,7 +510,7 @@ func (c *checker) signature(f *Func, d *syntax.FunDecl, owner *TypeDecl) {
 	c.open(f.TypeParams)
 	defer c.pop()
 	if d.Receiver != nil {
-		f.Receiver = c.receiver(d.Receiver)
+		f.Receiver = c.typ(d.Receiver)
 	}
 	for _, p := range d.Params {
 		v := &Var{Kind: Param, Name: p.Name, Type: c.typ(p.Type), Decl: p}
@@ -519,14 +523,19 @@ func (c *checker) signature(f *Func, d *syntax.FunDecl, owner *TypeDecl) {
 	c.failing(d, f)
 }
 
-// body checks a fun's default values and its body. A fun whose
-// receiver is Raise<E> has no this: its body is a raise scope for E.
+// body checks a fun's default values and its body. Where its receiver
+// is a Raise<E>, refused, what it raises says no more.
 func (c *checker) body(f *Func, d *syntax.FunDecl) {
 	c.open(f.TypeParams)
 	defer c.pop()
-	raise := c.raised(f.Receiver)
-	if f.Receiver != nil && raise == nil {
+	var raise Type
+	if f.Receiver != nil {
 		c.define(d, &Var{Kind: Param, Name: "this", Type: f.Receiver})
+	}
+	if n, ok := d.Receiver.(*syntax.NamedType); ok && f.Receiver == unknown {
+		if t, _ := c.findType(n.Name); t != nil && t == c.prelude("Raise") {
+			raise = unknown
+		}
 	}
 	for i, p := range d.Params {
 		if p.Default != nil {
@@ -751,7 +760,7 @@ func (c *checker) typ1(t syntax.Type) Type {
 		}
 		f := &FuncType{Result: c.typ(t.Result)}
 		if t.Receiver != nil {
-			f.Receiver = c.receiver(t.Receiver)
+			f.Receiver = c.typ(t.Receiver)
 		}
 		for _, p := range t.Params {
 			f.Params = append(f.Params, c.typ(p))
@@ -772,8 +781,9 @@ func (c *checker) typ1(t syntax.Type) Type {
 		if len(args) != len(params) {
 			return c.errorf(t, "type-arguments", "%s takes %d type arguments, and %d are written here", t.Name, len(params), len(args))
 		}
-		if r = subst(r, bind(params, args)); c.raised(r) != nil {
-			return c.errorf(t, "raise-receiver", "%s is written only as the receiver of a fun: fun %s.name(...): A", r, r)
+		r = subst(r, bind(params, args))
+		if e := c.raised(r); e != nil && c.file != c.core {
+			return c.errorf(t, "raise-receiver", "%s is not written in a program (spec.md 9): return an Either<%s, A> from either<%s, A> { ... }, and bind it where it is called", r, e, e)
 		}
 		if t.Nullable {
 			r = nullable(r)

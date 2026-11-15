@@ -269,10 +269,20 @@ Each entry: what was decided, why, and what would reopen it.
   constructor gets. Kotlin follows the constructor's visibility for `copy` in recent
   versions and, as far as we know, not its marker; refusing is the safe direction.
   Destructuring and `==` read a value and build none.
+- **`Either` is the only spelling of a fallible function** (15 Nov 2026). A program declares
+  no function with a `Raise<E>` receiver or `context(Raise<E>)`, and `withError` is gone;
+  each is refused where it is written, with the fix. Two spellings of one thing went against
+  principle 6. With `Either` only, every place a body can fail is marked in it, at a call by
+  `.bind()`, so it reads without opening the callee, and a forgotten `bind` is always caught
+  as a dropped or mistyped `Either`. `withError` served calling receiver code of another
+  error type; without that, it was a second way to write
+  `either<E2, A> { ... }.mapLeft { ... }.bind()`. `Raise<E>` stays inside `check/core.kg`,
+  the receiver of `raise`, `ensure` and `ensureNotNull` and of either's block. Accepted
+  cost: cusoon2's 26 receiver functions each become `= either { ... }`, with `.bind()` at
+  their calls. Reopen if ports read worse for `.bind()` at every call.
 
 ## Taken in the v0 spec, not yet discussed
 
-- Both Arrow spellings are in (`Either` values and `Raise<E>` receivers): cusoon2 uses both.
 - Markers (`@RequiresOptIn`, `@file:OptIn`) are the one annotation form, so the access walls
   port. Known hole: without inheritance, any file can implement an interface, so a wall is a
   data class with a marked constructor, as example 19's `HeldBusiness` is. `copy` and a sql
@@ -444,8 +454,7 @@ Each entry: what was decided, why, and what would reopen it.
 
 - **The forms of section 9 are Kogo declarations in the checker's own file, `check/core.kg`,
   with `Either` and `Raise`** (spec 9). A raise scope acts as a `Raise<E>` receiver that every
-  call inside it can use: `raise`, `ensure`, `ensureNotNull` and `withError` are funs with
-  that receiver, checked as any call is, and `either` takes a block of type
+  call inside it can use: `raise`, `ensure` and `ensureNotNull` are funs with that receiver, checked as any call is, and `either` takes a block of type
   `Raise<E>.() -> A`. What is code: `bind` (it needs both its `Either` and a scope), the
   scope's own rules, and the facts, about 170 lines. This keeps the agreed "built into the
   checker": the file is the checker's, read before the prelude, and no prelude can change
@@ -453,10 +462,15 @@ Each entry: what was decided, why, and what would reopen it.
   The checker knows `Either` and `Raise` by name, as it knows `List`. Reopen if a form's
   type cannot be written in Kogo.
 - **The raise scope is apart from `this`.** Inside `either { }` in an extension, `this` is
-  still the extension's receiver, as in Kotlin, where both are in scope at once. A
-  `Raise<E>` function has no `this`: with one, `val r = this` would carry a value of type
-  `Raise` around, and `r.raise(e)` would fail where no fact says so. Reopen if a port
-  writes `this.raise(e)`.
+  still the extension's receiver. This is not as in Kotlin, corrected in DEV-833: there
+  `this` inside `either { }` is the `Raise`, and the extension's receiver is reached
+  unqualified or by a label. What follows: `this.raise(...)`, `this.ensure(...)` and
+  `this.ensureNotNull(...)` on a member of `this` are refused (spec 9), the one place the
+  same text is valid in both and means something different. `this.name` on any other
+  member is accepted by Kogo and refused by Kotlin, so it differs in nothing that both
+  accept; nothing is done about it. A bare `this` passed as a value is the receiver in
+  Kogo and the `Raise` in Kotlin, which accepts it only where a `Raise` is wanted, and no
+  program can write one since DEV-833. Reopen if a program can again.
 - **A lambda inside a raise scope is in it; a local fun is not** (spec 9). Kotlin allows
   both. The lambda is Arrow's habit (`ids.map { load(it).bind() }`), and the facts mark
   each such lambda as able to fail, so the emitter knows. A local fun's failures are read
@@ -467,21 +481,21 @@ Each entry: what was decided, why, and what would reopen it.
   that fails, about 15 lines, and no example needs it. Accepted cost: framework code that
   takes `Raise<String>.(C, I) -> A` bodies, as cusoon2's RPC does, takes
   `(C, I) -> Either<String, A>` instead. Reopen when a port's framework code needs it.
-- **A `Raise<E2>` fun may be called where `E2` fits the scope's `E`**, and `bind` likewise,
-  checked by hand: Kogo has no `in`, so `Raise` is invariant everywhere else. A helper that
-  raises one variant then runs where its sealed interface is raised.
+- **`bind` takes an `Either<E2, A>` where `E2` fits the scope's `E`**, checked by hand,
+  since nothing in its signature ties it to the scope. An `Either` of one variant is then
+  bound where its sealed interface is raised.
 - **A call can fail when it makes the raise scope it is in fail** (`Info.Fails`): `bind`,
-  and a call of a `Raise<E>` fun. A call that gives an `Either` value cannot; `bind` on its
-  value can. A fun can fail with `E` when its receiver is `Raise<E>` or it returns
-  `Either<E, A>`, the two spellings; a lambda when it is a raise scope's block or holds a
-  call that fails into the scope around it. A call records the `E` it fails with (a
-  `Raise<S.A>` fun called where `S` is raised fails with `S.A`); a lambda records the
-  scope's. Reopen when the emitter wants the callee's notion on the call too.
+  `raise`, `ensure` and `ensureNotNull`. A call that gives an `Either` value cannot; `bind`
+  on its value can. A fun can fail with `E` when it returns `Either<E, A>`; a lambda when it
+  is a raise scope's block or holds a call that fails into the scope around it. A call
+  records the `E` it fails with (`bind` of an `Either<S.A, X>` where `S` is raised fails
+  with `S.A`); a lambda records the scope's. Reopen when the emitter wants the callee's
+  notion on the call too.
 - **A lambda that returns an `Either` is not in `Info.Fails`.** Its type says so already,
   and with it in, one entry held two facts: a lambda that binds into a `String` scope and
   returns `Either<Int, X>` was recorded only as `String`, so the emitter could not tell a
-  lambda that must short-circuit from one that gives a value. A fun keeps both spellings:
-  its receiver tells them apart. Reopen if the emitter wants the lambda's `Either` there.
+  lambda that must short-circuit from one that gives a value. Reopen if the emitter wants
+  the lambda's `Either` there.
 - **A lambda that fails into the raise scope is passed straight to a call** (spec 9).
   Kept in a `val`, returned, or passed where a type parameter is wanted (`listOf({ ... })`),
   it could run after the scope has ended, where nothing catches its failure. The rule is
@@ -490,21 +504,12 @@ Each entry: what was decided, why, and what would reopen it.
   function can; and a value of a function type called with such a lambda is refused,
   though it may run it at once. Closing the first needs an effect on function types.
   Reopen when a port keeps such a lambda, or the emitter finds a callee that does.
-- **Inside a raise scope a `Raise<E>` fun is not hidden by a member of `this`** (spec 9).
-  Both are candidates, and where both fit the call is ambiguous; Kotlin picks the `Raise`
-  one, its innermost receiver. No rank is added, since 5.2 has none. Outside a raise scope
-  the member still hides it. Overloads that differ only in their `Raise<E>` are chosen by
-  the scope's `E`; a lone candidate whose `E` does not fit keeps its `raise-type` error,
-  which says how to convert the failure.
 - **`Either` is built only with `left()` and `right()`**: the variants' constructors are
   `internal` to package `kogo`, and `Either.Left(e)` is refused with a message naming the
   two; any other hidden constructor gets `not-visible`. Kotlin accepts it; one way to build an `Either` leaves the emitter one form.
 - **The functions on an `Either` value are bindings in `prelude/either.kg`**, and the
   checker's tests read that file as it is, so they check the real declarations. The
   prelude also gained `String.lowercase` and `String.contains` for example 07.
-- **Not handled**: a generic `fun <E> Raise<E>.f()` whose `E` nothing but the scope
-  settles, called outside a raise scope, is refused with "nothing settles E" rather than
-  with the advice to wrap it in `either { }`.
 
 ## Taken writing the emitter's design (DEV-829), not yet discussed
 
@@ -539,8 +544,9 @@ Each entry: what was decided, why, and what would reopen it.
 - **`db.tx` is two declarations in `check/core.kg`**, one with a plain block and one whose
   block is a raise scope, and the checker keeps the second exactly where the enclosing fun
   returns an `Either<E, ...>`, settling `E` from it (spec 10.7). So `val r = db.tx { ... }`
-  in such a fun is an `Either` too, and dropping it is an error. In a `Raise<E>` fun the
-  plain one applies, and its block is in the fun's raise scope as any lambda is.
+  in such a fun is an `Either` too, and dropping it is an error. In an `either { }` of a fun
+  that returns no `Either` the plain one applies, and its block is in that raise scope as
+  any lambda is.
   `tx.atomically` is one plain declaration for the same reason. Not taken: choosing by the
   type wanted, which `val r = db.tx { }` does not state.
 - **Markers count only the file's opt-in** (spec 11). Kotlin also lets a marked declaration
@@ -563,6 +569,32 @@ Each entry: what was decided, why, and what would reopen it.
 - **The examples changed to pass**: 12, 13 and 16 import `kogo.time.Instant` (spec 2), and
   19 is `package example.markers`, since 12 also declares `Business`. The prelude gained
   `Uuid`, `newId`, `List.size` and `check`, which they use.
+
+## Taken making `Either` the only spelling (DEV-833), not yet discussed
+
+- **Example 08 is deleted and the gap left.** Renumbering 09 to 21 would rename thirteen
+  files that the tests, the parser's tree and open branches name; a gap costs nothing.
+  Reopen when the examples are next reorganized.
+- **The refusals' codes**: `raise-receiver` for `Raise<E>` written anywhere in a program,
+  reported at the type, so at the receiver of a fun; `kotlin-context` from the parser for
+  any `context(...)` before a declaration or a local fun, since Kogo has no context
+  parameters of any kind, while a call of something named `context` is still a call;
+  `with-error` for a call of `withError`, from the table that refuses Kotlin's scope
+  functions. Not taken: keeping `withError` in `check/core.kg` only to refuse it.
+- **A fun whose receiver is refused says no more of what its body raises**, so a ported
+  receiver function gets one error, not one for each `raise` in it.
+- **In a raise scope, a member of `this` does not hide `raise`, `ensure` or
+  `ensureNotNull`** (spec 9), though it hides any other extension (5.2). Hiding them, as
+  the issue asked, would make `either { raise("no") }` in a fun on a type with its own
+  `raise` give `Right` where Kotlin gives `Left`. Both are candidates: where one fits it is
+  the call; where both do, `ambiguous-call` says to rename the member. Not taken: ranking
+  the scope's first, as Kotlin does, since spec 5.2 ranks nothing, and suggesting
+  `this.raise(...)` for the member, which in Kotlin is the scope's. The choice among
+  overloads by the scope's `E` went with receiver funs.
+- **A name Kogo refuses from Kotlin is refused only where no package declares it.** A
+  program's own `withError`, or `run`, in a package the file does not import gets the
+  "add import" hint, not "is not Kogo". One order for the whole table, not a case for
+  `withError`.
 
 ## Taken refusing three programs (DEV-834), not yet discussed
 

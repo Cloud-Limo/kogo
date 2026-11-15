@@ -1,4 +1,4 @@
-// Converting the error type between layers: mapLeft on a value, withError on a block.
+// Converting the error type between layers: mapLeft, then bind.
 package example
 
 sealed interface StoreError {
@@ -8,10 +8,11 @@ sealed interface StoreError {
 fun load(id: Int): Either<StoreError, String> =
     if (id == 1) "one".right() else StoreError.Missing.left()
 
-fun Raise<StoreError>.loadOrRaise(id: Int): String = load(id).bind()
-
 fun title(id: Int): Either<String, String> = either {
     val a = load(id).mapLeft { "No item $id." }.bind()
-    val b = withError({ e: StoreError -> "No item ${id + 1}." }) { loadOrRaise(id + 1) }
+    // Several calls converted at once: a block of the inner error type.
+    val b = either<StoreError, String> { "${load(id + 1).bind()}, ${load(id + 2).bind()}" }
+        .mapLeft { "No items after $id." }
+        .bind()
     "$a and $b"
 }

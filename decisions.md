@@ -782,6 +782,13 @@ Each entry: what was decided, why, and what would reopen it.
 - **An `Either` writes itself as Arrow does, `Either.Left(value)`**, where the rule for
   data classes gave `Left(value=...)`. `"$result"` is valid in both languages and must
   read the same (principle 3).
+- **A lambda that fails into a raise scope is passed only to the prelude's funs**, which
+  run their blocks before they return. A fun of the program's could keep the lambda, as
+  `fun <T> later(b: () -> T) = b` does, and a failure raised after its scope has returned
+  would be a panic no scope recovers: a 500 where section 9 promises a value. Kotlin
+  allows it, and Arrow throws when it happens. Not taken: following each function-typed
+  parameter through its fun's body to see that it is only called, more checker for a case
+  no example has. Reopens when a program needs its own fun to run a failing block.
 - **The prelude's Go is safe to unwind through**, a rule stated at the top of
   `prelude/kogo/kogo.go`: a function that calls a lambda holds no lock and leaves nothing
   half done while it runs. Every one there already keeps what it builds to itself until it

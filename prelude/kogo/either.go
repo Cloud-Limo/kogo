@@ -75,9 +75,9 @@ func Raise_EnsureNotNull[E, A any](this Raise[E], value *A, raise func() E) A {
 
 // Either_Bind is x.bind(): the scope's E may be wider than x's, and
 // widen gives a failure of x's as one of the scope's.
-func Either_Bind[E, A, F any](this Either[E, A], scope Raise[F], widen func(E) F) A {
+func Either_Bind[E, A, F any](this Either[E, A], r Raise[F], widen func(E) F) A {
 	if l, ok := this.(Either_Left[E]); ok {
-		Raise_Raise(scope, widen(l.Value))
+		Raise_Raise(r, widen(l.Value))
 	}
 	return this.(Either_Right[A]).Value
 }

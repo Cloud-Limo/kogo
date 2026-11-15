@@ -646,15 +646,17 @@ trace(func() { t.Divide(1, 0) })
 }
 
 // A failure (spec.md 9) is recovered by its own raise scope: raised in
-// a lambda, through the prelude's Go that calls the lambda, and past a
-// scope of the same error type that the lambda is run inside.
+// a lambda, through the prelude's Go that calls the lambda, and not by
+// a scope inside it. That a failure passes a scope it is raised inside
+// but not on, which no program can write, is prelude/kogo's test.
 func TestFailures(t *testing.T) {
 	expect(t, [][2]string{
 		{`t.Total("12")`, "Either.Right(3)"},
 		{`t.Total("1x2")`, "Either.Left(no digit x)"},
 		{"t.Nested(1)", "Either.Left(outer)"},
-		{"t.Nested(2)", "Either.Right(Either.Right(2) Either.Left(inner))"},
-		{"t.Nested(3)", "Either.Right(Either.Right(3) Either.Right(3))"},
+		{"t.Nested(2)", "Either.Right(2 Either.Left(inner))"},
+		{"t.Nested(3)", "Either.Right(3 Either.Right(3))"},
+		{"t.Lifted(4)", "Either.Right(4)"},
 		{`t.Found(rt.Ptr("abc"))`, "Either.Right(3)"},
 		{"t.Found(nil)", "Either.Left(none)"},
 		{"t.Wider(0)", "Either.Left(A(n=0))"},
@@ -668,11 +670,8 @@ fun digit(c: Char): Either<String, Int> = either {
 
 fun total(s: String): Either<String, Int> = either { s.map { digit(it).bind() }.sumOf { it } }
 
-fun <T> attempt(block: () -> T): Either<String, T> = either { block() }
-
-// The lambda given to attempt raises on nested's scope.
 fun nested(n: Int): Either<String, String> = either {
-    val passed = attempt { if (n == 1) raise("outer") else n }
+    val passed = n.let { if (it == 1) raise("outer") else it }
     val own = either<String, Int> { if (n == 2) raise("inner") else n }
     "$passed $own"
 }
@@ -689,6 +688,9 @@ sealed interface S {
 fun a(n: Int): Either<S.A, Int> = if (n > 0) n.right() else S.A(n).left()
 
 fun wider(n: Int): Either<S, Int> = either { a(n).bind() + 1 }
+
+// An Either<Nothing, Int>, bound in a scope of String.
+fun lifted(n: Int): Either<String, Int> = either { n.right().bind() }
 `)
 }
 

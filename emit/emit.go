@@ -46,12 +46,15 @@ func emitAll(info *check.Info, prelude, program []*syntax.File, root string) (*e
 	for _, f := range bindings {
 		e.bound[f.Package.Name] = true
 	}
+	// The core's section 9 is emitted. Whatever else it declares, Db,
+	// Tx and their funs now, is refused until its slice writes it.
+	emitted := map[string]bool{"Raise": true, "either": true, "raise": true, "ensure": true, "ensureNotNull": true, "bind": true}
 	for _, d := range info.Core.Decls {
 		if c, ok := d.(*syntax.ClassDecl); ok && c.Name == "Either" {
 			e.either = info.Classes[c]
-		} else if ok && (c.Name == "Db" || c.Name == "Tx") {
+		} else if ok && c.Kind == "external class" && !emitted[c.Name] {
 			e.later[info.Classes[c]] = true
-		} else if f, ok := d.(*syntax.FunDecl); ok && (f.Name == "tx" || f.Name == "atomically") {
+		} else if f, ok := d.(*syntax.FunDecl); ok && !emitted[f.Name] {
 			e.later[info.Funcs[f]] = true
 		}
 	}
@@ -122,7 +125,7 @@ type emitter struct {
 	bound    map[string]bool           // the Kogo packages that Go implements: the prelude's
 	nullable map[*check.TypeParam]bool // the type parameters used as T?
 	scanned  map[*check.Func]bool      // the funs whose signatures are read for that
-	later    map[any]bool              // the core's Db and Tx and their funs: section 10
+	later    map[any]bool              // the core's declarations not emitted yet: Db, Tx and their funs
 	either   *check.TypeDecl           // the core's Either
 	insts    []inst
 

@@ -96,10 +96,12 @@ func (e *emitter) typeParams(tps []*check.TypeParam) (decl, use string) {
 // instantiate notes a use of a declaration with type arguments. One
 // settled as Nothing is refused: a sealed value is used as one of a
 // wider type argument for free only because no value's Go type holds
-// Nothing where its declaration holds a type parameter.
+// Nothing where its declaration holds a type parameter. bind's are
+// only read, never held, and Arrow's bind takes none to write.
 func (e *emitter) instantiate(at syntax.Node, f *check.Func, args []check.Type) {
+	bind := f.Name == "bind" && e.info.Fails[at] != nil
 	for i, a := range args {
-		if builtin(a, "Nothing") {
+		if builtin(a, "Nothing") && !bind {
 			e.notYet(at, fmt.Sprintf("the type argument Nothing, settled here for %s", f.TypeParams[i].Name), "write the type arguments, "+f.Name+"<...>(...)")
 		}
 		if _, ok := a.(*check.Nullable); ok {
@@ -197,12 +199,13 @@ func (e *emitter) convert(code string, from, to check.Type) string {
 			e.notYet(e.at, fmt.Sprintf("a %s used as a %s, whose type argument is another Go type", from, to), "build the value with the wider type argument, as "+t.Decl.Name+"<...>")
 		}
 	case *check.FuncType:
+		tin, fin := ins(to.(*check.FuncType)), ins(f)
 		t := to.(*check.FuncType)
 		var params, args []string
-		for i := range t.Params {
+		for i := range tin {
 			a := fmt.Sprintf("a%d", i)
-			params = append(params, a+" "+e.typ(t.Params[i]))
-			args = append(args, e.convert(a, t.Params[i], f.Params[i]))
+			params = append(params, a+" "+e.typ(tin[i]))
+			args = append(args, e.convert(a, tin[i], fin[i]))
 		}
 		return fmt.Sprintf("func(f %s) %s { return func(%s) %s { return %s } }(%s)", e.typ(from), e.typ(to),
 			strings.Join(params, ", "), e.typ(t.Result), e.convert("f("+strings.Join(args, ", ")+")", f.Result, t.Result), code)

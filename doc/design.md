@@ -271,10 +271,17 @@ timeouts and retries of outbound calls.
 
 ## MVP steps
 
+The MVP is a real cusoon2 module, with SQL, that matches its Kotlin
+original exactly when run side by side and is served over typed RPC.
+It is done when all five steps are.
+
 1. The SQL pass, as a Go library and a command.
 2. Parser and checker for what the first ported module uses.
 3. Go emitter.
-4. A differential run of a ported module against its Kotlin original.
+4. Differential runs of ported modules against their Kotlin originals:
+   the invoice ledger, then suppliers and businesses with SQL.
+5. The server, as "The server" above has it: the `api` list, the Go of
+   `kogo.rpc`, the emitted table and `kogo ts`.
 
 The run is side by side: one file of cases, hand-picked edges and a few
 thousand random ones from a fixed seed, feeds both the Kotlin and the

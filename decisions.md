@@ -642,6 +642,11 @@ Each entry: what was decided, why, and what would reopen it.
   `NaN` and `0.0` is not equal to `-0.0`. Between two expressions of type `Double` it is
   Go's `==`, which is IEEE's, as in Kotlin. A function is equal to nothing, itself
   included, where Kotlin compares references: Go cannot.
+- **Arithmetic on two literals is kept from Go's constant folding**: the left one is read
+  through `rt.Val`, so that `2147483647 + 1` wraps and a `Double` gives `Infinity`, as at
+  run time. A minus on a whole literal is one literal (`int32(-2147483648)`); on anything
+  else that Go reads as a constant it is a run-time minus, since Go's constants have no
+  `-0.0`.
 - **A constructor's default is written at the call with the call's type arguments**: for
   as long as it is written, each type parameter of the class names the Go type of its
   argument. A type parameter with no Go name where it is written stops the emitter: it is
@@ -683,8 +688,7 @@ Each entry: what was decided, why, and what would reopen it.
 - **A marker is written nowhere** (spec 11): the checker has enforced it, and it does
   nothing at run time, so a program with markers is emitted, not refused.
 - **Not handled**: two Kogo packages that import each other (Go refuses the cycle, with
-  its own message); arithmetic on literals that overflows (`2147483647 + 1`), which Go
-  refuses at compile time where Kotlin wraps; a literal outside its type's range;
+  its own message); a literal outside its type's range;
   `lowercase()` on `İ` and on a final sigma, where Kotlin's full case mapping and Go's
   simple one differ; two top-level vals that read each other.
 

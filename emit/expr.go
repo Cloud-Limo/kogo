@@ -29,11 +29,7 @@ func (e *emitter) expr(x syntax.Expr) string {
 	case *syntax.Literal:
 		switch x.Kind {
 		case "Int", "Long":
-			v := x.Value
-			if n, err := strconv.ParseUint(v, 10, 64); err == nil {
-				v = strconv.FormatUint(n, 10) // Go reads 010 as eight
-			}
-			return e.typ(e.info.Types[x]) + "(" + v + ")"
+			return e.typ(e.info.Types[x]) + "(" + digits(x.Value) + ")"
 		case "Double":
 			return "float64(" + x.Value + ")"
 		case "Char":
@@ -66,7 +62,16 @@ func (e *emitter) expr(x syntax.Expr) string {
 		code, _ := e.sel(x, nil, nil)
 		return code
 	case *syntax.Unary:
-		return "(" + x.Op + e.expr(x.X) + ")"
+		if l, ok := x.X.(*syntax.Literal); ok && x.Op == "-" && (l.Kind == "Int" || l.Kind == "Long") {
+			// One literal, so that -2147483648 is an Int.
+			return e.typ(e.info.Types[x]) + "(-" + digits(l.Value) + ")"
+		}
+		code := e.expr(x.X)
+		if x.Op == "-" && constant(x.X) {
+			// Go's constants have no -0.0, and -(-2147483648) overflows.
+			code = e.rt() + ".Val(" + code + ")"
+		}
+		return "(" + x.Op + code + ")"
 	case *syntax.Binary:
 		return e.binary(x)
 	case *syntax.Is:
@@ -93,6 +98,30 @@ func (e *emitter) expr(x syntax.Expr) string {
 	}
 	e.notYet(x, "this expression", "bind it to a val first")
 	return "nil"
+}
+
+// digits gives a whole number's digits as Go reads them: Go reads
+// 010 as eight.
+func digits(v string) string {
+	if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+		return strconv.FormatUint(n, 10)
+	}
+	return v
+}
+
+// constant reports whether Go reads the Go of x as a constant: a
+// number literal, or a whole one with a minus. Go works out arithmetic
+// on two constants exactly and refuses a result outside the type,
+// where Kotlin wraps an Int or a Long and gives a Double Infinity.
+func constant(x syntax.Expr) bool {
+	switch x := x.(type) {
+	case *syntax.Literal:
+		return x.Kind == "Int" || x.Kind == "Long" || x.Kind == "Double"
+	case *syntax.Unary:
+		l, ok := x.X.(*syntax.Literal)
+		return ok && x.Op == "-" && (l.Kind == "Int" || l.Kind == "Long")
+	}
+	return false
 }
 
 // wrap gives x, which Go writes as statements, as an expression: a
@@ -312,7 +341,11 @@ func (e *emitter) binary(x *syntax.Binary) string {
 		}
 		return code
 	}
-	return e.arith(x.Op, e.expr(x.X), e.info.Types[x.X], e.expr(x.Y), e.info.Types[x.Y])
+	a := e.expr(x.X)
+	if constant(x.X) && constant(x.Y) { // then Go would work it out
+		a = e.rt() + ".Val(" + a + ")"
+	}
+	return e.arith(x.Op, a, e.info.Types[x.X], e.expr(x.Y), e.info.Types[x.Y])
 }
 
 // An operand of a call: its receiver or an argument.

@@ -550,6 +550,32 @@ func TestForeignTypeParam(t *testing.T) {
 	t.Error(e.typ(&check.TypeParam{Name: "T"}))
 }
 
+// Arithmetic on literals wraps an Int or a Long and gives Infinity for
+// a Double, as at run time: Go would fold it as a constant and refuse
+// the overflow. A minus on a literal is one literal, so Int.MIN_VALUE
+// is written as Kotlin writes it, and -0.0 keeps its sign.
+func TestConstants(t *testing.T) {
+	e200 := "1" + strings.Repeat("0", 200) + ".0" // Kogo writes no exponent
+	expect(t, [][2]string{
+		{"t.Big()", "-2147483648"},
+		{"t.MsPerYear()", "1471228928"},
+		{"t.BigLong()", "-9223372036854775808"},
+		{"t.Huge()", "Infinity"},
+		{"t.MinInt()", "-2147483648"},
+		{"t.Negated()", "-2147483648"},
+		{"t.NegZero()", "-0.0"},
+	}, `package t
+
+fun big(): Int = 2147483647 + 1
+fun msPerYear(): Int = 1000 * 60 * 60 * 24 * 365
+fun bigLong(): Long = 9223372036854775807L + 1L
+fun huge(): Double = `+e200+` * `+e200+`
+fun minInt(): Int = -2147483648
+fun negated(): Int = -(-2147483648)
+fun negZero(): Double = -0.0
+`)
+}
+
 // A panic's trace names the Kogo file and line (principle 5): the
 // line of a statement, and the line of a call that is further down
 // than the statement begins.

@@ -47,40 +47,52 @@ func must[T any](v T, err error) T {
 // Db_Tx_Boolean_TxToA is db.tx { } where the enclosing fun returns no
 // Either: it commits when block returns and rolls back when block
 // panics, with a failure of a raise scope around it or with a bug.
-// At SERIALIZABLE, block is run again from the start for as long as
-// Postgres ends it with a serialization failure or a deadlock.
 func Db_Tx_Boolean_TxToA[A any](this Db, serializable *bool, block func(Tx) A) A {
-	opts := pgx.TxOptions{}
 	if serializable != nil && *serializable {
-		opts.IsoLevel = pgx.Serializable
+		return SerializableTx(this, func(*pgconn.PgError) bool { return true }, block)
 	}
+	a, _ := attempt(this, pgx.TxOptions{}, block)
+	return a
+}
+
+// SerializableTx is db.tx(serializable = true) { }, for the server
+// too, which limits its reruns: block is run again from the start for
+// as long as Postgres ends it with a serialization failure or a
+// deadlock and again, told which, says to go on. Where again says not
+// to, Postgres's error is a panic.
+func SerializableTx[A any](db Db, again func(conflict *pgconn.PgError) bool, block func(Tx) A) A {
 	for {
-		if a, done := attempt(this, opts, block); done {
+		a, conflict := attempt(db, pgx.TxOptions{IsoLevel: pgx.Serializable}, block)
+		if conflict == nil {
 			return a
+		}
+		if !again(conflict) {
+			panic(conflict)
 		}
 	}
 }
 
-// attempt runs block in one transaction. It is not done when the
-// transaction is to be run again.
-func attempt[A any](db Db, opts pgx.TxOptions, block func(Tx) A) (a A, done bool) {
+// attempt runs block in one transaction. It gives the conflict that
+// ended the transaction where it is to be run again.
+func attempt[A any](db Db, opts pgx.TxOptions, block func(Tx) A) (a A, conflict *pgconn.PgError) {
 	tx := must(db.pool.BeginTx(db.ctx, opts))
 	decimals(tx.Conn().TypeMap())
+	done := false
 	defer func() {
 		if done {
 			return
 		}
 		p := recover()
 		tx.Rollback(db.ctx)
-		var refused *pgconn.PgError
-		if err, ok := p.(error); !ok || opts.IsoLevel != pgx.Serializable || !errors.As(err, &refused) ||
-			refused.Code != "40001" && refused.Code != "40P01" {
+		if err, ok := p.(error); !ok || opts.IsoLevel != pgx.Serializable || !errors.As(err, &conflict) ||
+			conflict.Code != "40001" && conflict.Code != "40P01" {
 			panic(p)
 		}
 	}()
 	a = block(Tx{db.ctx, tx})
 	must(0, tx.Commit(db.ctx))
-	return a, true
+	done = true
+	return a, nil
 }
 
 // Db_Tx_Boolean_RaiseETxToA is db.tx { } where the enclosing fun

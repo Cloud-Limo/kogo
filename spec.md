@@ -989,8 +989,9 @@ Inputs and answers are JSON.
   have, a value of another type, a number that is not whole or does
   not fit where an `Int` or a `Long` is wanted, a string that is not a
   `Uuid` or not one of an enum's names: each is a 400, and the
-  operation does not run. Where the input is `Unit` the body is not
-  read.
+  operation does not run. A whole number is written as digits, as
+  JavaScript writes one: `1.0` and `1e3` are not whole. Where the
+  input is `Unit` the body is not read.
 - A `Long` crosses only from -9007199254740991 to 9007199254740991,
   the whole numbers JavaScript holds exactly. Reading one outside them
   is a 400; an answer that holds one is a bug, and panics. Send a

@@ -50,6 +50,14 @@ func TestAsKotlin(t *testing.T) {
 			t.Errorf("%v.toLong() is %d, want %d", c.d, got, c.want)
 		}
 	}
+	for _, c := range []struct {
+		d    float64
+		want int32
+	}{{2.9, 2}, {-2.9, -2}, {math.NaN(), 0}, {3e9, math.MaxInt32}, {-3e9, math.MinInt32}, {1e30, math.MaxInt32}, {math.Inf(-1), math.MinInt32}} {
+		if got := Double_ToInt(c.d); got != c.want {
+			t.Errorf("%v.toInt() is %d, want %d", c.d, got, c.want)
+		}
+	}
 	// Decimal digits come in runs of ten from a zero, which is what
 	// digitToInt counts on.
 	for _, r := range unicode.Nd.R16 {

@@ -208,6 +208,18 @@ Each entry: what was decided, why, and what would reopen it.
   counting whole characters, which is simpler and agrees with Postgres's `char_length`
   but changes what valid Kotlin means; storing UTF-16, which converts at every boundary.
   Accepted cost: `length` walks the string.
+- **A `Double` product is rounded before anything adds to it** (15 Nov 2026; spec 3). The
+  Go spec lets an implementation fuse `x*y + z` into one instruction that rounds once, across
+  statements too, and on arm64 Go does; Kotlin rounds each step, and the side-by-side run
+  compares `Double`s bit for bit. The emitter writes every `Double` multiplication as
+  `float64(x*y)`, the conversion the Go spec names as stopping fusion. Not taken: wrapping
+  only a product that feeds an addition, which has to follow values across statements.
+  Reopen if Go stops fusing, or a profile shows the lost instruction.
+- **`Double.toLong()` and `Double.toInt()` are Kotlin's, not Go's conversion** (15 Nov 2026;
+  spec 3). Go leaves an out-of-range conversion to the machine: `int64(1e30)` saturates on
+  arm64 and gives the minimum on amd64. The prelude spells Kotlin's rule out: truncate
+  toward zero, stop at the type's ends, `NaN` gives 0. Accepted cost: this arm64 VM already
+  saturates in hardware, so the tests that cover the ends cannot fail here; they guard amd64.
 - **A value-producing `if`, `when`, `?:` or `?.` is written toward where its value goes,
   and wrapped in a function elsewhere** (15 Nov 2026; spec 6). A `return`, `break` or
   `continue` buried in a larger expression is refused, though Kotlin allows it; the

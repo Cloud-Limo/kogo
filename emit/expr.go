@@ -262,7 +262,9 @@ func (e *emitter) num(code string, from, to check.Type) string {
 }
 
 // arith gives a op b for two numbers (spec.md section 3). Division is
-// a call, so that a division by zero panics in source order.
+// a call, so that a division by zero panics in source order. A Double
+// product is converted, which stops Go fusing it with an addition into
+// one instruction that rounds once: Kotlin rounds each.
 func (e *emitter) arith(op, a string, at check.Type, b string, bt check.Type) string {
 	t := at
 	if builtin(bt, "Long") {
@@ -276,6 +278,8 @@ func (e *emitter) arith(op, a string, at check.Type, b string, bt check.Type) st
 		return e.rt() + ".Mod(" + a + ", " + b + ")"
 	case op == "%":
 		return e.rt() + ".Rem(" + a + ", " + b + ")"
+	case op == "*" && builtin(t, "Double"):
+		return "float64(" + a + " * " + b + ")"
 	}
 	return "(" + a + " " + op + " " + b + ")"
 }

@@ -213,6 +213,42 @@ fun mixed(): String {
 // A value is used as a wider type (spec.md 5.1): a list is copied,
 // since Go has no wider type for a slice, a T becomes a T?, and a
 // function is wrapped.
+// A Double product is rounded before it is added, as Kotlin rounds it:
+// Go may fuse x*y + z into one instruction, and does on arm64. The
+// driver reads x through a function that is not inlined, so the
+// compiler cannot work the sum out exactly instead.
+func TestFused(t *testing.T) {
+	out := build(t, func(root string) map[string][]byte {
+		_, files, errs := emit(t, root, `package t
+
+fun inline(x: Double, y: Double, z: Double): Double = x * y + z
+
+fun across(x: Double, y: Double, z: Double): Double {
+    val p = x * y
+    return p + z
+}
+`)
+		if errs != nil {
+			t.Fatalf("%v", errs)
+		}
+		files["main.go"] = []byte(`package main
+import (
+"fmt"
+"ROOT/t"
+)
+//go:noinline
+func x() float64 { return 1 + 1.0/(1<<30) }
+func main() {
+fmt.Println(t.Inline(x(), x(), -1) == 1.0/(1<<29), t.Across(x(), x(), -1) == 1.0/(1<<29))
+}
+`)
+		return files
+	})
+	if out != "true true\n" {
+		t.Errorf("x*y + z is rounded once: %s", out)
+	}
+}
+
 func TestWidening(t *testing.T) {
 	expect(t, [][2]string{
 		{"t.Oks()", "3"},

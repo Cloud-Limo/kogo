@@ -178,6 +178,19 @@ func Double_ToLong(this float64) int64 {
 	return int64(this)
 }
 
+// Double_ToInt is Double_ToLong at the ends of Int.
+func Double_ToInt(this float64) int32 {
+	switch {
+	case this != this:
+		return 0
+	case this >= 1<<31:
+		return 1<<31 - 1
+	case this <= -1<<31:
+		return -1 << 31
+	}
+	return int32(this)
+}
+
 func T_Let[T, R any](this T, block func(T) R) R { return block(this) }
 
 func T_TakeIf[T any](this T, predicate func(T) bool) *T {

@@ -33,6 +33,7 @@ external fun Regex.matches(input: String): Boolean
 
 external fun Long.toDouble(): Double
 external fun Double.toLong(): Long
+external fun Double.toInt(): Int
 
 external fun <T, R> T.let(block: (T) -> R): R
 external fun <T> T.takeIf(predicate: (T) -> Boolean): T?

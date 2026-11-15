@@ -4,7 +4,8 @@
 //
 // It prints one JSON object a line for each error (file, line, column,
 // code, message) and exits 0 when there are none, 1 when there are
-// some, 2 when it could not run.
+// some, 2 when it could not run. A file that does not parse stops the
+// check: the files that parse are only parsed.
 package main
 
 import (
@@ -48,7 +49,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		tree, err := syntax.Parse(file, src)
 		var bad *syntax.Error
-		if errors.As(err, &bad) { // the other files are still checked
+		if errors.As(err, &bad) { // the other files are still parsed
 			failed = true
 			return out.Encode(bad)
 		}
@@ -59,11 +60,16 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fatal.Encode(syntax.Error{Code: "read", Message: err.Error()})
 		return 2
 	}
+	if failed {
+		// Checked without a file's declarations, the others would show
+		// false errors: each name it declares would be unknown.
+		return 1
+	}
 	_, faults := check.Check(files)
 	for _, f := range faults {
 		out.Encode(f)
 	}
-	if failed || len(faults) > 0 {
+	if len(faults) > 0 {
 		return 1
 	}
 	return 0

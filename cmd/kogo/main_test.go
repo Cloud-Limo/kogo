@@ -49,14 +49,22 @@ func TestExamples(t *testing.T) {
 }
 
 // An error is one JSON object on a line, with its file and position;
-// a file that does not parse is reported and the others still checked.
+// a file that does not parse is reported, and then nothing is checked,
+// since the others would be checked without its declarations.
 func TestErrors(t *testing.T) {
 	code, out := kogo(t, map[string]string{
 		"a.kg": "package a\n\nfun f(xs: List<Int>): Long = xs.sumOf { it }\n",
 		"b.kg": "package a\n\nfun g( = 1\n",
 	})
 	want := `{"file":"b.kg","line":3,"column":8,"code":"syntax","message":"expected a name, found \"=\""}
-{"file":"a.kg","line":3,"column":30,"code":"type-mismatch","message":"this is a Int where a Long is wanted: write .toLong()"}
+`
+	if code != 1 || out != want {
+		t.Errorf("exit %d, want 1\n got %s\nwant %s", code, out, want)
+	}
+	code, out = kogo(t, map[string]string{
+		"a.kg": "package a\n\nfun f(xs: List<Int>): Long = xs.sumOf { it }\n",
+	})
+	want = `{"file":"a.kg","line":3,"column":30,"code":"type-mismatch","message":"this is a Int where a Long is wanted: write .toLong()"}
 `
 	if code != 1 || out != want {
 		t.Errorf("exit %d, want 1\n got %s\nwant %s", code, out, want)

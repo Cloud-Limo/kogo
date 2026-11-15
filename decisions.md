@@ -297,6 +297,11 @@ Each entry: what was decided, why, and what would reopen it.
 - **Sections 9 to 11 are named, not checked**: `Either`, `Raise`, `Tx`, `Db`, the forms of
   section 9, a sql literal and a marker each give `not-yet-checked`. DEV-826 and DEV-827
   replace that.
+- **A file that does not parse stops `kogo check`**: its syntax error is reported, the
+  other files are parsed, and none is checked. Checked without its declarations, the
+  others show false errors, each naming something that is declared. Not taken: checking
+  them anyway (one typo, many wrong errors) or a parser that recovers past an error (its
+  size, to save one rerun). Reopen if ports show syntax errors fixed one rerun at a time.
 - **Not refused yet: `external` in application code** (spec 13). Nothing tells a binding's
   file from an application's until `kogo check` is told where bindings live. Nor: a `val`
   in an interface that a data object implements (it has no constructor to override it in),

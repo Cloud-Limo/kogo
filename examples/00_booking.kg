@@ -1,0 +1,20 @@
+// What example 01 reads of a booking: its price, its extra charges, and
+// what was agreed with the supplier when the job was given.
+package cusoon.model
+
+import cusoon.pricing.Cents
+
+data class Price(val amount: Cents)
+
+data class Booking(
+    val price: Price?,
+    val sharePercentWhenGiven: Int?,
+    val hadCardWhenGiven: Boolean?,
+    val stripeCardId: String?,
+    val fixedPayCents: Cents?,
+)
+
+data class BookingExtraCharge(val amount: Cents)
+
+// The discount, in percent, for an invoice charged to a card on file.
+val autoChargeDiscount: Double = 2.5

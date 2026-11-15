@@ -1,0 +1,52 @@
+  4:1   ClassDecl declares type Person
+  4:19  Param declares property Person.name: String
+  4:29  NamedType : String
+  4:37  Param declares property Person.mobile: String?
+  4:49  NamedType : String?
+  6:1   FunDecl declares fun contact(person: Person?): String
+  6:13  Param declares parameter person: Person?
+  6:21  NamedType : Person?
+  6:31  NamedType : String
+  7:13  Ident : Person?; is parameter person
+  7:20  Binary : Person
+  7:23  Jump : Nothing
+  7:30  StringLit : String
+  7:31  Literal : String
+  7:5   ValDecl declares local p: Person
+  8:18  Ident : Person; is local p
+  8:20  Select : String?; is property Person.mobile
+  8:28  Select is fun String.trim(): String
+  8:32  Call : String?; calls fun String.trim(): String, on its receiver, arguments per parameter []
+  8:36  Select is fun <T> T.takeIf(predicate: (T) -> Boolean): T?
+  8:43  Call : String?; calls fun <T> T.takeIf(predicate: (T) -> Boolean): T? with <String>, on its receiver, arguments per parameter [1]
+  8:43  Lambda : (String) -> Boolean; declares local it: String
+  8:45  Ident : String; is local it
+  8:48  Select is fun String.isNotEmpty(): Boolean
+  8:5   ValDecl declares local mobile: String?
+  8:58  Call : Boolean; calls fun String.isNotEmpty(): Boolean, on its receiver, arguments per parameter []
+  9:12  If : String
+  9:16  Ident : String?; is local mobile
+  9:23  Binary : Boolean
+  9:26  Literal : Nothing?
+  9:32  StringLit : String
+  9:35  Ident : Person; is local p
+  9:37  Select : String; is property Person.name
+  9:42  Literal : String
+  9:47  Ident : String; is local mobile; narrowed from String?
+  9:5   Jump : Nothing
+  9:60  Ident : Person; is local p
+  9:62  Select : String; is property Person.name
+ 13:1   FunDecl declares fun mobileOf(person: Person): String
+ 13:14  Param declares parameter person: Person
+ 13:22  NamedType : Person
+ 13:31  NamedType : String
+ 14:19  Call : String; calls fun <T> requireNotNull(value: T?, lazyMessage: () -> String): T with <String>, no receiver, arguments per parameter [1 1]
+ 14:20  Ident : Person; is parameter person
+ 14:27  Select : String?; is property Person.mobile
+ 14:35  Lambda : () -> String
+ 14:37  StringLit : String
+ 14:38  Literal : String
+ 14:47  Ident : Person; is parameter person
+ 14:5   Ident is fun <T> requireNotNull(value: T?, lazyMessage: () -> String): T
+ 14:54  Select : String; is property Person.name
+ 14:59  Literal : String

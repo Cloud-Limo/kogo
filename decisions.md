@@ -52,9 +52,9 @@ Each entry: what was decided, why, and what would reopen it.
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
   lines. Not taken: tables inside the checker, which make every prelude function a compiler
   change and put the prelude in the core (principle 8). Built into the checker all the same,
-  because the core sections define them: the operators (`+` on lists, `list[i]`, `in`,
-  ranges, `to`), the forms of section 9, the five SQL calls and `db.tx`, and what data
-  classes and enums provide. A binding may have a nullable receiver (`isNullOrBlank`,
+  because the core sections define them: the operators on numbers, `==`, ranges, the forms
+  of section 9, the five SQL calls and `db.tx`, and what data classes and enums provide.
+  The other operators are bindings (the entry below). A binding may have a nullable receiver (`isNullOrBlank`,
   `orEmpty`), which application code may not. Reopen if a prelude function's type cannot be
   written in Kogo and is too useful to leave out.
 - **Type arguments are settled in one fixed order, with no solver** (15 Nov 2026; spec 5.1):
@@ -74,6 +74,28 @@ Each entry: what was decided, why, and what would reopen it.
   The same answer serves ordering: the prelude declares `sortedBy` once per key type, since
   Kogo cannot say "any ordered type". Reopen if those lists become a burden; the other way
   is an "ordered" bound that only bindings may use.
+- **An operator on anything but a number is a binding** (15 Nov 2026; spec 6): `a + b` is
+  the prelude's `plus`, `a < b` its `compareTo`, `x in c` its `contains`, `c[i]` its `get`,
+  `a to b` its `to`. Only an `external fun` counts, so application code still defines no
+  operator. `Decimal + Decimal` and `Instant < Instant` then take a line of prelude and no
+  checker change, and the emitter sees an ordinary call; about 25 lines of checker against
+  about 60 that grow with each type. Accepted costs: `xs.plus(x)` is a second spelling of
+  `xs + x`, as in Kotlin; whoever writes bindings decides which types have an operator;
+  `"a" + "b"` needs `String.plus` in the prelude. The two stage-1 ports use only string
+  `+`, `list[i]` and `to`, so the gain is expected, not yet shown. Reopen if an operator's
+  meaning comes to depend on more than its receiver's and its argument's types, or if the
+  emitted call costs at run time.
+- **A whole-number literal is an `Int` unless a declared type, a parameter or a return type
+  asks for a `Long`** (15 Nov 2026; spec 3 and 5.1), and that holds for an argument that
+  settles a type parameter and for one side of `?:` or `if` with nothing wanted: `val x =
+  cents ?: 0`, `firstOr(longs, 0)` and `val xs: List<Long> = listOf(1, 2)` are refused with
+  "write 0L", though Kotlin takes all three. One rule says what a literal is, and the author
+  of a stage-1 port already wrote `0L` three times in 262 lines from the spec alone. Not
+  taken: letting a literal follow a `Long` beside it (about 15 lines), which still leaves
+  `==` and `listOf(1, 2)` needing the `L`; and also settling a literal after the wanted
+  type (about 25), a fifth step in the order for type arguments. Both only accept more, so
+  either can be added later and break nothing. Reopen if ports show repeated rounds of
+  checking over this.
 - **Only a name narrows** (15 Nov 2026; spec 4): a local `val` or a parameter, by `!= null`,
   `== null` and `is`, through `&&`, `||` and `!`, and for the rest of a block when the other
   branch cannot finish. A name that narrows never changes, so nothing learned is ever
@@ -81,6 +103,13 @@ Each entry: what was decided, why, and what would reopen it.
   stable. Not taken: narrowing a path (`booking.price`), and narrowing after `require`,
   `check` and `ensure`, both of which Kotlin does. No example or stage-1 port needs either.
   Reopen if ports keep binding a path to a `val` only to test it.
+- **Only a statement narrows for the rest of its block** (15 Nov 2026; spec 4): an `if`
+  whose other branch cannot finish, and `x ?: return y`. An `if`, `?:` or `when` used as a
+  value narrows nothing after it, though Kotlin's does: `val p = x ?: return y` gives `p`,
+  and the examples use `p`. Narrowing from a value would have to cover all three forms at
+  once (about 15 lines of checker, 40 of tests) and track what is known after any
+  expression, which the entry above avoids. Reopen if ports keep splitting
+  `val y = if (...) return ... else ...` into two statements.
 - **`Int` or `Long` mixed with `Double` is refused** (15 Nov 2026; spec 3). The two stage-1
   ports wrote one sum both ways, `amount * percent` and `amount.toDouble() * percent`; the
   second shows where cents become a floating-point number. `==` between `Int` and `Long` is
@@ -222,6 +251,66 @@ Each entry: what was decided, why, and what would reopen it.
 - **The branches of an `if` or a `when` used as a value need a common type** by the same
   small rule as type arguments (spec 5.1), since there is no `Any` for them to widen to.
 - **Type arguments are written all or none**, as in Kotlin.
+
+## Taken building the checker (DEV-825), not yet discussed
+
+- **A binding may take `vararg`** (spec 13), the third thing only a binding may write:
+  `listOf(10, 1, 3)` cannot be declared without it, and 5.1's "common type of several
+  arguments" assumes it. Application code still takes a `List`.
+- **A binding with a receiver is a member, in scope with no import** (spec 13). Example 20
+  calls `clock.now()` importing only `Clock`, as Kotlin code does of a class's members.
+  An import of one is an error that says to remove it, not "declares nothing named", which
+  would be false.
+- **A package is the files that share a package line** (spec 2); directories are not
+  checked. `examples/` holds three packages in one directory.
+- **A range is not a value** (spec 6): `a..b` and `a until b` are written only after `in`.
+  Section 3 has no range type and this keeps it so, at the cost of `(1..10).map { }`. No
+  example or stage-1 port writes one elsewhere. Reopen when a port wants to pass one.
+- **The common type is the wider of two types when one fits the other** (spec 5.1), as well
+  as the sealed interface of two variants. As first written, `Int` and `Int?` had none.
+- **`==` needs one side to fit the other, `?` aside** (spec 3). This is the rule that makes
+  `Int == Long` an error and lets `x == null` through.
+- **A nested variant is named in full, `Outcome.Ok`, everywhere** (spec 3.2), also inside
+  its sealed interface, where Kotlin allows `Ok`: one table of names for each package.
+- **`when (x)` over a type that is not sealed, an enum or `Boolean` needs `else` only when
+  used as a value**, as in Kotlin (spec 6). An `if` with no `else` that ends a lambda whose
+  result nothing wants is a statement, as in Kotlin.
+- **A top-level `val` states its type** (spec 5): "inference works inside a function body
+  only", applied to vals. Both stage-1 ports already do.
+- **Overloads: a local hides what is outside; otherwise every function of the name that
+  the file can see is a candidate** (spec 5.2), its own package's, imported or the
+  prelude's alike, and another file's `private` one is not. A value's property comes before
+  an extension val, and its interface's `fun` before an extension fun, as in Kotlin. Where
+  the receiver, the count and the names leave one candidate its parameters type the
+  arguments; where they leave several, each argument is read on its own, and a
+  whole-number literal still fits a `Long` parameter.
+- **The facts are tables keyed by tree node** (`check.Info`): `Types`, `Uses`, `Calls`,
+  `Narrowed`, and what each declaration declares. `Calls` also holds a read of an
+  extension val and an operator that is a binding, so the emitter has one notion of a
+  call. A failed expression has an unknown type that fits anything, and an error is
+  reported once, at the start of the expression it is about.
+- **The checker knows four prelude types by name**: `List`, `Set` and `Map` for `for`,
+  `Pair` for destructuring and for a map's entries, `List` for an enum's `entries`.
+- **The tree marks a trailing lambda** (`Arg.Trailing`): it fills the last parameter, where
+  a lambda inside the parentheses fills the next one, and the two differ when a default is
+  skipped.
+- **Sections 9 to 11 are named, not checked**: `Either`, `Raise`, `Tx`, `Db`, the forms of
+  section 9, a sql literal and a marker each give `not-yet-checked`. DEV-826 and DEV-827
+  replace that.
+- **A file that does not parse stops `kogo check`**: its syntax error is reported, the
+  other files are parsed, and none is checked. Checked without its declarations, the
+  others show false errors, each naming something that is declared. Not taken: checking
+  them anyway (one typo, many wrong errors) or a parser that recovers past an error (its
+  size, to save one rerun). Reopen if ports show syntax errors fixed one rerun at a time.
+- **`check.Check` takes the prelude's files apart from the program's, and only the
+  prelude's may declare a binding** (spec 13). `kogo check` loads the prelude itself, so
+  it knows which is which. Not taken: allowing `external` in package `kogo` and under it,
+  which any file could claim with its package line. An `external` in a program's file is
+  refused where it is declared; with it go the nullable receiver, `out` and `vararg` that
+  only a binding may write. Reopen if a program needs Go bindings of its own.
+- **Not refused yet**: a `val` in an interface that a data object implements (it has no
+  constructor to override it in), an `out` type parameter used as a parameter's type, and
+  two functions with one signature, which are an error only when called.
 
 ## Spec gaps found by the leakage ports, unresolved
 

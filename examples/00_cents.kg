@@ -1,0 +1,4 @@
+// Money is whole cents. Example 01 imports this; 02 computes with it.
+package cusoon.pricing
+
+typealias Cents = Long

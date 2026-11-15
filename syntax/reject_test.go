@@ -109,6 +109,13 @@ func TestFaults(t *testing.T) {
 		{"fun (‸String?).f(): String = this", "nullable-receiver", "take the value as a parameter"},
 		{"fun ‸String? .f(): String = this", "nullable-receiver", "take the value as a parameter"},
 		{"fun (‸(Int) -> Int)? .f(): Int = 1", "nullable-receiver", "take the value as a parameter"},
+		// What a binding alone may write, and what it may not.
+		{"data class D<‸out T>(val x: T)", "syntax", "out goes only on the type parameter of a sealed interface or an external class"},
+		{"fun <‸out T> f(x: T) {}", "syntax", "out goes only on the type parameter of a sealed interface or an external class"},
+		{"external class C ‸{ fun f(): Int }", "syntax", "declare each member as an external fun or val with the class as its receiver"},
+		{"external fun f(): Int ‸= 1", "syntax", "a binding has no body"},
+		{"external ‸data class D(val x: Int)", "syntax", "external goes before class, object, fun or val"},
+		{"fun f(‸external x: Int) {}", "syntax", "a parameter takes no modifier"},
 	} {
 		e, line, column := fault(t, c.src)
 		if e.Line != line || e.Column != column || e.Code != c.code || !strings.Contains(e.Message, c.message) {

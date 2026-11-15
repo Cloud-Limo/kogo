@@ -25,11 +25,13 @@ import kogo.time.Instant
 ```
 
 - One `package` line, then imports, then declarations. No wildcard imports,
-  no `import ... as`.
+  no `import ... as`. A package is the files that share a package line,
+  wherever they lie. An import names one declaration of another package;
+  a name of the file's own package needs none.
 - A file holds any number of top-level declarations: functions, `val`
   constants, types, typealiases, marker annotations.
-- `private` means this file. `internal` means this package (directory).
-  No modifier means public. There is no `protected`.
+- `private` means this file. `internal` means this package. No modifier
+  means public. There is no `protected`.
 - Comments: `//`, `/* */` and `/** */`. KDoc is kept as a comment.
 - The declarations of package `kogo` (section 12, and the functions of
   sections 8 and 9) are in scope in every file. `kogo.time` is imported
@@ -66,7 +68,10 @@ error in arithmetic and in comparison, though Kotlin allows it: write
 `.toDouble()`, so that the place where a whole number becomes a
 floating-point one is visible.
 
-Equality `==` is structural for every type. There is no `===`.
+Equality `==` is structural for every type. There is no `===`. One of
+its two sides must fit where the other's type is wanted (section 5.1),
+`?` aside, so `x == null` passes and `Int == Long` and `String == Int`
+are errors.
 
 ### 3.1 Data classes
 
@@ -95,7 +100,9 @@ sealed interface Outcome<out T> {
 ```
 
 The variants are data classes or `data object`s nested in the body or
-declared in the same file. `out` on a type parameter of a sealed interface
+declared in the same file. A nested one is named in full everywhere,
+`Outcome.Ok`, also inside the body, where Kotlin allows `Ok`. `out` on a
+type parameter of a sealed interface
 is the only variance annotation in the language, a binding's external
 class aside (section 13).
 
@@ -142,10 +149,13 @@ There is one absent value, `null`, and it only inhabits `T?`.
   `||` and `!`, and the `is` and `null` branches of `when (x)`. In
   `a && b`, `b` is read knowing `a` holds; in `a || b`, knowing it does
   not.
-- A narrowing holds in the branch where the test's outcome is known, and
-  for the rest of the block when the other branch cannot finish: after
-  `if (x == null) return y`, and after the statement `x ?: return y`,
-  `x` is a `T`. Inside `x?.let { }` the lambda's parameter is a `T`.
+- A narrowing holds in the branch where the test's outcome is known.
+  Two statements narrow for the rest of the block: an `if` whose other
+  branch cannot finish, and `x ?: return y`. After
+  `if (x == null) return y`, or the statement `x ?: return y`, `x` is a
+  `T`. Nothing used as a value narrows past itself, though Kotlin's
+  does: after `val p = x ?: return y` it is `p` that is a `T`, and `x`
+  is still a `T?`. Inside `x?.let { }` the lambda's parameter is a `T`.
 - `require`, `check` and `ensure` do not narrow, though Kotlin's do:
   write `val y = requireNotNull(x) { "why" }`, or `ensureNotNull`.
 - `requireNotNull(x) { "message" }` and `checkNotNull(x) { "message" }`
@@ -171,7 +181,7 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
   take the value as a parameter.
 - Every top-level function states its parameter types and its return type.
   The return type may be omitted only for `Unit`. Inference works inside a
-  function body only.
+  function body only, so a top-level `val` states its type too.
 - Default arguments and named arguments as in Kotlin. No `vararg`.
 - Generic functions take plain type parameters: no bounds, no `where`, no
   `reified`, no `inline`.
@@ -205,10 +215,11 @@ parameter types must be settled before its body is read; where they are
 not, state them: `{ e: StoreError -> ... }`. A type parameter that
 nothing settles is an error: write the type arguments.
 
-The common type of two types is that type when they are the same, `T?`
-for `T` and `null`, and the sealed interface for two of its variants;
-`Nothing` joins with anything. No other two types have one, since there
-is no `Any`. The branches of an `if` or a `when` used as a value, and
+The common type of two types is the wider one when one of them fits
+where the other is wanted (below): the type itself for two the same,
+`T?` for `T` and `null`, the other for `Nothing`. Two variants have
+their sealed interface. No other two types have one, since there is no
+`Any`. The branches of an `if` or a `when` used as a value, and
 the two sides of `?:`, need a common type in the same way, unless the
 type the result must have is known, when each is checked against that.
 
@@ -224,6 +235,7 @@ Kotlin infers more. These are errors in Kogo, each with its fix:
 | `val r = either { ... }`, nothing stating its type | `either<String, Int> { ... }` |
 | `listOf(1, "a")`, a `List<Any>` | no such list; there is no `Any` |
 | a lambda parameter typed by a later argument | `{ e: StoreError -> ... }` |
+| `val xs: List<Long> = listOf(1, 2)`: the arguments settle `T` first, and there a literal is an `Int` | `listOf<Long>(1, 2)`, or `1L` |
 
 ### 5.2 Overloads
 
@@ -240,6 +252,13 @@ One exception: when the candidates left differ only in what one lambda
 parameter returns, as the prelude's `sumOf` does for `Int`, `Long` and
 `Double`, the lambda is read once and what it returns chooses.
 
+Where the receiver, the count and the names leave one candidate, each
+argument is read as that candidate's parameter wants it, so a whole-number literal
+is a `Long` for a `Long` parameter. Where they leave several, each
+argument is read on its own first. A name in a body is a local before
+it is anything declared outside, and a value's own property or
+interface `fun` before an extension of the same name.
+
 ## 6. Statements and expressions
 
 - `val` everywhere. `var` only for locals inside a function body.
@@ -248,20 +267,28 @@ parameter returns, as the prelude's `sumOf` does for `Int`, `Long` and
 - `if`/`else` and `when` are expressions.
 - `when (x) { ... }` over a sealed interface, an enum or a `Boolean` must
   cover every case or have `else`; the compiler rejects a missing case.
-  `when { cond -> ... else -> ... }` requires `else`. Branch conditions:
+  `when { cond -> ... else -> ... }` requires `else`. Over any other type
+  `when (x)` needs `else` where it is used as a value. Branch conditions:
   constants, `is Type`, `in range`, comma-separated alternatives.
 - `is` checks and smart casts work on sealed interfaces.
 - Loops: `for (x in list)`, `for (i in 0 until n)`, `for ((k, v) in map)`,
   `while`. `break` and `continue` without labels.
 - `return` leaves the enclosing `fun`. Labelled returns (`return@name`) do
   not exist; restructure with `if`/`else` or a local function.
-- Ranges: `a..b`, `a until b`, `x in a..b`.
+- Ranges: `a..b`, `a until b`, `x in a..b`, between two `Int`s or two
+  `Long`s. A range is written only after `in`: in a test, a `for` and a
+  `when` condition. It is not a value and has no type.
 - String templates `"$name"` and `"${expr}"`. Raw strings `"""..."""`.
 - Operators: `+ - * / %`, `== !=`, `< <= > >=`, `&& || !`, `+=` and
-  friends on a local `var`.
+  friends on a local `var`. On numbers they are section 3's. On any
+  other type an operator is a binding (section 13), and the prelude says
+  which types have it: `a + b` is `plus`, and so `minus`, `times`, `div`
+  and `rem`; `a < b` and the other three are `compareTo`; `x in c` is
+  `c.contains(x)`; `c[i]` is `c.get(i)`. Only a binding counts:
+  application code defines no operator.
 - Scope functions: `let`, `also` and `takeIf` only. `apply`, `run`, `with`
   and `takeUnless` do not exist.
-- `to` builds a `Pair`: `a to b`.
+- `to` builds a `Pair`: `a to b`, the binding `to`.
 - A statement that is only a value is an error, where Kotlin warns: a
   name, a literal, a member read, a lambda, or an operator's result that
   nothing uses. A call, an assignment, `return` and the like, and
@@ -601,6 +628,7 @@ external object http {
 }
 
 external class List<out T>
+external fun <T> listOf(vararg elements: T): List<T>
 external val <T> List<T>.size: Int
 external fun <T, R> List<T>.map(transform: (T) -> R): List<R>
 external fun <T> List<T>.firstOrNull(): T?
@@ -614,9 +642,11 @@ external fun List<Long>.sum(): Long
   object may share its name, which gives `Uuid.parse(text)`.
 - `external fun` and `external val` declare a function and a property
   with no body. Every member of an external class is declared this way,
-  with the class as the receiver.
-- Two things are allowed in a binding and nowhere else: a nullable
-  receiver, and `out` on an external class's type parameter.
+  with the class as the receiver. One with a receiver is a member: it is
+  in scope wherever a value of that type is, and is never imported.
+- Three things are allowed in a binding and nowhere else: a nullable
+  receiver, `out` on an external class's type parameter, and `vararg` on
+  a parameter, which then takes any number of arguments.
 - `@go("package")` names the Go package of the declaration it precedes.
 
 Bindings are written by whoever maintains the prelude. Application code

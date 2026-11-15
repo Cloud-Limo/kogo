@@ -1,0 +1,28 @@
+  4:1   ClassDecl declares type Outcome
+  5:22  Param declares property Outcome.Ok.value: T
+  5:33  NamedType : T
+  5:38  NamedType : Outcome<T>
+  5:46  NamedType : T
+  5:5   ClassDecl declares type Outcome.Ok
+  6:24  Param declares property Outcome.Refused.message: String
+  6:37  NamedType : String
+  6:47  NamedType : Outcome<Nothing>
+  6:5   ClassDecl declares type Outcome.Refused
+  6:55  NamedType : Nothing
+  9:1   FunDecl declares fun describe(outcome: Outcome<Int>): String
+  9:14  Param declares parameter outcome: Outcome<Int>
+  9:23  NamedType : Outcome<Int>
+  9:31  NamedType : Int
+  9:38  NamedType : String
+ 10:11  Ident : Outcome<Int>; is parameter outcome
+ 10:5   When : String
+ 11:12  NamedType : Outcome.Ok<Int>
+ 11:26  StringLit : String
+ 11:27  Literal : String
+ 11:32  Ident : Outcome.Ok<Int>; is parameter outcome; narrowed from Outcome<Int>
+ 11:40  Select : Int; is property Outcome.Ok.value
+ 12:12  NamedType : Outcome.Refused
+ 12:31  StringLit : String
+ 12:32  Literal : String
+ 12:43  Ident : Outcome.Refused; is parameter outcome; narrowed from Outcome<Int>
+ 12:51  Select : String; is property Outcome.Refused.message

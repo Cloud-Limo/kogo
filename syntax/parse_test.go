@@ -65,8 +65,8 @@ func write(b *strings.Builder, v reflect.Value) {
 // line a declaration.
 func TestExamples(t *testing.T) {
 	files, _ := filepath.Glob("../examples/*.kg")
-	if len(files) != 21 {
-		t.Fatalf("%d examples, want 21", len(files))
+	if len(files) != 23 {
+		t.Fatalf("%d examples, want 23", len(files))
 	}
 	var got strings.Builder
 	for _, file := range files {
@@ -145,7 +145,13 @@ func TestDeclarations(t *testing.T) {
 		{"@RequiresOptIn\nannotation class M\n@M fun f() = 1\ndata class H @M constructor(val x: Int)",
 			`[(ClassDecl (Modifiers [(Annotation RequiresOptIn)]) "annotation class" M) (FunDecl (Modifiers [(Annotation M)]) f (Literal Int 1)) (ClassDecl "data class" H (Modifiers [(Annotation M)]) [(Param Val x (NamedType Int))])]`},
 		{"@go(\"httpx\")\nexternal object http {\n    fun get(url: String): Either<E, R>\n}",
-			`[(ClassDecl (Modifiers [(Annotation go [(StringLit [(Literal String httpx)])])]) "external object" http [(FunDecl get [(Param url (NamedType String))] (NamedType Either [(NamedType E) (NamedType R)]))])]`},
+			`[(ClassDecl (Modifiers [(Annotation go [(StringLit [(Literal String httpx)])])] External) "external object" http [(FunDecl get [(Param url (NamedType String))] (NamedType Either [(NamedType E) (NamedType R)]))])]`},
+		// The binding forms of section 13: a class with no body, and
+		// there only, out, a nullable receiver and vararg.
+		{"external class List<out T>\nexternal val <T> List<T>.size: Int\nexternal fun <T> List<T>?.orEmpty(): List<T>",
+			`[(ClassDecl (Modifiers External) "external class" List [(TypeParam Out T)]) (ValDecl (Modifiers External) [(TypeParam T)] (NamedType List [(NamedType T)]) size (NamedType Int)) (FunDecl (Modifiers External) [(TypeParam T)] (NamedType List [(NamedType T)] Nullable) orEmpty (NamedType List [(NamedType T)]))]`},
+		{"external fun <T> listOf(vararg elements: T): List<T>\nexternal fun String?.isNullOrBlank(): Boolean",
+			`[(FunDecl (Modifiers External) [(TypeParam T)] listOf [(Param Vararg elements (NamedType T))] (NamedType List [(NamedType T)])) (FunDecl (Modifiers External) (NamedType String Nullable) isNullOrBlank (NamedType Boolean))]`},
 	}, func(t *testing.T, src string) string { return show(parse(t, src).Decls) })
 
 	f, err := Parse("t.kg", []byte("@file:OptIn(A::class, b.B::class)\n\npackage x.y\n\nimport a.b.C\nimport d.e\n"))
@@ -182,18 +188,19 @@ func TestExpressions(t *testing.T) {
 		{"if (a) b\nelse c", `[(If (Ident a) (Block [(Ident b)]) (Block [(Ident c)]))]`},
 		// < opens type arguments only when > and ( or { follow.
 		{"q<R>(x)", `[(Call (Ident q) [(NamedType R)] [(Arg (Ident x))])]`},
-		{"e<A, B?> { it }", `[(Call (Ident e) [(NamedType A) (NamedType B Nullable)] [(Arg (Lambda (Block [(Ident it)])))])]`},
+		{"e<A, B?> { it }", `[(Call (Ident e) [(NamedType A) (NamedType B Nullable)] [(Arg (Lambda (Block [(Ident it)])) Trailing)])]`},
 		{"a < b && c > d", `[(Binary && (Binary < (Ident a) (Ident b)) (Binary > (Ident c) (Ident d)))]`},
 		{"a < b > (c)", `[(Call (Ident a) [(NamedType b)] [(Arg (Ident c))])]`},
 		{"f(a < b, c > d)", `[(Call (Ident f) [(Arg (Binary < (Ident a) (Ident b))) (Arg (Binary > (Ident c) (Ident d)))])]`},
 		// A brace after a call is a lambda; after a header, a body.
-		{"if (ok) run { x }", `[(If (Ident ok) (Block [(Call (Ident run) [(Arg (Lambda (Block [(Ident x)])))])]))]`},
+		{"if (ok) run { x }", `[(If (Ident ok) (Block [(Call (Ident run) [(Arg (Lambda (Block [(Ident x)])) Trailing)])]))]`},
 		{"for (x in xs) { y }", `[(For x (Ident xs) (Block [(Ident y)]))]`},
-		{"f(a) { b -> c }", `[(Call (Ident f) [(Arg (Ident a)) (Arg (Lambda [(LambdaParam b)] (Block [(Ident c)])))])]`},
+		{"f(a) { b -> c }", `[(Call (Ident f) [(Arg (Ident a)) (Arg (Lambda [(LambdaParam b)] (Block [(Ident c)])) Trailing)])]`},
+		{"f({ a }, { b })", `[(Call (Ident f) [(Arg (Lambda (Block [(Ident a)]))) (Arg (Lambda (Block [(Ident b)])))])]`},
 		{"{ (a, b), c: Int -> a }", `[(Lambda [(LambdaParam [a b]) (LambdaParam c (NamedType Int))] (Block [(Ident a)]))]`},
 		// Templates nest; escapes are Kotlin's.
 		{`"${if (a) "x" else "y"}"`, `[(StringLit [(If (Ident a) (Block [(StringLit [(Literal String x)])]) (Block [(StringLit [(Literal String y)])]))])]`},
-		{`"$n: ${f { "${it}}" }}$"`, `[(StringLit [(Ident n) (Literal String ": ") (Call (Ident f) [(Arg (Lambda (Block [(StringLit [(Ident it) (Literal String })])])))]) (Literal String $)])]`},
+		{`"$n: ${f { "${it}}" }}$"`, `[(StringLit [(Ident n) (Literal String ": ") (Call (Ident f) [(Arg (Lambda (Block [(StringLit [(Ident it) (Literal String })])])) Trailing)]) (Literal String $)])]`},
 		{`"\t\$xA\\"`, `[(StringLit [(Literal String "\t$xA\\")])]`},
 		{`"\uD83D\uDE00"`, "[(StringLit [(Literal String \U0001F600)])]"},
 		{"\"\"\"a\\n $b\"\"\"\"", `[(StringLit Raw [(Literal String "a\\n ") (Ident b) (Literal String "\"")])]`},
@@ -214,7 +221,7 @@ func TestStatements(t *testing.T) {
 		// data, enum, sealed and the refused modifiers are names where
 		// no declaration follows.
 		{"data.size\nvalue to key\nopen in s\nf { data -> data }\nfinal\ng()",
-			`[(Select (Ident data) size) (Binary to (Ident value) (Ident key)) (Binary in (Ident open) (Ident s)) (Call (Ident f) [(Arg (Lambda [(LambdaParam data)] (Block [(Ident data)])))]) (Ident final) (Call (Ident g))]`},
+			`[(Select (Ident data) size) (Binary to (Ident value) (Ident key)) (Binary in (Ident open) (Ident s)) (Call (Ident f) [(Arg (Lambda [(LambdaParam data)] (Block [(Ident data)])) Trailing)]) (Ident final) (Call (Ident g))]`},
 		{"fun g(x: Int = 1): Int {\n    return x\n}", `[(FunDecl g [(Param x (NamedType Int) (Literal Int 1))] (NamedType Int) (Block [(Jump return (Ident x))]))]`},
 	}, stmts)
 }
@@ -225,7 +232,7 @@ func TestSQL(t *testing.T) {
 		t.Fatalf("%d literals, want 1", len(f.SQL))
 	}
 	s := f.SQL[0]
-	if got, want := show(s), `(SQL query "select $a, ${b.c}, ${xs.map { it }}, $1, $ " [(SQLParam a) (SQLParam (Select (Ident b) c)) (SQLParam (Call (Select (Ident xs) map) [(Arg (Lambda (Block [(Ident it)])))]))])`; got != want {
+	if got, want := show(s), `(SQL query "select $a, ${b.c}, ${xs.map { it }}, $1, $ " [(SQLParam a) (SQLParam (Select (Ident b) c)) (SQLParam (Call (Select (Ident xs) map) [(Arg (Lambda (Block [(Ident it)])) Trailing)]))])`; got != want {
 		t.Errorf("\n got %s\nwant %s", got, want)
 	}
 	if s.Line != 2 || s.Column != 23 || s.TextPos.Offset != 38 || s.Params[1].Column != 40 {

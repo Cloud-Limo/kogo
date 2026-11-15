@@ -102,7 +102,7 @@ func TestSignatures(t *testing.T) {
 			`update supply_agreement set driver_share_percent = $share where driver_share_percent = any($shares::percent[])`,
 			"(share: Int, shares: List<Int>) -> "},
 	} {
-		st, err := c.Check(context.Background(), tc.literal, false)
+		st, err := c.Check(context.Background(), tc.literal)
 		if err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 		} else if got := signature(st); got != tc.want {
@@ -113,7 +113,7 @@ func TestSignatures(t *testing.T) {
 
 // exists and execute discard the columns, so they need no Kogo type.
 func TestDiscardedColumns(t *testing.T) {
-	st, err := connect(t).Check(context.Background(), `select pg_advisory_xact_lock($key)`, true)
+	st, err := connect(t).CheckDiscarding(context.Background(), `select pg_advisory_xact_lock($key)`)
 	if err != nil || signature(st) != "(key: Long) -> " {
 		t.Errorf("got %v, %v; want (key: Long) -> ", st, err)
 	}
@@ -126,7 +126,7 @@ func TestNoParseTreeIsAFailure(t *testing.T) {
 	if _, err := c.conn.Exec(context.Background(), "set client_min_messages = warning"); err != nil {
 		t.Fatal(err)
 	}
-	st, err := c.Check(context.Background(), `select legal_name from business`, false)
+	st, err := c.Check(context.Background(), `select legal_name from business`)
 	var e *Error
 	if err == nil || errors.As(err, &e) || !strings.Contains(err.Error(), "no parse tree") {
 		t.Errorf("got %v, %v; want a failure to check, not a fault in the literal", st, err)
@@ -172,7 +172,7 @@ func TestErrors(t *testing.T) {
 			`select id from business where created_at::timestamp = «$at`, "sql-unmapped-type", "parameter $at has the Postgres type timestamp without time zone"},
 	} {
 		offset := strings.Index(tc.literal, "«")
-		_, err := c.Check(context.Background(), strings.Replace(tc.literal, "«", "", 1), false)
+		_, err := c.Check(context.Background(), strings.Replace(tc.literal, "«", "", 1))
 		var e *Error
 		if !errors.As(err, &e) {
 			t.Errorf("%s: got %v, want an *Error", tc.name, err)

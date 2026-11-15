@@ -47,6 +47,7 @@ func TestCheckExamples(t *testing.T) {
 		"18_tx.kg:18:20 (share: Int, invite.businessId: Uuid, supplierId: Uuid) -> ",
 		"18_tx.kg:22:20 (inviteId: Uuid) -> ",
 		"19_markers.kg:15:27 (id: Uuid) -> id: Uuid, legal_name: String",
+		"21_sql_void.kg:6:16 (key: Long) -> ",
 	}
 	_, lines, code := kogoSQL(t, "check", "../../examples")
 	if code != 0 || len(lines) != len(want) {
@@ -138,6 +139,8 @@ invite again: outside 25
 drivers, any: 1 inactive: 0
 fees accounted: 2
 paid invoices: 1
+ann administers acme: true nobody does: false
+locked: 1
 `
 	if err != nil || string(out) != want {
 		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)

@@ -63,4 +63,9 @@ func main() {
 	at, reference := time.Now(), "REF-1"
 	fmt.Println("fees accounted:", must(Q16_sql_update_anyL6C20(ctx, tx, &at, &reference, [][16]byte{{15: 5}, {15: 6}, {15: 9}})))
 	fmt.Println("paid invoices:", must(Q17_sql_two_statementsL14C26(ctx, tx))[0].N)
+	nobody := [16]byte{15: 9}
+	fmt.Println("ann administers acme:", must(Q11_sql_one_scalarL12C15(ctx, tx, &ann, &acme)),
+		"nobody does:", must(Q11_sql_one_scalarL12C15(ctx, tx, &nobody, &acme)))
+	key := int64(822)
+	fmt.Println("locked:", must(Q21_sql_voidL6C16(ctx, tx, &key)))
 }

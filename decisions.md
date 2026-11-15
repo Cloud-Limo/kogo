@@ -41,6 +41,12 @@ Each entry: what was decided, why, and what would reopen it.
   Kogo type. Mapping `void` to `Unit` was the other way; it would let a row type carry a
   `Unit` field under `query<R>`, which means nothing. `void` stays an error under the query
   calls. Reopen if a call that discards columns comes to need one of them.
+- **`exists` sends its statement as written and reads the first row** (15 Nov 2026). The
+  emitted Go is `tx.Query`, then one `rows.Next()`, giving a `bool`. Counting rows affected
+  would be false for a statement whose command tag has no count, and wrapping it in
+  `select exists(...)` refuses `insert ... returning` and changes `for update`. pgx still
+  drains the remaining rows, so Postgres produces them all: write `limit 1` where there may
+  be many. Reopen if that cost shows up in a port.
 
 ## Taken in the v0 spec, not yet discussed
 

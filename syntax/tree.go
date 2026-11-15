@@ -217,6 +217,11 @@ type SQL struct {
 	Params  []*SQLParam
 }
 
+// Typed reports whether the call uses the result's columns, so that
+// they must be typed: query, queryOne and querySingle do; exists and
+// execute discard them.
+func (s *SQL) Typed() bool { return sqlCalls[s.Call] }
+
 // A SQLParam is $name, with Name set, or ${expr}, with Expr set.
 type SQLParam struct {
 	Pos

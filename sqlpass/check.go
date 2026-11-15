@@ -84,11 +84,20 @@ func Connect(ctx context.Context, connString string) (*Checker, error) {
 
 func (c *Checker) Close(ctx context.Context) { c.conn.Close(ctx) }
 
-// Check infers the signature of one literal. When the call discards
-// the columns, as exists and execute do, they are not typed and the
-// statement has none. A fault in the literal is an *Error; any other
-// error is a failure to ask the database.
-func (c *Checker) Check(ctx context.Context, literal string, discard bool) (*Statement, error) {
+// Check infers the signature of one literal. A fault in the literal
+// is an *Error; any other error is a failure to ask the database.
+func (c *Checker) Check(ctx context.Context, literal string) (*Statement, error) {
+	return c.check(ctx, literal, false)
+}
+
+// CheckDiscarding is Check for a call that throws the result's columns
+// away, as exists and execute do: they are not typed, so they need no
+// Kogo type, and the statement has none.
+func (c *Checker) CheckDiscarding(ctx context.Context, literal string) (*Statement, error) {
+	return c.check(ctx, literal, true)
+}
+
+func (c *Checker) check(ctx context.Context, literal string, discard bool) (*Statement, error) {
 	sql, params, edits, err := rewrite(literal)
 	if err != nil {
 		return nil, err

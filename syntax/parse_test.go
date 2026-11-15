@@ -65,8 +65,8 @@ func write(b *strings.Builder, v reflect.Value) {
 // line a declaration.
 func TestExamples(t *testing.T) {
 	files, _ := filepath.Glob("../examples/*.kg")
-	if len(files) != 20 {
-		t.Fatalf("%d examples, want 20", len(files))
+	if len(files) != 21 {
+		t.Fatalf("%d examples, want 21", len(files))
 	}
 	var got strings.Builder
 	for _, file := range files {
@@ -234,7 +234,7 @@ func TestSQL(t *testing.T) {
 
 	// A literal inside another's ${} comes after it, in source order.
 	f = parse(t, "fun f() = tx.query<R>(sql\"select ${tx.querySingle<Int>(sql\"select 1\")}\")")
-	if len(f.SQL) != 2 || f.SQL[0].Text != "select ${tx.querySingle<Int>(sql\"select 1\")}" || f.SQL[1].Text != "select 1" || f.SQL[1].Call != "querySingle" {
+	if len(f.SQL) != 2 || f.SQL[0].Text != "select ${tx.querySingle<Int>(sql\"select 1\")}" || f.SQL[1].Text != "select 1" || f.SQL[1].Call != "querySingle" || !f.SQL[1].Typed() {
 		t.Errorf("literals out of order: %s", show(f.SQL))
 	}
 }

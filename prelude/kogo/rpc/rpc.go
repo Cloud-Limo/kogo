@@ -87,18 +87,16 @@ func Db[Env, I, A any](name string, f func(kogo.Db, Env, Request, I) kogo.Either
 func answer[A any](op string, a A) []byte {
 	var b bytes.Buffer
 	b.WriteString(`{"type":"ok","value":`)
-	write(&b, reflect.ValueOf(&a).Elem(), op, "value", false)
+	write(&b, reflect.ValueOf(&a).Elem(), op, "value")
 	b.WriteString("}")
 	return b.Bytes()
 }
 
-// A Table is what the emitter writes for an api list: its operations,
-// each enum's entries (Name_entries) and each sealed interface's
-// Variants that its inputs reach.
+// A Table is what the emitter writes for an api list: its operations
+// and each enum's entries (Name_entries) that its inputs reach.
 type Table[Env any] struct {
 	Operations []Operation[Env]
 	Enums      []any
-	Sealed     []Sealed
 }
 
 // A Handler serves a table at the names of its operations, POST
@@ -115,10 +113,10 @@ type Handler[Env any] struct {
 }
 
 // NewHandler serves t over pool with env, and logs to log. Its Limit
-// is 90 seconds. It panics if t lacks an enum's entries or a sealed
-// interface's variants that an input reaches.
+// is 90 seconds. It panics if t lacks an enum's entries that an input
+// reaches.
 func NewHandler[Env any](t Table[Env], pool *pgxpool.Pool, env Env, log *slog.Logger) *Handler[Env] {
-	h := &Handler[Env]{90 * time.Second, map[string]Operation[Env]{}, newReader(t.Enums, t.Sealed), pool, env, log}
+	h := &Handler[Env]{90 * time.Second, map[string]Operation[Env]{}, newReader(t.Enums), pool, env, log}
 	for _, op := range t.Operations {
 		h.read.check(op.input, map[reflect.Type]bool{})
 		h.ops[op.Name] = op

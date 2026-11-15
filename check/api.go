@@ -14,10 +14,8 @@ import (
 type API struct {
 	Env Type  // the environment every operation of the list takes
 	Ops []*Op // in the list's order
-	// Types holds the wire types the operations reach, in the order
-	// first reached: enums, data classes, sealed interfaces, and the
-	// data objects that are their variants. A sealed interface comes
-	// before its variants.
+	// Types holds the wire types the operations reach, enums and data
+	// classes, in the order first reached.
 	Types []*TypeDecl
 }
 
@@ -178,8 +176,7 @@ type reach struct {
 }
 
 // add puts d in w.Types, reporting a name that TypeScript would take
-// twice. A sealed interface goes before any of its variants already
-// reached.
+// twice.
 func (c *checker) add(id *syntax.Ident, what string, w *reach, d *TypeDecl) {
 	w.seen[d] = true
 	if e := w.names[d.Simple()]; e != nil {
@@ -190,14 +187,7 @@ func (c *checker) add(id *syntax.Ident, what string, w *reach, d *TypeDecl) {
 	if d.Simple() == "Outcome" {
 		c.errorf(id, "wire-name", "%s's %s reaches %s, and Outcome is the answer's own type in TypeScript: rename it (spec.md 15.4)", id.Name, what, d.Name)
 	}
-	i := -1
-	if len(d.Variants) > 0 {
-		i = slices.IndexFunc(w.Types, func(e *TypeDecl) bool { return slices.Contains(d.Variants, e) })
-	}
-	if i < 0 {
-		i = len(w.Types)
-	}
-	w.Types = slices.Insert(w.Types, i, d)
+	w.Types = append(w.Types, d)
 }
 
 // wire checks that whole, the input or the answer of the operation at
@@ -228,7 +218,9 @@ func (c *checker) wire(id *syntax.Ident, what string, whole Type, w *reach) {
 		case is(n, tBoolean), number(n), is(n, tString), d == c.prelude("Uuid"):
 		case d == c.prelude("List"):
 			walk(n.Args[0], path)
-		case d.Kind != "enum class" && d.Kind != "data class" && d.Kind != "sealed interface":
+		case d.Kind == "sealed interface" || slices.ContainsFunc(d.Supers, func(s *Named) bool { return s.Decl.Kind == "sealed interface" }):
+			bad(t, path, "and no sealed interface or variant of one crosses the wire: send a data class, with an enum that says which case it is")
+		case d.Kind != "enum class" && d.Kind != "data class":
 			bad(t, path, "which does not cross the wire: send text the server has formatted")
 		case len(d.Params) > 0:
 			bad(t, path, "and a type on the wire has no type parameters: declare one type for each use")
@@ -241,19 +233,6 @@ func (c *checker) wire(id *syntax.Ident, what string, whole Type, w *reach) {
 			if d.Kind == "data class" {
 				for _, p := range d.Ctor.Params {
 					walk(p.Type, path+"."+p.Name)
-				}
-			}
-			for _, v := range d.Variants {
-				vpath := path + "." + v.Simple()
-				switch {
-				case v.Kind == "data object":
-					if !w.seen[v] {
-						c.add(id, what, w, v)
-					}
-				case slices.ContainsFunc(v.Ctor.Params, func(p *Var) bool { return p.Name == "type" }):
-					c.errorf(id, "wire", "%s's %s holds %s.type, and a variant on the wire has no property type, the key that holds its name: rename the property (spec.md 15.4)", id.Name, what, vpath)
-				default:
-					walk(self(v), vpath)
 				}
 			}
 		}

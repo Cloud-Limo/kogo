@@ -115,7 +115,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			if !lit.Typed() {
 				check = checker.CheckDiscarding
 			}
-			st, err := check(ctx, lit.Text)
+			st, err := check(ctx, lit.Text, spans(lit))
 			var fault *sqlpass.Error
 			switch {
 			case errors.As(err, &fault):
@@ -158,6 +158,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 		stdout.Write(src)
 	}
 	return 0
+}
+
+// spans gives where the parser found each parameter of a literal.
+func spans(lit *syntax.SQL) []sqlpass.Span {
+	var out []sqlpass.Span
+	for _, p := range lit.Params {
+		out = append(out, sqlpass.Span{Start: p.Offset - lit.TextPos.Offset, End: p.End.Offset - lit.TextPos.Offset})
+	}
+	return out
 }
 
 // position gives the line and column, both from 1, of a byte offset.

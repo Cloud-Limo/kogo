@@ -1,8 +1,12 @@
 // The core's own declarations: Either and the forms of a raise scope
-// (spec.md section 9). The checker reads them before the prelude and
-// knows each by name: a fun whose receiver is Raise<E> is called on
-// the raise scope around the call, bind needs one that takes its E,
-// and a block of type Raise<E>.() -> A is a raise scope for E.
+// (spec.md section 9), and the transactions of section 10.7. The
+// checker reads them before the prelude and knows each by name: a fun
+// whose receiver is Raise<E> is called on the raise scope around the
+// call, bind needs one that takes its E, a block of type
+// Raise<E>.() -> A is a raise scope for E, and of the two db.tx, the
+// second is the one called where the enclosing fun returns an
+// Either<E, ...>, with that E. The five calls of section 10.2 are the
+// checker's own code, since a sql literal is not a value.
 package kogo
 
 sealed interface Either<out E, out A> {
@@ -18,3 +22,10 @@ external fun <E> Raise<E>.ensure(condition: Boolean, raise: () -> E)
 external fun <E, A> Raise<E>.ensureNotNull(value: A?, raise: () -> E): A
 external fun <E, A> Either<E, A>.bind(): A
 external fun <E, F, A> Raise<E>.withError(transform: (F) -> E, block: Raise<F>.() -> A): A
+
+external class Db
+external class Tx
+
+external fun <A> Db.tx(serializable: Boolean = false, block: (Tx) -> A): A
+external fun <E, A> Db.tx(serializable: Boolean = false, block: Raise<E>.(Tx) -> A): Either<E, A>
+external fun <A> Tx.atomically(block: () -> A): A

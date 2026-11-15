@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"kogo/prelude"
+	"kogo/sqlpass"
 	"kogo/syntax"
 )
 
@@ -45,8 +46,7 @@ external fun <T, R> T.let(block: (T) -> R): R
 external fun <T> requireNotNull(value: T?, lazyMessage: () -> String): T
 external fun require(value: Boolean, lazyMessage: () -> String)
 external fun error(message: String): Nothing
-external class Conn
-external fun <R> Conn.query(statement: Int): List<R>
+external class Uuid
 external object Text {
     fun of(n: Int): String
 }
@@ -57,7 +57,7 @@ external object Text {
 func split(src string) []string {
 	files := strings.Split(src, "\n---\n")
 	for i, text := range files {
-		if !strings.HasPrefix(text, "package ") {
+		if !strings.HasPrefix(text, "package ") && !strings.HasPrefix(text, "@file:") {
 			files[i] = "package t\n" + text
 		}
 	}
@@ -90,7 +90,44 @@ func run(t *testing.T, src string) (*Info, []*syntax.Error) {
 			program = append(program, f)
 		}
 	}
-	return Check(pre, program)
+	return Check(pre, program, signature)
+}
+
+// signature answers for the SQL pass in the tests: a literal's text is
+// its own signature, as "$a: Int, ${b.c}: Kind{x y} -> id: Uuid, n:
+// List<Long>?", the parameters in the pass's order, a name once, and
+// Kind{x y} an enum of the constants x and y. A literal holding «
+// is refused there.
+func signature(lit *syntax.SQL) (*sqlpass.Statement, error) {
+	if i := strings.Index(lit.Text, "«"); i >= 0 {
+		return nil, &sqlpass.Error{Offset: i, Code: "sql-rejected", Message: "Postgres refused this"}
+	}
+	var typ func(string) sqlpass.Type
+	typ = func(s string) sqlpass.Type {
+		if elem, ok := strings.CutPrefix(s, "List<"); ok {
+			t := typ(strings.TrimSuffix(elem, ">"))
+			t.List = true
+			return t
+		}
+		if name, labels, ok := strings.Cut(s, "{"); ok {
+			return sqlpass.Type{Name: name, Enum: true, Labels: strings.Fields(strings.TrimSuffix(labels, "}"))}
+		}
+		return sqlpass.Type{Name: s}
+	}
+	params, columns, _ := strings.Cut(lit.Text, "->")
+	st := &sqlpass.Statement{SQL: lit.Text}
+	for _, p := range strings.Split(params, ",") {
+		if source, t, ok := strings.Cut(strings.TrimSpace(p), ": "); ok {
+			st.Params = append(st.Params, sqlpass.Param{Source: source, Type: typ(t)})
+		}
+	}
+	for _, col := range strings.Split(columns, ",") {
+		if name, t, ok := strings.Cut(strings.TrimSpace(col), ": "); ok {
+			base, null := strings.CutSuffix(t, "?")
+			st.Columns = append(st.Columns, sqlpass.Column{Name: name, Type: typ(base), Nullable: null})
+		}
+	}
+	return st, nil
 }
 
 // refused checks that each program is refused once, where ‸ stands,
@@ -152,9 +189,6 @@ func TestNames(t *testing.T) {
 		{"val n: Int = 1\n---\npackage t\n‸val n: Int = 2", "duplicate", "already declares n"},
 		{"package a\nimport b.g\nimport ‸c.g\n---\npackage b\nfun g(): Int = 1\n---\npackage c\nfun g(): Int = 2", "duplicate", "g is already imported from package b"},
 		// Sections 10 and 11 are another issue's: named, never passed.
-		{"fun f(tx: ‸Tx) {}", "not-yet-checked", "Tx belongs to spec.md section 10"},
-		{"fun f(q: Conn): List<Int> = q.query<Int>(‸sql\"select 1\")", "not-yet-checked", "a sql literal belongs to spec.md section 10"},
-		{"‸@Marker\nfun f() {}", "not-yet-checked", "the marker @Marker belongs to spec.md section 11"},
 		// Section 6: the scope functions that do not exist.
 		{"fun f(x: Int): Int = x.‸apply { 1 }", "kotlin-scope-function", "name the value and call it"},
 		{"fun f(x: Int): Int? = x.‸takeUnless { it > 1 }", "kotlin-scope-function", "use takeIf"},
@@ -167,7 +201,7 @@ func TestBindingsOnlyInPrelude(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, errs := Check(nil, []*syntax.File{f}); len(errs) != 1 || errs[0].Code != "external" {
+	if _, errs := Check(nil, []*syntax.File{f}, nil); len(errs) != 1 || errs[0].Code != "external" {
 		t.Errorf("got %v, want one external error", errs)
 	}
 }
@@ -347,6 +381,8 @@ func TestStatements(t *testing.T) {
 		"fun f(xs: List<Int>, m: Map<String, Int>): Int? {\n    var all = xs + 1\n    all += 2\n    val p = \"a\" to all[0]\n    val (name, n) = p\n    return m[name]\n}",
 		"fun f(c: Boolean, s: String?): String {\n    val t = s ?: return \"\"\n    xs(c)\n    return if (c) t else \"no\"\n}\nfun xs(c: Boolean): Int = if (c) 1 else if (!c) 2 else 3",
 		"fun f(xs: List<Int>) {\n    var n = 0\n    xs.forEach { n += it }\n    xs.forEach { g(it) }\n    xs.forEach { if (it > 0) n += 1 }\n}\nfun g(n: Int): Int = n",
+		// A lambda whose value is a wanted Unit may end with Unit.
+		"fun f(xs: List<Int>) {\n    xs.forEach {\n        g(it)\n        Unit\n    }\n}\nfun g(n: Int): Int = n",
 		"fun f(a: String, b: String): Boolean = a < b && a >= b",
 	)
 	refused(t, [][3]string{
@@ -451,6 +487,122 @@ func TestFailures(t *testing.T) {
 	})
 }
 
+// Section 10: the five calls, their result types and their parameters,
+// each rule broken. The literals spell their own signatures, as
+// signature reads them.
+func TestSQL(t *testing.T) {
+	passes(t,
+		`data class Row(val id: Uuid, val legalName: String, val abn: String?)
+fun f(tx: Tx, id: Uuid): List<Row> = tx.query<Row>(sql"$id: Uuid -> id: Uuid, legal_name: String, abn: String?")
+fun g(tx: Tx): Row? = tx.queryOne<Row>(sql" -> abn: String, legal_name: String, id: Uuid")
+fun h(tx: Tx): String? = tx.queryOne<String?>(sql" -> abn: String?")
+fun k(tx: Tx): Long = tx.querySingle<Long>(sql" -> n: Long")
+fun m(tx: Tx, id: Uuid): Boolean = tx.exists(sql"$id: Uuid -> v: Void")
+fun n(tx: Tx): Int = tx.execute(sql" -> v: Void")`,
+		// Nested data classes, one on the absent side of an outer join.
+		`data class Tenant(val id: Uuid, val slug: String)
+data class Row(val id: Uuid, val tenant: Tenant?, val owner: Tenant)
+fun f(tx: Tx): List<Row> = tx.query<Row>(sql" -> id: Uuid, tenant_id: Uuid?, tenant_slug: String?, owner_id: Uuid, owner_slug: String")`,
+		// A T? parameter, an enum by its constants, lists, a name
+		// written twice, a typealias and a type of kogo.time.
+		`import kogo.time.Instant
+enum class Kind { b, a }
+typealias Cents = Long
+data class P(val ids: List<Uuid>, val kind: Kind, val at: Instant)
+fun f(tx: Tx, kind: Kind?, ids: List<Uuid?>, p: P, active: Boolean?, total: Cents): List<P> =
+    tx.query<P>(sql"$active: Boolean, $kind: K{a b}, $ids: List<Uuid>, ${p.ids}: List<Uuid>, $total: Long, $active -> ids: List<Uuid>, kind: K{a b}, at: Instant")
+---
+package kogo.time
+external class Instant`,
+	)
+	refused(t, [][3]string{
+		{"data class Row(val id: Uuid)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> id: Uuid, legal_name: String\")", "sql-column-unused",
+			"column legal_name fills no property of Row: add a property legalName, or leave the column out"},
+		{"data class Row(val id: Uuid, val legalName: String)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> id: Uuid\")", "sql-column-missing",
+			"no column fills Row.legalName: select one named legal_name, with as legal_name if need be"},
+		{"data class T(val id: Uuid, val slug: String)\ndata class Row(val tenant: T?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> tenant_id: Uuid\")", "sql-column-missing",
+			"no column fills T.slug: select one named tenant_slug"},
+		{"data class Row(val id: Uuid)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> id: Long\")", "sql-column-type",
+			"column id is a Long, and fills Row.id, a Uuid: make that a Long, or cast the column in the statement"},
+		{"enum class Kind { a, b }\nfun f(tx: Tx): Kind = tx.querySingle<Kind>(‸sql\" -> kind: K{a c}\")", "sql-column-type",
+			"column kind is a enum class K { a, c }, and fills the result, a Kind"},
+		{"data class Row(val abn: String)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> abn: String?\")", "sql-nullable",
+			`column abn may be null, and fills Row.abn, a String: make that a String?, or if the column is never null, name it as "abn!"`},
+		{"fun f(tx: Tx): String = tx.querySingle<String>(‸sql\" -> abn: String?\")", "sql-nullable", "fills the result, a String: make that a String?"},
+		{"fun f(tx: Tx): Long = tx.querySingle<Long>(‸sql\" -> a: Long, b: Long\")", "sql-columns",
+			"this statement gives 2 columns, and a Long is one: read them into a data class with a property for each, or select one column"},
+		{"fun f(tx: Tx): List<Long> = tx.query<Long>(‸sql\"\")", "sql-columns", "this statement gives no columns: call execute, or add returning"},
+		{"data class Row(val n: Long)\nfun f(tx: Tx): Row? = tx.queryOne<Row?>(‸sql\" -> n: Long\")", "sql-columns", "a row is never null: write Row, not Row?"},
+		{"fun f(tx: Tx, id: String): Int = tx.execute(sql\"‸$id: Uuid, $id\")", "sql-parameter-type",
+			"$id is a String, and Postgres takes a Uuid there: pass a Uuid, or cast it in the statement, as $id::type"},
+		{"fun f(tx: Tx, ids: List<Int>): Int = tx.execute(sql\"‸${ids}: List<Long>\")", "sql-parameter-type", "${ids} is a List<Int>, and Postgres takes a List<Long> there"},
+		// The SQL pass's refusal, at its place in the literal.
+		{"fun f(tx: Tx): Int = tx.execute(sql\"\"\"\n    select\n    ‸«\"\"\")", "sql-rejected", "Postgres refused this"},
+		{"fun f(db: Db): Int = ‸db.execute(sql\"\")", "type-mismatch", "this is a Db where a Tx is wanted"},
+	})
+}
+
+// Section 10.7: db.tx, whose block is a raise scope where the
+// enclosing fun returns an Either, and tx.atomically.
+func TestTransactions(t *testing.T) {
+	passes(t,
+		"fun f(db: Db): Int = db.tx { tx -> tx.execute(sql\"\") }",
+		"fun f(db: Db): Int = db.tx(serializable = true) { tx -> tx.execute(sql\"\") }",
+		"fun f(db: Db, n: Int): Either<String, Int> = db.tx { tx ->\n    if (n < 0) raise(\"negative\")\n    tx.execute(sql\"\")\n}",
+		// The enclosing fun settles E, though nothing is wanted.
+		"fun f(db: Db): Either<String, Int> {\n    val r = db.tx { tx -> raise(\"no\") }\n    return r\n}",
+		"fun f(db: Db, n: Int): Either<String, Int> = db.tx { tx ->\n    tx.atomically {\n        ensure(n > 0) { \"not positive\" }\n        n\n    }\n}",
+		"fun f(tx: Tx): Int = tx.atomically { tx.execute(sql\"\") }",
+		"fun Db.f(): Either<String, Int> = tx { tx -> raise(\"no\") }",
+	)
+	refused(t, [][3]string{
+		{"fun f(db: Db): Int = db.tx { tx -> ‸raise(\"no\") }", "raise-scope", "this is not a raise scope"},
+		{"fun f(db: Db): Either<String, Int> = db.tx { tx -> raise(‸1) }", "type-mismatch", "this is a Int where a String is wanted"},
+		{"fun f(db: Db): Either<String, Int> {\n    ‸db.tx { tx -> 1 }\n    return 1.right()\n}", "either-dropped", "this Either<String, Int> is dropped"},
+	})
+}
+
+// Section 11: a marked fun, val or constructor is used only in a file
+// that opts in to its marker.
+func TestMarkers(t *testing.T) {
+	marked := "package a\n@RequiresOptIn\nannotation class M\n@M\nfun f(): Int = 1\n@M\nval limit: Int = 2\ndata class H @M constructor(val n: Int)\n---\n"
+	passes(t,
+		marked+"@file:OptIn(M::class)\npackage b\nimport a.M\nimport a.f\nimport a.limit\nimport a.H\nfun g(): Int = f() + limit + H(1).n",
+		marked+"package b\nimport a.H\nfun g(h: H): Int = h.n",
+	)
+	refused(t, [][3]string{
+		{marked + "package b\nimport a.f\nfun g(): Int = ‸f()", "opt-in", "f is marked @M: begin this file with @file:OptIn(M::class)"},
+		{marked + "package b\nimport a.limit\nfun g(): Int = ‸limit", "opt-in", "limit is marked @M"},
+		{marked + "package b\nimport a.H\nfun g(): H = ‸H(1)", "opt-in", "H is marked @M"},
+		{marked + "package a\nfun g(): Int = ‸f()", "opt-in", "f is marked @M"},
+		{"data class X(val n: Int)\n‸@X\nfun f() {}", "marker", "X is not a marker: a marker is declared @RequiresOptIn annotation class X"},
+		{"@file:OptIn(‸X::class)\npackage t\ndata class X(val n: Int)", "marker", "X is not a marker"},
+		{"‸@Marker\nfun f() {}", "unknown-name", "nothing named Marker"},
+		{"‸annotation class M", "marker", "@RequiresOptIn annotation class M"},
+		{"@RequiresOptIn\nannotation class M\n‸@M\ndata class X(val n: Int)", "marker", "a marker goes on a fun, a val or a constructor"},
+		{"@RequiresOptIn\nannotation class M\nfun f(m: ‸M) {}", "not-a-type", "M is a marker, not a type"},
+	})
+}
+
+// For each literal, what each parameter binds and the property each
+// column fills.
+func TestSQLFacts(t *testing.T) {
+	info, errs := run(t, `data class Tenant(val id: Uuid, val slug: String)
+data class Row(val id: Uuid, val tenant: Tenant?)
+fun f(tx: Tx, id: Uuid, n: Int): List<Row> = tx.query<Row>(sql"$id: Uuid, ${n + 1}: Int, $id -> tenant_slug: String?, id: Uuid, tenant_id: Uuid?")`)
+	if errs != nil {
+		t.Fatal(errs)
+	}
+	for lit, q := range info.SQL {
+		if q.Row.String() != "Row" || fmt.Sprint(q.Paths) != "[[1 1] [0] [1 0]]" {
+			t.Errorf("row %s filled by %v, want Row by [[1 1] [0] [1 0]]", q.Row, q.Paths)
+		}
+		if len(q.Args) != 2 || q.Args[0] != lit.Params[0].Expr || q.Args[1] != lit.Params[1].Expr || info.Uses[q.Args[0]].(*Var).Kind != Param {
+			t.Errorf("arguments %v, want $id, the parameter, and ${n + 1}", q.Args)
+		}
+	}
+}
+
 // Section 9: the two spellings of a fallible function are one notion
 // underneath. The same program in each has the same facts of what can
 // fail, line by line, leaving out either's block, which only the
@@ -545,7 +697,7 @@ func TestFacts(t *testing.T) {
 		}
 		files = append(files, f)
 	}
-	info, errs := Check(pre, files)
+	info, errs := Check(pre, files, nil)
 	if errs != nil {
 		t.Fatalf("examples 01 to 09 and 20: %v", errs)
 	}

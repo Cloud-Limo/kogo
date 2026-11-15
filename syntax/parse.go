@@ -930,6 +930,10 @@ func (p *parser) sql() *SQL {
 		sp := &SQLParam{Pos: part.pos, Name: part.name}
 		if part.expr {
 			sp.Expr = p.template(part)
+			sp.End = p.src.pos(part.end + 1)
+		} else {
+			sp.Expr = &Ident{Pos{part.pos.Offset + 1, part.pos.Line, part.pos.Column + 1}, part.name}
+			sp.End = Pos{part.pos.Offset + 1 + len(part.name), part.pos.Line, part.pos.Column + 1 + len(part.name)}
 		}
 		s.Params = append(s.Params, sp)
 	}

@@ -33,13 +33,13 @@ func TestCheckExamples(t *testing.T) {
 		"11_sql_one_scalar.kg:6:26 (businessId: Uuid) -> abn: String?",
 		"11_sql_one_scalar.kg:9:28 (businessId: Uuid) -> legal_name: String",
 		"11_sql_one_scalar.kg:12:15 (personId: Uuid, businessId: Uuid) -> ",
-		"12_sql_table_row.kg:17:27 (slug: String) -> id: Uuid, slug: String, legal_name: String, created_at: Instant, " +
+		"12_sql_table_row.kg:19:27 (slug: String) -> id: Uuid, slug: String, legal_name: String, created_at: Instant, " +
 			"abn: String?, abn_checked_at: Instant?, payid: String?, payid_name: String?",
-		"13_sql_upsert_returning.kg:17:35 (id: Uuid, businessId: Uuid, kind: InviteKind, personId: Uuid, invitedBy: Uuid, share: Int) -> " +
+		"13_sql_upsert_returning.kg:19:35 (id: Uuid, businessId: Uuid, kind: InviteKind, personId: Uuid, invitedBy: Uuid, share: Int) -> " +
 			"id: Uuid, business_id: Uuid, kind: InviteKind, person_id: Uuid, invited_by: Uuid, created_at: Instant, driver_share_percent: Int?",
 		"14_sql_outer_join.kg:9:28 (personId: Uuid) -> id: Uuid, legal_name: String, storefront_id: Uuid?, storefront_slug: String?",
 		"15_sql_optional_filter.kg:7:28 (active: Boolean) -> name: String, email: String, active: Boolean",
-		"16_sql_update_any.kg:6:20 (at: Instant, reference: String, invoiceIds: List<Uuid>) -> ",
+		"16_sql_update_any.kg:8:20 (at: Instant, reference: String, invoiceIds: List<Uuid>) -> ",
 		"17_sql_two_statements.kg:8:30 (id: Uuid) -> id: Uuid, number: String, total_cents: Long?",
 		"17_sql_two_statements.kg:10:30 (id: Uuid) -> id: Uuid, number: String, total_cents: Long?",
 		"17_sql_two_statements.kg:14:26 () -> n: Long",

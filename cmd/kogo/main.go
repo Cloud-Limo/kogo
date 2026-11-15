@@ -5,20 +5,27 @@
 // It prints one JSON object a line for each error (file, line, column,
 // code, message) and exits 0 when there are none, 1 when there are
 // some, 2 when it could not run. A file that does not parse stops the
-// check: the files that parse are only parsed.
+// check: the files that parse are only parsed. A program that holds a
+// sql literal is checked against the database $DATABASE_URL names, or
+// the PG* variables when that is unset; one that holds none, against
+// none.
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"kogo/check"
 	"kogo/prelude"
+	"kogo/sqlpass"
 	"kogo/syntax"
 )
 
@@ -66,7 +73,38 @@ func run(args []string, stdout, stderr io.Writer) int {
 		// false errors: each name it declares would be unknown.
 		return 1
 	}
-	_, faults := check.Check(pre, files)
+	var sigs check.Signatures
+	var lost error // a failure to ask the database, which stops the check
+	if slices.ContainsFunc(files, func(f *syntax.File) bool { return f.SQL != nil }) {
+		ctx := context.Background()
+		db, err := sqlpass.Connect(ctx, os.Getenv("DATABASE_URL"))
+		if err != nil {
+			fatal.Encode(syntax.Error{Code: "sql-connect", Message: fmt.Sprintf("no development database, set DATABASE_URL or the PG* variables: %v", err)})
+			return 2
+		}
+		defer db.Close(ctx)
+		sigs = func(lit *syntax.SQL) (*sqlpass.Statement, error) {
+			var spans []sqlpass.Span
+			for _, p := range lit.Params {
+				spans = append(spans, sqlpass.Span{Start: p.Offset - lit.TextPos.Offset, End: p.End.Offset - lit.TextPos.Offset})
+			}
+			ask := db.Check
+			if !lit.Typed() {
+				ask = db.CheckDiscarding
+			}
+			st, err := ask(ctx, lit.Text, spans)
+			var fault *sqlpass.Error
+			if err != nil && !errors.As(err, &fault) && lost == nil {
+				lost = err
+			}
+			return st, err
+		}
+	}
+	_, faults := check.Check(pre, files, sigs)
+	if lost != nil {
+		fatal.Encode(syntax.Error{Code: "sql-check", Message: lost.Error()})
+		return 2
+	}
 	for _, f := range faults {
 		out.Encode(f)
 	}

@@ -232,11 +232,20 @@ func TestSQL(t *testing.T) {
 		t.Fatalf("%d literals, want 1", len(f.SQL))
 	}
 	s := f.SQL[0]
-	if got, want := show(s), `(SQL query "select $a, ${b.c}, ${xs.map { it }}, $1, $ " [(SQLParam a) (SQLParam (Select (Ident b) c)) (SQLParam (Call (Select (Ident xs) map) [(Arg (Lambda (Block [(Ident it)])) Trailing)]))])`; got != want {
+	if got, want := show(s), `(SQL query "select $a, ${b.c}, ${xs.map { it }}, $1, $ " [(SQLParam a (Ident a)) (SQLParam (Select (Ident b) c)) (SQLParam (Call (Select (Ident xs) map) [(Arg (Lambda (Block [(Ident it)])) Trailing)]))])`; got != want {
 		t.Errorf("\n got %s\nwant %s", got, want)
 	}
 	if s.Line != 2 || s.Column != 23 || s.TextPos.Offset != 38 || s.Params[1].Column != 40 {
 		t.Errorf("literal at %d:%d, text at %d, ${ at column %d", s.Line, s.Column, s.TextPos.Offset, s.Params[1].Column)
+	}
+	for i, want := range []string{"$a", "${b.c}", "${xs.map { it }}"} {
+		p, at := s.Params[i], s.TextPos.Offset
+		if got := s.Text[p.Offset-at : p.End.Offset-at]; got != want || p.End.Column != p.Column+len(want) {
+			t.Errorf("parameter %d spans %q, ends at column %d", i, got, p.End.Column)
+		}
+	}
+	if id := s.Params[0].Expr.(*Ident); id.Offset != s.Params[0].Offset+1 {
+		t.Errorf("$a's name at %d, want %d", id.Offset, s.Params[0].Offset+1)
 	}
 
 	// A literal inside another's ${} comes after it, in source order.

@@ -691,9 +691,12 @@ Each entry: what was decided, why, and what would reopen it.
 - **A marker is written nowhere** (spec 11): the checker has enforced it, and it does
   nothing at run time, so a program with markers is emitted, not refused.
 - **Not handled**: two Kogo packages that import each other (Go refuses the cycle, with
-  its own message); a literal outside its type's range;
-  `lowercase()` on `İ` and on a final sigma, where Kotlin's full case mapping and Go's
-  simple one differ; two top-level vals that read each other.
+  its own message); a literal outside its type's range; two top-level vals that read each
+  other.
+- **`lowercase()` is Go's `strings.ToLower`**, stated in spec 12 as a corner where the
+  prelude differs (principle 3): matching `İ` and a final sigma means Java's case tables,
+  and no ported module depends on them. `uppercase()` is not in the prelude yet, so it
+  has no corner to state.
 
 ## Spec gaps found by the leakage ports, unresolved
 

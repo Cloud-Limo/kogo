@@ -676,6 +676,9 @@ all listed here:
 
 - `Regex` takes RE2 patterns: no lookaround and no backreferences.
 - A `String` never holds half of a surrogate pair (section 3).
+- `lowercase()` maps one character at a time: `"İ".lowercase()` is `"i"`
+  where Kotlin's is `"i̇"`, two characters, and a final `Σ` becomes `σ`
+  where Kotlin's is `ς`.
 
 **Numbers.** `coerceAtLeast`, `coerceAtMost`, `coerceIn`, `abs`, `max`,
 `min`, `toInt`, `toLong`, `toDouble`, `toString`. A `Decimal` holds what

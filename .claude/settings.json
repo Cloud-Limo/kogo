@@ -1,0 +1,8 @@
+{
+  "_comment": "Turns off Claude Code's git and PR attribution: the harness otherwise tells the model to add a Co-Authored-By trailer and a 'Generated with Claude Code' PR line, which CLAUDE.md forbids. includeCoAuthoredBy is the older key, kept for older builds.",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "includeCoAuthoredBy": false
+}

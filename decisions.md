@@ -133,6 +133,24 @@ Each entry: what was decided, why, and what would reopen it.
   half must, since it calls cusoon2's code, and the port is cusoon2's code in another
   language; `poc-rs` is the precedent. Not taken: a third repo, which spreads one
   experiment over three; the stage-1 directory, which is not a repository.
+- **Kogo adds no member to a type Kotlin has; what is Kogo's own is a function or a type
+  of a `kogo.` package, imported by name** (15 Nov 2026; `doc/design.md` principle 3, spec
+  12). cusoon2 prints a percentage through Java's `BigDecimal`
+  (`valueOf(x).stripTrailingZeros().toPlainString()`), and Kotlin has no function of its own
+  for it. The promise that a Kotlin name means Kotlin's behaviour helps only a reader who
+  can tell which names are Kotlin's, and `percent.toPlainString()` reads as Kotlin's. So it
+  is `plain(percent)`, imported as `kogo.text.plain` (DEV-843), as `kogo.time` stands for
+  `java.time`: a file's imports show what in it is not Kotlin's. The case will come back,
+  since printing is where Kotlin leans on Java most: cusoon2's 95 hand-written files hold
+  `Locale` 25 times, a `.format(` call 22, `DateTimeFormatter` 19 and `BigDecimal` 16.
+  Measured: Go's shortest plain digits gave Java's text for 500,000 numbers from a fixed
+  seed, all but negative zero, the smallest `Double`, and `NaN` and the infinities, where
+  Java throws. Not taken: the method on `Double`, agreed first and reversed; writing it in
+  the application from Kotlin's names, `toString().removeSuffix(".0")`, which agrees only
+  from 0.001 up to 10,000,000; a slice of `BigDecimal`, three functions that must match
+  Java's everywhere. `Uuid`, `newId` and `Decimal` are Kogo's own with no import; none is
+  a member of a Kotlin type, and they stay. Reopen if imports of `kogo.` functions come to
+  crowd a file, or a function keeps reading worse than the member would.
 - **The prelude's signatures are Kogo declarations, read by the checker like any other
   source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five

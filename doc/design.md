@@ -26,7 +26,9 @@ constraints) is worth typing.
    would mean reimplementing a JVM algorithm or table and no ported
    module's side-by-side run depends on it, and each is stated in
    `spec.md` section 12. A function that would differ in ordinary use
-   takes another name.
+   is Kogo's own. Kogo adds no member to a type Kotlin has: what is
+   Kogo's own is a function or a type of a `kogo.` package, imported by
+   name, so a file's imports show what in it is not Kotlin's.
 4. **Postgres is the type checker for SQL.** Never re-implement SQL
    typing; ask the database.
 5. **Go is a backend, not a source language.** Nobody reads the emitted

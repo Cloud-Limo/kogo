@@ -657,6 +657,14 @@ standard library and `java.time` where the meaning is the same. Its
 signatures are bindings (section 13) kept in `prelude/`: the lists below
 say what exists, and the declarations say what each takes and gives.
 
+The prelude adds no function or property to a type that Kotlin has: on
+a `Double`, a `String` or a `List`, every member is Kotlin's and means
+what Kotlin's means. Where a Kotlin program would reach into Java's
+library, for times or for printing a number, Kogo has a function or a
+type of its own in a package `kogo.<name>`, imported by name as
+`kogo.time` is. So a file's imports show what in it is not Kotlin's.
+`Uuid`, `newId` and `Decimal` are Kogo's own and need no import.
+
 **Collections** (immutable; "changing" one returns a new one).
 `listOf`, `emptyList`, `setOf`, `mapOf`, `size`, `isEmpty`, `isNotEmpty`,
 `contains`/`in`, `list[i]`, `map[k]` (gives `V?`), `first`, `firstOrNull`,

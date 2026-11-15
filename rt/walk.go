@@ -3,7 +3,6 @@ package rt
 import (
 	"math"
 	"reflect"
-	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf16"
@@ -12,18 +11,27 @@ import (
 // A data class is a struct whose first field is blank and tagged
 // kogo:"Name", or kogo:"Name,object" for a data object, and whose
 // other fields are tagged with their property's name. A type that Go
-// implements is compared by its exported fields and has a String
-// method for its text.
+// implements is compared by its exported fields, unless it embeds
+// Unordered, and has a String method for its text.
 
-// A collection that Go implements and == compares regardless of
-// order, a Set, gives its elements by Elements, each once.
-type unordered interface{ Elements() []any }
+// Unordered, embedded in a collection that Go implements, has == compare
+// the collection's Keys, each held once, regardless of order. Only a
+// type that embeds it is such a collection, so a data class with a
+// keys() member is still compared by its properties.
+type Unordered struct{}
+
+func (Unordered) unordered() {}
+
+type unordered interface {
+	unordered()
+	Keys() reflect.Value // a slice
+}
 
 // Equal is a == b for any two Kogo values (spec.md section 3): null
 // is nil, a T? holding a value is equal to that T, lists and data
-// classes are compared part by part, sets regardless of order, and a Double as Kotlin's equals
-// compares it, so NaN is equal to NaN and 0.0 is not equal to -0.0.
-// A function is equal to nothing.
+// classes are compared part by part, sets regardless of order, and a
+// Double as Kotlin's equals compares it, so NaN is equal to NaN and
+// 0.0 is not equal to -0.0. A function is equal to nothing.
 func Equal(a, b any) bool { return equal(reflect.ValueOf(a), reflect.ValueOf(b)) }
 
 // EqualDouble is a == b for two Double? values as Kotlin compares
@@ -53,6 +61,24 @@ func strip(v reflect.Value) reflect.Value {
 func origin(t reflect.Type) string {
 	name, _, _ := strings.Cut(t.Name(), "[")
 	return t.PkgPath() + "." + name
+}
+
+// sameKeys is whether two slices, each holding a key once, hold the
+// same keys in any order.
+func sameKeys(xs, ys reflect.Value) bool {
+	if xs.Len() != ys.Len() {
+		return false
+	}
+next:
+	for i := range xs.Len() {
+		for j := range ys.Len() {
+			if equal(xs.Index(i), ys.Index(j)) {
+				continue next
+			}
+		}
+		return false
+	}
+	return true
 }
 
 func equal(a, b reflect.Value) bool {
@@ -90,10 +116,7 @@ func equal(a, b reflect.Value) bool {
 			return false
 		}
 		if x, ok := a.Interface().(unordered); ok {
-			xs, ys := x.Elements(), b.Interface().(unordered).Elements()
-			return len(xs) == len(ys) && !slices.ContainsFunc(xs, func(x any) bool {
-				return !slices.ContainsFunc(ys, func(y any) bool { return Equal(x, y) })
-			})
+			return sameKeys(x.Keys(), b.Interface().(unordered).Keys())
 		}
 		for i := range a.NumField() {
 			if a.Type().Field(i).IsExported() && !equal(a.Field(i), b.Field(i)) {

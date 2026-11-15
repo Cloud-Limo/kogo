@@ -863,9 +863,11 @@ Each entry: what was decided, why, and what would reopen it.
   keys compared with `rt.Equal`, so a lookup costs the set's size and `setOf` its square.
   A hash would need a second walk that agrees with `==` everywhere. Reopen when a set or
   a map is big enough for the walk to show.
-- **`rt`'s `==` compares a Go type with an `Elements() []any` method regardless of order**,
-  each element once. `rt` knows no prelude type by name; `Map` can give its entries the
-  same way.
+- **`rt`'s `==` compares a Go type that embeds `rt.Unordered` by its `Keys()` regardless
+  of order**, each key once. `rt` knows no prelude type by name, and `Unordered`'s
+  unexported method means no data class can be taken for a set by a member's name; `Map`
+  can give its entries the same way. Not taken: an exported `Elements() []any`, which a
+  member could match and which copied every key on every comparison.
 - **One declaration where Kotlin has two or more.** `listOfNotNull(vararg elements: T?)`
   covers Kotlin's single-element overload; `List<T>.plus(elements: List<T>)` stands for
   Kotlin's `Collection<T>.plus(Iterable<T>)`, since Kogo has no `Iterable`, and the

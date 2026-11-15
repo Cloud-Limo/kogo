@@ -14,6 +14,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -118,8 +119,11 @@ func ListT_SumOf_TToLong[T any](this List[T], selector func(T) int64) int64 {
 	return sum
 }
 
-// List_Plus is a new list: neither operand's array is written.
-func List_Plus[T any](this, elements List[T]) List[T] { return slices.Concat(this, elements) }
+// List_Plus is a new list, never nil: neither operand's array is
+// written.
+func List_Plus[T any](this, elements List[T]) List[T] {
+	return append(append(make(List[T], 0, len(this)+len(elements)), this...), elements...)
+}
 
 // ordered holds each key once, in the order first given, comparing
 // keys as == does (decisions.md). Set is built on it, and Map is to be
@@ -136,16 +140,19 @@ func (o *ordered[K]) add(k K) {
 	}
 }
 
-type Set[T any] struct{ ordered[T] }
+// Set embeds rt.Unordered so that == compares its keys regardless of
+// order.
+type Set[T any] struct {
+	rt.Unordered
+	ordered[T]
+}
 
-func (s Set[T]) String() string { return rt.ToString(s.keys) }
-
-// Elements has rt's == compare two sets regardless of order.
-func (s Set[T]) Elements() []any { return List_widen(s.keys, func(x T) any { return x }) }
+func (s Set[T]) String() string      { return rt.ToString(s.keys) }
+func (s Set[T]) Keys() reflect.Value { return reflect.ValueOf(s.keys) }
 
 // Set_widen keeps every key: values that differ as Ts differ as Bs.
 func Set_widen[A, B any](s Set[A], f func(A) B) Set[B] {
-	return Set[B]{ordered[B]{List_widen(s.keys, f)}}
+	return Set[B]{ordered: ordered[B]{List_widen(s.keys, f)}}
 }
 
 func SetOf[T any](elements ...T) Set[T] {
@@ -275,12 +282,7 @@ func RequireNotNull[T any](value *T, lazyMessage func() string) T {
 	return *value
 }
 
-func Require(value bool, lazyMessage func() string) rt.Unit {
-	if !value {
-		panic(lazyMessage())
-	}
-	return rt.Unit{}
-}
+func Require(value bool, lazyMessage func() string) rt.Unit { return Check(value, lazyMessage) }
 
 func Check(value bool, lazyMessage func() string) rt.Unit {
 	if !value {

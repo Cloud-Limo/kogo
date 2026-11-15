@@ -2,6 +2,7 @@ package rt
 
 import (
 	"math"
+	"reflect"
 	"slices"
 	"testing"
 )
@@ -21,6 +22,24 @@ type box[T any] struct {
 	_     struct{} `kogo:"Box"`
 	Value T        `kogo:"value"`
 }
+
+// bag is a data class whose members are named as a collection's are.
+type bag struct {
+	_    struct{} `kogo:"Bag"`
+	Id   int32    `kogo:"id"`
+	Tags []any    `kogo:"tags"`
+}
+
+func (b bag) Elements() []any     { return b.Tags }
+func (b bag) Keys() reflect.Value { return reflect.ValueOf(b.Tags) }
+
+// pile is a collection Go implements whose keys == compares in any order.
+type pile struct {
+	Unordered
+	keys []int32
+}
+
+func (p pile) Keys() reflect.Value { return reflect.ValueOf(p.keys) }
 
 // == walks both values (spec.md section 3): a T? is its value or
 // null, and never its address.
@@ -46,6 +65,10 @@ func TestEqual(t *testing.T) {
 		{0.0, math.Copysign(0, -1), false},
 		{Char('a'), Char('a'), true},
 		{func() {}, func() {}, false},
+		{bag{Id: 1, Tags: []any{"a"}}, bag{Id: 2, Tags: []any{"a"}}, false}, // not a set
+		{pile{keys: []int32{1, 2}}, pile{keys: []int32{2, 1}}, true},
+		{pile{keys: []int32{1, 2}}, pile{keys: []int32{1, 3}}, false},
+		{pile{keys: []int32{1}}, pile{keys: []int32{1, 2}}, false},
 	} {
 		if got := Equal(c.a, c.b); got != c.want {
 			t.Errorf("Equal(%v, %v) is %v, want %v", c.a, c.b, got, c.want)

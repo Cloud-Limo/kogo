@@ -1,23 +1,33 @@
-// Command kogo checks Kogo programs.
+// Command kogo checks Kogo programs and writes their Go.
 //
-//	kogo check <dir>   check the .kg files under dir as one program
+//	kogo check <dir>        check the .kg files under dir as one program
+//	kogo emit <dir> <out>   check them and, when they pass, write their Go under out
 //
 // It prints one JSON object a line for each error (file, line, column,
 // code, message) and exits 0 when there are none, 1 when there are
 // some, 2 when it could not run. A file that does not parse stops the
 // check: the files that parse are only parsed.
+//
+// emit writes one Go package for each Kogo package, a.b's at
+// <out>/a/b/kogo.go. The Go imports kogo/rt and kogo/prelude/..., and
+// its own packages by the import path of <out>, which is read from
+// the go.mod above it: so <out> lies in a Go module that requires
+// this one.
 package main
 
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
 	"kogo/check"
+	"kogo/emit"
 	"kogo/prelude"
 	"kogo/syntax"
 )
@@ -29,8 +39,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	out, fatal := json.NewEncoder(stdout), json.NewEncoder(stderr)
 	out.SetEscapeHTML(false)
 	fatal.SetEscapeHTML(false)
-	if len(args) != 2 || args[0] != "check" {
-		fatal.Encode(syntax.Error{Code: "usage", Message: "usage: kogo check <dir>"})
+	if !(len(args) == 2 && args[0] == "check" || len(args) == 3 && args[0] == "emit") {
+		fatal.Encode(syntax.Error{Code: "usage", Message: "usage: kogo check <dir>, or kogo emit <dir> <out>"})
 		return 2
 	}
 	pre, err := prelude.Files()
@@ -66,12 +76,53 @@ func run(args []string, stdout, stderr io.Writer) int {
 		// false errors: each name it declares would be unknown.
 		return 1
 	}
-	_, faults := check.Check(pre, files)
+	info, faults := check.Check(pre, files)
+	var written map[string][]byte
+	if len(faults) == 0 && args[0] == "emit" {
+		root, err := importPath(args[2])
+		if err != nil {
+			fatal.Encode(syntax.Error{Code: "no-module", Message: err.Error()})
+			return 2
+		}
+		written, faults = emit.Emit(info, pre, files, root)
+	}
 	for _, f := range faults {
 		out.Encode(f)
 	}
 	if len(faults) > 0 {
 		return 1
 	}
+	for name, text := range written {
+		file := filepath.Join(args[2], filepath.FromSlash(name))
+		err := os.MkdirAll(filepath.Dir(file), 0o755)
+		if err == nil {
+			err = os.WriteFile(file, text, 0o644)
+		}
+		if err != nil {
+			fatal.Encode(syntax.Error{Code: "write", Message: err.Error()})
+			return 2
+		}
+	}
 	return 0
+}
+
+// importPath gives the import path of the directory out: that of the
+// module whose go.mod lies above it, and the way down from there.
+func importPath(out string) (string, error) {
+	abs, err := filepath.Abs(out)
+	if err != nil {
+		return "", err
+	}
+	for dir := abs; ; dir = filepath.Dir(dir) {
+		mod, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+		for _, line := range strings.Split(string(mod), "\n") {
+			if name, ok := strings.CutPrefix(strings.TrimSpace(line), "module "); ok && err == nil {
+				rel, err := filepath.Rel(dir, abs)
+				return path.Join(strings.Trim(name, `" `), filepath.ToSlash(rel)), err
+			}
+		}
+		if dir == filepath.Dir(dir) {
+			return "", fmt.Errorf("no go.mod lies above %s: write the Go inside a Go module that requires kogo, whose rt and prelude it imports", out)
+		}
+	}
 }

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -241,6 +243,8 @@ func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent boo
 	case col.Type.Fields != nil && n == nil:
 		c.errorf(lit, "sql-column-type", "%s is a row of %s, and fills %s, a %s: make that a data class with a property for each of its fields, or select them as columns",
 			subject, col.Type.Name, what, t)
+	case col.Type.Enum && !col.Type.List && enumClass(t) != nil && !c.maps(nonNull(t), col.Type):
+		c.errorf(lit, "sql-column-type", "%s is an enum, and fills %s, a %s: %s", subject, what, t, enumDiff(col.Type, enumClass(t), of == ""))
 	case col.Type.Fields == nil && !c.maps(nonNull(t), col.Type):
 		c.errorf(lit, "sql-column-type", "%s is a %s, and fills %s, a %s: make that a %s%s",
 			subject, kogoName(col.Type), what, t, kogoName(col.Type), cast)
@@ -313,6 +317,59 @@ func (c *checker) maps(t Type, pt sqlpass.Type) bool {
 		home = "kogo.time"
 	}
 	return n.Decl.Name == pt.Name && n.Decl.Pkg == home && (n.Decl.Kind == "builtin" || n.Decl.Kind == "external class")
+}
+
+// enumClass gives the enum class that t, or t?, names, or nil.
+func enumClass(t Type) *TypeDecl {
+	if n, ok := nonNull(t).(*Named); ok && n.Decl.Kind == "enum class" {
+		return n.Decl
+	}
+	return nil
+}
+
+var kotlinName = regexp.MustCompile(`\A[\p{L}_][\p{L}\p{Nd}_]*\z`)
+
+// enumDiff says how an enum's labels and an enum class's constants
+// differ, and what to change: a label that is no name cannot be a
+// constant, so its column, where it can be cast, is read as text.
+func enumDiff(pt sqlpass.Type, d *TypeDecl, cast bool) string {
+	var consts, lacks, extra, unnamed []string
+	for _, e := range d.Entries {
+		consts = append(consts, e.Name)
+	}
+	for _, l := range pt.Labels {
+		if !slices.Contains(consts, l) {
+			lacks = append(lacks, strconv.Quote(l))
+		}
+		if !kotlinName.MatchString(l) {
+			unnamed = append(unnamed, strconv.Quote(l))
+		}
+	}
+	for _, k := range consts {
+		if !slices.Contains(pt.Labels, k) {
+			extra = append(extra, k)
+		}
+	}
+	some := func(one string, xs []string) string {
+		if len(xs) > 1 {
+			one += "s"
+		}
+		return one + " " + strings.Join(xs, ", ")
+	}
+	var says []string
+	if lacks != nil {
+		says = append(says, fmt.Sprintf("its %s not in %s", some("label", lacks), d.Name))
+	}
+	if extra != nil {
+		says = append(says, fmt.Sprintf("%s has %s that it lacks", d.Name, some("constant", extra)))
+	}
+	fix := "make the constants of " + d.Name + " its labels"
+	if unnamed != nil && !cast {
+		fix = strings.Join(unnamed, ", ") + " cannot name a constant: select columns in place of this composite"
+	} else if unnamed != nil {
+		fix = fmt.Sprintf("%s cannot name a constant, so cast the column to text and read it as a String", strings.Join(unnamed, ", "))
+	}
+	return strings.Join(says, ", and ") + ": " + fix
 }
 
 // kogoName names a Postgres type as Kogo writes it, an enum with its

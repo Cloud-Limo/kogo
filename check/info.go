@@ -1,8 +1,8 @@
 // Package check checks a Kogo program against spec.md sections 2 to
-// 11: names, types, type arguments, overloads, narrowing, when,
-// expected failures, SQL and markers. It reads the parser's trees, the
-// prelude's among them, and the SQL pass's signatures, and reports
-// errors or gives the facts the emitter needs.
+// 11 and 15: names, types, type arguments, overloads, narrowing, when,
+// expected failures, SQL, markers and operations. It reads the
+// parser's trees, the prelude's among them, and the SQL pass's
+// signatures, and reports errors or gives the facts the emitter needs.
 package check
 
 import "kogo/syntax"
@@ -15,7 +15,8 @@ type Info struct {
 	// every written type.
 	Types map[syntax.Node]Type
 	// Uses holds what each *syntax.Ident, *syntax.Select,
-	// *syntax.FuncRef and *syntax.ClassRef refers to. A name that
+	// *syntax.FuncRef and *syntax.ClassRef refers to, a name in an
+	// api list among them. A name that
 	// refers to a property or to a function with a receiver, and is
 	// not a Select, is read on this.
 	Uses map[syntax.Node]Object
@@ -55,6 +56,8 @@ type Info struct {
 	// SQL holds each sql literal that one of the five calls of
 	// spec.md 10.2 takes, as matched with its row type and arguments.
 	SQL map[*syntax.SQL]*Query
+	// APIs holds each api list (spec.md 15) with its operations.
+	APIs map[*syntax.API]*API
 	// Core is the checker's own file, check/core.kg, as these tables
 	// know it: its declarations are package kogo's, with the prelude's.
 	Core *syntax.File

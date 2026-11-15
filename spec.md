@@ -910,7 +910,8 @@ fun updateJob(tx: Tx, env: OpsEnv, request: Request, input: UpdateJobInput): Eit
   it is written, its own package's or imported ones. The list may end
   with a comma.
 - A fun's name is its operation's name on the wire, so a list holds no
-  name twice. A fun may stand in more than one list.
+  name twice, and the name is one fun's: not two funs of that name in
+  scope. A fun may stand in more than one list.
 - An operation is an ordinary fun: any code may call it, and nothing
   but the list marks it.
 
@@ -981,8 +982,10 @@ Inputs and answers are JSON.
 - Any other type in an input or an answer is a compile error: a `Map`,
   a `Set`, a `Pair`, a `Decimal`, a type of `kogo.time`, a function, an
   external class. Send text that the server has formatted.
-- A sealed interface on the wire has no type parameters, and no variant
-  of it has a property named `type`. A nested variant goes by its own
+- `Unit` stands only as the whole input or the whole answer.
+- A data class or a sealed interface on the wire has no type
+  parameters, and no variant of a sealed interface has a property
+  named `type`. A nested variant goes by its own
   name, `ForBusiness` for `AcceptInvite.ForBusiness`, and a
   `data object` is `{"type": "Name"}`.
 - Two wire types of one name in one list are a compile error, and so

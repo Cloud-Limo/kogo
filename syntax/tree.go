@@ -1,5 +1,5 @@
 // Package syntax reads Kogo source files into syntax trees: spec.md
-// sections 2 to 13. It resolves no names and checks no types.
+// sections 2 to 13 and 15.1. It resolves no names and checks no types.
 package syntax
 
 // A Pos is a place in a source file: a byte offset, and a line and a
@@ -42,7 +42,16 @@ type File struct {
 	Package *Ident        // a dotted name, as cusoon.model
 	Imports []*Ident
 	Decls   []Decl
+	APIs    []*API // the api lists
 	SQL     []*SQL // every sql literal of the file, in source order
+}
+
+// An API is an api list, api name { f, g }: the funs it names as
+// operations (spec.md 15.1).
+type API struct {
+	Pos
+	Name string
+	Funs []*Ident
 }
 
 // An Annotation is @Name or @Name(args), and in a file's head,

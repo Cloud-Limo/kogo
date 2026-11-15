@@ -100,6 +100,8 @@ node, as Go's own type checker gives.
 - Where a name is narrowed, and to what.
 - For each `sql` literal, its signature and the column that fills each
   property.
+- For each `api` list, its operations in order, and the wire types they
+  reach.
 
 Every function, lambda and call is marked as able to fail with an error
 type `E`, or not, whichever spelling the author used, so the emitter

@@ -141,16 +141,20 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 	}
 	for i := range params {
 		params[i].Type, err = c.typeOf(ctx, sd.ParamOIDs[i])
-		if row := params[i].Type.Name; err == noKogoType("record") || err == nil && params[i].Type.Fields != nil {
-			if err != nil {
-				row = "record"
-			}
-			return nil, &Error{params[i].Offset, "sql-unmapped-type", fmt.Sprintf(
-				"parameter %s has the composite type %s, which a parameter cannot have: pass each field as a parameter of its own",
-				spelling(params[i]), row)}
-		} else if err != nil {
+		row, field := params[i].Type.Name, noField{}
+		switch {
+		case errors.As(err, &field):
+			row = field.name
+		case err == noKogoType("record"):
+			row = "record"
+		case err != nil:
 			return nil, unmapped(err, params[i].Offset, "parameter "+spelling(params[i]))
+		case params[i].Type.Fields == nil:
+			continue
 		}
+		return nil, &Error{params[i].Offset, "sql-unmapped-type", fmt.Sprintf(
+			"parameter %s has the composite type %s, which a parameter cannot have: pass each field as a parameter of its own",
+			spelling(params[i]), row)}
 	}
 	st := &Statement{SQL: sql, Params: params}
 	if discard {
@@ -164,13 +168,11 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 		}
 		whole := false // a table's whole row, whose fields are NOT NULL as its columns are
 		if len(exprs) == len(sd.Fields) {
-			notNull, err := c.notNull(ctx, query, exprs[i])
-			if err != nil {
+			var notNull bool
+			if notNull, whole, err = c.notNull(ctx, query, exprs[i]); err != nil {
 				return nil, err
 			}
 			col.Nullable = !notNull
-			rte, att := source(query, exprs[i], false)
-			whole = rte != nil && att == 0
 		}
 		if !whole {
 			col.Type = loose(col.Type)
@@ -274,8 +276,21 @@ type noKogoType string
 
 func (n noKogoType) Error() string { return string(n) }
 
+// noField is a composite type with a field, at any depth, outside
+// section 10.4: its name, and why, as "whose field f has the Postgres
+// type jsonb".
+type noField struct{ name, why string }
+
+func (n noField) Error() string { return n.name + ", " + n.why }
+
 func unmapped(err error, offset int, what string) error {
 	var pgType noKogoType
+	var field noField
+	if errors.As(err, &field) {
+		return &Error{offset, "sql-unmapped-type", fmt.Sprintf(
+			"%s has the Postgres type %s, which has no Kogo type: select its fields as columns, casting that one to a type of spec.md section 10.4",
+			what, field)}
+	}
 	if !errors.As(err, &pgType) {
 		return err
 	}
@@ -310,7 +325,10 @@ func (c *Checker) typeOf(ctx context.Context, oid uint32) (Type, error) {
 	case category == "A":
 		t, err = c.typeOf(ctx, elem)
 		t.List = true
-		if err == nil && t.Fields != nil { // an array of rows: a list of data classes, not yet mapped
+		// An array of rows, a list of data classes, is not yet mapped,
+		// and is named as itself, not as its element.
+		var field noField
+		if err == nil && t.Fields != nil || errors.As(err, &field) {
 			err = noKogoType(display)
 		}
 	case kind == "c":
@@ -337,12 +355,12 @@ func (c *Checker) typeOf(ctx context.Context, oid uint32) (Type, error) {
 // declare NOT NULL. A field's own fields may all be null, since no
 // table's constraint covers a value stored in a field.
 func (c *Checker) composite(ctx context.Context, relid uint32, display string) (Type, error) {
-	rows, _ := c.conn.Query(ctx, `select attname::text, atttypid, attnum::int from pg_attribute
-		where attrelid = $1 and attnum > 0 and not attisdropped order by attnum`, relid)
+	rows, _ := c.conn.Query(ctx, `select a.attname::text, a.atttypid, `+validNotNull+` from pg_attribute a
+		where a.attrelid = $1 and a.attnum > 0 and not a.attisdropped order by a.attnum`, relid)
 	type attribute struct {
-		Name   string
-		OID    uint32
-		Attnum int
+		Name    string
+		OID     uint32
+		NotNull bool
 	}
 	attrs, err := pgx.CollectRows(rows, pgx.RowToStructByPos[attribute])
 	if err != nil {
@@ -355,16 +373,13 @@ func (c *Checker) composite(ctx context.Context, relid uint32, display string) (
 	for _, a := range attrs {
 		ft, err := c.typeOf(ctx, a.OID)
 		var pgType noKogoType
-		if errors.As(err, &pgType) {
-			return Type{}, noKogoType(fmt.Sprintf("%s, whose field %s has the Postgres type %s", display, a.Name, string(pgType)))
+		var field noField
+		if errors.As(err, &pgType) || errors.As(err, &field) {
+			return Type{}, noField{display, fmt.Sprintf("whose field %s has the Postgres type %s", a.Name, err)}
 		} else if err != nil {
 			return Type{}, err
 		}
-		notNull, err := c.columnNotNull(ctx, int(relid), a.Attnum)
-		if err != nil {
-			return Type{}, err
-		}
-		t.Fields = append(t.Fields, Column{Name: a.Name, Type: loose(ft), Nullable: !notNull})
+		t.Fields = append(t.Fields, Column{Name: a.Name, Type: loose(ft), Nullable: !a.NotNull})
 	}
 	return t, nil
 }
@@ -394,18 +409,22 @@ func pascal(s string) string {
 	return b.String()
 }
 
+// validNotNull is whether the column of pg_attribute a has a validated
+// NOT NULL constraint. Postgres 18 also sets attnotnull for one NOT VALID.
+const validNotNull = `a.attnotnull and not exists (
+	select from pg_constraint k
+	where k.conrelid = a.attrelid and k.contype = 'n' and k.conkey = array[a.attnum] and not k.convalidated)`
+
 // columnNotNull reports whether a table's column has a validated NOT
-// NULL constraint. Postgres 18 also sets attnotnull for one NOT VALID.
+// NULL constraint.
 func (c *Checker) columnNotNull(ctx context.Context, table, column int) (bool, error) {
 	key := [2]int{table, column}
 	if v, ok := c.columns[key]; ok {
 		return v, nil
 	}
 	var v bool
-	err := c.conn.QueryRow(ctx, `select a.attnotnull and not exists (
-			select from pg_constraint k
-			where k.conrelid = a.attrelid and k.contype = 'n' and k.conkey = array[a.attnum] and not k.convalidated)
-		from pg_attribute a where a.attrelid = $1 and a.attnum = $2`, uint32(table), int16(column)).Scan(&v)
+	err := c.conn.QueryRow(ctx, `select `+validNotNull+` from pg_attribute a
+		where a.attrelid = $1 and a.attnum = $2`, uint32(table), int16(column)).Scan(&v)
 	if err != nil {
 		return false, err
 	}

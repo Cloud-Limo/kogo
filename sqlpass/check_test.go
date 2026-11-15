@@ -239,7 +239,10 @@ func TestErrors(t *testing.T) {
 		{"an array of rows",
 			`«select array_agg(t) as tenants from tenant t`, "sql-unmapped-type", `column "tenants" has the Postgres type tenant[]`},
 		{"a composite type with a field of a type outside the table",
-			`«select null::pg_namespace as n`, "sql-unmapped-type", `column "n" has the Postgres type pg_namespace, whose field oid has the Postgres type oid, which`},
+			`«select null::pg_namespace as n`, "sql-unmapped-type",
+			`column "n" has the Postgres type pg_namespace, whose field oid has the Postgres type oid, which has no Kogo type: select its fields as columns`},
+		{"an array of a composite type with a field outside the table, named as an array",
+			`«select array[null::pg_namespace] as ns`, "sql-unmapped-type", `column "ns" has the Postgres type pg_namespace[], which has no Kogo type`},
 		{"a parameter of a type outside the table",
 			`select id from business where created_at::timestamp = «$at`, "sql-unmapped-type", "parameter $at has the Postgres type timestamp without time zone"},
 	} {

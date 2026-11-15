@@ -642,6 +642,11 @@ external class Instant`,
 		// select b.*, where the whole row was meant.
 		{"data class B(val id: Uuid, val legalName: String)\ndata class Row(val business: B)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> id: Uuid, legal_name: String\")",
 			"sql-column-missing", "no column fills Row.business, a B: select a table's whole row as business, as in select b as business"},
+		// A sibling's own column, business_id, is not the prefix form.
+		{"data class B(val id: Uuid, val legalName: String)\ndata class Row(val id: Uuid, val businessId: Uuid, val business: B)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> id: Uuid, business_id: Uuid, legal_name: String\")",
+			"sql-column-missing", "no column fills Row.business, a B: select a table's whole row as business"},
+		{"data class B(val legalName: String, val legal_name: String)\ndata class Row(val business: B)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> business: business(legal_name: String)\")",
+			"sql-field-missing", "field legal_name of column business would fill two properties, B.legal_name among them: rename one of them"},
 		// Reading a row builds R and each data class in it, as their
 		// constructors do.
 		{"package a\nimport c.H\nfun f(tx: Tx): List<H> = tx.query<H>(‸sql\" -> b_n: Int\")\n---\npackage c\ndata class B internal constructor(val n: Int)\ndata class H(val b: B)",
@@ -650,6 +655,12 @@ external class Instant`,
 		{"fun f(tx: Tx): Int = tx.execute(sql\"\"\"\n    select\n    ‸«\"\"\")", "sql-rejected", "Postgres refused this"},
 		{"fun f(db: Db): Int = ‸db.execute(sql\"\")", "type-mismatch", "this is a Db where a Tx is wanted"},
 	})
+	// A data class with no column at all hides only the columns it
+	// would take, not one that no property takes.
+	src := "data class T(val slug: String)\ndata class Row(val id: Uuid, val owner: T)\nfun f(tx: Tx): List<Row> = tx.query<Row>(sql\" -> id: Uuid, slug: String, typo: Int\")"
+	if _, errs := run(t, src); len(errs) != 2 || errs[0].Code != "sql-column-missing" || !strings.HasPrefix(errs[1].Message, "column typo fills no property") {
+		t.Errorf("a missing data class: got %v, want sql-column-missing then typo unused", errs)
+	}
 }
 
 // Section 10.7: db.tx, whose block is a raise scope where the

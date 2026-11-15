@@ -148,12 +148,15 @@ func (c *checker) row(lit *syntax.SQL, q *Query) {
 	case d != nil && null:
 		c.errorf(lit, "sql-columns", "a row is never null: write %s, not %s", d, q.Row)
 	case d != nil:
-		// Where a data class had no column at all, the columns left
-		// over are likely its own, as b.* gives a business's: its error
-		// says what to select in their place.
+		// Where a data class had no column at all, a column left over
+		// of the name of one of its properties is likely its own, as b.*
+		// gives a business's: its error says what to select instead.
 		missed := c.fill(lit, d, "", nil, false, cols, q.Paths)
 		for i, path := range q.Paths {
-			if path == nil && !missed {
+			owned := slices.ContainsFunc(missed, func(m *Named) bool {
+				return slices.ContainsFunc(m.Decl.Props, func(p *Var) bool { return snake(p.Name) == cols[i].Name })
+			})
+			if path == nil && !owned {
 				c.errorf(lit, "sql-column-unused", "column %s fills no property of %s: add a property %s, or leave the column out",
 					cols[i].Name, d, camel(cols[i].Name))
 			}
@@ -181,26 +184,34 @@ func dataClass(t Type) *Named {
 // is what the columns of d begin with and path the properties that
 // lead to d from R. Inside a nullable data class, a column that may be
 // null fills a property that may not, since all of them are null where
-// it is absent. missed is whether some data class had no column at all.
-func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, absent bool, cols []sqlpass.Column, paths [][]int) (missed bool) {
+// it is absent. missed holds the data classes that had no column at
+// all. A column that a property of d takes by name, as business_id,
+// does not count as one with the prefix of a sibling, business.
+func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, absent bool, cols []sqlpass.Column, paths [][]int) (missed []*Named) {
 	c.builds(lit, d.Decl)
 	b := bind(d.Decl.Params, d.Args)
+	prefixed := func(name string) bool {
+		return slices.ContainsFunc(cols, func(col sqlpass.Column) bool {
+			return strings.HasPrefix(col.Name, name) &&
+				!slices.ContainsFunc(d.Decl.Props, func(p *Var) bool { return prefix+snake(p.Name) == col.Name })
+		})
+	}
 	for i, p := range d.Decl.Props {
 		t, name, here := subst(p.Type, b), prefix+snake(p.Name), append(slices.Clip(path), i)
 		what := d.Decl.Name + "." + p.Name
 		n := dataClass(t)
 		j := slices.IndexFunc(cols, func(col sqlpass.Column) bool { return col.Name == name })
 		switch {
-		case j < 0 && n != nil && !slices.ContainsFunc(cols, func(col sqlpass.Column) bool { return strings.HasPrefix(col.Name, name+"_") }):
+		case j < 0 && n != nil && !prefixed(name+"_"):
 			c.errorf(lit, "sql-column-missing", "no column fills %s, a %s: select a table's whole row as %s, as in select b as %s, or columns with the prefix %s_",
 				what, t, name, name, name)
-			missed = true
+			missed = append(missed, n)
 		case j < 0 && n != nil && len(path) > 8:
 			c.errorf(lit, "sql-columns", "%s holds data classes nested too deep to fill from columns", d)
 			return missed
 		case j < 0 && n != nil:
 			_, null := t.(*Nullable)
-			missed = c.fill(lit, n, name+"_", here, absent || null, cols, paths) || missed
+			missed = append(missed, c.fill(lit, n, name+"_", here, absent || null, cols, paths)...)
 		case j < 0:
 			c.errorf(lit, "sql-column-missing", "no column fills %s: select one named %s, with as %s if need be", what, name, name)
 		case paths[j] != nil:
@@ -258,6 +269,11 @@ func (c *checker) fields(lit *syntax.SQL, col sqlpass.Column, d *Named) {
 		if j < 0 {
 			c.errorf(lit, "sql-field-missing", "no field of column %s fills %s.%s: %s has no field %s; name the property after one of its fields, or select columns",
 				col.Name, d.Decl.Name, p.Name, col.Type.Name, name)
+			continue
+		}
+		if used[j] {
+			c.errorf(lit, "sql-field-missing", "field %s of column %s would fill two properties, %s.%s among them: rename one of them",
+				name, col.Name, d.Decl.Name, p.Name)
 			continue
 		}
 		used[j] = true

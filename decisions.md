@@ -771,9 +771,11 @@ Each entry: what was decided, why, and what would reopen it.
   `val business: Business` whole, and `business_id` beside it is then unused. A scalar
   column of that name is a type mismatch, not a reason to try the prefix.
 - **A nested data class with no column at all is one error**, saying to select the whole
-  row as `b as business`, and the unused columns are then not reported: under
-  `select b.*, t.*` they are the ones the whole row replaces, and an error for each would
-  bury the fix. Before, it was one error per property.
+  row as `b as business`, and an unused column named after one of its properties is then
+  not reported: under `select b.*, t.*` those are the ones the whole row replaces, and an
+  error for each would bury the fix. Other unused columns still are. Before, it was one
+  error per property. A column that a sibling property takes by name, as `business_id`
+  for `businessId`, does not count as the prefix form of `business`.
 - **Refused as `sql-unmapped-type`**: a parameter of a composite type, or one Postgres
   infers as `record` (`where total = $total`), since there is no way to send a data class;
   an array of a composite type, deferred with `array_agg(t)`; a composite type with no
@@ -783,7 +785,8 @@ Each entry: what was decided, why, and what would reopen it.
   nullability keep `sql-column-type` and `sql-nullable`, said of "field f of column c",
   without the cast or `"name!"` fix, which Postgres has not for a field.
 - **Not done: reading a composite at run time.** DEV-832 is not done, so the issue leaves
-  it out; `kogo-sql emit` writes no Go type for a composite column.
+  it out; `sqlpass.Emit` refuses a composite column, as `kogo-sql emit` then does with
+  `sql-emit`, rather than write Go that does not build.
 
 ## Spec gaps found by the leakage ports, unresolved
 

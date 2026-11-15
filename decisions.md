@@ -81,6 +81,29 @@ Each entry: what was decided, why, and what would reopen it.
   into, so a careless one can bring in the hidden state section 7 rules out. Not built:
   no example makes an outbound call. Build it with the handle design for outbound calls
   (see the gaps below) when a port first needs one.
+- **`db.tx` keeps its two outcomes: commit when the block finishes, roll back on a failure
+  or a panic** (15 Nov 2026). cusoon2's `commit = false` appears five times and every block
+  under it only reads, where rolling back and committing are the same. A true dry run,
+  writes that are looked at and undone, needs no new form: the block raises a failure that
+  carries the preview, `raise(Preview(changed))`, and the caller reads it. Not taken:
+  `db.tx(commit = false)`, a second switch no port needs; `db.read { }`, a read-only
+  transaction Postgres would enforce. Reopen if dry runs become common, since the idiom
+  calls a success a failure, or if a code path should be held to reading by Postgres.
+- **A constraint violation gets no construct; an expected conflict is written in SQL**
+  (15 Nov 2026; spec 10.6). cusoon2 handles a possible conflict with `on conflict` in 11
+  places and by catching the violation and reading its constraint's name in one. Not
+  taken: a block in a savepoint whose violation comes back as a failure naming the
+  constraint, a new construct whose names are strings the compiler would have to check
+  against the database. Accepted cost: an `update` has no `on conflict`, so its guard is an
+  `exists` first, and a request that slips between the two still panics. Reopen if a port
+  has several such sites or that window causes trouble.
+- **An outbound capability is a handle, and an `external object` has no effect**
+  (15 Nov 2026; spec 13). Section 13 bound HTTP as a global while section 7 says outbound
+  calls arrive as parameters, and a global has no handle to carry the request's context.
+  cusoon2 calls out from five of its hundred files, and mail goes through an outbox table
+  that a worker reads, so most request code writes rows. Not designed, on purpose:
+  timeouts, retries, and whether workers are written in Kogo; they wait, with an
+  application's own binding files, for the first port that calls out.
 - **The prelude's signatures are Kogo declarations, read by the checker like any other
   source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
@@ -457,18 +480,13 @@ Each entry: what was decided, why, and what would reopen it.
   location and a monotonic reading that break comparison by value.
 - **One naming rule gives every overload its Go name**, the prelude's and a program's; its
   spelling is left to whoever builds the emitter, to record here.
-- **Section 13's `external object http` contradicts section 7**, which says outbound calls
-  arrive as parameters, and a global has no context to use. Left as it is, since no example
-  makes an outbound call; when they are designed, the binding becomes a handle.
 
 ## Spec gaps found by the leakage ports, unresolved
 
-- A join returning two whole rows needs every column aliased by hand.
-- No mapping for composite types (`charge`).
-- `db.tx` cannot finish and roll back (the fees dry run).
-- No typed way to turn a named constraint violation into an expected failure.
-- Outbound calls have no design: section 13 binds HTTP as a global, section 7 says such
-  calls arrive as parameters, and the request's context rides in handles. An application's
-  own binding files wait on it.
+- A join returning two whole rows needs every column aliased by hand, and composite types
+  (`charge`) have no mapping. Agreed on 15 Nov 2026 and built in DEV-837: a composite type
+  fills a data class, and a whole row is selected as `b as business`.
+- Outbound calls are handles (above), but their timeouts and retries, workers, and an
+  application's own binding files have no design.
 - `Console`, `Decimal` and the text form of dates and instants have no stated members; the
   prelude's declarations (spec 13) are where they will be stated.

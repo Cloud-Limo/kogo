@@ -855,7 +855,8 @@ func (p *parser) call(fun Expr, pos Pos, typeArgs []Type) Expr {
 					p.notKogo(p.tok.pos, "spread", "*spread", "pass a List")
 				}
 				if p.tok.kind == tSQL && isSQL && a.Name == "" && len(c.Args) == 0 {
-					a.Value = p.sql()
+					s := p.sql()
+					s.Call, a.Value = sel.Name, s
 					if !p.at(")") && !(p.at(",") && p.peek(1).text == ")") {
 						p.fail(a.Pos, "sql-placement", "a sql literal is the only argument of %s", sel.Name)
 					}

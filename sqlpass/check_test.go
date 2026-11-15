@@ -111,6 +111,14 @@ func TestSignatures(t *testing.T) {
 	}
 }
 
+// exists and execute discard the columns, so they need no Kogo type.
+func TestDiscardedColumns(t *testing.T) {
+	st, err := connect(t).CheckDiscarding(context.Background(), `select pg_advisory_xact_lock($key)`)
+	if err != nil || signature(st) != "(key: Long) -> " {
+		t.Errorf("got %v, %v; want (key: Long) -> ", st, err)
+	}
+}
+
 // A session that does not return the parse tree must not pass every
 // column as nullable: that would hide the loss.
 func TestNoParseTreeIsAFailure(t *testing.T) {
@@ -158,6 +166,8 @@ func TestErrors(t *testing.T) {
 		{"braces inside an expression", `select «${ids.map { it }}`, "sql-parameter-syntax", "bind the value to a val"},
 		{"a type outside the table",
 			`«select created_at::timestamp as at from business`, "sql-unmapped-type", `column "at" has the Postgres type timestamp without time zone`},
+		{"a function returning void, when the columns are kept",
+			`«select pg_advisory_xact_lock(1)`, "sql-unmapped-type", `column "pg_advisory_xact_lock" has the Postgres type void`},
 		{"a parameter of a type outside the table",
 			`select id from business where created_at::timestamp = «$at`, "sql-unmapped-type", "parameter $at has the Postgres type timestamp without time zone"},
 	} {

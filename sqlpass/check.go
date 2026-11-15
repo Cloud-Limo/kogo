@@ -87,6 +87,17 @@ func (c *Checker) Close(ctx context.Context) { c.conn.Close(ctx) }
 // Check infers the signature of one literal. A fault in the literal
 // is an *Error; any other error is a failure to ask the database.
 func (c *Checker) Check(ctx context.Context, literal string) (*Statement, error) {
+	return c.check(ctx, literal, false)
+}
+
+// CheckDiscarding is Check for a call that throws the result's columns
+// away, as exists and execute do: they are not typed, so they need no
+// Kogo type, and the statement has none.
+func (c *Checker) CheckDiscarding(ctx context.Context, literal string) (*Statement, error) {
+	return c.check(ctx, literal, true)
+}
+
+func (c *Checker) check(ctx context.Context, literal string, discard bool) (*Statement, error) {
 	sql, params, edits, err := rewrite(literal)
 	if err != nil {
 		return nil, err
@@ -119,8 +130,11 @@ func (c *Checker) Check(ctx context.Context, literal string) (*Statement, error)
 			return nil, unmapped(err, params[i].Offset, "parameter "+spelling(params[i]))
 		}
 	}
-	exprs := outputs(query)
 	st := &Statement{SQL: sql, Params: params}
+	if discard {
+		return st, nil
+	}
+	exprs := outputs(query)
 	for i, f := range sd.Fields {
 		col := Column{Name: f.Name, Nullable: true}
 		if col.Type, err = c.typeOf(ctx, f.DataTypeOID); err != nil {

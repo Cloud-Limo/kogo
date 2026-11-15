@@ -111,7 +111,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		for _, lit := range tree.SQL {
 			line, column := lit.Line, lit.Column
-			st, err := checker.Check(ctx, lit.Text)
+			check := checker.Check
+			if !lit.Typed() {
+				check = checker.CheckDiscarding
+			}
+			st, err := check(ctx, lit.Text)
 			var fault *sqlpass.Error
 			switch {
 			case errors.As(err, &fault):
@@ -122,7 +126,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 				return err
 			case emit:
 				rel, _ := filepath.Rel(args[1], strings.TrimSuffix(file, ".kg"))
-				funcs = append(funcs, sqlpass.Func{Name: funcName(rel, line, column, names), Stmt: st})
+				funcs = append(funcs, sqlpass.Func{Name: funcName(rel, line, column, names), Stmt: st, Exists: lit.Call == "exists"})
 			default:
 				sig := signature{file, line, column, []named{}, []named{}}
 				for _, p := range st.Params {

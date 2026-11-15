@@ -9,10 +9,11 @@ import (
 )
 
 // A Func is a checked statement and the name of the Go function to
-// emit for it.
+// emit for it. Exists asks whether the statement gives any row.
 type Func struct {
-	Name string
-	Stmt *Statement
+	Name   string
+	Stmt   *Statement
+	Exists bool
 }
 
 // The Go type of each Kogo type, as pgx reads and writes it. The
@@ -41,9 +42,10 @@ func goType(t Type, nullable bool) string {
 
 var goName = regexp.MustCompile(`^[A-Z][A-Za-z0-9]*$`)
 
-// Emit writes a Go file with one function per statement. A statement
-// with columns gives a slice of its row struct; one without gives the
-// count of rows affected. Every parameter may be nil, which sends NULL.
+// Emit writes a Go file with one function per statement. An Exists
+// gives whether there is a row; otherwise a statement with columns
+// gives a slice of its row struct, and one without gives the count of
+// rows affected. Every parameter may be nil, which sends NULL.
 func Emit(pkg string, funcs []Func) ([]byte, error) {
 	var body bytes.Buffer
 	types := "" // every Go type used, to know what to import
@@ -57,6 +59,20 @@ func Emit(pkg string, funcs []Func) ([]byte, error) {
 		for i, p := range f.Stmt.Params {
 			args += fmt.Sprintf(", p%d %s", i+1, use(p.Type, true))
 			call += fmt.Sprintf(", p%d", i+1)
+		}
+		if f.Exists {
+			fmt.Fprintf(&body, `
+func %s(ctx context.Context, tx pgx.Tx%s) (bool, error) {
+	rows, err := tx.Query(ctx, %q%s)
+	if err != nil {
+		return false, err
+	}
+	found := rows.Next()
+	rows.Close()
+	return found, rows.Err()
+}
+`, f.Name, args, f.Stmt.SQL, call)
+			continue
 		}
 		if len(f.Stmt.Columns) == 0 {
 			fmt.Fprintf(&body, `

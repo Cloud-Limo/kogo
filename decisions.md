@@ -36,6 +36,17 @@ Each entry: what was decided, why, and what would reopen it.
   the checker handle a `this` that may be null, and no example or stage-1 port writes one; a
   parameter does the job. The parser refuses it at the `?.` (`nullable-receiver`). Reopen
   when a port needs one to read naturally.
+- **The columns under `exists` and `execute` are not typed** (15 Nov 2026). Both discard
+  them, so `tx.execute(sql"select pg_advisory_xact_lock($key)")` passes though `void` has no
+  Kogo type. Mapping `void` to `Unit` was the other way; it would let a row type carry a
+  `Unit` field under `query<R>`, which means nothing. `void` stays an error under the query
+  calls. Reopen if a call that discards columns comes to need one of them.
+- **`exists` sends its statement as written and reads the first row** (15 Nov 2026). The
+  emitted Go is `tx.Query`, then one `rows.Next()`, giving a `bool`. Counting rows affected
+  would be false for a statement whose command tag has no count, and wrapping it in
+  `select exists(...)` refuses `insert ... returning` and changes `for update`. pgx still
+  drains the remaining rows, so Postgres produces them all: write `limit 1` where there may
+  be many. Reopen if that cost shows up in a port.
 
 ## Taken in the v0 spec, not yet discussed
 
@@ -149,10 +160,6 @@ Each entry: what was decided, why, and what would reopen it.
   have no body, an enum has no constructor or body, and a type parameter has no bound.
 
 ## Spec gaps found by the leakage ports, unresolved
-
-- A `select` of a function returning `void` (`pg_advisory_xact_lock`, cusoon2's `bind_tenant`)
-  has a column with no Kogo type, so it is rejected even under `tx.execute`. `void` as `Unit`
-  would do it.
 
 - A join returning two whole rows needs every column aliased by hand.
 - No mapping for composite types (`charge`).

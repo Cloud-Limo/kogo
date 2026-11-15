@@ -586,9 +586,10 @@ one has no Kogo type. The whole row of a subquery or a CTE, like
 select from a table, or name the columns.
 
 Each label of an enum type must be a name a constant can have: a letter
-or `_`, then letters, digits and `_`. An enum with any other label, one
-holding a space or a hyphen, has no Kogo type: rename the label in
-Postgres, or cast the column to text and read it as a `String`.
+or `_`, then letters, digits and `_`, neither a hard keyword such as
+`in` nor underscores alone. An enum with any other label, one holding a
+space or a hyphen, has no Kogo type, whatever it fills: rename the label
+in Postgres, or cast the column to text and read it as a `String`.
 
 A parameter's Kogo type must map to the type Postgres infers for it. When
 Postgres cannot infer one, cast it: `$active::boolean`. A parameter or a

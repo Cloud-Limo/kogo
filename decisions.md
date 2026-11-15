@@ -494,6 +494,10 @@ Each entry: what was decided, why, and what would reopen it.
   like every other run. Not taken: the fixing session merges, as first written (DEV-858),
   which merges commits nobody else has read. Reopen if waiting for a lead session holds
   merges up.
+- **The lead merges a PR with nothing left to change** (16 Nov 2026, lead's ruling on
+  DEV-861). On a `Review:` or `Ruling:` that leaves nothing to change and that it agrees
+  with, the lead runs the tests and merges at the reviewed sha, without a `Fixed:`. Not
+  taken: a Fix session that changes nothing, which adds a step and no reader.
 
 ## Taken in the v0 spec, not yet discussed
 

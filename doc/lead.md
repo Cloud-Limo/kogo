@@ -40,6 +40,7 @@ however small, is an issue or goes into one that is open.
 | In Review | `Handoff:` | a Code review |
 | In Review | `Review:` | read it, then Fix |
 | In Review | `Ruling:` | Fix |
+| In Review | `Review:` or `Ruling:`, nothing to change | Merging, below |
 | In Review | `Fixed:` | Merging, below |
 
 ## What goes to Greg
@@ -109,14 +110,16 @@ follows "The launch comment" in cusoon2's
 
 ## Merging
 
-On `Fixed:`, in the issue's worktree, fast-forwarded: read the fix
-commits against the Review and its Rulings, then run `mise run testdb`
-and `mise exec -- go test ./...`. If they match and pass and nothing
-is Open, `gh pr merge --merge`, which moves the issue to Done, post
-`Merged: <sha>` on the PR and the issue, remove the worktree and both
-branches as in Starting step 3, and pull `main`. Otherwise post a
-`Ruling:` and ask for another Fix. Go to Greg only when what is Open
-is a choice of his kind.
+On `Fixed:`, or on a `Review:` or `Ruling:` that leaves nothing to
+change and that you agree with, in the issue's worktree, fast-forwarded
+(created from `origin/<branch>` when missing, as in Code review): read
+any fix commits against the Review and its Rulings, then run
+`mise run testdb` and `mise exec -- go test ./...`. If they match and
+pass and nothing is Open, `gh pr merge --merge`, which moves the issue
+to Done, post `Merged: <sha>` on the PR and the issue, remove the
+worktree and both branches as in Starting step 3, and pull `main`.
+Otherwise post a `Ruling:` and ask for another Fix. Go to Greg only
+when what is Open is a choice of his kind.
 
 After a merge, look at what the issue was for. File the next issue if
 the work exposed one.

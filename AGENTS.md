@@ -82,11 +82,12 @@ with them. `$LINEAR_API_KEY` is already in the shell.
   stays) or a **Question** (a choice that is Greg's or the lead's: the
   options and which you lean to). Post it on the PR and on the issue
   with `lin comment`, print it, and stop.
-- **Fix.** "Fix DEV-NNN": in the same worktree, fast-forwarded, make
-  every Fix of the newest Review as further commits. A `Ruling:`
-  comment after it answers its Questions and overrides the Review
-  where they differ, a Fix included. Rewrite the PR description if
-  the work moved. Push. Write one comment: the first line
+- **Fix.** "Fix DEV-NNN": in the same worktree, fast-forwarded or
+  made as in Code review when missing, make every Fix of the newest
+  Review as further commits. A `Ruling:` comment after it answers its
+  Questions and overrides the Review where they differ, a Fix
+  included. Rewrite the PR description if the work moved. Push.
+  Write one comment: the first line
   `Fixed: <PR url> at <sha>`, then what was done for each numbered
   item, and under **Open** any Question without a Ruling and any
   choice the fixes raised. Post it on the PR and on the issue with

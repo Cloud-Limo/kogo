@@ -724,38 +724,38 @@ t.Outer()
 // order; xs + ys and x in set are their bindings' calls.
 func TestCollections(t *testing.T) {
 	expect(t, [][2]string{
-		{"t.Counted(rt.Ptr[int64](9), []t.Line{{Kind: t.Kind_fare, Cents: 5}, {Kind: t.Kind_gift, Cents: 7}})", "[9, 5]"},
+		{"t.Counted(rt.Ptr[int64](9), []t.Line{{Kind: t.Kind_item, Cents: 5}, {Kind: t.Kind_voucher, Cents: 7}})", "[9, 5]"},
 		{"t.Counted(nil, nil)", "[]"},
-		{"t.Sets()", "[credit, gift] true false true"},
+		{"t.Sets()", "[discount, voucher] true false true"},
 		{"t.Capped(-5, 3) + t.Capped(10, 3) + t.Capped(10, 30)", "13"},
-		{"t.Paid(5, 2)", "3"},
+		{"t.Taken(5, 2)", "3"},
 		{"t.Second([]int64{10, 20}, 15)", "35"},
-		{"func() (s any) { defer func() { s = recover() }(); return t.Paid(1, 2) }()", "payment of 2 exceeds 1"},
+		{"func() (s any) { defer func() { s = recover() }(); return t.Taken(1, 2) }()", "taking 2 leaves less than none of 1"},
 	}, `package t
 
-enum class Kind { fare, credit, gift }
+enum class Kind { item, discount, voucher }
 
 data class Line(val kind: Kind, val cents: Long)
 
-data class Stop(val name: String, val via: String?)
+data class Tag(val name: String, val note: String?)
 
-val credits: Set<Kind> = setOf(Kind.credit, Kind.gift, Kind.credit)
+val off: Set<Kind> = setOf(Kind.discount, Kind.voucher, Kind.discount)
 
 fun counted(base: Long?, lines: List<Line>): List<Long> =
-    listOfNotNull(base) + lines.filter { !(it.kind in credits) }.map { it.cents }
+    listOfNotNull(base) + lines.filter { !(it.kind in off) }.map { it.cents }
 
 fun sets(): String {
-    val via = "B".takeIf { true }
-    return "$credits ${credits == setOf(Kind.gift, Kind.credit)} ${credits == setOf(Kind.gift)} ${Stop("A", via) in setOf(Stop("A", "B"))}"
+    val note = "B".takeIf { true }
+    return "$off ${off == setOf(Kind.voucher, Kind.discount)} ${off == setOf(Kind.voucher)} ${Tag("A", note) in setOf(Tag("A", "B"))}"
 }
 
 fun capped(net: Long, fee: Long): Long = fee.coerceAtMost(net.coerceAtLeast(0L))
 
 fun second(nets: List<Long>, n: Int): Long = nets[1] + n.toLong()
 
-fun paid(owing: Long, amount: Long): Long {
-    require(amount <= owing) { "payment of $amount exceeds $owing" }
-    return owing - amount
+fun taken(stock: Long, amount: Long): Long {
+    require(amount <= stock) { "taking $amount leaves less than none of $stock" }
+    return stock - amount
 }
 `)
 }

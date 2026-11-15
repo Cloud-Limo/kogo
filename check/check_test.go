@@ -428,6 +428,7 @@ func TestJumps(t *testing.T) {
 		"fun f(s: String?, c: Boolean): String {\n    val t = s ?: return \"\"\n    var u = t\n    u = if (c) t else return \"x\"\n    return when (c) {\n        true -> s ?: return \"y\"\n        false -> u\n    }\n}",
 		"fun f(s: String?): String = s ?: return \"none\"",
 		"fun f(xs: List<Int?>, limit: Int?): Int {\n    var n = 0\n    for (x in xs) {\n        val y = x ?: continue\n        n = if (y > 0) n + y else break\n    }\n    return n\n}",
+		"fun f(xs: List<Int>): Int = xs.first().let {\n    fun half(n: Int): Int {\n        if (n < 2) return 0\n        return n / 2\n    }\n    half(it)\n}",
 		// A loop inside the larger expression holds its own break.
 		"fun g(n: Int): Int = n\nfun f(xs: List<Int>, c: Boolean): Int = g(if (c) {\n    var n = 0\n    for (x in xs) {\n        if (x > 2) break\n        n += x\n    }\n    n\n} else 0)",
 	)
@@ -439,6 +440,9 @@ func TestJumps(t *testing.T) {
 		{"fun g(n: Int): Int = n\nfun f(c: Boolean): Int = g(if (c) {\n    ‸return 1\n} else 2)", "buried-jump", fix},
 		{"fun g(n: Int): Int = n\nfun f(xs: List<Int?>): Int {\n    var n = 0\n    for (x in xs) n += g(x ?: ‸continue)\n    return n\n}", "buried-jump", "val v = x ?: continue"},
 		{"fun f(xs: List<Int?>): Int {\n    for (x in xs) {\n        val y = (x ?: ‸break) + 1\n    }\n    return 1\n}", "buried-jump", "this break is buried"},
+		// A lambda holds no return; a local fun inside one does.
+		{"fun f(xs: List<Int>): Int {\n    xs.forEach { if (it > 1) ‸return it }\n    return 0\n}", "kotlin-lambda-return", "end the lambda with its value, and return after the call that runs it"},
+		{"fun f(x: Int?): Int = x?.let { ‸return it } ?: 0", "kotlin-lambda-return", "a lambda holds no return"},
 		// n += v is n = n + v: the value is an operand.
 		{"fun f(xs: List<Int?>): Int {\n    var n = 0\n    for (x in xs) n += x ?: ‸break\n    return n\n}", "buried-jump", fix},
 	})

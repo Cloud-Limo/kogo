@@ -246,6 +246,11 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 		return ft
 	case *syntax.Jump:
 		switch {
+		case e.Op == "return" && c.inLambda:
+			c.errorf(e, "kotlin-lambda-return", "a lambda holds no return (spec.md 6): end the lambda with its value, and return after the call that runs it")
+			if e.Value != nil {
+				c.expr(e.Value, nil)
+			}
 		case e.Op == "return" && c.buried || e.Op != "return" && c.buriedLoop:
 			c.errorf(e, "buried-jump", "this %s is buried in a larger expression, where Go has no place for it (spec.md 6): bind the value to a val first, as val v = x ?: %s, and use v", e.Op, e.Op)
 			if e.Value != nil {
@@ -910,8 +915,8 @@ func (c *checker) lambda(l *syntax.Lambda, params []Type, want Type) *FuncType {
 			c.local(p, p.Name, t, false)
 		}
 	}
-	defer func(n int, b, bl bool) { c.loops, c.buried, c.buriedLoop = n, b, bl }(c.loops, c.buried, c.buriedLoop)
-	c.loops, c.buried, c.buriedLoop = 0, false, false
+	defer func(n int, b, bl, il bool) { c.loops, c.buried, c.buriedLoop, c.inLambda = n, b, bl, il }(c.loops, c.buried, c.buriedLoop, c.inLambda)
+	c.loops, c.buried, c.buriedLoop, c.inLambda = 0, false, false, true
 	if ft.Result = c.block(l.Body, want, true, nil); want != nil {
 		ft.Result = want
 	}

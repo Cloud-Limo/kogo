@@ -133,10 +133,9 @@ type emitter struct {
 	fn      *scope
 
 	// The Kogo fun being written.
-	this    check.Type // the type of this, or nil
-	result  check.Type
-	lambdas int // how many lambdas this place is inside, within the fun
-	loops   []*loop
+	this   check.Type // the type of this, or nil
+	result check.Type
+	loops  []*loop
 }
 
 // An inst is a nullable type argument, and the type parameter it

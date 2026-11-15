@@ -214,6 +214,13 @@ Each entry: what was decided, why, and what would reopen it.
   examples and both stage-1 ports hold two jumps in a value's place, both
   `val x = y ?: return z`. Not taken: flattening every expression into statements and
   temporaries, about 400 lines and the simplified tree under another name.
+- **A lambda holds no `return`** (15 Nov 2026; spec 6). Kotlin allows one only in a lambda
+  it inlines, where it leaves the enclosing fun. A Kogo lambda is a function value, so
+  leaving the fun through it would take the panic that a failure uses, at every such
+  `return`. The checker refuses it (`kotlin-lambda-return`) and says to end the lambda
+  with its value and return after the call; `break` and `continue` in a lambda were
+  refused already. No example or stage-1 port writes one. Reopen if ports keep rewriting
+  `xs.forEach { if (...) return x }` as loops and it reads badly.
 - **The prelude's Go is our own package with no new dependency** (15 Nov 2026). `Decimal`
   holds what Postgres sent and has no arithmetic: the ports use it once and convert it to a
   `Double`, and cusoon2 keeps money in cents. Reopen when a port needs decimal arithmetic,
@@ -615,9 +622,6 @@ Each entry: what was decided, why, and what would reopen it.
     `prelude/` declares them.
   - SQL and transactions (spec 10): a `Tx` or a `Db` wherever one is written, and each of
     the five calls. Spec 7 puts one of the two in every fun that touches the database.
-  - a `return` inside a lambda. It would leave the fun around it through a Go function
-    value, which needs the panic that a failure uses. Whether Kogo wants it at all is
-    open: Kotlin allows it only because its lambdas are inlined.
   - a type argument that is nullable where the type parameter is used as `T?`
     (`x.takeIf { }` on an `Int?`): two pointers in Go, and the outer one would not be null
     when the value is.

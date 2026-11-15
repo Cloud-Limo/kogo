@@ -14,7 +14,7 @@ import (
 func (e *emitter) decl(d syntax.Decl) {
 	defer e.enter(d)()
 	e.fn = &scope{names: map[any]string{}, used: map[string]bool{"this_": true}}
-	e.this, e.result, e.lambdas, e.loops = nil, nil, 0, nil
+	e.this, e.result, e.loops = nil, nil, nil
 	if e.info.Fails[d] != nil {
 		e.notYet(d, "a fun that can fail (spec.md 9)", slices9and10)
 		return
@@ -77,10 +77,8 @@ func (e *emitter) params(d *syntax.FunDecl, f *check.Func) (params string, defau
 
 // body writes a fun's body after its opening line, and closes it.
 func (e *emitter) body(d *syntax.FunDecl, f *check.Func, defaults func()) {
-	defer func(this, result check.Type, lambdas int, loops []*loop) {
-		e.this, e.result, e.lambdas, e.loops = this, result, lambdas, loops
-	}(e.this, e.result, e.lambdas, e.loops)
-	if e.result, e.lambdas, e.loops = f.Result, 0, nil; f.Receiver != nil {
+	defer func(this, result check.Type, loops []*loop) { e.this, e.result, e.loops = this, result, loops }(e.this, e.result, e.loops)
+	if e.result, e.loops = f.Result, nil; f.Receiver != nil {
 		e.this = f.Receiver
 	}
 	defaults()

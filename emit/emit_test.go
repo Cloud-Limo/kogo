@@ -494,7 +494,6 @@ func TestRefused(t *testing.T) {
 		{"fun f(n: Int): Int = either<String, Int> { n }.getOrElse { 0 }", "1:22: not-yet-emitted", "a call of either (spec.md 9 and 10)"},
 		{"fun f(tx: Tx): Int = 1", "1:1: not-yet-emitted", "a Tx (spec.md 9 and 10)"},
 		{"fun f(n: Int): Int {\n    val tx: Tx? = null\n    return if (tx == null) n else tx.execute(sql\"select 1\")\n}", "2:5: not-yet-emitted", "a Tx (spec.md 9 and 10)"},
-		{"fun f(xs: List<Int>): Int {\n    xs.filter { return 1 }\n    return 0\n}", "2:17: not-yet-emitted", "end the lambda with its value, and return after the call"},
 		{"fun f(x: Int?): Int? = x.takeIf { true }", "1:24: not-yet-emitted", "a nullable type argument for T, which is used as T?"},
 		{"fun <T> none(x: T?): T? = x\nfun g(): Int? = none(null)", "2:17: not-yet-emitted", "write the type arguments, none<...>(...)"},
 		{"sealed interface S<out T> {\n    data class A<T>(val v: T) : S<T>\n}\nfun f(s: S<S.A<Int>>): S<S<Int>> = s", "4:36: not-yet-emitted", "build the value with the wider type argument"},

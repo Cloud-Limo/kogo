@@ -167,8 +167,6 @@ func (e *emitter) into(x syntax.Expr, d dest) {
 			l := e.loops[len(e.loops)-1]
 			l.used = true
 			e.w("%s %s", x.Op, l.label)
-		case e.lambdas > 0:
-			e.notYet(x, "a return inside a lambda, which leaves the fun around it", "end the lambda with its value, and return after the call that runs it")
 		case x.Value != nil:
 			e.into(x.Value, dest{ret, "", e.result})
 		default:

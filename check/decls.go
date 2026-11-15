@@ -90,6 +90,7 @@ type checker struct {
 	// and buriedLoop within its loop.
 	straight           syntax.Expr
 	buried, buriedLoop bool
+	inLambda           bool // inside a lambda of the fun at hand, which holds no return
 }
 
 // A pkg is the declarations of the files that share a package line.
@@ -429,10 +430,10 @@ func (c *checker) body(f *Func, d *syntax.FunDecl) {
 		}
 		c.define(p, f.Params[i])
 	}
-	defer func(r Type, l int, e Type, n int, b, bl bool) {
-		c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop = r, l, e, n, b, bl
-	}(c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop)
-	c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop = f.Result, 0, raise, len(c.lambdas), false, false
+	defer func(r Type, l int, e Type, n int, b, bl, il bool) {
+		c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda = r, l, e, n, b, bl, il
+	}(c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda)
+	c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda = f.Result, 0, raise, len(c.lambdas), false, false, false
 	c.straight = d.Expr
 	switch {
 	case d.Expr != nil && d.Result == nil:

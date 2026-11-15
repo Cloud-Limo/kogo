@@ -205,7 +205,6 @@ func (e *emitter) lambda(l *syntax.Lambda) string {
 			destructured = append(destructured, func() { e.parts(vars, t, ft.Params[i]) })
 		}
 	}
-	e.lambdas++
 	body := e.capture(func() {
 		for _, declare := range destructured {
 			declare()
@@ -213,7 +212,6 @@ func (e *emitter) lambda(l *syntax.Lambda) string {
 		e.block(l.Body, dest{ret, "", ft.Result})
 		e.end(ft.Result)
 	})
-	e.lambdas--
 	return "func(" + strings.Join(params, ", ") + ") " + e.typ(ft.Result) + " {\n" + body + e.dir() + "}"
 }
 

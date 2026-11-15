@@ -133,6 +133,24 @@ Each entry: what was decided, why, and what would reopen it.
   half must, since it calls cusoon2's code, and the port is cusoon2's code in another
   language; `poc-rs` is the precedent. Not taken: a third repo, which spreads one
   experiment over three; the stage-1 directory, which is not a repository.
+- **Kogo adds no member to a type Kotlin has; what is Kogo's own is a function or a type
+  of a `kogo.` package, imported by name** (15 Nov 2026; `doc/design.md` principle 3, spec
+  12). cusoon2 prints a percentage through Java's `BigDecimal`
+  (`valueOf(x).stripTrailingZeros().toPlainString()`), and Kotlin has no function of its own
+  for it. The promise that a Kotlin name means Kotlin's behaviour helps only a reader who
+  can tell which names are Kotlin's, and `percent.toPlainString()` reads as Kotlin's. So it
+  is `plain(percent)`, imported as `kogo.text.plain` (DEV-843), as `kogo.time` stands for
+  `java.time`: a file's imports show what in it is not Kotlin's. The case will come back,
+  since printing is where Kotlin leans on Java most: cusoon2's 95 hand-written files hold
+  `Locale` 25 times, a `.format(` call 22, `DateTimeFormatter` 19 and `BigDecimal` 16.
+  Measured: Go's shortest plain digits gave Java's text for 500,000 numbers from a fixed
+  seed, all but negative zero, the smallest `Double`, and `NaN` and the infinities, where
+  Java throws. Not taken: the method on `Double`, agreed first and reversed; writing it in
+  the application from Kotlin's names, `toString().removeSuffix(".0")`, which agrees only
+  from 0.001 up to 10,000,000; a slice of `BigDecimal`, three functions that must match
+  Java's everywhere. `Uuid`, `newId` and `Decimal` are Kogo's own with no import; none is
+  a member of a Kotlin type, and they stay. Reopen if imports of `kogo.` functions come to
+  crowd a file, or a function keeps reading worse than the member would.
 - **The prelude's signatures are Kogo declarations, read by the checker like any other
   source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
@@ -755,6 +773,46 @@ Each entry: what was decided, why, and what would reopen it.
   (DEV-826; DEV-833 removes the last way in), so there is nothing to refuse. Reopen if
   receiver function types return. Also `private` or `internal` on a binding with a
   receiver, which is accepted and hides nothing.
+
+## Taken emitting expected failures (DEV-831), not yet discussed
+
+- **A raise scope's block is a Go function whose first parameter is the scope's handle**,
+  a `kogo.Raise[E]`, and `either` is an ordinary call of the prelude's Go, under the name
+  the naming rule gives it (`Either_RaiseEToA`, beside the type `Either`). The lambdas
+  inside capture the handle. `raise`, `ensure`, `ensureNotNull` and `bind` are given the
+  handle of the innermost scope they are written in, which is the one the checker read
+  them against. Not taken: writing each block inline with its own `defer`, more emitter
+  for the same Go. The raising `db.tx` can take its handle the same way.
+- **The forms fail with the scope's `E`, converted where they are written.** `raise(e)`
+  is called with the scope's `E` as its type argument and `e` converted to it; `bind` is
+  given a function that widens its own `E` to the scope's. The scope then only asserts the
+  value's Go type, and an `Either<S.A, X>` bound in a scope of `S` gives a `Left` of `S`.
+- **A panic a scope does not own is panicked again, unchanged**: another scope's failure
+  and a bug alike. Go keeps the frames of the first panic in the trace, so it still names
+  the Kogo line, and a driver recovers the same value; a test shows both.
+- **The handle points to a struct of one byte**, since Go may give every new value of an
+  empty struct the same address, and two scopes would then share a handle.
+- **An `Either` used with wider type arguments is rebuilt** by the prelude's
+  `Either_widen`, as a list is copied by `List_widen`. `StoreError.Missing.left()` settles
+  `E` as `StoreError.Missing`, and example 09 returns it as an `Either<StoreError, String>`;
+  DEV-830 refused that for every sealed type. Other sealed types are still refused: no
+  example needs them, and rebuilding one means code for each of its variants.
+- **An `Either` writes itself as Arrow does, `Either.Left(value)`**, where the rule for
+  data classes gave `Left(value=...)`. `"$result"` is valid in both languages and must
+  read the same (principle 3).
+- **A lambda that fails into a raise scope is passed only to the prelude's funs**, which
+  run their blocks before they return. A fun of the program's could keep the lambda, as
+  `fun <T> later(b: () -> T) = b` does, and a failure raised after its scope has returned
+  would be a panic no scope recovers: a 500 where section 9 promises a value. Kotlin
+  allows it, and Arrow throws when it happens. Not taken: following each function-typed
+  parameter through its fun's body to see that it is only called, which makes a call's
+  legality depend on a body elsewhere (principle 2). Reopens when a program needs its own
+  fun to run a failing block, and then by Kotlin's marker on the signature, `inline fun`,
+  which forbids keeping the parameter, at the cost of a keyword Kogo does not have.
+- **The prelude's Go is safe to unwind through**, a rule stated at the top of
+  `prelude/kogo/kogo.go`: a function that calls a lambda holds no lock and leaves nothing
+  half done while it runs. Every one there already keeps what it builds to itself until it
+  returns.
 
 ## Taken mapping composite types (DEV-837), not yet discussed
 

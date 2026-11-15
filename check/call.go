@@ -607,6 +607,7 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 	for i, p := range f.Params {
 		pt := subst(p.Type, b)
 		for _, a := range k.placed[i] {
+			c.kept(f, a)
 			switch t := typed[a]; {
 			case fits(t, pt):
 			case wholeLiteral(a) && fits(tLong, pt):

@@ -506,6 +506,9 @@ func TestFailures(t *testing.T) {
 		"fun f(): Int? = either<String, Int> { 1 }.getOrNull()",
 		// A lambda inside a raise scope is in it.
 		"fun g(n: Int): Either<String, Int> = either { n }\nfun f(xs: List<Int>): Either<String, List<Int>> = either { xs.map { g(it).bind() } }",
+		// A fun of the program's takes a lambda that fails into no
+		// scope around it, or only into one inside it.
+		"fun <T> run(block: () -> T): T = block()\nfun f(n: Int): Either<String, Int> = either { run { either<String, Int> { raise(\"no\") }.getOrNull() } ?: raise(\"none\") }",
 		// In a raise scope a member of this does not hide the core's
 		// forms: where only one fits, it is the call. Outside one, the
 		// member is.
@@ -539,6 +542,10 @@ func TestFailures(t *testing.T) {
 		{"fun f(): Either<String, () -> Int> = either { ‸{ raise(\"no\") } }", "raise-escape", "this lambda fails into the raise scope around it, and is kept as a value, which could run outside the scope: pass it straight to the call that runs it, or make it return an Either<String, A>"},
 		{"fun g(): Either<String, Int> = either { 1 }\nfun f(): Either<String, () -> Int> = either { ‸{ g().bind() } }", "raise-escape", "pass it straight to the call"},
 		{"fun f(): Either<String, Int> = either {\n    val g: () -> Int = ‸{ raise(\"no\") }\n    g()\n}", "raise-escape", "pass it straight to the call"},
+		// Nor is it passed to a fun of the program's, which could keep
+		// it: the prelude's funs run it first.
+		{"fun <T> later(block: () -> T): () -> T = block\nfun f(): Either<String, () -> Int> = either { later ‸{ raise(\"no\") } }", "raise-escape", "this lambda fails into the raise scope around it, and is passed to later, which could keep it and run it outside the scope: only the prelude's funs are known to run it first; make it return an Either<String, A>, and bind what later gives"},
+		{"fun <T> run(block: () -> T): T = block()\nfun f(xs: List<Int>): Either<String, List<Int>> = either { run ‸{ xs.map { if (it < 0) raise(\"no\") else it } } }", "raise-escape", "is passed to run"},
 		// A local fun is not in the raise scope around it.
 		{"fun f(): Either<String, Int> = either {\n    fun g(): Int = ‸raise(\"no\")\n    g()\n}", "raise-scope", "this is not a raise scope"},
 		// A dropped Either.

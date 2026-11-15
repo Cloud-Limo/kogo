@@ -214,13 +214,17 @@ func (e *emitter) sel(x *syntax.Select, recv *operand, rt check.Type) (string, c
 	panic("emit: ." + x.Name + " refers to nothing")
 }
 
-// lambda writes a lambda as a Go function value.
+// lambda writes a lambda as a Go function value. The block of a raise
+// scope, whose receiver is Raise<E>, takes the scope's handle first;
+// the lambdas inside it capture the handle.
 func (e *emitter) lambda(l *syntax.Lambda) string {
 	ft := e.info.Types[l].(*check.FuncType)
-	if e.info.Fails[l] != nil {
-		e.notYet(l, "a lambda that can fail (spec.md 9)", slices9and10)
-	}
 	var params []string
+	defer func(r *raise) { e.raise = r }(e.raise)
+	if ft.Receiver != nil {
+		e.raise = &raise{e.local(ft, "raise"), ft.Receiver.(*check.Named)}
+		params = append(params, e.raise.handle+" "+e.typ(ft.Receiver))
+	}
 	var destructured []func()
 	if len(l.Params) == 0 && len(ft.Params) == 1 {
 		params = append(params, e.local(e.info.Vars[l][0], "it")+" "+e.typ(ft.Params[0]))
@@ -423,14 +427,21 @@ func (e *emitter) callExpr(x *syntax.Call, recv *operand, rt check.Type) (string
 // rt: that of a ?. once it is known not to be null.
 func (e *emitter) call(at syntax.Node, c *check.Call, recv *operand, rt check.Type) (string, check.Type) {
 	if c == nil { // one of the five calls of spec.md 10.2, which the checker settles apart
-		e.notYet(at, "a call that takes a sql literal (spec.md 10)", slices9and10)
+		e.notYet(at, "a call that takes a sql literal (spec.md 10)", slice10)
 		return "nil", e.info.Types[at]
 	}
 	f := c.Func
-	if e.info.Fails[at] != nil {
-		e.notYet(at, "a call that can fail (spec.md 9)", slices9and10)
-	} else if e.later[f] {
-		e.notYet(at, "a call of "+f.Name+" (spec.md 9 and 10)", slices9and10)
+	if e.later[f] {
+		e.notYet(at, "a call of "+f.Name+" (spec.md 10)", slice10)
+	}
+	// bind, raise, ensure and ensureNotNull are given the handle of
+	// the raise scope they are in, and fail with its E (prelude/kogo).
+	form, bind := e.info.Fails[at] != nil, ""
+	if form && f.Name != "bind" { // called on the scope, in place of this
+		args := slices.Clone(c.TypeArgs)
+		args[0] = e.raise.typ.Args[0]
+		c = &check.Call{Func: f, TypeArgs: args, Args: c.Args}
+		recv, rt = &operand{code: e.raise.handle}, e.raise.typ
 	}
 	var ops []operand
 	if f == nil { // a value of a function type is called
@@ -489,13 +500,18 @@ func (e *emitter) call(at syntax.Node, c *check.Call, recv *operand, rt check.Ty
 			ops = append(ops, operand{code: "nil"})
 		}
 	}
+	if form && f.Name == "bind" {
+		scopeErr := e.raise.typ.Args[0]
+		bind = ", " + e.typ(scopeErr)
+		ops = append(ops, operand{code: e.raise.handle}, operand{code: e.widener(c.TypeArgs[0], scopeErr)})
+	}
 	result := sub(f.Result)
 	build := func(codes []string) string {
 		name := e.fn.names[f] // a local fun
 		if name == "" {
 			name = e.qualify(f.Pkg, e.names[f])
 			if len(c.TypeArgs) > 0 {
-				name += "[" + e.typs(c.TypeArgs) + "]"
+				name += "[" + e.typs(c.TypeArgs) + bind + "]"
 			}
 		}
 		return name + "(" + strings.Join(codes, ", ") + ")"

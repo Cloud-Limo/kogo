@@ -26,7 +26,9 @@ constraints) is worth typing.
    would mean reimplementing a JVM algorithm or table and no ported
    module's side-by-side run depends on it, and each is stated in
    `spec.md` section 12. A function that would differ in ordinary use
-   takes another name.
+   is Kogo's own. Kogo adds no member to a type Kotlin has: what is
+   Kogo's own is a function or a type of a `kogo.` package, imported by
+   name, so a file's imports show what in it is not Kotlin's.
 4. **Postgres is the type checker for SQL.** Never re-implement SQL
    typing; ask the database.
 5. **Go is a backend, not a source language.** Nobody reads the emitted
@@ -143,16 +145,19 @@ string, a `Boolean` or an enum, and one runtime function that walks both
 values everywhere else: Go compares a pointer by address and does not
 compare slices. The same walk gives `toString()` its text. Go has no
 wider type for a container, so a `List<Ok<Int>>` used as a
-`List<Outcome<Int>>` is copied; one value widening is free or takes an
-address.
+`List<Outcome<Int>>` is copied and an `Either<Missing, A>` used as an
+`Either<StoreError, A>` is rebuilt; one value widening is free or takes
+an address.
 
 **Failures.** `raise` and `bind` are ordinary calls that panic; the
 `either { }` block recovers and gives the failure as a value, as Arrow
-does with an exception. Each scope has a handle, a local that the
-lambdas inside it capture. No function a program declares takes a
-hidden scope parameter, since a function that can fail returns an
-`Either`; the core's own forms, `raise`, `ensure` and `ensureNotNull`,
-are given the handle of the scope they are called in. A failure carries
+does with an exception. Each scope has a handle: the block of `either`
+is a Go function that takes it as its first parameter, and the lambdas
+inside capture it. No function a program declares takes a hidden scope
+parameter, since a function that can fail returns an `Either`; the
+core's own forms, `raise`, `ensure`, `ensureNotNull` and `bind`, are
+given the handle of the innermost scope they are written in, and fail
+with its error type. A failure carries
 the handle it was raised on, so a scope recovers only its own. A panic
 of any other kind is a bug (section 8 of the spec) and passes through
 untouched. So a failure works anywhere inside its scope, lambdas

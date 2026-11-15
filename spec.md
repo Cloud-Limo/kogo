@@ -435,9 +435,10 @@ Outside a raise scope these forms are errors: wrap the code in
   `either<E2, A> { ... }.mapLeft { e -> ... }.bind()`.
 - A lambda inside a raise scope is in it, as in Kotlin:
   `either { ids.map { load(it).bind() } }`. A local `fun` is not.
-  A lambda that fails into the scope is passed straight to the call
-  that runs it: kept as a value, in a `val` or as a result, it could
-  run outside the scope, and is refused.
+  A lambda that fails into the scope is passed straight to a prelude
+  fun that runs it: kept as a value, in a `val` or as a result, or
+  passed to a fun of the program's, which could keep it, it could run
+  outside the scope, and is refused.
 - Inside a raise scope, a member of `this` named `raise`, `ensure` or
   `ensureNotNull` does not hide the form, as it hides an extension
   (section 5.2): both are candidates, and where both fit, the call is
@@ -465,7 +466,8 @@ bind it, fold it, return it or assign it.
 
 `Either.Left` and `Either.Right` are the variants of the sealed
 interface `Either`, each with a `value`. An `Either` is built only with
-`left()` and `right()`: `Either.Left(e)` is refused. The functions of
+`left()` and `right()`: `Either.Left(e)` is refused. It writes itself
+as Arrow does, `Either.Left(value)`, not as a data class. The functions of
 this table are the prelude's, in `prelude/either.kg`.
 
 The error type `E` is any type. cusoon2 uses `String` (words for the
@@ -681,6 +683,14 @@ The prelude is a library, not part of the core. Names match Kotlin's
 standard library and `java.time` where the meaning is the same. Its
 signatures are bindings (section 13) kept in `prelude/`: the lists below
 say what exists, and the declarations say what each takes and gives.
+
+The prelude adds no function or property to a type that Kotlin has: on
+a `Double`, a `String` or a `List`, every member is Kotlin's and means
+what Kotlin's means. Where a Kotlin program would reach into Java's
+library, for times or for printing a number, Kogo has a function or a
+type of its own in a package `kogo.<name>`, imported by name as
+`kogo.time` is. So a file's imports show what in it is not Kotlin's.
+`Uuid`, `newId` and `Decimal` are Kogo's own and need no import.
 
 **Collections** (immutable; "changing" one returns a new one).
 `listOf`, `emptyList`, `setOf`, `mapOf`, `size`, `isEmpty`, `isNotEmpty`,

@@ -1322,6 +1322,25 @@ Each entry: what was decided, why, and what would reopen it.
   failed logins, so an address that knows its numbers is never refused. The example is package `example.ops`, so that its `InvoiceStatus`, whose
   constants are the Postgres labels, is not example 05's.
 
+## Taken writing the workflow (DEV-858), not yet discussed
+
+- **A branch has the name Linear gives its issue.** An async run checks out the issue's pushed
+  branch by that name and starts from `main` when it finds none, so a branch an agent named
+  itself (`dev-852-kogo-ts`) would be missed by a run sent to review or fix it. Not taken:
+  short names with the wrapper searching for `dev-NNN-*`, which is more code in cusoon2 for
+  shorter names nobody types. Reopen if the long names get in the way.
+- **Handoff and Review comments go on the PR as well as the issue.** A run has no Linear
+  access and is shown none of the issue's earlier comments; the PR is the one place both a
+  run and a Zed session can read. Reopen if runs are given the issue's comments.
+- **A Question without a Ruling stops the merge, not the fixes.** "Fix and merge" makes the
+  fixes and pushes, then stops. Not taken: refusing to start, which loses the fixes for one
+  open point; merging and filing the Question, which merges what the review doubted.
+- **The lead removes worktrees, not the session that merges.** That session is standing in
+  the worktree, and an async merge has no session here at all.
+- **The lead does not commit.** Its decisions reach the repository through the issue or the
+  PR they belong to, so every change has had a Code review. Reopen if that makes small
+  corrections slow.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, workers, and an

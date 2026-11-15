@@ -28,6 +28,8 @@ import kogo.time.Instant
   no `import ... as`. A package is the files that share a package line,
   wherever they lie. An import names one declaration of another package;
   a name of the file's own package needs none.
+- Packages do not import each other, directly or through others, though
+  Kotlin allows it.
 - A file holds any number of top-level declarations: functions, `val`
   constants, types, typealiases, marker annotations, `api` lists
   (section 15).
@@ -881,6 +883,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `inline`, `reified`, `operator`, `infix` | a plain function |
 | `println`, `readln` | a `Console` parameter, from `kogo.io` |
 | value classes | `typealias`, in v0 |
+| packages that import each other, directly or through others | move what one takes from the other into a package both may import |
 
 ## 15. Operations
 

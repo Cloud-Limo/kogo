@@ -50,6 +50,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 		c.importAll(f)
 		c.optIn(f)
 	}
+	c.cycles(program)
 	for i := 0; i < len(c.sigs); i++ {
 		c.sigs[i]()
 	}

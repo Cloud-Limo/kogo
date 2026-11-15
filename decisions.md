@@ -1452,6 +1452,18 @@ Each entry: what was decided, why, and what would reopen it.
   directory in a module root, which is the user's business.
 - **An `<out>` that is a link is followed before the walk**, as the write follows it, and
   the stale file is named under `<out>` as given.
+- **`<dir>` is walked with a separator appended** in `kogo check`, `emit` and `ts`
+  (DEV-864, the lead's ruling), so a `<dir>` that is a link is followed and every name the
+  walk makes, a source's or an unreadable's, lies under `<dir>` as given. Links below
+  `<dir>` stay unfollowed. A dangling link, a missing path and a file are each `read`,
+  exit 2: `kogo check <dir>` is all the README, the spec and the usage line promise, and
+  one rule for the argument is worth more than a second way in that nothing uses. Not
+  taken: resolving the link with `EvalSymlinks` and joining each name back onto `<dir>`,
+  which kept a file argument working. Reopen if a file argument is wanted.
+- **A `<dir>` with no `.kg` file under it is `no-source`, exit 2**, for `check`, `emit`
+  and `ts` (DEV-864, the lead's ruling): a mistyped path to an empty directory would
+  otherwise pass the only gate in silence. The message names `<dir>` and says to give the
+  directory that holds the program. Not taken: an empty program has no errors, exit 0.
 
 ## Taken refusing `==` on a function (DEV-845), not yet discussed
 

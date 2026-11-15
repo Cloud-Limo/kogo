@@ -61,7 +61,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	var files []*syntax.File
 	failed := false
-	err = filepath.WalkDir(args[1], func(file string, d fs.DirEntry, err error) error {
+	// The separator makes the walk follow a <dir> that is a link.
+	err = filepath.WalkDir(args[1]+string(filepath.Separator), func(file string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(file, ".kg") {
 			return err
 		}
@@ -86,6 +87,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 		// Checked without a file's declarations, the others would show
 		// false errors: each name it declares would be unknown.
 		return 1
+	}
+	if len(files) == 0 { // a mistyped <dir> would pass
+		fatal.Encode(syntax.Error{Code: "no-source", Message: fmt.Sprintf("no .kg file lies under %s: give the directory that holds the program", args[1])})
+		return 2
 	}
 	var sigs check.Signatures
 	var lost error // a failure to ask the database, which stops the check

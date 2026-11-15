@@ -372,6 +372,42 @@ func TestErrors(t *testing.T) {
 	}
 }
 
+// A <dir> that is a link to a program's directory is that directory:
+// its errors are found and name each file under the link as given.
+func TestLinkedDir(t *testing.T) {
+	dir, link := t.TempDir(), filepath.Join(t.TempDir(), "link")
+	os.WriteFile(filepath.Join(dir, "a.kg"), []byte("package a\n\nfun f(): Int = nope\n"), 0o644)
+	if err := os.Symlink(dir, link); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"check", link}, &stdout, &stderr)
+	if want := `{"file":"` + filepath.Join(link, "a.kg") + `","line":3,"column":16,"code":"unknown-name"`; code != 1 || !strings.HasPrefix(stdout.String(), want) {
+		t.Errorf("exit %d, want 1\n got %s%s\nwant %s...", code, &stdout, &stderr, want)
+	}
+	// A link that names nothing is a <dir> that cannot be read.
+	dangling := filepath.Join(t.TempDir(), "dangling")
+	os.Symlink(filepath.Join(dir, "nowhere"), dangling)
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"check", dangling}, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), `"code":"read"`) {
+		t.Errorf("dangling: exit %d, want 2 and read\n got %s%s", code, &stdout, &stderr)
+	}
+}
+
+// A <dir> with no .kg file under it is not a program: each command
+// refuses it rather than pass it.
+func TestNoSource(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("package a\n"), 0o644)
+	for _, args := range [][]string{{"check", dir}, {"emit", dir, t.TempDir()}, {"ts", dir, t.TempDir()}} {
+		var stdout, stderr bytes.Buffer
+		if code := run(args, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), `"code":"no-source"`) || !strings.Contains(stderr.String(), dir) {
+			t.Errorf("%s: exit %d, want 2 and no-source naming %s\n got %s%s", args[0], code, dir, &stdout, &stderr)
+		}
+	}
+}
+
 // A program with no sql literal is checked without a database; one
 // with a literal and no database cannot be.
 func TestNoDatabase(t *testing.T) {

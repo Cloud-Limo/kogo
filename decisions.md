@@ -465,7 +465,15 @@ Each entry: what was decided, why, and what would reopen it.
   The checker knows `Either` and `Raise` by name, as it knows `List`. Reopen if a form's
   type cannot be written in Kogo.
 - **The raise scope is apart from `this`.** Inside `either { }` in an extension, `this` is
-  still the extension's receiver, as in Kotlin, where both are in scope at once.
+  still the extension's receiver. This is not as in Kotlin, corrected in DEV-833: there
+  `this` inside `either { }` is the `Raise`, and the extension's receiver is reached
+  unqualified or by a label. What follows: `this.raise(...)`, `this.ensure(...)` and
+  `this.ensureNotNull(...)` on a member of `this` are refused (spec 9), the one place the
+  same text is valid in both and means something different. `this.name` on any other
+  member is accepted by Kogo and refused by Kotlin, so it differs in nothing that both
+  accept; nothing is done about it. A bare `this` passed as a value is the receiver in
+  Kogo and the `Raise` in Kotlin, which accepts it only where a `Raise` is wanted, and no
+  program can write one since DEV-833. Reopen if a program can again.
 - **A lambda inside a raise scope is in it; a local fun is not** (spec 9). Kotlin allows
   both. The lambda is Arrow's habit (`ids.map { load(it).bind() }`), and the facts mark
   each such lambda as able to fail, so the emitter knows. A local fun's failures are read
@@ -577,10 +585,14 @@ Each entry: what was decided, why, and what would reopen it.
   keeping `withError` in `check/core.kg` only to refuse it.
 - **A fun whose receiver is refused says no more of what its body raises**, so a ported
   receiver function gets one error, not one for each `raise` in it.
-- **`raise`, `ensure` and `ensureNotNull` are hidden by a member of `this` of the same
-  name**, as any extension is (spec 5.2). The exception served receiver funs; with it went
-  the choice among overloads by the scope's `E`. Reopen if a port's interface has a fun
-  named like a form.
+- **In a raise scope, a member of `this` does not hide `raise`, `ensure` or
+  `ensureNotNull`** (spec 9), though it hides any other extension (5.2). Hiding them, as
+  the issue asked, would make `either { raise("no") }` in a fun on a type with its own
+  `raise` give `Right` where Kotlin gives `Left`. Both are candidates: where one fits it is
+  the call; where both do, `ambiguous-call` says to rename the member. Not taken: ranking
+  the scope's first, as Kotlin does, since spec 5.2 ranks nothing, and suggesting
+  `this.raise(...)` for the member, which in Kotlin is the scope's. The choice among
+  overloads by the scope's `E` went with receiver funs.
 
 ## Spec gaps found by the leakage ports, unresolved
 

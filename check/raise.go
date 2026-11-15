@@ -84,3 +84,9 @@ func (c *checker) txRaise(f *Func) bool {
 func (c *checker) otherTx(f *Func) bool {
 	return f.file == c.core && f.Name == "tx" && c.txRaise(f) != (c.either(c.result) != nil)
 }
+
+// form reports whether f is one of the core's forms, raise, ensure
+// and ensureNotNull, called in a raise scope.
+func (c *checker) form(f *Func) bool {
+	return c.raise != nil && f.file == c.core && c.raised(f.Receiver) != nil
+}

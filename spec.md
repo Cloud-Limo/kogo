@@ -414,6 +414,12 @@ Outside a raise scope these forms are errors: wrap the code in
   A lambda that fails into the scope is passed straight to the call
   that runs it: kept as a value, in a `val` or as a result, it could
   run outside the scope, and is refused.
+- Inside a raise scope, a member of `this` named `raise`, `ensure` or
+  `ensureNotNull` does not hide the form, as it hides an extension
+  (section 5.2): both are candidates, and where both fit, the call is
+  an error that says to rename the member. `this.raise(...)` on such a
+  member is the same error, since in Kotlin `this` inside `either { }`
+  is the raise scope.
 - `either`'s `E` is settled as section 5.1 says, before its block is
   read: by the type wanted, or written, `either<String, Int> { ... }`.
 - A program does not write `Raise<E>`. The forms' signatures are the

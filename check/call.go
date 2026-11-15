@@ -31,10 +31,11 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			if rt = c.this(); rt != nil {
 				cands = c.methods(rt, name)
 			}
-			// this's interface fun comes before an extension.
+			// this's interface fun comes before an extension, but in a
+			// raise scope not before the core's forms (spec.md 9).
 			member := cands != nil
 			for _, f := range c.funcs(name) {
-				if f.Kind == Fun && !c.otherTx(f) && (!member || f.Receiver == nil) {
+				if f.Kind == Fun && !c.otherTx(f) && (!member || f.Receiver == nil || c.form(f)) {
 					cands = append(cands, f)
 				}
 			}
@@ -76,7 +77,14 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 		if safe {
 			rt = nonNull(rt)
 		}
-		if cands = c.methods(rt, name); cands == nil {
+		cands = c.methods(rt, name)
+		// In Kotlin, this inside either { } is the Raise, and
+		// this.raise(...) the scope's form (spec.md 9).
+		if x, ok := recv.(*syntax.Ident); ok && x.Name == "this" && cands != nil && slices.ContainsFunc(c.funcs(name), c.form) {
+			c.loose(e.Args, nil)
+			return c.errorf(fun, "ambiguous-call", "in Kotlin this.%s inside either { } is the raise scope's %s, not %s's: rename %s's %s", name, name, rt, rt, name)
+		}
+		if cands == nil {
 			for _, f := range c.funcs(name) {
 				if f.Kind == Fun && f.Receiver != nil && !c.otherTx(f) {
 					cands = append(cands, f)
@@ -299,6 +307,9 @@ func (c *checker) resolve(at, where syntax.Node, name string, cands []*Func, rec
 		var fs []*Func
 		for _, k := range left {
 			fs = append(fs, k.f)
+		}
+		if slices.ContainsFunc(fs, c.form) && slices.ContainsFunc(fs, func(f *Func) bool { return f.Kind == Method }) {
+			return c.errorf(where, "ambiguous-call", "both the raise scope's %s and %s's fit this call, and nothing ranks them: rename %s's %s", name, rt, rt, name)
 		}
 		return c.errorf(where, "ambiguous-call", "%d declarations of %s fit this call and nothing ranks them: rename one of %s", len(left), name, sigs(fs))
 	case bare:

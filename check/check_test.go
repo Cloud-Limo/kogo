@@ -435,6 +435,13 @@ func TestFailures(t *testing.T) {
 		"fun f(): Int? = either<String, Int> { 1 }.getOrNull()",
 		// A lambda inside a raise scope is in it.
 		"fun g(n: Int): Either<String, Int> = either { n }\nfun f(xs: List<Int>): Either<String, List<Int>> = either { xs.map { g(it).bind() } }",
+		// In a raise scope a member of this does not hide the core's
+		// forms: where only one fits, it is the call. Outside one, the
+		// member is.
+		"interface V {\n    fun raise(r: Int): Int\n}\nfun V.f(): Either<String, Int> = either { raise(\"no\") }",
+		"interface V {\n    fun raise(r: Int): Int\n}\nfun V.f(): Either<String, Int> = either { raise(1) }",
+		"interface V {\n    fun ensure(n: Int): Boolean\n}\nfun V.f(n: Int): Either<String, Int> = either {\n    ensure(n > 0) { \"negative\" }\n    n\n}",
+		"interface V {\n    fun raise(r: String): Int\n}\nfun V.f(): Int = raise(\"no\")",
 		// Working with an Either value.
 		"fun f(c: Boolean): Either<String, Int> = if (c) 1.right() else \"no\".left()",
 		"fun f(x: Either<String, Int>): String = x.fold({ e -> e }, { n -> \"$n\" })",
@@ -449,6 +456,10 @@ func TestFailures(t *testing.T) {
 		{"fun f(): Either<String, Int> = either { raise(‸1) }", "type-mismatch", "this is a Int where a String is wanted"},
 		{"fun f(): Either<String, Int> = either {\n    ensure(true) { ‸1 }\n    1\n}", "type-mismatch", "this is a Int where a String is wanted"},
 		{"fun g(): Either<Int, Int> = either { 1 }\nfun f(): Either<String, Int> = either { g().‸bind() }", "raise-type", "bind can fail with a Int, and this raise scope fails with a String: convert the failure, .mapLeft { e -> ... }.bind()"},
+		{"interface V {\n    fun raise(r: String): Int\n}\nfun V.f(): Either<String, Int> = either { ‸raise(\"no\") }", "ambiguous-call", "both the raise scope's raise and V's fit this call, and nothing ranks them: rename V's raise"},
+		{"interface V {\n    fun raise(r: String): Int\n}\nfun V.f(): Either<String, Int> = either { this.‸raise(\"no\") }", "ambiguous-call", "in Kotlin this.raise inside either { } is the raise scope's raise, not V's: rename V's raise"},
+		{"interface V {\n    fun ensure(c: Boolean, f: () -> String)\n}\nfun V.f(): Either<String, Int> = either {\n    this.‸ensure(true) { \"no\" }\n    1\n}", "ambiguous-call", "rename V's ensure"},
+		{"interface V {\n    fun ensureNotNull(n: Int?, f: () -> String): Int\n}\nfun V.f(n: Int?): Either<String, Int> = either { this.‸ensureNotNull(n) { \"none\" } }", "ambiguous-call", "rename V's ensureNotNull"},
 		// The forms outside a raise scope.
 		{"fun g(): Either<String, Int> = either { 1 }\nfun f(): Int = g().‸bind()", "raise-scope", "bind can fail with a String, and this is not a raise scope: wrap it in either<String, ...> { }"},
 		{"fun f(): Int = ‸raise(\"no\")", "raise-scope", "raise can fail with a String"},

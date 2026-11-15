@@ -23,8 +23,9 @@ is open.
 1. `git -C ~/Dev/kogo pull --ff-only`.
 2. `LINEAR_PROJECT=Kogo lin list board`: every open issue with its
    state and the first line of its newest comment.
-3. Remove the worktree of each issue that is Done: check `git status`
-   there is clean, then `git worktree remove` and `git branch -d`.
+3. Remove each worktree whose PR has merged (`gh pr list --state
+   merged --head <branch>`): check `git status` there is clean, then
+   `git worktree remove` and `git branch -d`.
 4. Tell Greg, in this order and briefly: what waits for him, what is
    ready to merge, what needs a review, what is running, what could
    start. End with the one move you suggest.
@@ -37,7 +38,6 @@ is open.
 | In Review | `Handoff:` | a Code review |
 | In Review | `Review:` | read it, then Fix and merge |
 | In Review | `Ruling:` | Fix and merge |
-| Done | `Merged:` | remove its worktree |
 
 ## What goes to Greg
 

@@ -14,9 +14,9 @@ follow and the `lin` shorthand used here.
 - **Architecture and taste.** You bring Greg the choices that shape
   the result and settle the rest yourself.
 
-You write issues, launch comments and rulings. You do not write code
-or commit: a change, however small, is an issue or goes into one that
-is open.
+You write issues, launch comments and rulings, and you merge: the one
+thing you do to a branch. You do not write code or commit: a change,
+however small, is an issue or goes into one that is open.
 
 ## Starting
 
@@ -38,8 +38,9 @@ is open.
 | Todo | launch comment | Greg adds the `agent` label |
 | In Progress | `Taken` | wait |
 | In Review | `Handoff:` | a Code review |
-| In Review | `Review:` | read it, then Fix and merge |
-| In Review | `Ruling:` | Fix and merge |
+| In Review | `Review:` | read it, then Fix |
+| In Review | `Ruling:` | Fix |
+| In Review | `Fixed:` | Merging, below |
 
 ## What goes to Greg
 
@@ -68,7 +69,7 @@ Suggest one and say why in a line; Greg agrees or picks the other.
 - **Zed** when Greg wants to watch or steer, when the work is a
   conversation, or when it needs this VM (a read of `cusoon_b`, the
   stage-1 ports). Give Greg the phrase: "Pickup DEV-NNN", "Code review
-  DEV-NNN" or "Fix and merge DEV-NNN".
+  DEV-NNN" or "Fix DEV-NNN".
 
 A step's place does not bind the next: a PR coded in Zed can be
 reviewed by a run, and the reverse.
@@ -86,7 +87,7 @@ follows "The launch comment" in cusoon2's
 | Code | `pr opus medium 40m` | how: files, what to leave alone, tests |
 | Code, heavy design | `pr fable high 40m` | the same |
 | Review | `comment opus high 40m` | the PR; what to look at hardest |
-| Fix and merge | `pr opus medium 40m` | the PR; each Ruling in full |
+| Fix | `pr opus medium 40m` | the PR; each Ruling in full; it pushes and does not merge |
 
 - 40m is nearly always enough: the largest PR so far took 50m. Raise
   it for a reason you can state.
@@ -94,17 +95,28 @@ follows "The launch comment" in cusoon2's
   comment links, the repository and the PR. It does not see the
   issue's other comments. So quote a Ruling in the brief, and point a
   review or a fix at the PR, where the Handoff and Review also are.
-- The Review and Fix and merge briefs name the step in `AGENTS.md`
-  and add only what is particular to this PR.
+- The Review and Fix briefs name the step in `AGENTS.md` and add only
+  what is particular to this PR.
 
 ## Reading what comes back
 
 - Check a claim against the code before passing it on.
 - A Review of Fix and Won't fix only, which you agree with: suggest
-  Fix and merge. Disagree with an item and you post a `Ruling:` that
-  says so.
+  Fix. Disagree with an item and you post a `Ruling:` that says so.
 - A Question that is yours: post `Ruling: <n>: <the answer>` on the
   issue and the PR. One that is Greg's: bring it to him as above, then
   post his answer as the Ruling.
-- After a merge, look at what the issue was for. File the next issue
-  if the work exposed one.
+
+## Merging
+
+On `Fixed:`, in the issue's worktree, fast-forwarded: read the fix
+commits against the Review and its Rulings, then run `mise run testdb`
+and `mise exec -- go test ./...`. If they match and pass and nothing
+is Open, `gh pr merge --merge`, which moves the issue to Done, post
+`Merged: <sha>` on the PR and the issue, remove the worktree and both
+branches as in Starting step 3, and pull `main`. Otherwise post a
+`Ruling:` and ask for another Fix. Go to Greg only when what is Open
+is a choice of his kind.
+
+After a merge, look at what the issue was for. File the next issue if
+the work exposed one.

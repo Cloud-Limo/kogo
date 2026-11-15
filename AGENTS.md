@@ -82,22 +82,24 @@ with them. `$LINEAR_API_KEY` is already in the shell.
   stays) or a **Question** (a choice that is Greg's or the lead's: the
   options and which you lean to). Post it on the PR and on the issue
   with `lin comment`, print it, and stop.
-- **Fix and merge.** "Fix and merge", with the key when the session
-  is new: in the same worktree, fast-forwarded, make every Fix of the
-  newest Review as further commits. A `Ruling:` comment after it
-  answers its Questions and overrides the Review where they differ,
-  a Fix included. Rewrite the PR description if the work moved. Push.
-  If a Question has no Ruling, stop here and say so. Otherwise
-  `gh pr merge --merge` and post `Merged: <sha>` with what was fixed
-  on the issue and the PR. The merge moves the issue to Done. Leave
-  the worktree and the remote branch: the lead removes both.
+- **Fix.** "Fix DEV-NNN": in the same worktree, fast-forwarded, make
+  every Fix of the newest Review as further commits. A `Ruling:`
+  comment after it answers its Questions and overrides the Review
+  where they differ, a Fix included. Rewrite the PR description if
+  the work moved. Push. Write one comment: the first line
+  `Fixed: <PR url> at <sha>`, then what was done for each numbered
+  item, and under **Open** any Question without a Ruling and any
+  choice the fixes raised. Post it on the PR and on the issue with
+  `lin comment DEV-NNN` (no `--state`: it stays In Review), print it,
+  and stop. Do not merge: the lead reads the fixes and merges.
 - **Async runs.** A run has no Linear access and its clone is its
   worktree. Where a step posts on the issue, write that comment as the
   run's `answer.md`, which the wrapper posts, and post it on the PR
-  yourself. A review run leaves its tree clean: whatever is left is
-  pushed to the PR's branch.
+  yourself. A review or fix run leaves its tree clean: whatever is
+  left is pushed to the PR's branch. No run merges.
 - Greg does not review Kogo's PRs on GitHub. Review is the Code
-  review step, and the lead answers for the quality of what merges.
+  review step, and the lead answers for the quality of what merges
+  and is the only one that merges.
   Never rebase or force-push a pushed branch: reviews hold its shas.
 - A PR description is three parts and nothing else: one or two
   sentences of what it does, verb first, carrying "Fixes DEV-NNN"; one

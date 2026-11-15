@@ -170,6 +170,7 @@ func (c *checker) methods(rt Type, name string) []*Func {
 			f := Func{TypeParams: d.Params, Receiver: self(d), Owner: d, vis: d.vis, owners: len(d.Params)}
 			d.copy, d.toString = &f, &Func{}
 			*d.toString = f
+			d.copy.vis = d.Ctor.vis // copy builds a value, as the constructor does
 			d.copy.Kind, d.copy.Name, d.copy.Params, d.copy.Result = Copy, "copy", d.Props, self(d)
 			d.toString.Kind, d.toString.Name, d.toString.Result = ToString, "toString", tString
 		}
@@ -612,6 +613,10 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 		call.TypeArgs = append(call.TypeArgs, b[p])
 	}
 	c.info.Calls[at] = call
-	c.demand(where, f.Name, f.vis)
+	if f.Kind == Copy {
+		c.builds(where, f.Owner)
+	} else {
+		c.demand(where, f.Name, f.vis)
+	}
 	return subst(f.Result, b)
 }

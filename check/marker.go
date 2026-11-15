@@ -73,3 +73,11 @@ func (c *checker) demand(at syntax.Node, name string, v vis) {
 		}
 	}
 }
+
+// builds reports a value of the data class d made other than by
+// calling its constructor, by copy or from a sql row, in a file that
+// could not call it (spec.md 3.1, 10.3 and 11).
+func (c *checker) builds(at syntax.Node, d *TypeDecl) {
+	c.see(at, d.Name+"'s constructor", d.Ctor.vis)
+	c.demand(at, d.Name, d.Ctor.vis)
+}

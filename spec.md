@@ -91,7 +91,8 @@ data class Discount(val description: String, val amount: Cents, val struck: Bool
   `val` is implemented in the constructor (`override val label: String`).
 - Default values and named arguments work as in Kotlin.
 - `copy(...)`, `==`, `toString()` and destructuring (`val (a, b) = pair`)
-  are provided.
+  are provided. `copy` builds a value as the constructor does, so it may
+  be called only where the constructor may.
 - A data class may implement interfaces: `data class Ok<T>(val value: T) : Outcome<T>`.
 - A constructor may carry a visibility or a marker (section 11):
   `data class Held internal constructor(val id: ID)`.
@@ -520,6 +521,8 @@ column.
   A nullable nested data class is `null` when all of its columns are null
   (the absent side of an outer join), so a column that may be null fills
   a property of it that may not.
+- Reading a row builds `R` and each data class in it, so it is allowed
+  only where each one's constructor may be called (sections 2 and 11).
 - A data class `R` is not written nullable, since a row is never null;
   `queryOne<R>` gives the `R?`. A scalar `R` is a `T?` where its column
   may be null: `queryOne<String?>`.
@@ -615,12 +618,13 @@ data class HeldBusiness @UnscopedRead constructor(val business: Business, val st
 ```
 
 A file may use a marked function, property or constructor only if it
-begins with `@file:OptIn(UnscopedRead::class)`. Anything else is a compile
-error. Only the file's opt-in counts: marking the function that makes the
-use does not stand in for it, as it does in Kotlin, and the file that
-declares a marked function opts in to use it too. A type carries no
-marker; mark its constructor. Markers do nothing at run time. No other
-annotation exists.
+begins with `@file:OptIn(UnscopedRead::class)`. Anything else is a
+compile error. A `copy` of a data class and a row read into one (10.3)
+use its constructor. Only the file's opt-in counts: marking the function
+that makes the use does not stand in for it, as it does in Kotlin, and
+the file that declares a marked function opts in to use it too. A type
+carries no marker; mark its constructor. Markers do nothing at run time.
+No other annotation exists.
 
 ## 12. Prelude
 

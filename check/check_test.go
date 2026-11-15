@@ -185,10 +185,11 @@ func TestNames(t *testing.T) {
 		{"package a\nfun f(): Int = ‸g()\n---\npackage a\nprivate fun g(): Int = 1", "not-visible", "g is private to f2.kg"},
 		{"package a\nfun f(x: ‸P): Int = 1\n---\npackage a\nprivate data class P(val n: Int)", "not-visible", "P is private to f2.kg"},
 		{"package a\nimport c.P\nfun f(): P = ‸P(1)\n---\npackage c\ndata class P internal constructor(val n: Int)", "not-visible", "P's constructor is internal to package c"},
+		// copy builds a value as the constructor does, and needs what it needs.
+		{"package a\nimport c.P\nimport c.make\nfun f(): P = make().‸copy(n = 2)\n---\npackage c\ndata class P internal constructor(val n: Int)\nfun make(): P = P(1)", "not-visible", "P's constructor is internal to package c"},
 		{"data class P(val n: Int)\n‸typealias P = Int", "duplicate", "package t already declares P: rename one"},
 		{"val n: Int = 1\n---\npackage t\n‸val n: Int = 2", "duplicate", "already declares n"},
 		{"package a\nimport b.g\nimport ‸c.g\n---\npackage b\nfun g(): Int = 1\n---\npackage c\nfun g(): Int = 2", "duplicate", "g is already imported from package b"},
-		// Sections 10 and 11 are another issue's: named, never passed.
 		// Section 6: the scope functions that do not exist.
 		{"fun f(x: Int): Int = x.‸apply { 1 }", "kotlin-scope-function", "name the value and call it"},
 		{"fun f(x: Int): Int? = x.‸takeUnless { it > 1 }", "kotlin-scope-function", "use takeIf"},
@@ -536,6 +537,10 @@ external class Instant`,
 		{"fun f(tx: Tx, id: String): Int = tx.execute(sql\"‸$id: Uuid, $id\")", "sql-parameter-type",
 			"$id is a String, and Postgres takes a Uuid there: pass a Uuid, or cast it in the statement, as $id::type"},
 		{"fun f(tx: Tx, ids: List<Int>): Int = tx.execute(sql\"‸${ids}: List<Long>\")", "sql-parameter-type", "${ids} is a List<Int>, and Postgres takes a List<Long> there"},
+		// Reading a row builds R and each data class in it, as their
+		// constructors do.
+		{"package a\nimport c.H\nfun f(tx: Tx): List<H> = tx.query<H>(‸sql\" -> b_n: Int\")\n---\npackage c\ndata class B internal constructor(val n: Int)\ndata class H(val b: B)",
+			"not-visible", "B's constructor is internal to package c"},
 		// The SQL pass's refusal, at its place in the literal.
 		{"fun f(tx: Tx): Int = tx.execute(sql\"\"\"\n    select\n    ‸«\"\"\")", "sql-rejected", "Postgres refused this"},
 		{"fun f(db: Db): Int = ‸db.execute(sql\"\")", "type-mismatch", "this is a Db where a Tx is wanted"},
@@ -567,13 +572,16 @@ func TestTransactions(t *testing.T) {
 func TestMarkers(t *testing.T) {
 	marked := "package a\n@RequiresOptIn\nannotation class M\n@M\nfun f(): Int = 1\n@M\nval limit: Int = 2\ndata class H @M constructor(val n: Int)\n---\n"
 	passes(t,
-		marked+"@file:OptIn(M::class)\npackage b\nimport a.M\nimport a.f\nimport a.limit\nimport a.H\nfun g(): Int = f() + limit + H(1).n",
+		marked+"@file:OptIn(M::class)\npackage b\nimport a.M\nimport a.f\nimport a.limit\nimport a.H\nfun g(): Int = f() + limit + H(1).copy(n = 3).n",
 		marked+"package b\nimport a.H\nfun g(h: H): Int = h.n",
 	)
 	refused(t, [][3]string{
 		{marked + "package b\nimport a.f\nfun g(): Int = ‸f()", "opt-in", "f is marked @M: begin this file with @file:OptIn(M::class)"},
 		{marked + "package b\nimport a.limit\nfun g(): Int = ‸limit", "opt-in", "limit is marked @M"},
 		{marked + "package b\nimport a.H\nfun g(): H = ‸H(1)", "opt-in", "H is marked @M"},
+		// copy and a sql row build an H as its constructor does.
+		{marked + "package b\nimport a.H\nfun g(h: H): H = h.‸copy(n = 2)", "opt-in", "H is marked @M"},
+		{marked + "package b\nimport a.H\nfun g(tx: Tx): List<H> = tx.query<H>(‸sql\" -> n: Int\")", "opt-in", "H is marked @M"},
 		{marked + "package a\nfun g(): Int = ‸f()", "opt-in", "f is marked @M"},
 		{"data class X(val n: Int)\n‸@X\nfun f() {}", "marker", "X is not a marker: a marker is declared @RequiresOptIn annotation class X"},
 		{"@file:OptIn(‸X::class)\npackage t\ndata class X(val n: Int)", "marker", "X is not a marker"},

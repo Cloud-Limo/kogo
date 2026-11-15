@@ -116,7 +116,9 @@ func (c *checker) params(lit *syntax.SQL, q *Query, types []Type) {
 }
 
 // row matches the columns to R (spec.md 10.3): a data class's
-// properties by name, or a scalar's one column.
+// properties by name, or a scalar's one column. Each data class filled
+// is built as its constructor would build it, and needs what a call of
+// the constructor needs.
 func (c *checker) row(lit *syntax.SQL, q *Query) {
 	cols := q.Stmt.Columns
 	q.Paths = make([][]int, len(cols))
@@ -159,6 +161,7 @@ func dataClass(t Type) *Named {
 // column that may be null fills a property that may not, since all of
 // them are null where it is absent.
 func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, absent bool, cols []sqlpass.Column, paths [][]int) {
+	c.builds(lit, d.Decl)
 	b := bind(d.Decl.Params, d.Args)
 	for i, p := range d.Decl.Props {
 		t, name, here := subst(p.Type, b), prefix+snake(p.Name), append(slices.Clip(path), i)

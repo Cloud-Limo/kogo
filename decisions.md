@@ -175,12 +175,22 @@ Each entry: what was decided, why, and what would reopen it.
   was weighed and set aside, since nobody reads the Go. Not gained: stopping pure code
   when its request is cancelled, and request-wide data without a handle. Reopen if either
   is needed; Kogo source does not change either way.
+- **`copy` and a sql row need whatever the constructor needs** (15 Nov 2026; spec 3.1, 10.3
+  and 11): its visibility, `private` or `internal`, and its marker. Each builds a value
+  without calling the constructor, and the access walls rest on who may construct the
+  type: otherwise `held.copy(business = other)`, or `tx.queryOne<HeldBusiness>(...)`, makes
+  a `HeldBusiness` in a file with no opt-in. The refusal is the one a call of the
+  constructor gets. Kotlin follows the constructor's visibility for `copy` in recent
+  versions and, as far as we know, not its marker; refusing is the safe direction.
+  Destructuring and `==` read a value and build none.
 
 ## Taken in the v0 spec, not yet discussed
 
 - Both Arrow spellings are in (`Either` values and `Raise<E>` receivers): cusoon2 uses both.
 - Markers (`@RequiresOptIn`, `@file:OptIn`) are the one annotation form, so the access walls
-  port. Known hole: without inheritance, any file can implement the `HeldBusiness` interface.
+  port. Known hole: without inheritance, any file can implement an interface, so a wall is a
+  data class with a marked constructor, as example 19's `HeldBusiness` is. `copy` and a sql
+  row no longer get round that constructor (see "Agreed with Greg").
 - Value classes are out: cusoon2 has none, and binding distinct id types to SQL columns needs
   a design (foreign keys could supply it).
 - No `apply`/`run`/`with`, no labelled returns, no `object`, no classes beyond data classes.

@@ -21,6 +21,16 @@ import (
 // A function is equal to nothing.
 func Equal(a, b any) bool { return equal(reflect.ValueOf(a), reflect.ValueOf(b)) }
 
+// EqualDouble is a == b for two Double? values as Kotlin compares
+// two that are each a Double or a Double?: IEEE's ==, so NaN is not
+// equal to NaN and 0.0 is equal to -0.0, once neither is null.
+func EqualDouble(a, b *float64) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
 // strip gives the value inside pointers and interfaces, or the zero
 // Value for null.
 func strip(v reflect.Value) reflect.Value {

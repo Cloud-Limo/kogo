@@ -576,6 +576,42 @@ fun negZero(): Double = -0.0
 `)
 }
 
+// == between two values that are each a Double or a Double? is IEEE's,
+// as in Kotlin: NaN is not equal to itself and 0.0 is equal to -0.0.
+// Inside a data class it is Kotlin's equals, which says the opposite.
+func TestDoubleEquality(t *testing.T) {
+	expect(t, [][2]string{
+		{"t.Nz(rt.Ptr(0.0))", "true"},
+		{"t.Nz(nil)", "false"},
+		{"t.NotNaN()", "false"},
+		{"t.Both(nil, nil)", "true"},
+		{"t.Both(rt.Ptr(1.5), nil)", "false"},
+		{"t.Zero(nil) + t.ZeroOfNeg()", "otherzero"},
+		{"t.Boxed()", "true false"},
+	}, `package t
+
+fun nz(x: Double?): Boolean = x == -0.0
+
+fun notNaN(): Boolean {
+    val n: Double? = 0.0 / 0.0
+    return n == n
+}
+
+fun both(a: Double?, b: Double?): Boolean = a == b
+
+fun zero(x: Double?): String = when (x) {
+    0.0 -> "zero"
+    else -> "other"
+}
+
+fun zeroOfNeg(): String = zero(-0.0)
+
+data class D(val v: Double)
+
+fun boxed(): String = "${D(0.0 / 0.0) == D(0.0 / 0.0)} ${D(0.0) == D(-0.0)}"
+`)
+}
+
 // A panic's trace names the Kogo file and line (principle 5): the
 // line of a statement, and the line of a call that is further down
 // than the statement begins.

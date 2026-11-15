@@ -251,19 +251,37 @@ func plain(t check.Type) bool {
 	return ok && (n.Decl.Kind == "enum class" || n.Decl.Kind == "builtin" && n.Decl.Name != "Unit" && n.Decl.Name != "Nothing")
 }
 
-// equals gives a == y, a being Go of the type at. Anything but two
-// plain values is compared by rt's walk: Go compares a pointer by its
+// double gives t's Double when t is Double or Double?, and nil when
+// it is neither.
+func double(t check.Type) check.Type {
+	if n, ok := t.(*check.Nullable); ok {
+		t = n.Elem
+	}
+	if builtin(t, "Double") {
+		return t
+	}
+	return nil
+}
+
+// equals gives a == y, a being Go of the type at. Two values that are
+// each a Double or a Double? are compared by IEEE's ==, as Kotlin
+// compares them, once neither is null. Anything else but two plain
+// values is compared by rt's walk: Go compares a pointer by its
 // address, and slices not at all.
 func (e *emitter) equals(a string, at check.Type, y syntax.Expr) string {
 	_, null := at.(*check.Nullable)
 	if l, ok := y.(*syntax.Literal); ok && l.Kind == "Null" && null {
 		return "(" + a + " == nil)"
 	}
-	if b := e.expr(y); plain(at) && e.same(at, e.info.Types[y]) {
+	b, bt := e.expr(y), e.info.Types[y]
+	switch {
+	case plain(at) && e.same(at, bt):
 		return "(" + a + " == " + b + ")"
-	} else {
-		return e.rt() + ".Equal(" + a + ", " + b + ")"
+	case double(at) != nil && double(bt) != nil:
+		opt := &check.Nullable{Elem: double(at)}
+		return e.rt() + ".EqualDouble(" + e.convert(a, at, opt) + ", " + e.convert(b, bt, opt) + ")"
 	}
+	return e.rt() + ".Equal(" + a + ", " + b + ")"
 }
 
 // is gives the test that code, of the type t, is the variant v.

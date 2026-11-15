@@ -639,9 +639,10 @@ Each entry: what was decided, why, and what would reopen it.
   class's name and each field tagged with its property's, which `toString()` reads. Not
   taken: a generated method for each class.
 - **`==` inside a value compares a `Double` as Kotlin's `equals` does**: `NaN` is equal to
-  `NaN` and `0.0` is not equal to `-0.0`. Between two expressions of type `Double` it is
-  Go's `==`, which is IEEE's, as in Kotlin. A function is equal to nothing, itself
-  included, where Kotlin compares references: Go cannot.
+  `NaN` and `0.0` is not equal to `-0.0`. Between two expressions that are each a `Double`
+  or a `Double?` it is IEEE's, as in Kotlin: Go's `==`, or `rt.EqualDouble` once either
+  may be null. A function is equal to nothing, itself included, where Kotlin compares
+  references: Go cannot.
 - **Arithmetic on two literals is kept from Go's constant folding**: the left one is read
   through `rt.Val`, so that `2147483647 + 1` wraps and a `Double` gives `Infinity`, as at
   run time. A minus on a whole literal is one literal (`int32(-2147483648)`); on anything

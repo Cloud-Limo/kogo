@@ -208,10 +208,17 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 	case *syntax.Index:
 		return c.operator(e, "get", e.X, c.expr(e.X, nil), e.Index, want)
 	case *syntax.Lambda:
+		// Here a lambda is a value, not an argument that a call runs.
+		var ft *FuncType
 		if f, ok := nonNull(want).(*FuncType); ok {
-			return c.lambda(e, f.Params, f.Result)
+			ft = c.lambda(e, f.Params, f.Result)
+		} else {
+			ft = c.lambda(e, make([]Type, len(e.Params)), nil)
 		}
-		return c.lambda(e, make([]Type, len(e.Params)), nil)
+		if err := c.info.Fails[e]; err != nil {
+			c.errorf(e, "raise-escape", "this lambda fails into the raise scope around it, and is kept as a value, which could run outside the scope: pass it straight to the call that runs it, or make it return an Either<%s, A>", err)
+		}
+		return ft
 	case *syntax.If:
 		return c.ifExpr(e, want, true)
 	case *syntax.When:
@@ -883,9 +890,6 @@ func (c *checker) lambda(l *syntax.Lambda, params []Type, want Type) *FuncType {
 	c.loops = 0
 	if ft.Result = c.block(l.Body, want, true, nil); want != nil {
 		ft.Result = want
-	}
-	if e := c.either(ft.Result); e != nil && c.info.Fails[l] == nil {
-		c.info.Fails[l] = e
 	}
 	c.info.Types[l] = ft
 	return ft

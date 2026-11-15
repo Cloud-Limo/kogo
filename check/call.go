@@ -31,9 +31,11 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			if rt = c.this(); rt != nil {
 				cands = c.methods(rt, name)
 			}
-			member := cands != nil // this's interface fun comes before an extension
+			// this's interface fun comes before an extension, but
+			// not before a fun called on the raise scope.
+			member := cands != nil
 			for _, f := range c.funcs(name) {
-				if f.Kind == Fun && !(member && f.Receiver != nil) {
+				if f.Kind == Fun && (!member || f.Receiver == nil || c.raise != nil && c.raised(f.Receiver) != nil) {
 					cands = append(cands, f)
 				}
 			}
@@ -46,14 +48,18 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 		if q := c.qualifier(fun.X); q != "" {
 			if d, _ := c.findType(q + "." + name); d != nil && d.Ctor != nil && c.visible(d.Ctor.vis) {
 				cands = []*Func{d.Ctor}
+			} else if d != nil && d.Ctor != nil {
+				c.loose(e.Args, nil)
+				if outer, _ := c.findType(q); outer == c.prelude("Either") {
+					return c.errorf(fun, "either-constructor", "an Either is built with e.left() or a.right(), not with its constructor")
+				}
+				c.see(fun, q+"."+name+"'s constructor", d.Ctor.vis)
+				return unknown
 			} else if o := c.findObject(q); o != nil {
 				cands = slices.DeleteFunc(slices.Clone(o.Methods), func(f *Func) bool { return f.Name != name })
 			}
 			if len(cands) == 0 {
 				c.loose(e.Args, nil)
-				if d, _ := c.findType(q + "." + name); d != nil && d.file == c.core {
-					return c.errorf(fun, "either-constructor", "an Either is built with e.left() or a.right(), not with its constructor")
-				}
 				return c.errorf(fun, "unknown-name", "%s has no function %s", q, name)
 			}
 			break
@@ -430,6 +436,12 @@ func wholeLiteral(e syntax.Expr) bool {
 // a lambda fits any parameter of a function type.
 func (c *checker) accepts(k candidate, typed map[syntax.Expr]Type) bool {
 	if tp, _ := settle(k, typed); tp != nil {
+		return false
+	}
+	// The raise scope is the receiver of a fun called on it, and fits
+	// when the fun's E does (spec.md 9). A lone candidate keeps its
+	// raise-type error, which says how to convert the failure.
+	if r := c.raised(k.f.Receiver); r != nil && c.raise != nil && !fits(subst(r, k.b), c.raise) {
 		return false
 	}
 	for i, p := range k.f.Params {

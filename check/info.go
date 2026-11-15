@@ -38,16 +38,18 @@ type Info struct {
 	// Classes holds the type of each *syntax.ClassDecl.
 	Classes map[*syntax.ClassDecl]*TypeDecl
 	// Fails holds the error type E of each function, lambda and call
-	// that can fail (spec.md section 9), whichever spelling is used:
-	// a *syntax.FunDecl or *syntax.ValDecl whose function has the
-	// receiver Raise<E> or returns Either<E, A>; a *syntax.Lambda that
-	// is a raise scope for E (the block of either or withError), that
-	// holds a call failing into the raise scope around it, which then
-	// fails with E, or that returns Either<E, A>; and a *syntax.Call
-	// that makes the raise scope it is in fail: bind, and a call of a
-	// fun whose receiver is Raise<E>, raise, ensure, ensureNotNull and
-	// withError among them. A call that gives an Either value is not
-	// one: bind on its value is.
+	// that can fail (spec.md section 9). A *syntax.FunDecl whose
+	// function has the receiver Raise<E> or returns Either<E, A>,
+	// whichever spelling is used, and a *syntax.ValDecl, an extension
+	// val, that returns Either<E, A>. A *syntax.Lambda that is a raise
+	// scope for E, the block of either or withError, or that holds a
+	// call failing into the raise scope around it, which fails with
+	// E: running it can fail. A lambda that returns an Either is not
+	// one; its type says so. A *syntax.Call that makes the raise scope
+	// it is in fail: bind, and a call of a fun whose receiver is
+	// Raise<E>, raise, ensure, ensureNotNull and withError among them.
+	// A call that gives an Either value is not one: bind on its value
+	// is.
 	Fails map[syntax.Node]Type
 }
 

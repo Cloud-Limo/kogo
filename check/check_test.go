@@ -400,6 +400,12 @@ func TestFailures(t *testing.T) {
 		"fun f(): Int? = either<String, Int> { 1 }.getOrNull()",
 		// A lambda inside a raise scope is in it.
 		"fun g(n: Int): Either<String, Int> = either { n }\nfun f(xs: List<Int>): Either<String, List<Int>> = either { xs.map { g(it).bind() } }",
+		// The raise scope is the receiver of a fun called on it: it
+		// chooses between overloads, and this's member does not hide
+		// it, though it does outside a raise scope.
+		"fun Raise<String>.g(): Int = 1\nfun Raise<Int>.g(): Int = 2\nfun f(): Either<String, Int> = either { g() }",
+		"interface V {\n    fun ensure(n: Int): Boolean\n}\nfun V.f(n: Int): Either<String, Int> = either {\n    ensure(n > 0) { \"negative\" }\n    n\n}",
+		"interface V {\n    fun raise(r: String): Int\n}\nfun V.f(): Int = raise(\"no\")",
 		// Working with an Either value.
 		"fun f(c: Boolean): Either<String, Int> = if (c) 1.right() else \"no\".left()",
 		"fun f(x: Either<String, Int>): String = x.fold({ e -> e }, { n -> \"$n\" })",
@@ -419,6 +425,11 @@ func TestFailures(t *testing.T) {
 		{"fun g(): Either<String, Int> = either { 1 }\nfun f(): Int = g().‸bind()", "raise-scope", "bind can fail with a String, and this is not a raise scope: wrap it in either<String, ...> { }, or call it from a fun Raise<String>.name(...)"},
 		{"fun Raise<String>.g(): Int = 1\nfun f(): Int = ‸g()", "raise-scope", "g can fail with a String, and this is not a raise scope: wrap it in either<String, ...> { }"},
 		{"fun f(): Int = ‸raise(\"no\")", "raise-scope", "raise can fail with a String"},
+		// A lambda that fails into the raise scope around it is not
+		// kept as a value, which could run outside the scope.
+		{"fun f(): Either<String, () -> Int> = either { ‸{ raise(\"no\") } }", "raise-escape", "this lambda fails into the raise scope around it, and is kept as a value, which could run outside the scope: pass it straight to the call that runs it, or make it return an Either<String, A>"},
+		{"fun Raise<String>.g(): Int = 1\nfun Raise<String>.f(): () -> Int = ‸{ g() }", "raise-escape", "pass it straight to the call"},
+		{"fun f(): Either<String, Int> = either {\n    val g: () -> Int = ‸{ raise(\"no\") }\n    g()\n}", "raise-escape", "pass it straight to the call"},
 		// A local fun is not in the raise scope around it.
 		{"fun f(): Either<String, Int> = either {\n    fun g(): Int = ‸raise(\"no\")\n    g()\n}", "raise-scope", "this is not a raise scope"},
 		// A dropped Either.
@@ -433,6 +444,7 @@ func TestFailures(t *testing.T) {
 		{"fun f(g: ‸Raise<String>.() -> Int) {}", "function-receiver", "a function type has no receiver (spec.md 5): take the value as a parameter, or for Raise<E> return an Either<E, A>"},
 		{"fun f(g: ‸Int.() -> Int) {}", "function-receiver", "take the value as a parameter"},
 		{"fun f(): Either<String, Int> = Either.‸Left(\"no\")", "either-constructor", "an Either is built with e.left() or a.right()"},
+		{"sealed interface S {\n    data class P private constructor(val n: Int) : S\n}\n---\nfun f(): S = S.‸P(1)", "not-visible", "S.P's constructor is private to f1.kg"},
 		// A block is a lambda, and a call that fails says no more of it.
 		{"fun f(g: () -> Int): Either<String, Int> = either(‸g)", "type-mismatch", "this is a () -> Int where a Raise<String>.() -> Int is wanted"},
 		{"fun f(): Either<String, Int> = ‸either(1) { raise(\"no\") }", "arguments", "either is given block twice"},
@@ -492,14 +504,22 @@ fun twice String`
 			t.Errorf("%s\n got %s\nwant %s", src, strings.Join(got, "\n"), want)
 		}
 	}
-	// A lambda that returns an Either can fail, as a fun that does.
+	// A lambda that returns an Either does not fail: its value is the
+	// Either, which its type says.
 	info, _ := run(t, "fun f(x: Either<String, Int>): Either<String, Int> = x.flatMap { it.right() }")
 	for n, e := range info.Fails {
-		if _, ok := n.(*syntax.Lambda); ok && e.String() == "String" {
-			return
+		if _, ok := n.(*syntax.Lambda); ok {
+			t.Errorf("the lambda of flatMap: got %v, want it not to fail", e)
 		}
 	}
-	t.Errorf("the lambda of flatMap: got %v, want it to fail with String", info.Fails)
+	// A call that fails in a lambda of a call that failed leaves the
+	// raise scope around it as it was.
+	info, _ = run(t, "fun g(): Either<String, Int> = either { 1 }\nfun f(): Either<String, Int> = either<String, Int> { h(1) { g().bind() } }")
+	for n, e := range info.Fails {
+		if l, ok := n.(*syntax.Lambda); ok && info.Types[l].(*FuncType).Receiver != nil && e.String() != "String" {
+			t.Errorf("either's block: got %v, want it to fail with String", e)
+		}
+	}
 }
 
 var update = flag.Bool("update", false, "rewrite testdata/*.facts from the checker")

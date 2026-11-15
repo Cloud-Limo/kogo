@@ -345,13 +345,32 @@ Each entry: what was decided, why, and what would reopen it.
 - **A call can fail when it makes the raise scope it is in fail** (`Info.Fails`): `bind`,
   and a call of a `Raise<E>` fun. A call that gives an `Either` value cannot; `bind` on its
   value can. A fun can fail with `E` when its receiver is `Raise<E>` or it returns
-  `Either<E, A>`, the two spellings; a lambda when it is a raise scope's block, holds a call
-  that fails into the scope around it, or returns an `Either`. A call records the `E` it
-  fails with (a `Raise<S.A>` fun called where `S` is raised fails with `S.A`); a lambda
-  records the scope's. Reopen when the emitter wants the callee's notion on the call too.
+  `Either<E, A>`, the two spellings; a lambda when it is a raise scope's block or holds a
+  call that fails into the scope around it. A call records the `E` it fails with (a
+  `Raise<S.A>` fun called where `S` is raised fails with `S.A`); a lambda records the
+  scope's. Reopen when the emitter wants the callee's notion on the call too.
+- **A lambda that returns an `Either` is not in `Info.Fails`.** Its type says so already,
+  and with it in, one entry held two facts: a lambda that binds into a `String` scope and
+  returns `Either<Int, X>` was recorded only as `String`, so the emitter could not tell a
+  lambda that must short-circuit from one that gives a value. A fun keeps both spellings:
+  its receiver tells them apart. Reopen if the emitter wants the lambda's `Either` there.
+- **A lambda that fails into the raise scope is passed straight to a call** (spec 9).
+  Kept in a `val`, returned, or passed where a type parameter is wanted (`listOf({ ... })`),
+  it could run after the scope has ended, where nothing catches its failure. The rule is
+  where the lambda is written, about 8 lines. Accepted holes: a callee that keeps its
+  function parameter, in a data class, say, can still run it later, as a non-inline Kotlin
+  function can; and a value of a function type called with such a lambda is refused,
+  though it may run it at once. Closing the first needs an effect on function types.
+  Reopen when a port keeps such a lambda, or the emitter finds a callee that does.
+- **Inside a raise scope a `Raise<E>` fun is not hidden by a member of `this`** (spec 9).
+  Both are candidates, and where both fit the call is ambiguous; Kotlin picks the `Raise`
+  one, its innermost receiver. No rank is added, since 5.2 has none. Outside a raise scope
+  the member still hides it. Overloads that differ only in their `Raise<E>` are chosen by
+  the scope's `E`; a lone candidate whose `E` does not fit keeps its `raise-type` error,
+  which says how to convert the failure.
 - **`Either` is built only with `left()` and `right()`**: the variants' constructors are
   `internal` to package `kogo`, and `Either.Left(e)` is refused with a message naming the
-  two. Kotlin accepts it; one way to build an `Either` leaves the emitter one form.
+  two; any other hidden constructor gets `not-visible`. Kotlin accepts it; one way to build an `Either` leaves the emitter one form.
 - **The functions on an `Either` value are bindings in `prelude/either.kg`**, and the
   checker's tests read that file as it is, so they check the real declarations. The
   prelude also gained `String.lowercase` and `String.contains` for example 07.

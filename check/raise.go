@@ -81,7 +81,7 @@ func (c *checker) fails(e *syntax.Call, call *Call) {
 		return
 	}
 	switch {
-	case err == unknown:
+	case err == unknown, c.raise == unknown: // something failed already: say no more
 	case c.raise == nil:
 		c.errorf(e.Fun, "raise-scope", "%s can fail with a %s, and this is not a raise scope: wrap it in either<%s, ...> { }, or call it from a fun Raise<%s>.name(...)", f.Name, err, err, err)
 	case !fits(err, c.raise):

@@ -406,6 +406,13 @@ call in `either { }`.
   raised. Convert any other failure with `mapLeft` or `withError`.
 - A lambda inside a raise scope is in it, as in Kotlin:
   `either { ids.map { load(it).bind() } }`. A local `fun` is not.
+  A lambda that fails into the scope is passed straight to the call
+  that runs it: kept as a value, in a `val` or as a result, it could
+  run outside the scope, and is refused.
+- A `Raise<E>` function is called on the raise scope as on a receiver.
+  Overloads that differ only in their `E` are chosen by the scope's,
+  and a member of `this` with the same name does not hide one, as it
+  hides an extension (section 5.2).
 - `Raise<E>` is written only as the receiver of a function, and that
   function has no `this`. `either`'s `E` is settled as section 5.1
   says, before its block is read: by the type wanted, or written,

@@ -194,9 +194,26 @@ func (p *parser) file() {
 		p.end()
 	}
 	for p.tok.kind != tEOF {
-		f.Decls = append(f.Decls, p.decl(false))
+		if p.at("api") && p.peek(1).kind == tIdent {
+			f.APIs = append(f.APIs, p.api())
+		} else {
+			f.Decls = append(f.Decls, p.decl(false))
+		}
 		p.end()
 	}
+}
+
+// api reads an api list. api is a name like any other elsewhere.
+func (p *parser) api() *API {
+	a := &API{Pos: p.tok.pos}
+	p.next()
+	_, a.Name = p.ident()
+	p.want("{")
+	p.list("}", func() {
+		pos, name := p.ident()
+		a.Funs = append(a.Funs, &Ident{pos, name})
+	})
+	return a
 }
 
 // Modifiers that Kotlin has and Kogo does not, with the section 14 row

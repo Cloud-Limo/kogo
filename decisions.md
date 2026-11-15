@@ -1394,14 +1394,20 @@ Each entry: what was decided, why, and what would reopen it.
   repeat.
 - **One width for a Go file, the widest of its sources' directives.** A package of several
   `.kg` files is one Go file, and its code starts at one column. The width is that of the
-  directive naming each source's last line, found from the largest line of any node in its
-  tree, with one space after it. Not taken: a width per source, which starts a package's code
-  at a column for each file; reading the source again to count its lines, which tests that
-  parse text in memory cannot.
+  directive naming each source's last line, with one space after it. Not taken: a width per
+  source, which starts a package's code at a column for each file.
+- **The parser counts a source's lines** (ruled on the review of DEV-857): `syntax.File` has
+  `Lines`, the line the source ends on, set by `Parse`, and `emit` takes the width from it.
+  A count of the source's lines is the parser's to know, and `emit` already reads
+  `syntax.File`. Not taken: leaving `syntax` alone and finding the largest line of any node
+  by a reflection walk over the tree, 24 lines in `emit`; reading the source again, which
+  tests that parse text in memory cannot; a fixed five digits, spaces on every line of a
+  short file.
 - **A type's fields and a case's statements are a level in, as gofmt has them.** A struct, an
-  interface, a block, a `switch` and a closure each open a level; `} else {` and a `case`
-  close one and open the next. A line with no position (none is written today inside a
-  declaration) gets its tabs and no directive.
+  interface, a block, a `switch` and a closure each open a level; `} else {` closes one and
+  opens the next, and a `case` and its conditions are written at the `switch`'s level. A
+  line with no position (none is written today inside a declaration) gets its tabs and no
+  directive.
 
 ## Spec gaps found by the leakage ports, unresolved
 

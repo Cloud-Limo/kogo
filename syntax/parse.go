@@ -1,6 +1,7 @@
 package syntax
 
 import (
+	"bytes"
 	"fmt"
 	"slices"
 	"strings"
@@ -19,7 +20,7 @@ func Parse(name string, src []byte) (f *File, err error) {
 		}
 	}()
 	s := newSource(name, string(src))
-	p := &parser{src: s, toks: lex(s, 0, len(src)), f: &File{Name: name}}
+	p := &parser{src: s, toks: lex(s, 0, len(src)), f: &File{Name: name, Lines: bytes.Count(src, []byte("\n")) + 1}}
 	p.tok = p.toks[0]
 	p.file()
 	return p.f, nil

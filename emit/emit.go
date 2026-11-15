@@ -15,7 +15,6 @@ import (
 	"go/token"
 	"maps"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -34,8 +33,9 @@ const (
 // Emit gives the Go for a checked program: one file for each Kogo
 // package, a.b's at a/b/kogo.go under the directory whose import path
 // is root and whose path is out: the line directives name each source
-// relative to the directory of the file. It gives errors and no files when the program holds what
-// is not emitted yet, or two declarations that Go cannot tell apart.
+// relative to the directory of the file. It gives errors and no files
+// when the program holds what is not emitted yet, or two declarations
+// that Go cannot tell apart.
 func Emit(info *check.Info, prelude, program []*syntax.File, root, out string) (map[string][]byte, []*syntax.Error) {
 	_, files, errs := emitAll(info, prelude, program, root, out)
 	return files, errs
@@ -77,12 +77,9 @@ func emitAll(info *check.Info, prelude, program []*syntax.File, root, outDir str
 		paths := map[*syntax.File]string{}
 		for _, f := range files[pkg] {
 			abs, _ := filepath.Abs(f.Name)
-			rel, err := filepath.Rel(filepath.Join(outDir, dir), abs)
-			if err != nil {
-				rel = abs
-			}
+			rel, _ := filepath.Rel(filepath.Join(outDir, dir), abs)
 			paths[f] = filepath.ToSlash(rel)
-			e.width = max(e.width, len(fmt.Sprintf("/*line %s:%d*/ ", paths[f], lastLine(reflect.ValueOf(f)))))
+			e.width = max(e.width, len(fmt.Sprintf("/*line %s:%d*/ ", paths[f], f.Lines)))
 		}
 		body := e.capture(func() {
 			for _, f := range files[pkg] {
@@ -222,31 +219,6 @@ func (e *emitter) dir() string {
 	}
 	d := fmt.Sprintf("/*line %s:%d*/", e.path, e.line)
 	return d + strings.Repeat(" ", max(e.width-len(d), 1)) + tabs
-}
-
-// lastLine gives the last source line that a node of a file is on.
-func lastLine(v reflect.Value) int {
-	n := 0
-	switch v.Kind() {
-	case reflect.Pointer, reflect.Interface:
-		if !v.IsNil() {
-			n = lastLine(v.Elem())
-		}
-	case reflect.Slice:
-		for i := range v.Len() {
-			n = max(n, lastLine(v.Index(i)))
-		}
-	case reflect.Struct:
-		if p, ok := v.Interface().(syntax.Pos); ok {
-			return p.Line
-		}
-		for i := range v.NumField() {
-			if v.Type().Field(i).IsExported() {
-				n = max(n, lastLine(v.Field(i)))
-			}
-		}
-	}
-	return n
 }
 
 // w writes one line of Go.

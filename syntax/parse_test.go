@@ -52,6 +52,8 @@ func write(b *strings.Builder, v reflect.Value) {
 			write(b, v.Index(i))
 		}
 		b.WriteString("]")
+	case reflect.Int:
+		b.WriteString(strconv.Itoa(int(v.Int())))
 	case reflect.String:
 		if s := v.String(); s == "" || strings.ContainsAny(s, " ()[]\"\n\t\\") {
 			b.WriteString(strconv.Quote(s))
@@ -158,7 +160,7 @@ func TestDeclarations(t *testing.T) {
 	}, func(t *testing.T, src string) string { return show(parse(t, src).Decls) })
 
 	f, err := Parse("t.kg", []byte("@file:OptIn(A::class, b.B::class)\n\npackage x.y\n\nimport a.b.C\nimport d.e\n"))
-	if got := show(f); err != nil || got != `(File t.kg [(Annotation OptIn [(ClassRef A) (ClassRef b.B)])] (Ident x.y) [(Ident a.b.C) (Ident d.e)])` {
+	if got := show(f); err != nil || got != `(File t.kg [(Annotation OptIn [(ClassRef A) (ClassRef b.B)])] (Ident x.y) [(Ident a.b.C) (Ident d.e)] 7)` {
 		t.Errorf("file head: %s %v", got, err)
 	}
 

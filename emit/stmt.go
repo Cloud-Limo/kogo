@@ -268,6 +268,7 @@ func (e *emitter) when(x *syntax.When, d dest) {
 	e.open("switch {")
 	for _, b := range x.Branches {
 		back := e.enter(b)
+		e.depth-- // a case and its conditions are at the switch's level
 		var conds []string
 		for _, c := range b.Conds {
 			switch {
@@ -282,10 +283,11 @@ func (e *emitter) when(x *syntax.When, d dest) {
 			}
 		}
 		if conds == nil {
-			e.turn("default:")
+			e.w("default:")
 		} else {
-			e.turn("case %s:", strings.Join(conds, " || "))
+			e.w("case %s:", strings.Join(conds, " || "))
 		}
+		e.depth++
 		e.block(b.Body, d)
 		back()
 	}

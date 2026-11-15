@@ -698,7 +698,7 @@ trace(func() { t.Divide(1, 0) })
 // starts each line's code at one column, after the line's directive,
 // indented a tab for each block or closure it is in.
 func TestLayout(t *testing.T) {
-	_, files, errs := emit(t, "x", "package t\n\nfun f(n: Int): Int {\n    val g = { x: Int ->\n        x + n\n    }\n    return g(2)\n}\n")
+	_, files, errs := emit(t, "x", "package t\n\n\n\n\n\n\nfun f(n: Int): Int {\n    val g = { x: Int ->\n        x + n\n    }\n    return g(2)\n}\n")
 	if errs != nil {
 		t.Fatalf("%v", errs)
 	}

@@ -577,6 +577,12 @@ it in the statement.
 - A list: `where id = any($ids)`.
 - A choice between two statements (with and without `for update`, two
   sort directions): write both literals in an `if`/`else`.
+- A conflict that is an expected outcome: a constraint Postgres
+  refuses is a panic (section 8), so say it in the statement.
+  `insert ... on conflict do nothing returning *` under `queryOne`
+  gives `null` when a unique constraint stood in the way, and where
+  there are two, one `tx.exists` says which. An `update` has no
+  `on conflict`: test with `tx.exists` first.
 
 ### 10.7 Transactions
 
@@ -683,8 +689,11 @@ checker reads them like any other file, and so can an author.
 
 ```kotlin
 @go("httpx")
-external object http {
-    fun get(url: String): Either<HttpError, Response>
+external class Http
+external fun Http.get(url: String): Either<HttpError, Response>
+
+external object Uuid {
+    fun parse(text: String): Uuid?
 }
 
 external class List<out T>
@@ -696,7 +705,14 @@ external fun <T> List<T>?.orEmpty(): List<T>
 external fun List<Long>.sum(): Long
 ```
 
-- `external object` holds functions called on its name: `http.get(url)`.
+- `external object` holds functions called on its name:
+  `Uuid.parse(text)`. They have no effect: an object is reachable from
+  anywhere, and section 7 has effects arrive as parameters.
+- A binding with an effect, an outbound call, takes a handle: an
+  external class such as `Http`, passed to the function that calls out
+  as `Tx` and `Db` are, so the signature shows it. The handle carries
+  the request's context. Nothing checks that a binding keeps to this;
+  it is the rule for whoever writes one.
 - `external class Name<T>` names a type that Go implements. It has no
   body, and Kogo code cannot construct or implement it. An external
   object may share its name, which gives `Uuid.parse(text)`.

@@ -22,10 +22,10 @@ func Console_Println(this Console, message string) rt.Unit {
 	return Console_Print(this, message+"\n")
 }
 
+// Console_Print drops a failed write, as Kotlin's System.out does: a
+// closed or full output does not stop the program.
 func Console_Print(this Console, message string) rt.Unit {
-	if _, err := goio.WriteString(this.out, message); err != nil {
-		panic(err)
-	}
+	goio.WriteString(this.out, message)
 	return rt.Unit{}
 }
 

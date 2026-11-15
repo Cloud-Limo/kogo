@@ -6,6 +6,7 @@ package time
 
 import (
 	"fmt"
+	"strconv"
 	gotime "time"
 )
 
@@ -28,7 +29,20 @@ type Instant struct {
 
 func (i Instant) utc() gotime.Time { return gotime.Unix(i.Seconds, int64(i.Nanos)).UTC() }
 func (i Instant) String() string {
-	return i.utc().Format("2006-01-02T15:04:05") + fraction(i.Nanos) + "Z"
+	t := i.utc()
+	return year(t.Year()) + t.Format("-01-02T15:04:05") + fraction(i.Nanos) + "Z"
+}
+
+// year writes a year as java.time does: four digits at least, with a
+// sign before a negative one and before one of five digits or more.
+func year(y int) string {
+	switch {
+	case y > 9999:
+		return "+" + strconv.Itoa(y)
+	case y < 0:
+		return fmt.Sprintf("-%04d", -y)
+	}
+	return fmt.Sprintf("%04d", y)
 }
 
 // fraction writes the nanoseconds of a second as java.time does: in
@@ -47,7 +61,9 @@ func fraction(nanos int32) string {
 
 type LocalDate struct{ Year, Month, Day int32 }
 
-func (d LocalDate) String() string { return fmt.Sprintf("%04d-%02d-%02d", d.Year, d.Month, d.Day) }
+func (d LocalDate) String() string {
+	return fmt.Sprintf("%s-%02d-%02d", year(int(d.Year)), d.Month, d.Day)
+}
 
 // A ZoneId is a named zone of the tz database.
 type ZoneId struct {
@@ -73,13 +89,32 @@ type ZonedDateTime struct {
 
 func (z ZonedDateTime) local() gotime.Time { return z.Instant.utc().In(z.Zone.loc) }
 
-// String is java.time's text: seconds are left out when they are zero.
+// String is java.time's text: seconds are left out when they are zero,
+// and so are the offset's.
 func (z ZonedDateTime) String() string {
-	layout := "2006-01-02T15:04"
-	if t := z.local(); t.Second() != 0 || z.Instant.Nanos != 0 {
+	t, layout := z.local(), "-01-02T15:04"
+	if t.Second() != 0 || z.Instant.Nanos != 0 {
 		layout += ":05"
 	}
-	return z.local().Format(layout) + fraction(z.Instant.Nanos) + z.local().Format("Z07:00") + "[" + z.Zone.Name + "]"
+	return year(t.Year()) + t.Format(layout) + fraction(z.Instant.Nanos) + offset(t) + "[" + z.Zone.Name + "]"
+}
+
+// offset writes t's offset from UTC as java.time does: Z for none, and
+// the seconds only where there are some, as in a zone's local mean time.
+func offset(t gotime.Time) string {
+	_, secs := t.Zone()
+	if secs == 0 {
+		return "Z"
+	}
+	sign := "+"
+	if secs < 0 {
+		sign, secs = "-", -secs
+	}
+	s := fmt.Sprintf("%s%02d:%02d", sign, secs/3600, secs/60%60)
+	if secs%60 != 0 {
+		s += fmt.Sprintf(":%02d", secs%60)
+	}
+	return s
 }
 
 func Clock_Now(this Clock) Instant                           { return this.now() }

@@ -86,11 +86,13 @@ func List_Get[T any](this List[T], index int32) T { return this[index] }
 
 func List_IsNotEmpty[T any](this List[T]) bool { return len(this) > 0 }
 
+// List_FirstOrNull, as every nullable result, is a copy: a pointer
+// into the list would hold all of it and could change it.
 func List_FirstOrNull[T any](this List[T]) *T {
 	if len(this) == 0 {
 		return nil
 	}
-	return &this[0]
+	return rt.Ptr(this[0])
 }
 
 // List_SingleOrNull is null for an empty list and for one of two or
@@ -99,7 +101,7 @@ func List_SingleOrNull[T any](this List[T]) *T {
 	if len(this) != 1 {
 		return nil
 	}
-	return &this[0]
+	return rt.Ptr(this[0])
 }
 
 func List_ForEach[T any](this List[T], action func(T) rt.Unit) rt.Unit {

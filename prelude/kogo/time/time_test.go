@@ -19,6 +19,14 @@ func TestTime(t *testing.T) {
 		{rt.ToString(sydney), "2026-11-16T01:30:00.120+11:00[Australia/Sydney]"},
 		{rt.ToString(Instant_AtZone(Instant{Seconds: 1794753000}, ZoneId_Of("UTC"))), "2026-11-15T14:30Z[UTC]"},
 		{rt.ToString(LocalDate{Year: 987, Month: 1, Day: 2}), "0987-01-02"},
+		// Years past four digits, or before year 0, and an offset in
+		// seconds, as Java 21 writes them.
+		{rt.ToString(LocalDate{Year: -1, Month: 1, Day: 2}), "-0001-01-02"},
+		{rt.ToString(LocalDate{Year: 10000, Month: 1, Day: 2}) + " " + rt.ToString(LocalDate{Year: -10000, Month: 1, Day: 2}), "+10000-01-02 -10000-01-02"},
+		{rt.ToString(Instant{Seconds: -62167219201, Nanos: 120_000_000}), "-0001-12-31T23:59:59.120Z"},
+		{rt.ToString(Instant_AtZone(LocalDate_AtStartOfDay(LocalDate{Year: -1, Month: 1, Day: 2}, sydney.Zone), sydney.Zone)), "-0001-01-02T00:00+10:04:52[Australia/Sydney]"},
+		{rt.ToString(Instant_AtZone(LocalDate_AtStartOfDay(LocalDate{Year: 10000, Month: 1, Day: 2}, sydney.Zone), sydney.Zone)), "+10000-01-02T00:00+11:00[Australia/Sydney]"},
+		{rt.ToString(Instant_AtZone(Instant{Seconds: 1794753000}, ZoneId_Of("Etc/GMT+5"))), "2026-11-15T09:30-05:00[Etc/GMT+5]"},
 		{rt.ToString(LocalDate_PlusDays(LocalDate{Year: 2028, Month: 2, Day: 28}, 1)), "2028-02-29"},
 		{rt.ToString(LocalDate_PlusDays(LocalDate{Year: 2026, Month: 12, Day: 30}, 33)), "2027-02-01"},
 		{rt.ToString(LocalDate_PlusDays(LocalDate{Year: 2026, Month: 3, Day: 1}, -1)), "2026-02-28"},

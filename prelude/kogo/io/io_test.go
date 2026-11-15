@@ -1,9 +1,21 @@
 package io
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
+
+type closed struct{}
+
+func (closed) Write([]byte) (int, error) { return 0, errors.New("broken pipe") }
+
+// A failed write is dropped, as Kotlin's System.out drops it.
+func TestConsoleClosed(t *testing.T) {
+	c := NewConsole(strings.NewReader(""), closed{})
+	Console_Println(c, "lost")
+	Console_Print(c, "lost")
+}
 
 // readln gives each line without its break, the last even with none,
 // and panics past the end, as Kotlin's does.

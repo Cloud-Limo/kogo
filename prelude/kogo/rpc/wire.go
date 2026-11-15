@@ -37,9 +37,12 @@ func newReader(enums []any) reader {
 	r := reader{map[reflect.Type][]string{}}
 	for _, entries := range enums {
 		v := reflect.ValueOf(entries)
+		t := v.Type().Elem()
+		names := r.enums[t]
 		for i := range v.Len() {
-			r.enums[v.Type().Elem()] = append(r.enums[v.Type().Elem()], v.Index(i).String())
+			names = append(names, v.Index(i).String())
 		}
+		r.enums[t] = names // an enum with no constants is in the table too
 	}
 	return r
 }

@@ -1,7 +1,7 @@
 // Package emit writes Go from a checked Kogo program: doc/design.md,
 // "The emitter". It writes pure code, spec.md sections 2 to 6,
-// expected failures, section 9, and SQL and transactions, sections 7
-// and 10.
+// expected failures, section 9, SQL and transactions, sections 7
+// and 10, and the table of each api list, section 15.
 //
 // Nobody reads the Go. Each line of it is preceded by a //line
 // directive, so that a Go panic's trace names the Kogo file and line.
@@ -75,6 +75,9 @@ func emitAll(info *check.Info, prelude, program []*syntax.File, root string) (*e
 				for _, d := range f.Decls {
 					e.decl(d)
 				}
+				for _, d := range f.APIs {
+					e.table(d)
+				}
 			}
 		})
 		dir := strings.ReplaceAll(pkg, ".", "/")
@@ -114,7 +117,7 @@ type emitter struct {
 	info     *check.Info
 	root     string // the import path of the directory written to
 	errs     []*syntax.Error
-	names    map[any]string            // the Go name of each top-level type, fun, val and enum constant
+	names    map[any]string            // the Go name of each top-level type, fun, val, enum constant, enum's entries and api table
 	bound    map[string]bool           // the Kogo packages that Go implements: the prelude's
 	nullable map[*check.TypeParam]bool // the type parameters used as T?
 	scanned  map[*check.Func]bool      // the funs whose signatures are read for that

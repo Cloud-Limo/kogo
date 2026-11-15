@@ -69,6 +69,12 @@ create table invoice (
     platform_fee_reference text
 );
 
+-- How often each address has looked an invoice up (examples/22_api.kg).
+create table look (
+    address text primary key,
+    count integer not null
+);
+
 -- A composite type made with create type, whose fields Postgres
 -- cannot declare NOT NULL, and a table holding it.
 create type amount as (cents bigint, currency text);

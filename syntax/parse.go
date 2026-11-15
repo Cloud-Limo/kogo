@@ -410,10 +410,10 @@ func (p *parser) typeParams(out bool) []*TypeParam {
 		pos := p.tok.pos
 		tp := &TypeParam{Pos: pos, Out: p.peek(1).kind == tIdent && p.got("out")}
 		if tp.Out && !out {
-			p.fail(tp.Pos, "syntax", "out goes only on a sealed interface's type parameter")
+			p.fail(tp.Pos, "syntax", "out goes only on the type parameter of a sealed interface or an external class")
 		}
 		if p.at("in") {
-			p.fail(p.tok.pos, "syntax", "a type parameter is plain, or out on a sealed interface")
+			p.fail(p.tok.pos, "syntax", "a type parameter is plain, or out on a sealed interface or an external class")
 		}
 		_, tp.Name = p.ident()
 		if p.at(":") {

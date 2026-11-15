@@ -3,6 +3,7 @@ package rt
 import (
 	"math"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf16"
@@ -14,9 +15,13 @@ import (
 // implements is compared by its exported fields and has a String
 // method for its text.
 
+// A collection that Go implements and == compares regardless of
+// order, a Set, gives its elements by Elements, each once.
+type unordered interface{ Elements() []any }
+
 // Equal is a == b for any two Kogo values (spec.md section 3): null
 // is nil, a T? holding a value is equal to that T, lists and data
-// classes are compared part by part, and a Double as Kotlin's equals
+// classes are compared part by part, sets regardless of order, and a Double as Kotlin's equals
 // compares it, so NaN is equal to NaN and 0.0 is not equal to -0.0.
 // A function is equal to nothing.
 func Equal(a, b any) bool { return equal(reflect.ValueOf(a), reflect.ValueOf(b)) }
@@ -83,6 +88,12 @@ func equal(a, b reflect.Value) bool {
 	case reflect.Struct:
 		if origin(a.Type()) != origin(b.Type()) {
 			return false
+		}
+		if x, ok := a.Interface().(unordered); ok {
+			xs, ys := x.Elements(), b.Interface().(unordered).Elements()
+			return len(xs) == len(ys) && !slices.ContainsFunc(xs, func(x any) bool {
+				return !slices.ContainsFunc(ys, func(y any) bool { return Equal(x, y) })
+			})
 		}
 		for i := range a.NumField() {
 			if a.Type().Field(i).IsExported() && !equal(a.Field(i), b.Field(i)) {

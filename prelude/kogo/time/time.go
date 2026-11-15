@@ -85,6 +85,12 @@ func (z ZonedDateTime) String() string {
 func Clock_Now(this Clock) Instant                           { return this.now() }
 func Instant_AtZone(this Instant, zone ZoneId) ZonedDateTime { return ZonedDateTime{this, zone} }
 
+// LocalDate_PlusDays counts across months and years, as java.time does.
+func LocalDate_PlusDays(this LocalDate, daysToAdd int64) LocalDate {
+	y, m, d := gotime.Date(int(this.Year), gotime.Month(this.Month), int(this.Day)+int(daysToAdd), 0, 0, 0, 0, gotime.UTC).Date()
+	return LocalDate{int32(y), int32(m), int32(d)}
+}
+
 func ZonedDateTime_ToLocalDate(this ZonedDateTime) LocalDate {
 	y, m, d := this.local().Date()
 	return LocalDate{int32(y), int32(m), int32(d)}

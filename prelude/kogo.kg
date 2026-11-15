@@ -1,21 +1,29 @@
 // The prelude: what Go provides to every Kogo file (spec.md sections 12
-// and 13). It holds what the checked examples use; the rest of section
-// 12 is added as programs come to need it.
+// and 13). It holds what the examples and the ports call; the rest of
+// section 12 is added as programs come to need it.
 package kogo
 
 external class List<out T>
 external class Pair<out A, out B>
+external class Set<out T>
 external class Regex
 external class Uuid
 
 external fun <T> listOf(vararg elements: T): List<T>
+external fun <T> listOfNotNull(vararg elements: T?): List<T>
 external val <T> List<T>.size: Int
+external fun <T> List<T>.get(index: Int): T
 external fun <T> List<T>.filter(predicate: (T) -> Boolean): List<T>
+external fun <T, R> List<T>.map(transform: (T) -> R): List<R>
 external fun <T, R> List<T>.mapIndexed(transform: (Int, T) -> R): List<R>
 external fun <T, R> List<T>.zip(other: List<R>): List<Pair<T, R>>
 external fun List<Long>.sum(): Long
 external fun <T> List<T>.sumOf(selector: (T) -> Int): Int
 external fun <T> List<T>.sumOf(selector: (T) -> Long): Long
+external fun <T> List<T>.plus(elements: List<T>): List<T>
+
+external fun <T> setOf(vararg elements: T): Set<T>
+external fun <T> Set<T>.contains(element: T): Boolean
 
 external val String.length: Int
 external fun String.plus(other: String): String
@@ -31,13 +39,17 @@ external fun Char.digitToInt(): Int
 external fun Regex(pattern: String): Regex
 external fun Regex.matches(input: String): Boolean
 
+external fun Int.toLong(): Long
 external fun Long.toDouble(): Double
+external fun Long.coerceAtLeast(minimumValue: Long): Long
+external fun Long.coerceAtMost(maximumValue: Long): Long
 external fun Double.toLong(): Long
 external fun Double.toInt(): Int
 
 external fun <T, R> T.let(block: (T) -> R): R
 external fun <T> T.takeIf(predicate: (T) -> Boolean): T?
 external fun <T> requireNotNull(value: T?, lazyMessage: () -> String): T
+external fun require(value: Boolean, lazyMessage: () -> String)
 external fun check(value: Boolean, lazyMessage: () -> String)
 
 external fun newId(): Uuid

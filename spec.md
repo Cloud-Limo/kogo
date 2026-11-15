@@ -303,11 +303,12 @@ interface `fun` before an extension of the same name.
   `x ?: return y` are statements. So `- b` on a line of its own, which
   section 6.1 reads as a new statement, is refused.
 - `return`, `break` and `continue` stand in a value's place only where
-  that value goes straight into a `val`, an assignment or a `return`,
-  or is the result of the function or lambda: the right side of `?:`,
-  or a branch of an `if` or a `when` there, as `val p = x ?: return y`.
-  Buried in a larger expression, as `f(x ?: return y)`, one is an
-  error, though Kotlin allows it: bind the value to a `val` first.
+  that value goes straight into a `val`, an assignment with `=` or a
+  `return`, or is the result of the function or lambda: the right side
+  of `?:`, or a branch of an `if` or a `when` there, as
+  `val p = x ?: return y`. Buried in a larger expression, as
+  `f(x ?: return y)` or `n += x ?: break`, one is an error, though
+  Kotlin allows it: bind the value to a `val` first.
 
 ### 6.1 Lines, operators and literals
 

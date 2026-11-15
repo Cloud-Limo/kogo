@@ -108,6 +108,10 @@ func (c *checker) this() Type {
 // settles a literal and a call's type arguments (spec.md 3 and 5.1).
 // The caller checks that the type fits.
 func (c *checker) expr(e syntax.Expr, want Type) Type {
+	defer func(b, bl bool) { c.buried, c.buriedLoop = b, bl }(c.buried, c.buriedLoop)
+	if c.straight != e {
+		c.buried, c.buriedLoop = true, true
+	}
 	t := c.expr1(e, want)
 	c.info.Types[e] = t
 	return t
@@ -241,6 +245,11 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 		return ft
 	case *syntax.Jump:
 		switch {
+		case e.Op == "return" && c.buried || e.Op != "return" && c.buriedLoop:
+			c.errorf(e, "buried-jump", "this %s is buried in a larger expression, where Go has no place for it (spec.md 6): bind the value to a val first, as val v = x ?: %s, and use v", e.Op, e.Op)
+			if e.Value != nil {
+				c.expr(e.Value, nil)
+			}
 		case e.Op != "return":
 			if c.loops == 0 {
 				c.errorf(e, "outside-loop", "%s is written in a for or a while, and not in a lambda there", e.Op)
@@ -248,6 +257,7 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 		case c.result == nil:
 			c.errorf(e, "outside-loop", "return is written in a fun")
 		case e.Value != nil:
+			c.straight = e.Value
 			c.value(e.Value, c.result)
 		case !fits(tUnit, c.result):
 			c.errorf(e, "type-mismatch", "return needs a value here: a %s", c.result)
@@ -276,6 +286,7 @@ func (c *checker) ident(e *syntax.Ident) Type {
 	}
 	if this := c.this(); this != nil {
 		if t, ok := c.member(e, nil, this, e.Name); ok {
+			c.narrowedThis(e)
 			return t
 		}
 	}
@@ -296,6 +307,14 @@ func (c *checker) ident(e *syntax.Ident) Type {
 		return c.errorf(e, "not-a-value", "%s is a type, not a value", e.Name)
 	}
 	return c.missing(e, e.Name)
+}
+
+// narrowedThis notes that the name id reads a member of this,
+// unwritten, where this is narrowed.
+func (c *checker) narrowedThis(id *syntax.Ident) {
+	if v, ok := c.scope.lookup("this").(*Var); ok && c.typeOf(v) != v.Type {
+		c.info.Narrowed[id] = c.typeOf(v)
+	}
 }
 
 // member reads the property or the extension val called name of a
@@ -456,11 +475,14 @@ func (c *checker) binary(e *syntax.Binary, want Type) Type {
 	case "?:":
 		var xt, yt Type
 		if want == nil {
-			xt, yt = c.expr(e.X, nil), c.expr(e.Y, nil)
+			xt = c.expr(e.X, nil)
+			c.straight = e.Y
+			yt = c.expr(e.Y, nil)
 		} else {
 			if xt = c.expr(e.X, nullable(want)); !fits(nonNull(xt), want) {
 				c.mismatch(e.X, nonNull(xt), want)
 			}
+			c.straight = e.Y
 			yt = c.value(e.Y, want)
 		}
 		return c.common(e, want, nonNull(xt), yt)
@@ -886,8 +908,8 @@ func (c *checker) lambda(l *syntax.Lambda, params []Type, want Type) *FuncType {
 			c.local(p, p.Name, t, false)
 		}
 	}
-	defer func(n int) { c.loops = n }(c.loops)
-	c.loops = 0
+	defer func(n int, b, bl bool) { c.loops, c.buried, c.buriedLoop = n, b, bl }(c.loops, c.buried, c.buriedLoop)
+	c.loops, c.buried, c.buriedLoop = 0, false, false
 	if ft.Result = c.block(l.Body, want, true, nil); want != nil {
 		ft.Result = want
 	}

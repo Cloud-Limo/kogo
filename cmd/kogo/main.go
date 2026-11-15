@@ -61,10 +61,16 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	var files []*syntax.File
 	failed := false
-	err = filepath.WalkDir(args[1], func(file string, d fs.DirEntry, err error) error {
+	root, err := filepath.EvalSymlinks(args[1]) // WalkDir does not follow a linked root
+	if err != nil {
+		root = args[1] // and the walk reports it
+	}
+	err = filepath.WalkDir(root, func(file string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(file, ".kg") {
 			return err
 		}
+		rel, _ := filepath.Rel(root, file) // file lies under root
+		file = filepath.Join(args[1], rel) // named under <dir> as given
 		src, err := os.ReadFile(file)
 		if err != nil {
 			return err

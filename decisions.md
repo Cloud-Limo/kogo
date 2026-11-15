@@ -1435,6 +1435,11 @@ Each entry: what was decided, why, and what would reopen it.
   directory in a module root, which is the user's business.
 - **An `<out>` that is a link is followed before the walk**, as the write follows it, and
   the stale file is named under `<out>` as given.
+- **A `<dir>` that is a link is followed before the walk** in `kogo check`, `emit` and
+  `ts` (DEV-864), and each source is named under `<dir>` as given (the lead's, as for
+  `<out>`). Links below `<dir>` stay unfollowed. Emit's line directives then run through
+  the link and reach the file. A `<dir>` whose link cannot be resolved is walked as given,
+  so the walk's `read` error names it as the user wrote it.
 
 ## Spec gaps found by the leakage ports, unresolved
 

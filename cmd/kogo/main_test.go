@@ -372,6 +372,21 @@ func TestErrors(t *testing.T) {
 	}
 }
 
+// A <dir> that is a link to a program's directory is that directory:
+// its errors are found and name each file under the link as given.
+func TestLinkedDir(t *testing.T) {
+	dir, link := t.TempDir(), filepath.Join(t.TempDir(), "link")
+	os.WriteFile(filepath.Join(dir, "a.kg"), []byte("package a\n\nfun f(): Int = nope\n"), 0o644)
+	if err := os.Symlink(dir, link); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"check", link}, &stdout, &stderr)
+	if want := `{"file":"` + filepath.Join(link, "a.kg") + `","line":3,"column":16,"code":"unknown-name"`; code != 1 || !strings.HasPrefix(stdout.String(), want) {
+		t.Errorf("exit %d, want 1\n got %s%s\nwant %s...", code, &stdout, &stderr, want)
+	}
+}
+
 // A program with no sql literal is checked without a database; one
 // with a literal and no database cannot be.
 func TestNoDatabase(t *testing.T) {

@@ -259,9 +259,12 @@ func (c *checker) resolve(at, where syntax.Node, name string, cands []*Func, rec
 			left = c.byLambda(left, typed)
 		}
 	}
-	var sigs []string
-	for _, f := range cands {
-		sigs = append(sigs, describe(f, nil))
+	sigs := func(fs []*Func) string { // for the errors only
+		var out []string
+		for _, f := range fs {
+			out = append(out, describe(f, nil))
+		}
+		return strings.Join(out, "; ")
 	}
 	vague := func(t Type) bool {
 		f, ok := t.(*FuncType)
@@ -275,17 +278,17 @@ func (c *checker) resolve(at, where syntax.Node, name string, cands []*Func, rec
 		return unknown // an argument failed, so nothing chooses: say no more
 	case len(left) > 1:
 		c.loose(args, typed)
-		sigs = sigs[:0]
+		var fs []*Func
 		for _, k := range left {
-			sigs = append(sigs, describe(k.f, nil))
+			fs = append(fs, k.f)
 		}
-		return c.errorf(where, "ambiguous-call", "%d declarations of %s fit this call and nothing ranks them: rename one of %s", len(left), name, strings.Join(sigs, "; "))
+		return c.errorf(where, "ambiguous-call", "%d declarations of %s fit this call and nothing ranks them: rename one of %s", len(left), name, sigs(fs))
 	case bare:
 		c.loose(args, typed)
 		return c.errorf(where, "nullable", "this %s may be null: write ?.%s, or test it for null first", rt, name)
 	case len(cands) == 1:
 		c.loose(args, typed)
-		return c.errorf(where, "arguments", "%s %s: it is %s", name, why, sigs[0])
+		return c.errorf(where, "arguments", "%s %s: it is %s", name, why, sigs(cands))
 	}
 	c.loose(args, typed)
 	var types []string
@@ -298,7 +301,7 @@ func (c *checker) resolve(at, where syntax.Node, name string, cands []*Func, rec
 			types = append(types, "a lambda")
 		}
 	}
-	return c.errorf(where, "no-overload", "no %s fits this call with (%s): the candidates are %s", name, strings.Join(types, ", "), strings.Join(sigs, "; "))
+	return c.errorf(where, "no-overload", "no %s fits this call with (%s): the candidates are %s", name, strings.Join(types, ", "), sigs(cands))
 }
 
 // receives reports whether f can be called on a receiver of type rt,

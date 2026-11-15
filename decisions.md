@@ -876,7 +876,8 @@ Each entry: what was decided, why, and what would reopen it.
   tell such a column from one Postgres declares `NOT NULL`, and need not. Inside a
   nullable nested data class every column is a pointer; the data class is `null` when all
   are, and a null beside one that is not panics, naming the column (spec 10.3, the hole
-  DEV-827 accepted).
+  DEV-827 accepted). A `List` is read as a pointer whatever its column says: the driver
+  reads a null into a slice as an empty one, with no error, so `NotNull` panics instead.
 - **The prelude's types take themselves to and from the driver's**, by the interfaces pgx
   reads and writes its own types through, so a `Uuid`, an `Instant` or a `Decimal` is an
   argument and a scan target as it stands, alone, in a `T?` and in a list. Each refuses a
@@ -884,6 +885,9 @@ Each entry: what was decided, why, and what would reopen it.
   `pgxpool`, which brings pgx's own `puddle` and `x/sync` into `go.mod`.
 - **`Decimal` is the text Postgres writes**, `12.50`, `NaN`, `Infinity`: a Go string. Two
   are equal when their text is, so `1.5` is not `1.50`, as with Java's `BigDecimal.equals`.
+  The driver reads a zero, which Postgres sends with no digits, as `0` whatever its scale,
+  so the prelude registers a numeric codec of its own on each connection as a transaction
+  begins: it reads a zero's scale from the header and leaves every other value to pgx's.
   `LocalTime` is the nanoseconds since midnight and `Duration` seconds and nanoseconds, as
   java.time holds them, each writing itself as java.time does. They are declared with no
   members yet: nothing uses one, and the test of every type reads them from a row.
@@ -895,7 +899,11 @@ Each entry: what was decided, why, and what would reopen it.
   cut, not rounded, as the driver does. Reopen if a port stores calendar intervals.
 - **A panic from the database carries the driver's error unchanged**, so `db.tx` can tell
   a serialization failure by its code and a server can log Postgres's own message. A
-  wrong row count panics with a text that holds the statement. The `//line` directives
+  wrong row count panics with a text that holds the statement. `queryOne` and
+  `querySingle` stop at a second row, so the text says "more than one row", not how many.
+- **`24:00` in a `time` is a panic, as is sending a `Duration` past an int64 of
+  microseconds** (spec 10.4). Postgres holds `24:00:00`; `java.time.LocalTime` does not.
+  A `Duration` of over about 292,000 years would wrap to a wrong interval. The `//line` directives
   give the Kogo line.
 - **`db.tx(serializable = true)` reruns without a limit**, as the spec says, on SQLSTATE
   40001 and 40P01 only, whether the block or the commit met it. Without `serializable`
@@ -909,7 +917,16 @@ Each entry: what was decided, why, and what would reopen it.
   made of come with it. A `Db` is made from a pool that already exists, so there is no
   hook when a connection opens; the cost is a map lookup for each such statement. `citext`
   is an extension's type that the driver cannot derive, and a table's row may hold one, so
-  it is registered as text on the same occasion.
+  it is registered as text on the same occasion. The emitter passes the name as
+  `format_type` writes it, quoted where it must be (`"Price"`), and unqualified where the
+  type is on the search path; the prelude finds it with `to_regtype` on the connection's
+  own search path, tells the driver of it by schema and catalog name, and registers it
+  under the written name too. Not taken: carrying the catalog name in `sqlpass.Type`,
+  which would bind the type to the schema it was checked against.
+- **A connection knows a composite type by name until it closes.** A migration that drops
+  and makes again a type a running server reads leaves the old OID on each connection
+  that read it, and those connections panic on it. Restart the server after such a
+  migration. Reopen if migrations run under a live server.
 - **Postgres sends the absent side of an outer join as NULL, not as a row of nulls**: the
   run-time reading confirms what DEV-837 assumed, and a whole row that an outer join nulls
   is `null`.
@@ -919,7 +936,9 @@ Each entry: what was decided, why, and what would reopen it.
   tell it with. A list of `citext` reads and writes as text. Reopen when a port needs one:
   carry the Postgres name in `sqlpass.Type` and tell the driver as for a composite.
 - **An empty `List` is sent as an empty array.** Go's nil slice is an empty list, and the
-  driver would send it as `NULL`.
+  driver would send it as `NULL`. The prelude finds a nil slice by reflection on every
+  argument. Not taken: having the emitter wrap each argument the checker knows is a list,
+  more emitter code to save a walk that costs nothing next to the round trip.
 - **The five calls on `tx?.` have no Go**: the checker already refuses a `Tx?` before the
   dot, so the emitter has no case for it.
 - **`check.Snake` is exported**: a field of a composite type fills the property of its

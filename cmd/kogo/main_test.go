@@ -159,7 +159,7 @@ business by id: Business(id=00000000-0000-0000-0000-000000000001, legalName=Acme
 held: Acme Pty Ltd
 hold of nobody: null
 locked: 1
-legal name of nobody panics: querySingle read 0 rows, and reads exactly one: select legal_name from business where id = $1
+legal name of nobody panics: querySingle read no row, and reads exactly one: select legal_name from business where id = $1
 fees of a missing invoice panics: The eligible fees changed before they were recorded
 fees, the first rolled back: kotlin.Unit
 invite's kind: outside

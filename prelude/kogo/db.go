@@ -2,10 +2,12 @@ package kogo
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -63,6 +65,7 @@ func Db_Tx_Boolean_TxToA[A any](this Db, serializable *bool, block func(Tx) A) A
 // transaction is to be run again.
 func attempt[A any](db Db, opts pgx.TxOptions, block func(Tx) A) (a A, done bool) {
 	tx := must(db.pool.BeginTx(db.ctx, opts))
+	decimals(tx.Conn().TypeMap())
 	defer func() {
 		if done {
 			return
@@ -112,12 +115,13 @@ func Tx_Atomically[A any](this Tx, block func() A) A {
 type Scan func(dest ...any)
 
 // rows runs a statement and reads each row of its result with read,
-// which the emitter writes from the checker's facts.
-func rows[R any](tx Tx, sql string, read func(Scan) R, args []any) []R {
+// which the emitter writes from the checker's facts, up to max rows
+// where max is not 0.
+func rows[R any](tx Tx, sql string, read func(Scan) R, args []any, max int) []R {
 	result := must(tx.tx.Query(tx.ctx, sql, bound(args)...))
 	defer result.Close()
 	out := []R{}
-	for result.Next() {
+	for (max == 0 || len(out) < max) && result.Next() {
 		out = append(out, read(func(dest ...any) { must(0, result.Scan(dest...)) }))
 	}
 	must(0, result.Err())
@@ -142,28 +146,32 @@ func bound(args []any) []any {
 
 // The five calls of spec.md 10.2. R is the type the call gives for
 // one row: for queryOne a T?, which is null where there is no row.
+// queryOne and querySingle read no further than a second row.
 
 func Tx_Query[R any](this Tx, sql string, read func(Scan) R, args ...any) List[R] {
-	return rows(this, sql, read, args)
+	return rows(this, sql, read, args, 0)
 }
 
 func Tx_QueryOne[R any](this Tx, sql string, read func(Scan) R, args ...any) (null R) {
-	switch found := rows(this, sql, read, args); len(found) {
+	switch found := rows(this, sql, read, args, 2); len(found) {
 	case 0:
 		return null
 	case 1:
 		return found[0]
 	default:
-		panic(fmt.Sprintf("queryOne read %d rows, and reads one or none: %s", len(found), sql))
+		panic("queryOne read more than one row, and reads one or none: " + sql)
 	}
 }
 
 func Tx_QuerySingle[R any](this Tx, sql string, read func(Scan) R, args ...any) R {
-	found := rows(this, sql, read, args)
-	if len(found) != 1 {
-		panic(fmt.Sprintf("querySingle read %d rows, and reads exactly one: %s", len(found), sql))
+	switch found := rows(this, sql, read, args, 2); len(found) {
+	case 0:
+		panic("querySingle read no row, and reads exactly one: " + sql)
+	case 1:
+		return found[0]
+	default:
+		panic("querySingle read more than one row, and reads exactly one: " + sql)
 	}
-	return found[0]
 }
 
 // Tx_Exists sends the statement as written and asks for its first row
@@ -213,7 +221,11 @@ func Row[T any](null bool, v T) *T {
 // composite types named, and what their fields are made of: the driver
 // reads a value of a type only when it has been told of the type, and
 // is told once for each connection. citext is an extension's, so the
-// driver is told of that too.
+// driver is told of that too. A name is as Postgres writes it, quoted
+// where it must be, and is found on the connection's search path; the
+// driver is told of the type by its schema and its name in the
+// catalog, and then by the name as written, so that it is not told
+// again.
 func Tx_Known(this Tx, names ...string) Tx {
 	conn := this.tx.Conn()
 	types := conn.TypeMap()
@@ -225,9 +237,18 @@ func Tx_Known(this Tx, names ...string) Tx {
 	if !known("citext") && conn.QueryRow(this.ctx, "select oid from pg_type where typname = 'citext'").Scan(&citext) == nil {
 		types.RegisterType(&pgtype.Type{Name: "citext", OID: citext, Codec: pgtype.TextCodec{}})
 	}
-	must(conn.LoadTypes(this.ctx, names)) // which tells the driver of each
-	if i := slices.IndexFunc(names, func(name string) bool { return !known(name) }); i >= 0 {
+	var found []string
+	must(0, conn.QueryRow(this.ctx, `select array_agg(coalesce(n.nspname || '.' || t.typname, '') order by u.i)
+		from unnest($1::text[]) with ordinality u(name, i)
+		left join pg_type t on t.oid = to_regtype(u.name) and t.typtype = 'c'
+		left join pg_namespace n on n.oid = t.typnamespace`, names).Scan(&found))
+	if i := slices.Index(found, ""); i >= 0 {
 		panic("Postgres has no composite type " + names[i] + " on this connection's search path")
+	}
+	must(conn.LoadTypes(this.ctx, found)) // which tells the driver of each
+	for i, name := range found {
+		t, _ := types.TypeForName(name)
+		types.RegisterType(&pgtype.Type{Name: names[i], OID: t.OID, Codec: t.Codec})
 	}
 	return this
 }
@@ -259,4 +280,45 @@ func (d *Decimal) ScanNumeric(v pgtype.Numeric) error {
 func (d Decimal) NumericValue() (pgtype.Numeric, error) {
 	var n pgtype.Numeric
 	return n, n.Scan(string(d))
+}
+
+// decimals has the driver read a numeric into a Decimal by a codec of
+// its own, alone and in an array, once for each connection. The
+// driver's own reads a zero, which Postgres sends with no digits, as
+// 0 whatever its scale; this one reads 0.00 for a zero of scale 2.
+func decimals(types *pgtype.Map) {
+	if t, ok := types.TypeForOID(pgtype.NumericOID); ok {
+		if _, ours := t.Codec.(numericCodec); ours {
+			return
+		}
+	}
+	numeric := &pgtype.Type{Name: "numeric", OID: pgtype.NumericOID, Codec: numericCodec{}}
+	types.RegisterType(numeric)
+	types.RegisterType(&pgtype.Type{Name: "_numeric", OID: pgtype.NumericArrayOID, Codec: &pgtype.ArrayCodec{ElementType: numeric}})
+}
+
+type numericCodec struct{ pgtype.NumericCodec }
+
+func (c numericCodec) PlanScan(m *pgtype.Map, oid uint32, format int16, target any) pgtype.ScanPlan {
+	plan := c.NumericCodec.PlanScan(m, oid, format, target)
+	if _, ok := target.(*Decimal); ok && format == pgtype.BinaryFormatCode {
+		return zeroScan{plan}
+	}
+	return plan
+}
+
+// A zeroScan reads a numeric into a Decimal, a zero by its header:
+// no digits, a sign of 0 and the scale.
+type zeroScan struct{ pgtype.ScanPlan }
+
+func (p zeroScan) Scan(src []byte, dst any) error {
+	if len(src) == 8 && binary.BigEndian.Uint16(src) == 0 && binary.BigEndian.Uint16(src[4:]) == 0 {
+		text := "0"
+		if scale := int(binary.BigEndian.Uint16(src[6:])); scale > 0 {
+			text += "." + strings.Repeat("0", scale)
+		}
+		*dst.(*Decimal) = Decimal(text)
+		return nil
+	}
+	return p.ScanPlan.Scan(src, dst)
 }

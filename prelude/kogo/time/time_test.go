@@ -70,7 +70,8 @@ func TestPlusDaysRange(t *testing.T) {
 
 // A time and a length of time come from Postgres's microseconds and
 // write themselves as java.time does. What Postgres holds and Kogo
-// does not is an error: a null, infinity, an interval with months.
+// does not is an error: a null, infinity, an interval with months,
+// 24:00; and so is a Duration too long to send.
 func TestPostgres(t *testing.T) {
 	var span Duration
 	var clock LocalTime
@@ -100,11 +101,23 @@ func TestPostgres(t *testing.T) {
 		"a null date":              new(LocalDate).ScanDate(pgtype.Date{}),
 		"a date of -infinity":      new(LocalDate).ScanDate(pgtype.Date{InfinityModifier: pgtype.NegativeInfinity, Valid: true}),
 		"a null time":              new(LocalTime).ScanTime(pgtype.Time{}),
+		"a time of 24:00":          new(LocalTime).ScanTime(pgtype.Time{Microseconds: 86400e6, Valid: true}),
 		"a null interval":          new(Duration).ScanInterval(pgtype.Interval{}),
 		"an interval with a month": new(Duration).ScanInterval(pgtype.Interval{Months: 1, Valid: true}),
 	} {
 		if err == nil {
 			t.Errorf("%s is read as a value", what)
+		}
+	}
+	const most, least = math.MaxInt64 / 1_000_000, math.MinInt64 / 1_000_000
+	for _, d := range []Duration{{Seconds: most, Nanos: 999_999_999}, {Seconds: least - 1, Nanos: 999_999_999}} {
+		if _, err := d.IntervalValue(); err == nil {
+			t.Errorf("%v is sent as an interval", d)
+		}
+	}
+	for _, d := range []Duration{{Seconds: most, Nanos: 775_807_000}, {Seconds: least}} {
+		if _, err := d.IntervalValue(); err != nil {
+			t.Errorf("the longest Duration Postgres holds is not sent: %v", err)
 		}
 	}
 }

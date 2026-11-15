@@ -596,9 +596,11 @@ Postgres keeps microseconds, so an `Instant`, a `LocalTime` and a
 `Duration` are sent cut to the microsecond. A `Duration` is sent as a
 count of microseconds, and an `interval` read as one counts a day as 24
 hours. What Postgres holds and the Kogo type does not is a panic when
-it is read (section 8): `infinity` in a `timestamptz` or a `date`, and
-an `interval` with months, which has no fixed length. A `Decimal` holds
-`NaN` and `Infinity` as well as numbers. An empty `List` is sent as an
+it is read (section 8): `infinity` in a `timestamptz` or a `date`,
+`24:00` in a `time`, and an `interval` with months, which has no fixed
+length. A `Duration` too long for an `interval`'s microseconds is a
+panic when it is sent. A `Decimal` holds `NaN` and `Infinity` as well
+as numbers, and a zero keeps its scale: `0.00`. An empty `List` is sent as an
 empty array, never as `NULL`.
 
 ### 10.5 Nullability

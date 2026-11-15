@@ -109,7 +109,8 @@ func (e *emitter) fill(q *check.Query, t check.Type, path []int, absent bool, de
 // column declares what one column, or one field of a composite type,
 // is scanned into, and sets dest to point there. It gives the Go of
 // its value as the type t, and a test for null where it may be null.
-// A column that t or absent lets be null is read as a pointer; any
+// A column that t or absent lets be null is read as a pointer, and so
+// is a list, which the driver reads from a null as an empty one; any
 // other is read as it is, and the driver refuses a null, as one in a
 // column named "name!" (spec.md 10.5). A composite type is read field
 // by field, in Postgres's order, into the properties of their names:
@@ -131,7 +132,7 @@ func (e *emitter) column(name string, ct sqlpass.Type, t check.Type, absent bool
 		}
 		*dest = fmt.Sprintf("%s.Composite{Null: &%s, Fields: []any{%s}}", kogo, v, strings.Join(fields, ", "))
 		code, nulls = fmt.Sprintf("%s.Row(%s, %s{%s})", kogo, v, e.typ(d), strings.Join(props, ", ")), []string{v}
-	case null || absent:
+	case null || absent || ct.List:
 		e.w("var %s *%s", v, e.typ(elem))
 		*dest, code, nulls = "&"+v, v, []string{v + " == nil"}
 	default:

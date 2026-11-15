@@ -123,7 +123,8 @@ fun totals(db: Db): List<Long?> = db.tx { tx -> tx.query<Long?>(sql"select total
 // Rows fill R by the checker's facts, and the row count rules of the
 // calls hold (spec.md 10.2, 10.3, 10.5): a nullable nested data class
 // is null when all of its columns are, a column named "name!" panics
-// on a null, and a composite type fills a data class by its fields.
+// on a null, a list among them, and a composite type fills a data
+// class by its fields, whatever its name.
 func TestRows(t *testing.T) {
 	sites := "[Site(legalName=Acme, shop=Shop(id=00000000-0000-0000-0000-000000000004, businessId=00000000-0000-0000-0000-000000000001, slug=Acme-Store)), Site(legalName=Bolt, shop=null)]"
 	expectWith(t, withDB, seed, [][2]string{
@@ -132,13 +133,15 @@ func TestRows(t *testing.T) {
 		{`t.HalfSites(db)`, "panics: column shop_slug is null, and fills a property that is not nullable"},
 		{`t.Largest(db, 1000)`, "2000"},
 		{`t.Largest(db, 5000)`, "panics: can't scan into dest[0] (col: m!): cannot scan NULL into *int64"},
+		{`t.NoNames(db)`, "panics: column names is null, and fills a property that is not nullable"},
 		{`t.Quotes(db)`, "[Quote(id=00000000-0000-0000-0000-00000000000b, total=Amount(cents=1500, currency=AUD), deposit=null), " +
 			"Quote(id=00000000-0000-0000-0000-00000000000c, total=Amount(cents=2000, currency=NZD), deposit=Amount(cents=500, currency=null))]"},
 		{`t.HeldIn(db, "NZD")`, "Held(quote=Quote(id=00000000-0000-0000-0000-00000000000c, total=Amount(cents=2000, currency=NZD), deposit=Amount(cents=500, currency=null)))"},
 		{`t.HeldIn(db, "USD")`, "null"},
-		{`t.HeldIn(db, "%")`, "panics: queryOne read 2 rows, and reads one or none: select q as quote from quote q where (q.total).currency like $1"},
+		{`t.HeldIn(db, "%")`, "panics: queryOne read more than one row, and reads one or none: select q as quote from quote q where (q.total).currency like $1"},
+		{`t.Quoted(db)`, "Priced(price=Price(cents=250))"},
 		{`t.Slug(db, "ACME-store")`, "Acme-Store"},
-		{`t.Slug(db, "none")`, "panics: querySingle read 0 rows, and reads exactly one: select slug from tenant where slug = $1"},
+		{`t.Slug(db, "none")`, "panics: querySingle read no row, and reads exactly one: select slug from tenant where slug = $1"},
 		{`t.Has(db, "acme-store")`, "true"},
 		{`t.Has(db, "none")`, "false"},
 	}, `package t
@@ -175,6 +178,15 @@ fun largest(db: Db, over: Long): Long = db.tx { tx ->
     tx.querySingle<Long>(sql"""select max((total).cents) as "m!" from quote where (total).cents > $over""")
 }
 
+fun noNames(db: Db): List<String> = db.tx { tx ->
+    tx.querySingle<List<String>>(sql"""select array_agg(name) as "names!" from person where false""")
+}
+
+data class Price(val cents: Long?)
+data class Priced(val price: Price?)
+
+fun quoted(db: Db): Priced = db.tx { tx -> tx.querySingle<Priced>(sql"""select row(250)::"Price" as price""") }
+
 // A column of a composite type, and a row that holds one.
 fun quotes(db: Db): List<Quote> = db.tx { tx -> tx.query<Quote>(sql"select id, total, deposit from quote order by id") }
 
@@ -200,6 +212,8 @@ func TestValues(t *testing.T) {
 		{`func() bool { rows := t.Everything(db); return len(rows) == 2 && rt.Equal(rows[0], rows[1]) }()`, "true"},
 		{`t.Untagged(db)`, "2"},
 		{`t.Tags(db)`, "[[], []]"},
+		{`t.Zero(db)`, "0.00"},
+		{`t.Zeros(db)`, "[0.00, 0, 1.50]"},
 	}, `package t
 
 import kogo.time.Duration
@@ -231,5 +245,9 @@ fun untagged(db: Db): Int = db.tx { tx ->
 }
 
 fun tags(db: Db): List<List<String>> = db.tx { tx -> tx.query<List<String>>(sql"select tags from every_type") }
+
+// A zero keeps its scale, alone and in a list.
+fun zero(db: Db): Decimal = db.tx { tx -> tx.querySingle<Decimal>(sql"""select 0.00::numeric(4, 2) as "z!" """) }
+fun zeros(db: Db): List<Decimal> = db.tx { tx -> tx.querySingle<List<Decimal>>(sql"""select array[0.00, 0, 1.50] as "z!" """) }
 `)
 }

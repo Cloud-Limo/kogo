@@ -7,6 +7,7 @@ package time
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	gotime "time"
 
@@ -97,8 +98,10 @@ func (d Duration) String() string {
 // Instant is a timestamptz, a LocalDate a date, a LocalTime a time
 // and a Duration an interval. Postgres's infinity is none of them,
 // and an interval with months has no length: each is an error, as a
-// null is, which the caller panics with. An interval's day is 24
-// hours, and a Duration is sent as microseconds alone.
+// null is, which the caller panics with, and so is a time of 24:00,
+// which Postgres holds and a LocalTime does not. An interval's day is
+// 24 hours, and a Duration is sent as microseconds alone: one too long
+// for an int64 of them is an error too.
 
 func (i *Instant) ScanTimestamptz(v pgtype.Timestamptz) error {
 	if !v.Valid || v.InfinityModifier != pgtype.Finite {
@@ -126,8 +129,8 @@ func (d LocalDate) DateValue() (pgtype.Date, error) {
 }
 
 func (t *LocalTime) ScanTime(v pgtype.Time) error {
-	if !v.Valid {
-		return errors.New("null is not a LocalTime")
+	if !v.Valid || v.Microseconds >= 86400e6 {
+		return errors.New("null or 24:00 is not a LocalTime")
 	}
 	*t = LocalTime{v.Microseconds * 1000}
 	return nil
@@ -150,6 +153,9 @@ func (d *Duration) ScanInterval(v pgtype.Interval) error {
 }
 
 func (d Duration) IntervalValue() (pgtype.Interval, error) {
+	if d.Seconds > (math.MaxInt64-int64(d.Nanos)/1000)/1_000_000 || d.Seconds < math.MinInt64/1_000_000 {
+		return pgtype.Interval{}, fmt.Errorf("%s is too long for an interval", d)
+	}
 	return pgtype.Interval{Microseconds: d.Seconds*1e6 + int64(d.Nanos)/1000, Valid: true}, nil
 }
 

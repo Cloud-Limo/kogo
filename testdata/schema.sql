@@ -79,6 +79,9 @@ create table quote (
     deposit amount
 );
 
+-- A composite type whose name Postgres writes quoted.
+create type "Price" as (cents bigint);
+
 -- One column per row of the type table, all NOT NULL but `note`.
 create table every_type (
     flag boolean not null,

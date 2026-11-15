@@ -144,8 +144,10 @@ Each entry: what was decided, why, and what would reopen it.
   since printing is where Kotlin leans on Java most: cusoon2's 95 hand-written files hold
   `Locale` 25 times, a `.format(` call 22, `DateTimeFormatter` 19 and `BigDecimal` 16.
   Measured: Go's shortest plain digits gave Java's text for 500,000 numbers from a fixed
-  seed, all but negative zero, the smallest `Double`, and `NaN` and the infinities, where
-  Java throws. Not taken: the method on `Double`, agreed first and reversed; writing it in
+  seed and for the first 2,000,000 by bit pattern, all but negative zero, `NaN` and the
+  infinities, where Java throws, and eight subnormals, 1, 2, 10, 12, 14, 16, 18 and 20
+  times the smallest. Random numbers miss those: Java writes at least two digits, the
+  closest two, and that differs from one shortest digit only below `1.0E-322`. Not taken: the method on `Double`, agreed first and reversed; writing it in
   the application from Kotlin's names, `toString().removeSuffix(".0")`, which agrees only
   from 0.001 up to 10,000,000; a slice of `BigDecimal`, three functions that must match
   Java's everywhere. `Uuid`, `newId` and `Decimal` are Kogo's own with no import; none is

@@ -34,8 +34,8 @@ import kogo.time.Instant
   means public. There is no `protected`.
 - Comments: `//`, `/* */` and `/** */`. KDoc is kept as a comment.
 - The declarations of package `kogo` (section 12, and the functions of
-  sections 8 and 9) are in scope in every file. `kogo.time` is imported
-  by name.
+  sections 8 and 9) are in scope in every file. `kogo.time` and
+  `kogo.text` are imported by name.
 
 ## 3. Types
 
@@ -740,6 +740,15 @@ Postgres sent, exactly: it has `toDouble`, `toString`, `==` and
 (`ofDays`, `ofMinutes`, `ofSeconds`), `Clock.now()`. There is no default
 zone: every conversion names its zone.
 
+**Text** (`kogo.text`). `plain(value: Double): String` writes a number
+as its shortest digits, with no exponent and no trailing `.0`: `5.0` is
+`5`, `12.5` is `12.5`, `1.0E7` is `10000000`. Negative zero is `0`. `NaN`
+and an infinity have no digits and are a bug: `plain` panics. Every
+other `Double` reads as Java's `BigDecimal` writes it but eight below
+`1.0E-322`, 1, 2, 10, 12, 14, 16, 18 and 20 times the smallest: where
+the shortest digits are one, Java writes the closest two, so the
+smallest `Double` ends in `5` here and `49` in Java.
+
 **Ids.** `Uuid`, `Uuid.parse(text): Uuid?`, `newId(): Uuid` (time-ordered
 random).
 
@@ -810,6 +819,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `suspend`, coroutines, `Flow`, threads | plain blocking code |
 | `Sequence`, `generateSequence`, `MutableList`, arrays | a `while` loop with a local `var`, or the list functions |
 | `java.time.*`, `java.util.UUID`, `BigDecimal` | `kogo.time.*`, `Uuid`, `Decimal` |
+| `BigDecimal.valueOf(x).stripTrailingZeros().toPlainString()` | `plain(x)`, from `kogo.text`, not `Decimal` |
 | `OffsetDateTime`, `LocalDateTime` | `Instant`, or `ZonedDateTime` with a named zone |
 | jOOQ (`ctx.select...`, records, `.store()`, `into(X::class.java)`) | `sql"""` and a data class |
 | `X::class`, reflection | nothing; the only `::class` is inside `@file:OptIn(...)` |

@@ -322,6 +322,17 @@ fun units(): String {
 `)
 }
 
+// A function of a kogo. package is imported by name and called as
+// any other (spec.md section 12).
+func TestPreludeImport(t *testing.T) {
+	expect(t, [][2]string{{"t.Percent(12.5)", "12.5%"}, {"t.Percent(5.0)", "5%"}}, `package t
+
+import kogo.text.plain
+
+fun percent(rate: Double): String = "${plain(rate)}%"
+`)
+}
+
 // The rest of sections 3 to 6, each through the Go it becomes.
 func TestLanguage(t *testing.T) {
 	expect(t, [][2]string{

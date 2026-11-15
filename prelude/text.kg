@@ -1,0 +1,6 @@
+// Text that Kotlin would have Java's library write.
+package kogo.text
+
+// The shortest digits that read back as value, with no exponent and
+// no trailing ".0": 5.0 is "5", 12.5 is "12.5".
+external fun plain(value: Double): String

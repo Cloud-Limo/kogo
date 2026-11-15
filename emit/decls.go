@@ -134,16 +134,11 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 			e.w("%s() %s", claim(v.Decl, "Get"+export(v.Name)), e.typ(v.Type))
 		}
 		for _, m := range td.Methods {
-			md := m.Decl.(*syntax.FunDecl)
-			if md.TypeParams != nil || slices.ContainsFunc(md.Params, func(p *syntax.Param) bool { return p.Default != nil }) {
-				e.notYet(md, "an interface's fun with type parameters or a default value", "pass the value, or make it a top-level fun")
-				continue
-			}
 			var ps []check.Type
 			for _, p := range m.Params {
 				ps = append(ps, p.Type)
 			}
-			e.w("%s(%s) %s", claim(md, export(m.Name)), e.typs(ps), e.typ(m.Result))
+			e.w("%s(%s) %s", claim(m.Decl, export(m.Name)), e.typs(ps), e.typ(m.Result))
 		}
 		e.w("}")
 	case "enum class":

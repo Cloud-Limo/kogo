@@ -3,7 +3,9 @@ package check
 import (
 	"cmp"
 	"maps"
+	"math"
 	"slices"
+	"strconv"
 	"strings"
 
 	"kogo/syntax"
@@ -114,7 +116,43 @@ func (c *checker) expr(e syntax.Expr, want Type) Type {
 	}
 	t := c.expr1(e, want)
 	c.info.Types[e] = t
+	c.read(c.info.Uses[e])
+	if call := c.info.Calls[e]; call != nil && call.Func != nil {
+		c.read(call.Func)
+		if call.Func.Kind == Method {
+			c.readOverride(call)
+		}
+	}
 	return t
+}
+
+// readOverride records that a call of an interface's fun on a data
+// class or a data object refers to that one's override: in Go it is a
+// call on the struct, which Go follows, not through the interface.
+func (c *checker) readOverride(call *Call) {
+	rt := c.this()
+	if call.Receiver != nil {
+		rt = c.info.Types[call.Receiver]
+	}
+	n, ok := nonNull(rt).(*Named)
+	if !ok || n.Decl.Kind != "data class" && n.Decl.Kind != "data object" {
+		return
+	}
+	for _, m := range n.Decl.Methods {
+		if m.Name == call.Func.Name {
+			c.read(m)
+		}
+	}
+}
+
+// read records that the val or the fun at hand refers to o, where o
+// is a top-level val or a fun (spec.md 6).
+func (c *checker) read(o Object) {
+	v, isVar := o.(*Var)
+	_, isFunc := o.(*Func)
+	if c.owner != nil && (isVar && v.Kind == Global || isFunc) && !slices.Contains(c.reads[c.owner], o) {
+		c.reads[c.owner] = append(c.reads[c.owner], o)
+	}
 }
 
 // value checks an expression against the type it must have.
@@ -127,6 +165,26 @@ func (c *checker) value(e syntax.Expr, want Type) Type {
 }
 
 func number(t Type) bool { return whole(t) || is(t, tDouble) }
+
+// literal types a whole-number literal written at, minus being "-" when
+// one is written before it. Kotlin takes the two together, so that
+// -2147483648 is an Int, but checks a Long's digits alone (spec.md 3).
+func (c *checker) literal(at syntax.Node, l *syntax.Literal, minus string, want Type) Type {
+	t := tInt
+	if l.Kind == "Long" || is(nonNull(want), tLong) {
+		t = tLong
+	}
+	n, err := strconv.ParseInt(minus+l.Value, 10, 64)
+	switch {
+	case err != nil || minus != "" && n == math.MinInt64:
+		c.errorf(at, "number-range", "%s%s is past a Long's range, as in Kotlin (spec.md 3): a whole number's digits are at most %d, even after a minus", minus, l.Value, math.MaxInt64)
+		return unknown // its one error
+	case is(t, tInt) && (n < math.MinInt32 || n > math.MaxInt32):
+		c.errorf(at, "number-range", "%s%s is past an Int's range, where Kotlin reads it as a Long (spec.md 3): write %s%sL", minus, l.Value, minus, l.Value)
+		return unknown
+	}
+	return t
+}
 
 // first gives the node an expression's text begins with: an operator
 // and a call are positioned further in.
@@ -162,13 +220,8 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 	switch e := e.(type) {
 	case *syntax.Literal:
 		switch e.Kind {
-		case "Int":
-			if is(nonNull(want), tLong) {
-				return tLong
-			}
-			return tInt
-		case "Long":
-			return tLong
+		case "Int", "Long":
+			return c.literal(e, e, "", want)
 		case "Double":
 			return tDouble
 		case "Char":
@@ -196,6 +249,10 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 		if e.Op == "!" {
 			c.value(e.X, tBoolean)
 			return tBoolean
+		}
+		if l, ok := e.X.(*syntax.Literal); ok && (l.Kind == "Int" || l.Kind == "Long") {
+			c.info.Types[l] = c.literal(e, l, "-", want)
+			return c.info.Types[l]
 		}
 		t := c.expr(e.X, want)
 		if t != unknown && !number(t) {

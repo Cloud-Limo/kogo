@@ -95,10 +95,6 @@ func (e *emitter) stmt(s syntax.Stmt) {
 		}
 	case *syntax.FunDecl:
 		f := e.info.Funcs[s]
-		if s.TypeParams != nil {
-			e.notYet(s, "a local fun with type parameters", "declare it at the top level")
-			return
-		}
 		name := e.local(f, f.Name)
 		params, defaults := e.params(s, f)
 		e.w("var %s func(%s) %s", name, params, e.typ(f.Result))

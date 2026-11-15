@@ -837,8 +837,6 @@ func TestRefused(t *testing.T) {
 		{"fun f(x: Int?): Int? = x.takeIf { true }", "1:24: not-yet-emitted", "a nullable type argument for T, which is used as T?"},
 		{"fun <T> none(x: T?): T? = x\nfun g(): Int? = none(null)", "2:17: not-yet-emitted", "write the type arguments, none<...>(...)"},
 		{"sealed interface S<out T> {\n    data class A<T>(val v: T) : S<T>\n}\nfun f(s: S<S.A<Int>>): S<S<Int>> = s", "4:36: not-yet-emitted", "build the value with the wider type argument"},
-		{"fun f(): Int {\n    fun <T> id(x: T): T = x\n    return id(1)\n}", "2:5: not-yet-emitted", "declare it at the top level"},
-		{"interface I {\n    fun <T> id(x: T): T\n}", "2:5: not-yet-emitted", "make it a top-level fun"},
 		{"fun a(x: Int): Int = x\nfun A(x: Int): Int = x", "2:1: go-name", "are both A_Int in Go"},
 		{"data class D(val a: Int, val A: Int)", "1:26: go-name", "two members of D are both A in Go"},
 		{"interface I {\n    val name: String\n}\ndata class D(override val name: String, val getName: String) : I", "4:14: go-name", "two members of D are both GetName in Go"},

@@ -279,6 +279,28 @@ Each entry: what was decided, why, and what would reopen it.
   package for each cycle group, whose Go names shift when an import joins two groups. Both
   only accept more, so either can follow later and break nothing. Reopen if ports spend
   their time untangling, or new code keeps meeting the error.
+- **`kogo check` is the only gate** (15 Nov 2026; design "Pipeline"). A program that
+  passes it builds and runs. A limit that stands is a checker error with a line of the
+  spec; where the emitter cannot yet write a form the checker accepts, it refuses with
+  `not-yet-emitted`, a debt with an issue (DEV-847), never a rule. So five refusals moved
+  into the checker: an interface's fun with type parameters or a default value (spec
+  3.4), a local fun with type parameters (spec 5), a whole-number literal outside the
+  type it is read as (spec 3), and a top-level val whose value refers to itself or to a
+  val below it in its file (spec 6). The last follows the funs and vals a value refers
+  to, as Go does: Go refuses `val c: Int = g()` with `fun g(): Int = c` as an
+  initialization cycle, and `val a: Int = f()` with `fun f(): Int = b` and `b` declared
+  below prints 0 under Kotlin 2.4 and 1 under Go. Nor may a package's files use each
+  other through their vals (agreed in review): Kotlin 2.4 sets up a file's vals when the
+  file is first used, a call of one of its funs included, so f1 `val a: Int = f()` with
+  f2 `fun f(): Int = 1` and `val c: Int = a` gives `c` 0 when main reads `a` first and 1
+  when it reads `c` first (checked), and Go gives 1. Only one package's files can do
+  this, since packages do not import each other; a rough count found no such files in
+  cusoon2 and none in the stage-1 ports. Not taken: two gates, with a list in
+  the spec of what the emitter refuses, which leaves an author to learn limits by running
+  the emitter; counting only a read written in the value, as first agreed, which let both
+  of those programs through. A rough count found none of the first three forms in
+  cusoon2. Reopen if a port needs a generic fun in an interface, or files whose vals use
+  each other.
 - **The prelude's signatures are Kogo declarations, read by the checker like any other
   source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
@@ -835,15 +857,16 @@ Each entry: what was decided, why, and what would reopen it.
   - a sealed value used as one whose type argument is another Go type (`Outcome<Ok<Int>>`
     as `Outcome<Outcome<Int>>`): the value keeps the Go type it was made with, and an `is`
     test would miss it. A list is copied instead; a sealed value would have to be rebuilt.
-  - a local fun or an interface's fun with type parameters (Go has neither), an
-    interface's fun with a default, an interface that implements another or has members
-    and an `out` parameter, a reference to a fun with a default, a `?.` call of a property
-    that holds a function, and a `for` over a `Map` or a `Set`.
+  - an interface that implements another or has members and an `out` parameter, a
+    reference to a fun with a default, a `?.` call of a property that holds a function,
+    and a `for` over a `Map` or a `Set`. A local fun or an interface's fun with type
+    parameters, and an interface's fun with a default, were here; since DEV-846 the
+    checker refuses them (see "Agreed with Greg").
 - **A marker is written nowhere** (spec 11): the checker has enforced it, and it does
   nothing at run time, so a program with markers is emitted, not refused.
-- **Not handled**: a literal outside its type's range; two top-level vals that read each
-  other. Two Kogo packages that import each other are now refused by the checker (see
-  "Agreed with Greg").
+- **Not handled**: nothing left of the first list. A literal outside its type's range
+  and two top-level vals that read each other are refused by the checker since DEV-846,
+  and two Kogo packages that import each other since DEV-844 (see "Agreed with Greg").
 - **`lowercase()` is Go's `strings.ToLower`**, stated in spec 12 as a corner where the
   prelude differs (principle 3): matching `İ` and a final sigma means Java's case tables,
   and no ported module depends on them. `uppercase()` is not in the prelude yet, so it
@@ -1176,6 +1199,34 @@ Each entry: what was decided, why, and what would reopen it.
   so a path spelled another way changes nothing. From there the cycle takes, at each
   package, the earliest import that keeps it shortest, and the error stands at the first.
   Comparing whole cycles import by import was written first and is not simpler to tell.
+
+## Taken making `kogo check` the only gate (DEV-846), not yet discussed
+
+- **A reference counts wherever it is written**: in a lambda that never runs, and in a
+  fun that is named and not called, as in Go's rule, which speaks of what a declaration
+  refers to. So `val h: () -> Int = { b }` with `b` below is refused, though Kotlin runs
+  it right. Counting only what runs would take flow analysis. A local fun's body counts
+  as the body of the fun around it, as Go counts a closure's. A call of an interface's
+  fun on a data class or a data object follows its override, as Go follows a call on a
+  struct; a call through an interface is not followed, and Go does not follow one
+  either. A data class's default values count as its constructor's.
+- **Only a file's top-level vals and funs make another file use it**: a data class or a
+  data object is its own class in Kotlin, set up apart from its file's vals. The rule
+  refuses some cycles of files that read no val early, such as a val that calls a fun of
+  a file whose vals use the first one's funs alone: telling those apart is more code than
+  any port needs. A val on a cycle of vals leads to no file, being refused already.
+- **`-9223372036854775808L` is refused, as in Kotlin 2.4** (checked), while
+  `-2147483648` is an `Int`: Kotlin takes the minus with an `Int` literal, but checks a
+  `Long`'s digits alone. Write `-9223372036854775807L - 1L`.
+- **Section 14 gained two rows the issue did not list**, `val n = 3000000000` and a val
+  that reads one below it through a function: both are valid Kotlin and errors in Kogo,
+  which is what the table holds.
+- **A val's error stands at the val and names each val and fun on the way**, which is
+  what to move or to make a fun. A cycle is told once, at its first val in the order the
+  files were given. A read of a val below is told at the reader unless the two are on
+  one cycle, and a val on a cycle still has its other reads told. A cycle of files is
+  told at the val that leads out of the first file on it, the shortest from that file.
+- **Codes**: `interface-fun`, `local-fun`, `number-range` and `val-order`.
 
 ## Taken checking api lists (DEV-849), not yet discussed
 

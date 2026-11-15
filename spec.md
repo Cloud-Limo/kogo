@@ -81,6 +81,18 @@ its two sides must fit where the other's type is wanted (section 5.1),
 `?` aside, so `x == null` passes and `Int == Long` and `String == Int`
 are errors.
 
+A value that holds a function is not compared, though Kotlin compares
+functions by reference. `==` and `!=` are an error where either side's
+type holds one: a function type, a data class with a property whose type
+holds one, a sealed interface with such a variant, and a `T?` or a type
+argument of any of these, as `List<Rule>`, and an interface that
+declares a function `val`; so is a `when` branch that compares its
+subject with such a value. Comparing with `null` is allowed. Where the
+type does not show the function, behind a type parameter or an
+interface, the comparison panics once it reaches the function, and
+answers `false` where a part before it differs, `contains`, `distinct`
+and a `Set`'s or `Map`'s keys included.
+
 A `String` counts as Kotlin's does: `length`, `substring`, `padStart`
 and reading it as `Char`s count UTF-16 units, so `"😀".length` is 2. It
 never holds half of a surrogate pair, though Kotlin's can: an operation
@@ -915,6 +927,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `val n = 3000000000`, a `Long` | `3000000000L` |
 | a top-level `val` that reads one below it through a function | declare the one it reads above it |
 | two files whose top-level `val`s use each other's files | move the `val`s into one file, or make one a fun |
+| `==` on a value that holds a function, as `rule == rule` | compare the other properties |
 
 ## 15. Operations
 

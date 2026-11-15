@@ -31,7 +31,8 @@ type unordered interface {
 // is nil, a T? holding a value is equal to that T, lists and data
 // classes are compared part by part, sets regardless of order, and a
 // Double as Kotlin's equals compares it, so NaN is equal to NaN and
-// 0.0 is not equal to -0.0. A function is equal to nothing.
+// 0.0 is not equal to -0.0. A function panics: the checker refuses ==
+// where it sees one, and cannot see one behind a type parameter.
 func Equal(a, b any) bool { return equal(reflect.ValueOf(a), reflect.ValueOf(b)) }
 
 // EqualDouble is a == b for two Double? values as Kotlin compares
@@ -85,6 +86,9 @@ func equal(a, b reflect.Value) bool {
 	a, b = strip(a), strip(b)
 	if !a.IsValid() || !b.IsValid() {
 		return a.IsValid() == b.IsValid()
+	}
+	if a.Kind() == reflect.Func || b.Kind() == reflect.Func {
+		panic("a function cannot be compared")
 	}
 	if a.Kind() != b.Kind() {
 		return false

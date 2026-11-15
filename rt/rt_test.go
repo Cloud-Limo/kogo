@@ -64,7 +64,6 @@ func TestEqual(t *testing.T) {
 		{nan, nan, true}, // as Kotlin's equals has it, for a Double inside a value
 		{0.0, math.Copysign(0, -1), false},
 		{Char('a'), Char('a'), true},
-		{func() {}, func() {}, false},
 		{bag{Id: 1, Tags: []any{"a"}}, bag{Id: 2, Tags: []any{"a"}}, false}, // not a set
 		{pile{keys: []int32{1, 2}}, pile{keys: []int32{2, 1}}, true},
 		{pile{keys: []int32{1, 2}}, pile{keys: []int32{1, 3}}, false},

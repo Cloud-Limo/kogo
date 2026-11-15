@@ -558,6 +558,8 @@ func (c *checker) binary(e *syntax.Binary, want Type) Type {
 				fix = ": write the literal with L, or .toLong()"
 			}
 			c.errorf(e, "type-mismatch", "%s compares a %s with a %s, which are never equal%s", e.Op, xt, yt, fix)
+		} else if !null(e.X) && !null(e.Y) {
+			c.funcEquality(e, e.Op, xt, yt)
 		}
 		return tBoolean
 	case "..", "until":
@@ -905,6 +907,8 @@ func (c *checker) cond(cond *syntax.Cond, st Type, subject *Var, covered map[str
 		ct := c.expr(cond.X, nil)
 		if x, y := nonNull(st), nonNull(ct); !fits(x, y) && !fits(y, x) {
 			c.errorf(cond, "type-mismatch", "this %s is never equal to the when's subject, a %s", ct, st)
+		} else if !null(cond.X) {
+			c.funcEquality(cond, "this when", st, ct)
 		}
 		switch o := c.info.Uses[cond.X].(type) {
 		case *TypeDecl:
@@ -979,4 +983,59 @@ func (c *checker) lambda(l *syntax.Lambda, params []Type, want Type) *FuncType {
 	}
 	c.info.Types[l] = ft
 	return ft
+}
+
+// funcEquality refuses comparing two values, of types x and y, where
+// either holds a function (spec.md 3). op says what compares them.
+func (c *checker) funcEquality(at syntax.Node, op string, x, y Type) {
+	for _, t := range []Type{x, y} {
+		where := holdsFunc(t, map[*TypeDecl]bool{})
+		if where == "" {
+			continue
+		}
+		msg := "%s compares a %s, and " + where + " holds a function, which is never compared: compare the other properties"
+		if _, fn := nonNull(t).(*FuncType); fn && where == "it" {
+			msg = "%s compares a %s, a function, which is never compared: compare a name kept beside it"
+		} else if where == "it" {
+			msg = "%s compares a %s, which holds a function, which is never compared: compare a name kept beside each function"
+		}
+		c.errorf(at, "function-equality", msg, op, t)
+		return
+	}
+}
+
+// holdsFunc names where a value of t holds a function (spec.md 3): a
+// declaration's property, "it" for t or a type argument itself, or ""
+// for nowhere. A declaration is read unsubstituted, once, and its type
+// arguments apart, so a type that refers to itself ends.
+func holdsFunc(t Type, seen map[*TypeDecl]bool) string {
+	switch t := t.(type) {
+	case *FuncType:
+		return "it"
+	case *Nullable:
+		return holdsFunc(t.Elem, seen)
+	case *Named:
+		for _, a := range t.Args {
+			if where := holdsFunc(a, seen); where != "" {
+				return where
+			}
+		}
+		if seen[t.Decl] {
+			return ""
+		}
+		seen[t.Decl] = true
+		for _, v := range t.Decl.Variants {
+			if where := holdsFunc(&Named{Decl: v}, seen); where != "" {
+				return where
+			}
+		}
+		for _, p := range t.Decl.Props {
+			if where := holdsFunc(p.Type, seen); where == "it" {
+				return t.Decl.Name + "'s property " + p.Name
+			} else if where != "" {
+				return where
+			}
+		}
+	}
+	return ""
 }

@@ -356,6 +356,30 @@ func TestTypes(t *testing.T) {
 	})
 }
 
+// A value that holds a function is not compared (spec.md 3), where the
+// type shows one: Kotlin compares functions by reference, Go not at all.
+func TestFunctionEquality(t *testing.T) {
+	rule := "data class Rule(val name: String, val test: (Int) -> Boolean)\n"
+	passes(t,
+		"data class P(val n: Int, val next: P?, val all: List<P>)\nfun f(a: P, b: P?): Boolean = a == b || b != null",
+		"fun f(g: (() -> Unit)?): Boolean = g == null",
+		"fun f(g: (() -> Unit)?): Int = when (g) {\n    null -> 1\n    else -> 2\n}",
+		"interface I { val n: Int }\nfun f(a: I, b: I): Boolean = a == b",
+	)
+	refused(t, [][3]string{
+		{"fun f(g: (Int) -> Boolean): Boolean = g ‸== g", "function-equality", "== compares a (Int) -> Boolean, a function, which is never compared: compare a name kept beside it"},
+		{"fun f(a: List<() -> Unit>): Boolean = a ‸== a", "function-equality", "== compares a List<() -> Unit>, which holds a function, which is never compared"},
+		{rule + "fun f(r: Rule, o: Rule): Int = when (r) {\n    ‸o -> 1\n    else -> 2\n}", "function-equality", "this when compares a Rule, and Rule's property test holds a function"},
+		{"interface I { val f: () -> Unit }\nfun f(a: I, b: I): Boolean = a ‸== b", "function-equality", "I's property f"},
+		{rule + "fun f(r: Rule): Boolean = r ‸!= r", "function-equality", "!= compares a Rule, and Rule's property test holds a function, which is never compared: compare the other properties"},
+		{rule + "sealed interface S {\n    data object A : S\n    data class B(val r: Rule) : S\n}\nfun f(s: S): Boolean = s ‸== S.A", "function-equality", "compares a S, and Rule's property test"},
+		{rule + "fun f(a: List<Rule>, b: List<Rule>): Boolean = a ‸== b", "function-equality", "compares a List<Rule>, and Rule's property test"},
+		{rule + "fun f(a: Rule?, b: Rule): Boolean = a ‸== b", "function-equality", "compares a Rule?, and Rule's property test"},
+		{rule + "fun f(a: Pair<String, Rule>, b: Pair<String, Rule>): Boolean = a ‸== b", "function-equality", "Rule's property test"},
+		{"data class N(val next: N?, val f: () -> Unit)\nfun f(a: N): Boolean = a ‸== a", "function-equality", "N's property f"},
+	})
+}
+
 // Section 4: absence and narrowing.
 func TestNarrowing(t *testing.T) {
 	passes(t,

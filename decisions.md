@@ -177,6 +177,90 @@ Each entry: what was decided, why, and what would reopen it.
   a port writes `pay?.let { it + x }`. Not taken: `Long.plus(Long)` for the one call in
   cusoon2's pay arithmetic, which opens every operator on every pair of number types to
   the same request. Reopen if ported code keeps reaching for the named form.
+- **A program names its operations in an `api` list, a declaration of Kogo's own**
+  (15 Nov 2026; spec 15.1): `api ops { me, updateJob }`. An operation stays an ordinary
+  top-level fun with explicit parameters, and the list is what the compiler reads to write
+  the server's table and the TypeScript. First proposed as a call, `api(::me, ::updateJob)`,
+  which Kotlin 2.4 compiles given two library declarations; Greg refused it for looking like
+  an ordinary call while the compiler does the work, the worry behind the rule on Kogo's own
+  names. Rust has no construct either, but marks every such thing as a macro, `#[...]` or
+  `name!`. Not taken: a block with the operations written inside it and the context declared
+  once, which makes an operation a thing of the language but hides a parameter and keeps an
+  audience in one file; a file outside the source; every public fun of a named package,
+  where a helper of the right shape becomes an operation by accident; an annotation, since
+  markers are the one annotation form. cusoon2 keeps its 20 operations in a hand-written
+  list today. Reopen if lists and funs drift apart in ways the checker cannot say.
+- **An operation's first parameter says who runs the transaction, and a refusal rolls
+  back** (15 Nov 2026; spec 15.3). With a `Tx`, the server opens one SERIALIZABLE
+  transaction, reruns the operation on a conflict, commits an answer and rolls back a
+  refusal or a panic: a refused request has changed nothing. With a `Db`, the server opens
+  nothing and the body writes its own `db.tx`. cusoon2 runs every request in one such
+  transaction, but its RPC commits on a refusal and holds "a body checks before it writes"
+  by convention; its older GraphQL side rolls a refusal back through a savepoint, in 54
+  places, and exempts the logins by a comment. No reason for the RPC's rule is recorded;
+  our reading is that the logins, among its first seven operations, need a failed attempt
+  to stay counted, and one rule had to serve all. Here the exemption is a `Db` in the
+  signature. Not taken: the server always owning it, under which the login cannot be
+  written; the operation always owning it, which puts `db.tx(serializable = true)` round
+  all 20 bodies. Accepted cost: an RPC operation ported from cusoon2 that relies on the
+  commit becomes the `Db` kind. Reopen if `Db` operations become the common kind.
+- **An operation takes the database, the environment, the request and the input, and
+  nothing runs before it** (15 Nov 2026; spec 15.2). `Request` is `kogo.rpc`'s: cookies,
+  headers, the caller's address. The environment is the application's data class of what
+  lives as long as the server. cusoon2 packs these into one `call` that the server builds;
+  its operations use it 38 times for the database, 11 for the identity provider, 7 for the
+  session and 3 for the address and user agent, and 14 of the 20 open with their own
+  `requireDriver(call)`. Not taken: a context that an application's function builds and the
+  list names, a step the reader does not see, which for a `Db` operation would need a
+  transaction of its own. An application that wants the context calls its builder on its
+  first line. Accepted cost: four parameters on every operation.
+- **The wire carries what cusoon2 sends today, and sealed interfaces** (15 Nov 2026;
+  spec 15.4): `Boolean`, `Int`, `Long`, `Double`, `String`, `Uuid`, enums, data classes,
+  `List`, `T?` and `Unit`; names as written, nothing optional, and strict reading, a
+  missing, unknown or mistyped key being a 400. cusoon2's 20 operations send 35 data
+  classes with 107 fields: 53 `String`, 14 ids, 13 data classes or enums, 12 `Int`, 7
+  lists, 4 `Boolean`, 3 `Long`, 1 `Double`; 22 may be null. Sealed interfaces were added
+  on Greg's question of what they are good for: cusoon2's `AcceptInviteInput` has two
+  nullable fields whose three valid combinations are stated in a comment, and a sealed
+  input lets TypeScript refuse the fourth and `when` cover the three. The tag is a key
+  `type` holding the variant's name, since Kogo has no annotation to name one. Not taken:
+  dates and times, which cusoon2 sends as text it has formatted; maps. Each can be added
+  and break nothing. Forced, not chosen: a `Double` that is `NaN` or an infinity has no
+  JSON, so an answer holding one panics.
+- **A `Long` crosses as a number, within what JavaScript holds exactly** (15 Nov 2026;
+  spec 15.4). JavaScript read `9007199254740993` from JSON as `9007199254740992`, with no
+  error (run in node). cusoon2 sends a `Long` as a number unguarded; its three are cents,
+  whose limit is about 90 trillion dollars. An answer holding a `Long` past the limit
+  panics, and an input holding one is a 400. Not taken: a string, exact for every value,
+  which makes each page convert before any arithmetic. Reopen if a real value passes the
+  limit.
+- **A refusal is words: every operation returns `Either<String, A>`** (15 Nov 2026; spec
+  15.2), as all 20 of cusoon2's do, and every page handles a refusal one way. An operation
+  that must tell the page which of several things happened says so in its answer, which
+  may be a sealed type and commits. Not taken: any wire type as the refusal, which lets a
+  page branch on a refusal that rolled back, and lets an internal error type onto the
+  wire. Widening later breaks no operation, though the answer's object gains a key.
+- **`kogo ts` writes the types and the table of operations, and no client** (15 Nov 2026;
+  spec 15.6). The types are where a mistake between backend and frontend is caught.
+  cusoon2's client is 79 lines of `fetch`, a CSRF header and a React hook, which depend on
+  the application. The file is checked in and a stale one is caught by the application's
+  own checks with `git diff`, so Kogo has no flag for it. cusoon2's generator is 111 lines
+  and works by reflection at run time; this one reads the checker's facts.
+- **The server is an emitted table, a Go library and the application's own `main`**
+  (15 Nov 2026; `doc/design.md` "The server"). `main` is about fifteen lines of Go that
+  read the configuration, open the pool, build the environment and mount the handler. Not
+  taken: an entry point in the language or a `kogo serve`, which would make Kogo say how
+  configuration is read, how a handle is built from a secret and how other routes are
+  added. An application already writes Go behind its own bindings.
+- **At the boundary a refusal is a 200, a bug is a 500, and reruns that run out are a
+  503** (15 Nov 2026; spec 15.5), with a 400 for input that does not read and a 404 for no
+  such operation. One id for each HTTP request, given before any rerun; cusoon2 learned
+  that an id for each attempt misleads. Logged: the operation, the outcome, the time, each
+  rerun with its cause, a panic's message and trace. Two changes from cusoon2: it answers
+  500 when reruns run out, and here a 500 always means a bug; it logs inputs and answers
+  at debug level, and here they are not logged at all until someone needs a switch.
+  The server's reruns stop after 90 seconds unless `main` says otherwise, cusoon2's figure,
+  while `db.tx(serializable = true)` written in a body still reruns without a limit.
 - **The prelude's signatures are Kogo declarations, read by the checker like any other
   source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
@@ -1016,3 +1100,5 @@ Each entry: what was decided, why, and what would reopen it.
 
 - Outbound calls are handles (above), but their timeouts and retries, workers, and an
   application's own binding files have no design.
+- Operations (spec 15) leave out, on purpose: how one sets a cookie, which a login needs;
+  Origin and CSRF checks; a limit on the reruns of a `db.tx` written in a `Db` operation.

@@ -133,6 +133,12 @@ Each entry: what was decided, why, and what would reopen it.
   half must, since it calls cusoon2's code, and the port is cusoon2's code in another
   language; `poc-rs` is the precedent. Not taken: a third repo, which spreads one
   experiment over three; the stage-1 directory, which is not a repository.
+- **The MVP is served over typed RPC** (15 Nov 2026; `doc/design.md` "MVP steps"). It
+  is a real cusoon2 module, with SQL, that matches its Kotlin original exactly side by
+  side and answers HTTP requests through an `api` list; the server is its fifth step.
+  Serving typed RPC is what Kogo is for. Not taken: stopping at the side-by-side runs,
+  which proves the emitter but leaves Kogo a library no request reaches. Reopen if the
+  server's issues stall the ports.
 - **Kogo adds no member to a type Kotlin has; what is Kogo's own is a function or a type
   of a `kogo.` package, imported by name** (15 Nov 2026; `doc/design.md` principle 3, spec
   12). cusoon2 prints a percentage through Java's `BigDecimal`

@@ -204,7 +204,7 @@ func (e *emitter) sel(x *syntax.Select, recv *operand, rt check.Type) (string, c
 		case o.Kind == check.Entry:
 			return e.qualify(o.Owner.Pkg, e.names[o]), o.Type
 		case o.Decl == nil && o.Name == "entries":
-			return e.qualify(o.Owner.Pkg, e.names[o.Owner]+"_entries"), o.Type
+			return e.entries(o.Owner), o.Type
 		}
 		if recv == nil {
 			recv, rt = &operand{code: e.expr(x.X)}, e.info.Types[x.X]

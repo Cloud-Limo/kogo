@@ -117,7 +117,7 @@ type emitter struct {
 	info     *check.Info
 	root     string // the import path of the directory written to
 	errs     []*syntax.Error
-	names    map[any]string            // the Go name of each top-level type, fun, val and enum constant
+	names    map[any]string            // the Go name of each top-level type, fun, val, enum constant, enum's entries and api table
 	bound    map[string]bool           // the Kogo packages that Go implements: the prelude's
 	nullable map[*check.TypeParam]bool // the type parameters used as T?
 	scanned  map[*check.Func]bool      // the funs whose signatures are read for that

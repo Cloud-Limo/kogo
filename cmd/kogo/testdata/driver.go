@@ -202,7 +202,9 @@ func main() {
 	post("no status", "setStatus", `{"number": "INV-2"}`)
 	post("not a status", "setStatus", `{"number": "INV-2", "status": "void"}`)
 	post("no such operation", "cancel", "{}")
-	post("look up a missing invoice", "lookUp", `{"number": "INV-9"}`)
 	post("look up", "lookUp", `{"number": "INV-1"}`)
-	post("look up a third time", "lookUp", `{"number": "INV-1"}`)
+	post("look up again", "lookUp", `{"number": "INV-1"}`)
+	post("look up a missing invoice", "lookUp", `{"number": "INV-9"}`)
+	post("look up another missing invoice", "lookUp", `{"number": "INV-8"}`)
+	post("look up after two misses", "lookUp", `{"number": "INV-1"}`)
 }

@@ -148,7 +148,7 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 			e.w("const %s %s = %q", e.names[v], name, v.Name)
 			all = append(all, e.names[v])
 		}
-		e.w("var %s_entries = []%s{%s}", name, name, strings.Join(all, ", "))
+		e.w("var %s = []%s{%s}", e.names[entries{td}], name, strings.Join(all, ", "))
 	case "data class", "data object":
 		simple := td.Simple()
 		if d.Kind == "data object" {
@@ -205,7 +205,7 @@ func (e *emitter) table(d *syntax.API) {
 	}
 	for _, t := range a.Types {
 		if t.Kind == "enum class" {
-			enums = append(enums, e.qualify(t.Pkg, e.names[t]+"_entries"))
+			enums = append(enums, e.entries(t))
 		}
 	}
 	env := e.typ(a.Env)

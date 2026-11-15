@@ -829,7 +829,8 @@ fun tally(words: List<String>): Pair<Int, String> {
 }
 
 // What is not emitted yet is refused where it stands, never emitted
-// wrongly, and so are two declarations that Go cannot tell apart.
+// wrongly, and so are two declarations that Go cannot tell apart,
+// an enum's entries among them.
 func TestRefused(t *testing.T) {
 	for _, c := range [][3]string{
 		{"enum class Kind { in_house, outside }\nfun f(tx: Tx, kinds: List<Kind>): Int = tx.execute(sql\"delete from invite where kind = any($kinds)\")", "2:93: not-yet-emitted", "a parameter that is a list of an enum"},
@@ -838,6 +839,7 @@ func TestRefused(t *testing.T) {
 		{"fun <T> none(x: T?): T? = x\nfun g(): Int? = none(null)", "2:17: not-yet-emitted", "write the type arguments, none<...>(...)"},
 		{"sealed interface S<out T> {\n    data class A<T>(val v: T) : S<T>\n}\nfun f(s: S<S.A<Int>>): S<S<Int>> = s", "4:36: not-yet-emitted", "build the value with the wider type argument"},
 		{"fun a(x: Int): Int = x\nfun A(x: Int): Int = x", "2:1: go-name", "are both A_Int in Go"},
+		{"enum class Kind { entries, b }", "1:19: go-name", "are both Kind_entries in Go"},
 		{"data class D(val a: Int, val A: Int)", "1:26: go-name", "two members of D are both A in Go"},
 		{"interface I {\n    val name: String\n}\ndata class D(override val name: String, val getName: String) : I", "4:14: go-name", "two members of D are both GetName in Go"},
 	} {
@@ -936,12 +938,13 @@ func TestPrelude(t *testing.T) {
 
 // Each api list is a table in its package: its operations in order,
 // by their names on the wire, an imported one among them, and the
-// entries of each enum they reach. A table whose name a type has
-// takes _api.
+// entries of each enum they reach. A table whose name a type or a fun
+// has takes _api, and a val named as an enum's entries takes _val.
 func TestTables(t *testing.T) {
 	expect(t, [][2]string{
 		{"fmt.Sprint([]string{t.Ops.Operations[0].Name, t.Ops.Operations[1].Name}, t.Ops.Enums)", "[me f] [[Alone Shared] [Open Done]]"},
 		{"fmt.Sprint([]string{t.Other_api.Operations[0].Name}, t.Other_api.Enums)", "[g] [[S M]]"},
+		{"fmt.Sprint(t.Other_Int(4), t.Kind_entries_val)", "4 3"},
 	}, `package t
 import kogo.rpc.Request
 import u.g
@@ -949,6 +952,8 @@ api ops { me, f }
 api other { g }
 data class Env(val n: Int)
 data class Other(val n: Int)
+fun other(n: Int): Int = n
+val kind_entries: Int = 3
 data class Ask(val kind: Kind)
 enum class Kind { Alone, Shared }
 enum class State { Open, Done }

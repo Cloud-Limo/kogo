@@ -171,15 +171,17 @@ accept: Either.Right(kotlin.Unit)
 accept again: Either.Left(NoInvite)
 suppliers after: [SupplierRow(id=00000000-0000-0000-0000-000000000002, legalName=Bolt Couriers, driverSharePercent=25)]
 invoices: 200 {"type":"ok","value":[{"number":"INV-1","status":"paid","totalCents":1000},{"number":"INV-2","status":"sent","totalCents":null}]}
-paid with no total: 200 {"type":"refused","message":"Invoice INV-2 has no total, so it stays a draft."}
+paid with no total: 200 {"type":"refused","message":"Invoice INV-2 has no total, so it cannot be paid."}
 invoices after the refusal: 200 {"type":"ok","value":[{"number":"INV-1","status":"paid","totalCents":1000},{"number":"INV-2","status":"sent","totalCents":null}]}
 back to a draft: 200 {"type":"ok","value":{"number":"INV-2","status":"draft","totalCents":null}}
 no status: 400 setStatus: input.status is missing
 not a status: 400 setStatus: input.status is not one of draft, sent, paid
 no such operation: 404
-look up a missing invoice: 200 {"type":"refused","message":"There is no invoice INV-9."}
 look up: 200 {"type":"ok","value":{"number":"INV-1","status":"paid","totalCents":1000}}
-look up a third time: 200 {"type":"refused","message":"Too many looks. Try again later."}
+look up again: 200 {"type":"ok","value":{"number":"INV-1","status":"paid","totalCents":1000}}
+look up a missing invoice: 200 {"type":"refused","message":"There is no invoice INV-9."}
+look up another missing invoice: 200 {"type":"refused","message":"There is no invoice INV-8."}
+look up after two misses: 200 {"type":"refused","message":"Too many looks. Try again later."}
 `
 	if err != nil || string(out) != want {
 		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)

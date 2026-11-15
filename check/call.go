@@ -35,7 +35,7 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			// not before a fun called on the raise scope.
 			member := cands != nil
 			for _, f := range c.funcs(name) {
-				if f.Kind == Fun && (!member || f.Receiver == nil || c.raise != nil && c.raised(f.Receiver) != nil) {
+				if f.Kind == Fun && !c.otherTx(f) && (!member || f.Receiver == nil || c.raise != nil && c.raised(f.Receiver) != nil) {
 					cands = append(cands, f)
 				}
 			}
@@ -44,6 +44,11 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			}
 		}
 	case *syntax.Select:
+		if len(e.Args) == 1 {
+			if lit, ok := e.Args[0].Value.(*syntax.SQL); ok {
+				return c.sql(e, lit)
+			}
+		}
 		name = fun.Name
 		if q := c.qualifier(fun.X); q != "" {
 			if d, _ := c.findType(q + "." + name); d != nil && d.Ctor != nil && c.visible(d.Ctor.vis) {
@@ -74,7 +79,7 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 		}
 		if cands = c.methods(rt, name); cands == nil {
 			for _, f := range c.funcs(name) {
-				if f.Kind == Fun && f.Receiver != nil {
+				if f.Kind == Fun && f.Receiver != nil && !c.otherTx(f) {
 					cands = append(cands, f)
 				}
 			}
@@ -130,7 +135,7 @@ func (c *checker) noFunc(at syntax.Node, name string, rt Type, member bool) Type
 	}
 	d, _ := c.findType(name)
 	switch {
-	case member && later[name] == 0 && notKogo[name] == "":
+	case member && notKogo[name] == "":
 		return c.errorf(at, "unknown-name", "a %s has no function %s", rt, name)
 	case member || d == nil:
 		return c.missing(at, name)
@@ -165,6 +170,7 @@ func (c *checker) methods(rt Type, name string) []*Func {
 			f := Func{TypeParams: d.Params, Receiver: self(d), Owner: d, vis: d.vis, owners: len(d.Params)}
 			d.copy, d.toString = &f, &Func{}
 			*d.toString = f
+			d.copy.vis = d.Ctor.vis // copy builds a value, as the constructor does
 			d.copy.Kind, d.copy.Name, d.copy.Params, d.copy.Result = Copy, "copy", d.Props, self(d)
 			d.toString.Kind, d.toString.Name, d.toString.Result = ToString, "toString", tString
 		}
@@ -324,6 +330,9 @@ func (c *checker) receives(f *Func, rt Type, written bool) (binding, bool) {
 	b := binding{}
 	for _, p := range f.TypeParams {
 		b[p] = nil
+	}
+	if e := c.either(c.result); e != nil && c.txRaise(f) {
+		b[f.TypeParams[0]] = e // the enclosing fun's (spec.md 10.7)
 	}
 	switch {
 	case f.Receiver == nil:
@@ -604,5 +613,10 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 		call.TypeArgs = append(call.TypeArgs, b[p])
 	}
 	c.info.Calls[at] = call
+	if f.Kind == Copy {
+		c.builds(where, f.Owner)
+	} else {
+		c.demand(where, f.Name, f.vis)
+	}
 	return subst(f.Result, b)
 }

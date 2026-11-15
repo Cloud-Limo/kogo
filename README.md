@@ -10,8 +10,8 @@ against the real schema at build time.
 - `doc/design.md`: principles and how it compiles.
 
 Built so far: the parser (`syntax`), the SQL pass (`sqlpass`) with its
-command, the prelude's first declarations (`prelude`), and the checker's
-core (`check`): names, types, nulls and `when`, spec sections 2 to 6.
+command, the prelude's first declarations (`prelude`), and the checker
+(`check`), spec sections 2 to 11.
 
 ```
 mise exec -- go build -o bin/kogo ./cmd/kogo
@@ -20,7 +20,8 @@ bin/kogo check <dir>
 
 `kogo check` checks the `.kg` files under a directory as one program and
 prints one JSON error a line (file, line, column, code, message). It
-exits 0 when there are none.
+exits 0 when there are none. A program with a `sql"""` literal is checked
+against the database `DATABASE_URL` names, as below.
 
 ```
 mise exec -- go build -o bin/kogo-sql ./cmd/kogo-sql

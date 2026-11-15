@@ -91,7 +91,8 @@ data class Discount(val description: String, val amount: Cents, val struck: Bool
   `val` is implemented in the constructor (`override val label: String`).
 - Default values and named arguments work as in Kotlin.
 - `copy(...)`, `==`, `toString()` and destructuring (`val (a, b) = pair`)
-  are provided.
+  are provided. `copy` builds a value as the constructor does, so it may
+  be called only where the constructor may.
 - A data class may implement interfaces: `data class Ok<T>(val value: T) : Outcome<T>`.
 - A constructor may carry a visibility or a marker (section 11):
   `data class Held internal constructor(val id: ID)`.
@@ -498,15 +499,16 @@ fun suppliersOf(tx: Tx, operatorId: ID): List<SupplierRow> =
 | `tx.exists(sql"...")` | `Boolean` | true when at least one row |
 | `tx.execute(sql"...")` | `Int`, rows affected | |
 
-`insert`/`update`/`delete ... returning` go through the query calls. `exists` and `execute`
-discard the result's columns, so those columns are not typed and need no type of section
-10.4: `tx.execute(sql"select pg_advisory_xact_lock($key)")` passes though `void` has none,
-and a `returning` under `execute` is ignored.
+Each is called on a `Tx` written before the dot: in a fun on `Tx`,
+`this.execute(sql"...")`. `insert`/`update`/`delete ... returning` go through the query
+calls. `exists` and `execute` discard the result's columns, so those columns are not typed
+and need no type of section 10.4: `tx.execute(sql"select pg_advisory_xact_lock($key)")`
+passes though `void` has none, and a `returning` under `execute` is ignored.
 
 ### 10.3 Result types
 
-`R` is a scalar type when the statement returns one column, otherwise a
-data class.
+`R` is a data class, or a scalar type when the statement returns one
+column.
 
 - Columns are matched to the data class's properties **by name**: column
   `legal_name` fills property `legalName` (snake_case to camelCase). Every
@@ -518,7 +520,13 @@ data class.
   `select sa.driver_share_percent, b.id as business_id, b.legal_name as business_legal_name`
   fills `data class Supplier(val driverSharePercent: Int, val business: BusinessName)`.
   A nullable nested data class is `null` when all of its columns are null
-  (the absent side of an outer join).
+  (the absent side of an outer join), so a column that may be null fills
+  a property of it that may not.
+- Reading a row builds `R` and each data class in it, so it is allowed
+  only where each one's constructor may be called (sections 2 and 11).
+- A data class `R` is not written nullable, since a row is never null;
+  `queryOne<R>` gives the `R?`. A scalar `R` is a `T?` where its column
+  may be null: `queryOne<String?>`.
 - `select t.*` is allowed when the data class has exactly the table's
   columns. `kogo schema` writes `schema.kg` with one such data class per
   table and one enum per Postgres enum; it is ordinary source, checked in.
@@ -539,7 +547,7 @@ data class.
 | `time` | `LocalTime` |
 | `interval` | `Duration` |
 | an enum type | the enum of the same constants in `schema.kg` |
-| `T[]` | `List<T>` |
+| `T[]` | `List<T>`, or `List<T?>` |
 | a domain | its base type's mapping |
 
 A parameter's Kogo type must map to the type Postgres infers for it. When
@@ -582,13 +590,17 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
 ```
 
 - `db.tx { tx -> ... }` runs the block in one transaction. The block is a
-  raise scope when the enclosing function returns `Either`. It commits
-  when the block finishes, and rolls back on a failure or a panic.
+  raise scope when the enclosing function returns `Either<E, ...>`, for
+  that `E`, and `db.tx` then gives an `Either<E, A>` of the block's value
+  `A`, wherever it is written; elsewhere it gives the block's value. It
+  commits when the block finishes, and rolls back on a failure or a
+  panic.
 - `db.tx(serializable = true) { ... }` runs at SERIALIZABLE and reruns the
   block from the start on a serialization failure or deadlock, so the
   block must have no effect outside the transaction.
 - `tx.atomically { ... }` runs a nested block in a savepoint and rolls
-  back to it on a failure.
+  back to it on a failure. The block is in the raise scope around it,
+  as any lambda is.
 
 ## 11. Markers
 
@@ -607,8 +619,13 @@ data class HeldBusiness @UnscopedRead constructor(val business: Business, val st
 ```
 
 A file may use a marked function, property or constructor only if it
-begins with `@file:OptIn(UnscopedRead::class)`. Anything else is a compile
-error. Markers do nothing at run time. No other annotation exists.
+begins with `@file:OptIn(UnscopedRead::class)`. Anything else is a
+compile error. A `copy` of a data class and a row read into one (10.3)
+use its constructor. Only the file's opt-in counts: marking the function
+that makes the use does not stand in for it, as it does in Kotlin, and
+the file that declares a marked function opts in to use it too. A type
+carries no marker; mark its constructor. Markers do nothing at run time.
+No other annotation exists.
 
 ## 12. Prelude
 

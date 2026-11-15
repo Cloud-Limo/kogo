@@ -69,6 +69,7 @@ func TestFaults(t *testing.T) {
 		{"val s = ‸sql\"select 1\"", "sql-placement", "only the argument of tx.query<R>"},
 		{"fun f() = tx.query<R>(a, ‸sql\"select 1\")", "sql-placement", "only the argument"},
 		{"fun f() = tx.run(‸sql\"select 1\")", "sql-placement", "only the argument"},
+		{"fun Tx.f() = execute(‸sql\"select 1\")", "sql-placement", "call execute on the Tx: tx.execute(...), or this.execute(...) in a fun on Tx"},
 		{"fun f() = tx.execute(‸sql\"select 1\" + x)", "sql-placement", "the only argument of execute"},
 		{"fun f() = tx.query‸(sql\"select 1\")", "sql-placement", "with the row type R"},
 		{"fun f() = tx.execute‸<Int>(sql\"select 1\")", "sql-placement", "without one"},

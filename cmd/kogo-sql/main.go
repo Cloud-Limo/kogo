@@ -21,6 +21,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"kogo/check"
 	"kogo/sqlpass"
 	"kogo/syntax"
 )
@@ -86,6 +87,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return fatal("sql-connect", fmt.Errorf("no development database, set DATABASE_URL or the PG* variables: %w", err))
 	}
 	defer checker.Close(ctx)
+	ask := check.Signer(ctx, checker)
 
 	out, faults := encoder(stdout), encoder(stdout)
 	if emit {
@@ -111,11 +113,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		for _, lit := range tree.SQL {
 			line, column := lit.Line, lit.Column
-			check := checker.Check
-			if !lit.Typed() {
-				check = checker.CheckDiscarding
-			}
-			st, err := check(ctx, lit.Text)
+			st, err := ask(lit)
 			var fault *sqlpass.Error
 			switch {
 			case errors.As(err, &fault):

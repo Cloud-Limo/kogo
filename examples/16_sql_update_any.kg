@@ -1,6 +1,8 @@
 // execute gives the rows affected; a list binds to = any(...).
 package example
 
+import kogo.time.Instant
+
 fun accountFees(tx: Tx, invoiceIds: List<Uuid>, reference: String, at: Instant) {
     val updated =
         tx.execute(sql"""

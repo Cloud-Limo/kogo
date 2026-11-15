@@ -209,12 +209,22 @@ Each entry: what was decided, why, and what would reopen it.
   was weighed and set aside, since nobody reads the Go. Not gained: stopping pure code
   when its request is cancelled, and request-wide data without a handle. Reopen if either
   is needed; Kogo source does not change either way.
+- **`copy` and a sql row need whatever the constructor needs** (15 Nov 2026; spec 3.1, 10.3
+  and 11): its visibility, `private` or `internal`, and its marker. Each builds a value
+  without calling the constructor, and the access walls rest on who may construct the
+  type: otherwise `held.copy(business = other)`, or `tx.queryOne<HeldBusiness>(...)`, makes
+  a `HeldBusiness` in a file with no opt-in. The refusal is the one a call of the
+  constructor gets. Kotlin follows the constructor's visibility for `copy` in recent
+  versions and, as far as we know, not its marker; refusing is the safe direction.
+  Destructuring and `==` read a value and build none.
 
 ## Taken in the v0 spec, not yet discussed
 
 - Both Arrow spellings are in (`Either` values and `Raise<E>` receivers): cusoon2 uses both.
 - Markers (`@RequiresOptIn`, `@file:OptIn`) are the one annotation form, so the access walls
-  port. Known hole: without inheritance, any file can implement the `HeldBusiness` interface.
+  port. Known hole: without inheritance, any file can implement an interface, so a wall is a
+  data class with a marked constructor, as example 19's `HeldBusiness` is. `copy` and a sql
+  row no longer get round that constructor (see "Agreed with Greg").
 - Value classes are out: cusoon2 has none, and binding distinct id types to SQL columns needs
   a design (foreign keys could supply it).
 - No `apply`/`run`/`with`, no labelled returns, no `object`, no classes beyond data classes.
@@ -224,9 +234,8 @@ Each entry: what was decided, why, and what would reopen it.
 
 - **A name is one parameter, an expression one per occurrence.** `$active` twice is `$1` twice,
   so Postgres types it once and the cast in 10.6's idiom is optional; `${newId()}` twice is
-  two values, as a string template would evaluate it. `${...}` may not contain braces: the
-  parser reads them, but the SQL pass scans the literal itself until the checker hands it
-  parsed parameters. There is no way to write the text `$name`, and so no tagged dollar
+  two values, as a string template would evaluate it. Since DEV-827 the parser tells the pass
+  where each parameter lies, so `${...}` holds any expression. There is no way to write the text `$name`, and so no tagged dollar
   quoting.
 - **The emitted Go is a shape for the emitter to replace.** One function per literal over a
   `pgx.Tx`, returning `([]Row, error)` or the rows affected, named `Q<path>L<line>C<column>`
@@ -366,7 +375,7 @@ Each entry: what was decided, why, and what would reopen it.
   skipped.
 - **Sections 9 to 11 are named, not checked**: `Either`, `Raise`, `Tx`, `Db`, the forms of
   section 9, a sql literal and a marker each give `not-yet-checked`. DEV-826 and DEV-827
-  replace that.
+  replaced that.
 - **A file that does not parse stops `kogo check`**: its syntax error is reported, the
   other files are parsed, and none is checked. Checked without its declarations, the
   others show false errors, each naming something that is declared. Not taken: checking
@@ -460,6 +469,54 @@ Each entry: what was decided, why, and what would reopen it.
 - **Section 13's `external object http` contradicts section 7**, which says outbound calls
   arrive as parameters, and a global has no context to use. Left as it is, since no example
   makes an outbound call; when they are designed, the binding becomes a handle.
+
+## Taken checking SQL and markers (DEV-827), not yet discussed
+
+- **The checker reads the SQL pass's own `Statement`** for a literal's signature, and the
+  facts carry it for the emitter (`Info.SQL`, with what each parameter binds and the
+  property each column fills). Not taken: a copy of the type in `check`, which would keep
+  pgx out of its build at the cost of a conversion. `check` still runs with no database: a
+  test answers with signatures of its own, written as the literal's text.
+- **A data class `R` may take any number of columns; a scalar `R` takes one** (spec 10.3).
+  As written, a one-column statement could only fill a scalar, so a one-property data class
+  was refused. A data class `R` written nullable is refused: a row is never null.
+- **A property takes the column named by its name in snake case**, `legalName` from
+  `legal_name`, compared exactly; a quoted mixed-case alias fills nothing. Of two columns
+  with one name, the second fills nothing and is reported.
+- **Inside a nullable nested data class, a column that may be null fills a property that
+  may not** (spec 10.3): on the outer join's absent side every column is null. Accepted
+  hole: a row where only some of them are null passes the check, and the emitted code must
+  panic on it.
+- **An enum maps by its set of constants**, in any order, whatever either side calls the
+  type. A list's elements may be `T` or `T?`, since Postgres does not say whether an array
+  holds a null.
+- **`db.tx` is two declarations in `check/core.kg`**, one with a plain block and one whose
+  block is a raise scope, and the checker keeps the second exactly where the enclosing fun
+  returns an `Either<E, ...>`, settling `E` from it (spec 10.7). So `val r = db.tx { ... }`
+  in such a fun is an `Either` too, and dropping it is an error. In a `Raise<E>` fun the
+  plain one applies, and its block is in the fun's raise scope as any lambda is.
+  `tx.atomically` is one plain declaration for the same reason. Not taken: choosing by the
+  type wanted, which `val r = db.tx { }` does not state.
+- **Markers count only the file's opt-in** (spec 11). Kotlin also lets a marked declaration
+  use another of the same marker, and its declaring file needs no opt-in; example 19 opts in
+  all the same. One rule, checked at each call, constructor and read of a val. A type
+  carries no marker, and `@RequiresOptIn` goes on nothing but a marker.
+- **A lambda whose value is a wanted `Unit` may end with `Unit`**: it is the lambda's
+  value, not a statement (spec 6). Example 18 ends `db.tx`'s block so.
+- **Where an error is reported**: Postgres's refusal at the place it names, a parameter's
+  wrong type at the parameter, and a column's fault at the literal, since Postgres does not
+  say where a column is written; the message names the column and the property.
+- **`kogo check` connects only when the program holds a sql literal**, to `$DATABASE_URL`
+  as `kogo-sql` does. A failure to ask the database stops the check with exit 2. The test
+  that goes through the SQL pass to the test database is `cmd/kogo`'s, over the examples;
+  the checker's own tests need none (`doc/design.md`).
+- **The five calls need their `Tx` written before the dot.** In a fun on `Tx`, a bare
+  `execute(sql"...")` is refused with a fix naming `this.execute`. No example or port calls
+  one on an implicit receiver, and taking it would have the checker and the emitter both
+  find that receiver. Reopen if a port writes helpers as funs on `Tx`.
+- **The examples changed to pass**: 12, 13 and 16 import `kogo.time.Instant` (spec 2), and
+  19 is `package example.markers`, since 12 also declares `Business`. The prelude gained
+  `Uuid`, `newId`, `List.size` and `check`, which they use.
 
 ## Spec gaps found by the leakage ports, unresolved
 

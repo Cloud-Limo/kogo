@@ -1,6 +1,8 @@
 // select * into the table's data class from schema.kg.
 package example
 
+import kogo.time.Instant
+
 // As `kogo schema` writes it:
 data class Business(
     val id: Uuid,

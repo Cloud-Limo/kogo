@@ -1,7 +1,7 @@
 // A marker: only a file that opts in may make a HeldBusiness or read by bare id.
 @file:OptIn(UnscopedRead::class)
 
-package example
+package example.markers
 
 @RequiresOptIn
 annotation class UnscopedRead

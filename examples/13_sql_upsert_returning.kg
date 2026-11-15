@@ -1,5 +1,7 @@
 package example
 
+import kogo.time.Instant
+
 enum class InviteKind { in_house, outside }
 
 data class Invite(

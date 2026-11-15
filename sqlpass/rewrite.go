@@ -23,62 +23,53 @@ type Param struct {
 	Type   Type
 }
 
+// A Span is where one $name or ${expr} of a literal lies, as the
+// parser found it: literal[Start:End].
+type Span struct{ Start, End int }
+
 // An edit records one renumbering: the parameter is at sql[at:], and
 // the text after it lies shift bytes further on in the literal.
 type edit struct{ at, shift int }
 
-// rewrite replaces each $name and ${expr} with a numbered parameter.
-// A name that occurs twice is one parameter; an expression is one
-// parameter per occurrence, since evaluating it may have an effect.
-func rewrite(literal string) (string, []Param, []edit, error) {
+// rewrite replaces each parameter with a numbered one. A name that
+// occurs twice is one parameter; an expression is one parameter per
+// occurrence, since evaluating it may have an effect. Any other $ is
+// SQL text, but for a numbered parameter, which is refused.
+func rewrite(literal string, spans []Span) (string, []Param, []edit, error) {
 	var sql strings.Builder
 	var params []Param
 	var edits []edit
 	byName := map[string]int{}
-	for i := 0; i < len(literal); {
-		if literal[i] != '$' || i+1 == len(literal) {
-			sql.WriteByte(literal[i])
-			i++
-			continue
+	text := func(from, to int) error {
+		for i := from; i+1 < to; i++ {
+			if literal[i] == '$' && literal[i+1] >= '0' && literal[i+1] <= '9' {
+				return &Error{i, "sql-parameter-syntax", "a numbered parameter is not Kogo: write $name, the value to bind"}
+			}
 		}
-		j, n := i+1, 0
-		switch c := literal[j]; {
-		case c == '{':
-			end := strings.IndexAny(literal[j+1:], "{}")
-			if end < 0 || literal[j+1+end] == '{' {
-				return "", nil, nil, &Error{i, "sql-parameter-syntax",
-					"${ needs a closing } and no braces inside: bind the value to a val and write $name"}
-			}
-			j += end + 2
-			source := strings.TrimSpace(literal[i+2 : j-1])
-			if source == "" {
-				return "", nil, nil, &Error{i, "sql-parameter-syntax",
-					"${} needs an expression between the braces, as in ${row.id}"}
-			}
-			params = append(params, Param{Source: source, Offset: i})
+		sql.WriteString(literal[from:to])
+		return nil
+	}
+	prev := 0
+	for _, s := range spans {
+		if err := text(prev, s.Start); err != nil {
+			return "", nil, nil, err
+		}
+		var n int
+		if name := literal[s.Start+1 : s.End]; name[0] == '{' {
+			params = append(params, Param{Source: strings.TrimSpace(name[1 : len(name)-1]), Offset: s.Start})
 			n = len(params)
-		case isNameByte(c) && (c < '0' || c > '9'):
-			for j < len(literal) && isNameByte(literal[j]) {
-				j++
-			}
-			name := literal[i+1 : j]
-			if n = byName[name]; n == 0 {
-				params = append(params, Param{Source: name, Offset: i})
-				n = len(params)
-				byName[name] = n
-			}
-		case c >= '0' && c <= '9':
-			return "", nil, nil, &Error{i, "sql-parameter-syntax",
-				"a numbered parameter is not Kogo: write $name, the value to bind"}
-		default: // a lone $, as in dollar quoting
-			sql.WriteByte('$')
-			i++
-			continue
+		} else if n = byName[name]; n == 0 {
+			params = append(params, Param{Source: name, Offset: s.Start})
+			n = len(params)
+			byName[name] = n
 		}
 		at := sql.Len()
 		fmt.Fprintf(&sql, "$%d", n)
-		edits = append(edits, edit{at, j - sql.Len()})
-		i = j
+		edits = append(edits, edit{at, s.End - sql.Len()})
+		prev = s.End
+	}
+	if err := text(prev, len(literal)); err != nil {
+		return "", nil, nil, err
 	}
 	return sql.String(), params, edits, nil
 }

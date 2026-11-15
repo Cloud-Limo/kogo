@@ -22,6 +22,44 @@ func connect(t *testing.T) *Checker {
 	return c
 }
 
+// spans finds the parameters of a literal as the parser would: $name,
+// and ${expr} up to the brace that closes it.
+func spans(literal string) []Span {
+	var out []Span
+	for i := 0; i+1 < len(literal); i++ {
+		j := i + 1
+		switch c := literal[j]; {
+		case literal[i] != '$':
+			continue
+		case c == '{':
+			for depth := 0; j < len(literal); j++ {
+				if literal[j] == '{' {
+					depth++
+				} else if literal[j] == '}' {
+					if depth--; depth == 0 {
+						break
+					}
+				}
+			}
+			j++
+		case isNameByte(c) && (c < '0' || c > '9'):
+			for j < len(literal) && isNameByte(literal[j]) {
+				j++
+			}
+		default:
+			continue
+		}
+		out = append(out, Span{i, j})
+		i = j - 1
+	}
+	return out
+}
+
+// check checks a literal with the parameters spans finds.
+func check(c *Checker, literal string) (*Statement, error) {
+	return c.Check(context.Background(), literal, spans(literal))
+}
+
 // signature renders a statement as "(name: Type, ...) -> name: Type?, ...".
 func signature(st *Statement) string {
 	var params, cols []string
@@ -98,11 +136,13 @@ func TestSignatures(t *testing.T) {
 		{"an expression is a parameter each time it occurs",
 			`select body from every_type where id = ${newId()} or id = ${ newId() } or small = ${row.small}`,
 			"(newId(): Uuid, newId(): Uuid, row.small: Int) -> body: String"},
+		{"braces inside an expression, which the parser delimits",
+			`select ${ids.map { it }.size}::int as "n!"`, "(ids.map { it }.size: Int) -> n: Int"},
 		{"a domain parameter and an array of a domain",
 			`update supply_agreement set driver_share_percent = $share where driver_share_percent = any($shares::percent[])`,
 			"(share: Int, shares: List<Int>) -> "},
 	} {
-		st, err := c.Check(context.Background(), tc.literal)
+		st, err := check(c, tc.literal)
 		if err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 		} else if got := signature(st); got != tc.want {
@@ -111,9 +151,24 @@ func TestSignatures(t *testing.T) {
 	}
 }
 
+// An enum carries its constants, as a parameter, as a column and in a
+// list, for the checker to match them with a Kogo enum's.
+func TestEnumLabels(t *testing.T) {
+	st, err := check(connect(t), `select kind, array[kind] as kinds from invite where kind = $kind`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, typ := range []Type{st.Params[0].Type, st.Columns[0].Type, st.Columns[1].Type} {
+		if strings.Join(typ.Labels, " ") != "in_house outside" {
+			t.Errorf("%s has labels %v, want in_house outside", typ, typ.Labels)
+		}
+	}
+}
+
 // exists and execute discard the columns, so they need no Kogo type.
 func TestDiscardedColumns(t *testing.T) {
-	st, err := connect(t).CheckDiscarding(context.Background(), `select pg_advisory_xact_lock($key)`)
+	lit := `select pg_advisory_xact_lock($key)`
+	st, err := connect(t).CheckDiscarding(context.Background(), lit, spans(lit))
 	if err != nil || signature(st) != "(key: Long) -> " {
 		t.Errorf("got %v, %v; want (key: Long) -> ", st, err)
 	}
@@ -126,7 +181,7 @@ func TestNoParseTreeIsAFailure(t *testing.T) {
 	if _, err := c.conn.Exec(context.Background(), "set client_min_messages = warning"); err != nil {
 		t.Fatal(err)
 	}
-	st, err := c.Check(context.Background(), `select legal_name from business`)
+	st, err := check(c, `select legal_name from business`)
 	var e *Error
 	if err == nil || errors.As(err, &e) || !strings.Contains(err.Error(), "no parse tree") {
 		t.Errorf("got %v, %v; want a failure to check, not a fault in the literal", st, err)
@@ -161,9 +216,7 @@ func TestErrors(t *testing.T) {
 			`select id from business where«`, "sql-rejected", "syntax error at end of input"},
 		{"a refusal whose detail says why",
 			`select «'{1'::int[] as ids`, "sql-rejected", `malformed array literal: "{1". Unexpected end of input.`},
-		{"an empty expression", `select «${ } as x`, "sql-parameter-syntax", "${} needs an expression"},
 		{"a numbered parameter", `select id from business where id = «$1`, "sql-parameter-syntax", "write $name"},
-		{"braces inside an expression", `select «${ids.map { it }}`, "sql-parameter-syntax", "bind the value to a val"},
 		{"a type outside the table",
 			`«select created_at::timestamp as at from business`, "sql-unmapped-type", `column "at" has the Postgres type timestamp without time zone`},
 		{"a function returning void, when the columns are kept",
@@ -172,7 +225,7 @@ func TestErrors(t *testing.T) {
 			`select id from business where created_at::timestamp = «$at`, "sql-unmapped-type", "parameter $at has the Postgres type timestamp without time zone"},
 	} {
 		offset := strings.Index(tc.literal, "«")
-		_, err := c.Check(context.Background(), strings.Replace(tc.literal, "«", "", 1))
+		_, err := check(c, strings.Replace(tc.literal, "«", "", 1))
 		var e *Error
 		if !errors.As(err, &e) {
 			t.Errorf("%s: got %v, want an *Error", tc.name, err)

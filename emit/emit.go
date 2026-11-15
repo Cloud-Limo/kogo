@@ -1,7 +1,7 @@
 // Package emit writes Go from a checked Kogo program: doc/design.md,
-// "The emitter". It writes pure code, spec.md sections 2 to 6, and
-// expected failures, section 9; SQL and transactions, sections 7 and
-// 10, are refused as not yet emitted.
+// "The emitter". It writes pure code, spec.md sections 2 to 6,
+// expected failures, section 9, and SQL and transactions, sections 7
+// and 10.
 //
 // Nobody reads the Go. Each line of it is preceded by a //line
 // directive, so that a Go panic's trace names the Kogo file and line.
@@ -40,22 +40,15 @@ func Emit(info *check.Info, prelude, program []*syntax.File, root string) (map[s
 func emitAll(info *check.Info, prelude, program []*syntax.File, root string) (*emitter, map[string][]byte, []*syntax.Error) {
 	e := &emitter{
 		info: info, root: root, names: map[any]string{}, bound: map[string]bool{},
-		nullable: map[*check.TypeParam]bool{}, scanned: map[*check.Func]bool{}, later: map[any]bool{},
+		nullable: map[*check.TypeParam]bool{}, scanned: map[*check.Func]bool{},
 	}
 	bindings := append([]*syntax.File{info.Core}, prelude...)
 	for _, f := range bindings {
 		e.bound[f.Package.Name] = true
 	}
-	// The core's section 9 is emitted. Whatever else it declares, Db,
-	// Tx and their funs now, is refused until its slice writes it.
-	emitted := map[string]bool{"Raise": true, "either": true, "raise": true, "ensure": true, "ensureNotNull": true, "bind": true}
 	for _, d := range info.Core.Decls {
 		if c, ok := d.(*syntax.ClassDecl); ok && c.Name == "Either" {
 			e.either = info.Classes[c]
-		} else if ok && c.Kind == "external class" && !emitted[c.Name] {
-			e.later[info.Classes[c]] = true
-		} else if f, ok := d.(*syntax.FunDecl); ok && !emitted[f.Name] {
-			e.later[info.Funcs[f]] = true
 		}
 	}
 	e.name(bindings)
@@ -125,7 +118,6 @@ type emitter struct {
 	bound    map[string]bool           // the Kogo packages that Go implements: the prelude's
 	nullable map[*check.TypeParam]bool // the type parameters used as T?
 	scanned  map[*check.Func]bool      // the funs whose signatures are read for that
-	later    map[any]bool              // the core's declarations not emitted yet: Db, Tx and their funs
 	either   *check.TypeDecl           // the core's Either
 	insts    []inst
 
@@ -183,9 +175,6 @@ func (e *emitter) refuse(at syntax.Node, code, format string, args ...any) {
 func (e *emitter) notYet(at syntax.Node, what, fix string) {
 	e.refuse(at, "not-yet-emitted", "%s is not emitted yet: %s", what, fix)
 }
-
-// The fix for what belongs to the slice that follows this one.
-const slice10 = "the next slice of the emitter writes SQL and transactions"
 
 // first gives where a node's text begins: an operator and a call are
 // positioned further in.

@@ -44,9 +44,6 @@ func (e *emitter) typ(t check.Type) string {
 			}
 			return e.rt() + "." + t.Decl.Name
 		}
-		if e.later[t.Decl] {
-			e.notYet(e.at, "a "+t.Decl.Name+" (spec.md 10)", slice10)
-		}
 		for i, a := range t.Args {
 			if _, ok := a.(*check.Nullable); ok {
 				e.insts = append(e.insts, inst{t.Decl.Params[i], e.file, e.at})

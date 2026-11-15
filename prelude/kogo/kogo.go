@@ -1,8 +1,9 @@
 // Package kogo is the Go behind the declarations of Kogo's package
 // kogo: prelude/kogo.kg and prelude/either.kg, and what check/core.kg
-// declares for section 9. Each Go name follows the emitter's naming
-// rule (decisions.md), and a test of the emitter compiles a use of
-// every one of prelude/ against its declaration.
+// declares for sections 9 and 10 (either.go, db.go). Each Go name
+// follows the emitter's naming rule (decisions.md), and a test of the
+// emitter compiles a use of every one of prelude/ against its
+// declaration.
 //
 // A failure is a panic (either.go), so it may unwind through any
 // function here that calls a lambda. Such a function holds no lock
@@ -364,17 +365,12 @@ func expand(b *strings.Builder, re *regexp.Regexp, replacement, s string, m []in
 func Int_ToLong(this int32) int64      { return int64(this) }
 func Long_ToDouble(this int64) float64 { return float64(this) }
 
-// A Decimal is a numeric as Postgres wrote it, exactly: "1.50" keeps
-// its scale, and so is not equal to "1.5", as in Java.
-type Decimal struct{ Text string }
-
-func (d Decimal) String() string { return d.Text }
-
-// Decimal_ToDouble is the closest Double, as Java's is.
+// Decimal_ToDouble is the closest Double, as Java's is; NaN and
+// Infinity, which Postgres holds, are Double's own.
 func Decimal_ToDouble(this Decimal) float64 {
-	f, err := strconv.ParseFloat(this.Text, 64)
+	f, err := strconv.ParseFloat(string(this), 64)
 	if err != nil && !errors.Is(err, strconv.ErrRange) {
-		panic("not a numeric: " + this.Text)
+		panic("not a numeric: " + string(this))
 	}
 	return f
 }

@@ -70,17 +70,19 @@ func TestExamples(t *testing.T) {
 	}
 }
 
-// The Go that kogo emit writes for examples 01 to 07, 09 and 20 is built
-// with testdata/driver.go and run: each result was worked out by hand
-// from the Kogo.
+// The Go that kogo emit writes for the examples is built with
+// testdata/driver.go and run, 10 to 19 and 21 against the test
+// database: each result was worked out by hand from the Kogo and the
+// rows the driver begins with.
 func TestEmittedGoRuns(t *testing.T) {
+	testDB(t)
 	// Inside the module, which holds the rt and the prelude it imports.
 	dir, err := os.MkdirTemp(".", "emitted")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	if code, out := kogo(t, examples(t, "0[0-79]_*.kg", "20_*.kg"), dir); code != 0 || out != "" {
+	if code, out := kogo(t, examples(t, "*.kg"), dir); code != 0 || out != "" {
 		t.Fatalf("exit %d, want 0\n%s", code, out)
 	}
 	driver, err := os.ReadFile("testdata/driver.go")
@@ -137,6 +139,37 @@ none free: null
 slug: acme-3
 today in Sydney: 2026-11-16
 today in New York: 2026-11-15
+suppliers: [SupplierRow(id=00000000-0000-0000-0000-000000000002, legalName=Bolt Couriers, driverSharePercent=40)]
+abn of acme: 51824753556
+abn of bolt: null
+abn of nobody: null
+legal name: Bolt Couriers
+ann administers acme: true
+nobody administers acme: false
+business: Business(id=00000000-0000-0000-0000-000000000001, slug=acme, legalName=Acme Pty Ltd, createdAt=2026-01-02T03:04:05Z, abn=51824753556, abnCheckedAt=null, payid=null, payidName=null)
+business of no slug: null
+administered: [Administered(id=00000000-0000-0000-0000-000000000001, legalName=Acme Pty Ltd, storefront=Storefront(id=00000000-0000-0000-0000-000000000004, slug=acme-store)), Administered(id=00000000-0000-0000-0000-000000000002, legalName=Bolt Couriers, storefront=null)]
+drivers: [LinkedDriver(name=Ann, email=ann@example.com, active=true)]
+inactive drivers: []
+invoice: Invoice(id=00000000-0000-0000-0000-000000000005, number=INV-1, totalCents=1000)
+invoice for update: Invoice(id=00000000-0000-0000-0000-000000000006, number=INV-2, totalCents=null)
+no invoice: null
+paid invoices: 1
+business by id: Business(id=00000000-0000-0000-0000-000000000001, legalName=Acme Pty Ltd)
+held: Acme Pty Ltd
+hold of nobody: null
+locked: 1
+legal name of nobody panics: querySingle read no row, and reads exactly one: select legal_name from business where id = $1
+fees of a missing invoice panics: The eligible fees changed before they were recorded
+fees, the first rolled back: kotlin.Unit
+invite's kind: outside
+invite's share: null
+accept with no share: Either.Left(NoShare)
+invite again: 25
+the same invite: true
+accept: Either.Right(kotlin.Unit)
+accept again: Either.Left(NoInvite)
+suppliers after: [SupplierRow(id=00000000-0000-0000-0000-000000000002, legalName=Bolt Couriers, driverSharePercent=25)]
 `
 	if err != nil || string(out) != want {
 		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)
@@ -152,8 +185,8 @@ func TestEmitRefuses(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	code, out := kogo(t, map[string]string{"a.kg": "package a\n\nfun f(tx: Tx): Int = 1\n"}, dir)
-	want := `{"file":"a.kg","line":3,"column":1,"code":"not-yet-emitted","message":"a Tx (spec.md 10) is not emitted yet: the next slice of the emitter writes SQL and transactions"}
+	code, out := kogo(t, map[string]string{"a.kg": "package a\n\nfun f(x: Int?): Int? = x.takeIf { true }\n"}, dir)
+	want := `{"file":"a.kg","line":3,"column":24,"code":"not-yet-emitted","message":"a nullable type argument for T, which is used as T? where it is declared, is not emitted yet: pass a type that is not nullable, and keep the null outside"}
 `
 	if written, _ := os.ReadDir(dir); code != 1 || out != want || len(written) != 0 {
 		t.Errorf("exit %d, want 1, with %d files written\n got %s\nwant %s", code, len(written), out, want)

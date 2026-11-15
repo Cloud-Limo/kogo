@@ -9,6 +9,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"kogo/rt"
 )
 
@@ -238,7 +240,7 @@ func TestPortCalls(t *testing.T) {
 		{rt.ToString(List_FirstOrNull(EmptyList[int32]())), "null"},
 		{rt.ToString(List_ToSet(ListOf[int32](2, 1, 2, 3))), "[2, 1, 3]"},
 		{rt.ToString(A_To[int32, string](1, "a")), "(1, a)"},
-		{rt.ToString(Decimal{"1.50"}) + " " + rt.ToString(Decimal_ToDouble(Decimal{"1.50"})), "1.50 1.5"},
+		{rt.ToString(Decimal("1.50")) + " " + rt.ToString(Decimal_ToDouble(Decimal("1.50"))), "1.50 1.5"},
 		// Go's regexp skips an empty match just after a match, where
 		// Kotlin's gives "-a--c-" (spec.md 12).
 		{String_Replace("abc", re("b*"), "-"), "-a-c-"},
@@ -253,10 +255,10 @@ func TestPortCalls(t *testing.T) {
 	if !String_StartsWith("+61 4", "+") || String_StartsWith("61", "+") || !List_IsNotEmpty(ListOf(1)) || List_IsNotEmpty(EmptyList[int]()) {
 		t.Error("startsWith or isNotEmpty")
 	}
-	if EmptyList[int]() == nil || !math.IsInf(Decimal_ToDouble(Decimal{"1e400"}), 1) {
+	if EmptyList[int]() == nil || !math.IsInf(Decimal_ToDouble(Decimal("1e400")), 1) {
 		t.Error("emptyList is nil, or a numeric past Double is not Infinity")
 	}
-	if rt.Equal(Decimal{"1.50"}, Decimal{"1.5"}) || !rt.Equal(Decimal{"1.50"}, Decimal{"1.50"}) {
+	if rt.Equal(Decimal("1.50"), Decimal("1.5")) || !rt.Equal(Decimal("1.50"), Decimal("1.50")) {
 		t.Error("a Decimal's == is not Java's, which counts the scale")
 	}
 	list := ListOf[int32](1, 2)
@@ -291,4 +293,19 @@ func TestPortCalls(t *testing.T) {
 		}
 	}()
 	CheckNotNull[int](nil, func() string { return "gone" })
+}
+
+// A Decimal is a numeric as Postgres writes it, digit for digit, and
+// goes back as it came. A null is no Decimal and no Uuid. The rest of
+// db.go needs a database: emit's tests run it.
+func TestPostgres(t *testing.T) {
+	for _, text := range []string{"12.50", "-0.001", "1500", "NaN", "Infinity", "-Infinity"} {
+		var back Decimal
+		if n, err := Decimal(text).NumericValue(); err != nil || back.ScanNumeric(n) != nil || string(back) != text {
+			t.Errorf("%s comes back as %s (%v)", text, back, err)
+		}
+	}
+	if new(Decimal).ScanNumeric(pgtype.Numeric{}) == nil || new(Uuid).ScanUUID(pgtype.UUID{}) == nil {
+		t.Error("a null is read as a value")
+	}
 }

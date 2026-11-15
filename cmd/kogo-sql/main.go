@@ -1,8 +1,7 @@
 // Command kogo-sql checks the sql literals of .kg files against Postgres.
 // A file that does not parse is reported and its literals are not checked.
 //
-//	kogo-sql check <dir>          print each literal's signature, or its error, one JSON object a line
-//	kogo-sql emit <dir> <package> print a Go file with one function per literal
+//	kogo-sql check <dir>   print each literal's signature, or its error, one JSON object a line
 //
 // The database is $DATABASE_URL, or the PG* variables when that is unset.
 // It exits 0 when every literal passes, 1 when one fails, 2 when it could not run.
@@ -17,7 +16,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -56,30 +54,13 @@ func encoder(w io.Writer) *json.Encoder {
 	return e
 }
 
-var nonWord = regexp.MustCompile(`\W`)
-
-// funcName names the Go function of the literal at line and column of
-// a file, rel being its path from the directory without .kg. Mapping
-// the path to a Go name can make two files' names alike; used holds
-// the names given, and a name already given gets a number added.
-func funcName(rel string, line, column int, used map[string]bool) string {
-	base := fmt.Sprintf("Q%sL%dC%d", nonWord.ReplaceAllString(rel, "_"), line, column)
-	name := base
-	for n := 2; used[name]; n++ {
-		name = fmt.Sprintf("%s_%d", base, n)
-	}
-	used[name] = true
-	return name
-}
-
 func run(args []string, stdout, stderr io.Writer) int {
 	fatal := func(code string, err error) int {
 		encoder(stderr).Encode(diagnostic{Code: code, Message: err.Error()})
 		return 2
 	}
-	emit := len(args) == 3 && args[0] == "emit"
-	if !emit && (len(args) != 2 || args[0] != "check") {
-		return fatal("usage", errors.New("usage: kogo-sql check <dir>, or kogo-sql emit <dir> <package>"))
+	if len(args) != 2 || args[0] != "check" {
+		return fatal("usage", errors.New("usage: kogo-sql check <dir>"))
 	}
 	ctx := context.Background()
 	checker, err := sqlpass.Connect(ctx, os.Getenv("DATABASE_URL"))
@@ -89,12 +70,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	defer checker.Close(ctx)
 	ask := check.Signer(ctx, checker)
 
-	out, faults := encoder(stdout), encoder(stdout)
-	if emit {
-		faults = encoder(stderr)
-	}
-	var funcs []sqlpass.Func
-	names := map[string]bool{}
+	out := encoder(stdout)
 	failed := false
 	err = filepath.WalkDir(args[1], func(file string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(file, ".kg") {
@@ -108,7 +84,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		var bad *syntax.Error
 		if errors.As(err, &bad) {
 			failed = true
-			faults.Encode(diagnostic{file, bad.Line, bad.Column, bad.Code, bad.Message})
+			out.Encode(diagnostic{file, bad.Line, bad.Column, bad.Code, bad.Message})
 			return nil
 		}
 		for _, lit := range tree.SQL {
@@ -119,12 +95,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 			case errors.As(err, &fault):
 				failed = true
 				line, column = position(string(bytes), lit.TextPos.Offset+fault.Offset)
-				faults.Encode(diagnostic{file, line, column, fault.Code, fault.Message})
+				out.Encode(diagnostic{file, line, column, fault.Code, fault.Message})
 			case err != nil:
 				return err
-			case emit:
-				rel, _ := filepath.Rel(args[1], strings.TrimSuffix(file, ".kg"))
-				funcs = append(funcs, sqlpass.Func{Name: funcName(rel, line, column, names), Stmt: st, Exists: lit.Call == "exists"})
 			default:
 				sig := signature{file, line, column, []named{}, []named{}}
 				for _, p := range st.Params {
@@ -147,13 +120,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	if failed {
 		return 1
-	}
-	if emit {
-		src, err := sqlpass.Emit(args[2], funcs)
-		if err != nil {
-			return fatal("sql-emit", err)
-		}
-		stdout.Write(src)
 	}
 	return 0
 }

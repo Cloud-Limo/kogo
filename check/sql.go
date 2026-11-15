@@ -156,7 +156,7 @@ func (c *checker) row(lit *syntax.SQL, q *Query) {
 		missed := c.fill(lit, d, "", nil, false, cols, q.Paths)
 		for i, path := range q.Paths {
 			owned := slices.ContainsFunc(missed, func(m *Named) bool {
-				return slices.ContainsFunc(m.Decl.Props, func(p *Var) bool { return snake(p.Name) == cols[i].Name })
+				return slices.ContainsFunc(m.Decl.Props, func(p *Var) bool { return Snake(p.Name) == cols[i].Name })
 			})
 			if path == nil && !owned {
 				c.errorf(lit, "sql-column-unused", "column %s fills no property of %s: add a property %s, or leave the column out",
@@ -195,11 +195,11 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 	prefixed := func(name string) bool {
 		return slices.ContainsFunc(cols, func(col sqlpass.Column) bool {
 			return strings.HasPrefix(col.Name, name) &&
-				!slices.ContainsFunc(d.Decl.Props, func(p *Var) bool { return prefix+snake(p.Name) == col.Name })
+				!slices.ContainsFunc(d.Decl.Props, func(p *Var) bool { return prefix+Snake(p.Name) == col.Name })
 		})
 	}
 	for i, p := range d.Decl.Props {
-		t, name, here := subst(p.Type, b), prefix+snake(p.Name), append(slices.Clip(path), i)
+		t, name, here := subst(p.Type, b), prefix+Snake(p.Name), append(slices.Clip(path), i)
 		what := d.Decl.Name + "." + p.Name
 		n := dataClass(t)
 		j := slices.IndexFunc(cols, func(col sqlpass.Column) bool { return col.Name == name })
@@ -278,7 +278,7 @@ func (c *checker) fields(lit *syntax.SQL, col sqlpass.Column, d *Named) {
 	b := bind(d.Decl.Params, d.Args)
 	used := make([]bool, len(col.Type.Fields))
 	for _, p := range d.Decl.Props {
-		name := snake(p.Name)
+		name := Snake(p.Name)
 		j := slices.IndexFunc(col.Type.Fields, func(f sqlpass.Column) bool { return f.Name == name })
 		if j < 0 {
 			c.errorf(lit, "sql-field-missing", "no field of column %s fills %s.%s: %s has no field %s; name the property after one of its fields, or select columns",
@@ -412,9 +412,9 @@ func kogoName(pt sqlpass.Type) string {
 	return s
 }
 
-// snake gives the column name that fills a property: legalName is
-// legal_name.
-func snake(name string) string {
+// Snake gives the name of the column, or of the field of a composite
+// type, that fills a property: legalName is legal_name.
+func Snake(name string) string {
 	var b strings.Builder
 	for i, r := range name {
 		if unicode.IsUpper(r) {

@@ -1,11 +1,13 @@
 package emit
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -39,8 +41,24 @@ func emit(t *testing.T, root string, sources ...string) (*emitter, map[string][]
 		}
 		program = append(program, f)
 	}
-	// A sql literal's signature is the test's own: no parameters, no columns.
-	info, errs := check.Check(pre, program, func(*syntax.SQL) (*sqlpass.Statement, error) { return &sqlpass.Statement{}, nil })
+	// A sql literal is checked against the test database, which the
+	// driver then runs it against: $DATABASE_URL names it to both.
+	var sigs check.Signatures
+	if slices.ContainsFunc(program, func(f *syntax.File) bool { return f.SQL != nil }) {
+		url := os.Getenv("KOGO_TEST_DATABASE_URL")
+		if url == "" {
+			url = "postgres://kogo:kogo@127.0.0.1/kogo_test"
+		}
+		t.Setenv("DATABASE_URL", url)
+		ctx := context.Background()
+		db, err := sqlpass.Connect(ctx, url)
+		if err != nil {
+			t.Fatalf("no test database, create it with `mise run testdb`: %v", err)
+		}
+		defer db.Close(ctx)
+		sigs = check.Signer(ctx, db)
+	}
+	info, errs := check.Check(pre, program, sigs)
 	if errs != nil {
 		t.Fatalf("%s\n%v", strings.Join(sources, "\n---\n"), errs)
 	}
@@ -76,17 +94,28 @@ func build(t *testing.T, files func(root string) map[string][]byte) string {
 
 // run emits a program and runs a driver that prints the value of each
 // Go expression of calls, in package t, a line each as toString()
-// writes it.
-func run(t *testing.T, calls []string, sources ...string) []string {
+// writes it, or the panic it ends in. more is Go that the driver
+// declares, and setup Go that it runs first.
+func run(t *testing.T, more, setup string, calls []string, sources ...string) []string {
 	t.Helper()
 	out := build(t, func(root string) map[string][]byte {
 		_, files, errs := emit(t, root, sources...)
 		if errs != nil {
 			t.Fatalf("%v", errs)
 		}
-		driver := "package main\nimport (\n\"fmt\"\n\"kogo/rt\"\n\"ROOT/t\"\n)\nfunc main() {\n"
+		driver := "package main\nimport (\n\"fmt\"\n\"kogo/rt\"\n\"ROOT/t\"\n)\n" + more + `
+func show(value func() any) {
+defer func() {
+if p := recover(); p != nil {
+fmt.Println("panics:", p)
+}
+}()
+fmt.Println(rt.ToString(value()))
+}
+func main() {
+` + setup
 		for _, call := range calls {
-			driver += "fmt.Println(rt.ToString(" + call + "))\n"
+			driver += "show(func() any { return " + call + " })\n"
 		}
 		files["main.go"] = []byte(driver + "}\n")
 		return files
@@ -98,11 +127,16 @@ func run(t *testing.T, calls []string, sources ...string) []string {
 // compares what it gives, as text, with what the Kogo says it gives.
 func expect(t *testing.T, cases [][2]string, sources ...string) {
 	t.Helper()
+	expectWith(t, "", "", cases, sources...)
+}
+
+func expectWith(t *testing.T, more, setup string, cases [][2]string, sources ...string) {
+	t.Helper()
 	var calls []string
 	for _, c := range cases {
 		calls = append(calls, c[0])
 	}
-	got := run(t, calls, sources...)
+	got := run(t, more, setup, calls, sources...)
 	if len(got) != len(cases) {
 		t.Fatalf("%d lines, want %d:\n%s", len(got), len(cases), strings.Join(got, "\n"))
 	}
@@ -798,8 +832,8 @@ fun tally(words: List<String>): Pair<Int, String> {
 // wrongly, and so are two declarations that Go cannot tell apart.
 func TestRefused(t *testing.T) {
 	for _, c := range [][3]string{
-		{"fun f(tx: Tx): Int = 1", "1:1: not-yet-emitted", "a Tx (spec.md 10)"},
-		{"fun f(n: Int): Int {\n    val tx: Tx? = null\n    return if (tx == null) n else tx.execute(sql\"select 1\")\n}", "2:5: not-yet-emitted", "a Tx (spec.md 10)"},
+		{"enum class Kind { in_house, outside }\nfun f(tx: Tx, kinds: List<Kind>): Int = tx.execute(sql\"delete from invite where kind = any($kinds)\")", "2:93: not-yet-emitted", "a parameter that is a list of an enum"},
+		{"enum class Kind { in_house, outside }\nfun f(tx: Tx): List<Kind>? = tx.querySingle<List<Kind>?>(sql\"select array_agg(kind) as kinds from invite\")", "2:30: not-yet-emitted", "column kinds, which holds a list of an enum,"},
 		{"fun f(x: Int?): Int? = x.takeIf { true }", "1:24: not-yet-emitted", "a nullable type argument for T, which is used as T?"},
 		{"fun <T> none(x: T?): T? = x\nfun g(): Int? = none(null)", "2:17: not-yet-emitted", "write the type arguments, none<...>(...)"},
 		{"sealed interface S<out T> {\n    data class A<T>(val v: T) : S<T>\n}\nfun f(s: S<S.A<Int>>): S<S<Int>> = s", "4:36: not-yet-emitted", "build the value with the wider type argument"},

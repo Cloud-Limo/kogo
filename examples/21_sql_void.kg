@@ -1,0 +1,6 @@
+// exists and execute discard the result's columns, so they need no
+// Kogo type: a select of a void function passes under execute.
+package example
+
+fun lockInvoice(tx: Tx, key: Long): Int =
+    tx.execute(sql"select pg_advisory_xact_lock($key)")

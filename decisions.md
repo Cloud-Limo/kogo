@@ -580,9 +580,10 @@ Each entry: what was decided, why, and what would reopen it.
   Reopen when the examples are next reorganized.
 - **The refusals' codes**: `raise-receiver` for `Raise<E>` written anywhere in a program,
   reported at the type, so at the receiver of a fun; `kotlin-context` from the parser for
-  any `context(...)`, since Kogo has no context parameters of any kind; `with-error` for a
-  call of `withError`, from the table that refuses Kotlin's scope functions. Not taken:
-  keeping `withError` in `check/core.kg` only to refuse it.
+  any `context(...)` before a declaration or a local fun, since Kogo has no context
+  parameters of any kind, while a call of something named `context` is still a call;
+  `with-error` for a call of `withError`, from the table that refuses Kotlin's scope
+  functions. Not taken: keeping `withError` in `check/core.kg` only to refuse it.
 - **A fun whose receiver is refused says no more of what its body raises**, so a ported
   receiver function gets one error, not one for each `raise` in it.
 - **In a raise scope, a member of `this` does not hide `raise`, `ensure` or

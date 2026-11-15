@@ -222,6 +222,8 @@ func TestStatements(t *testing.T) {
 		// no declaration follows.
 		{"data.size\nvalue to key\nopen in s\nf { data -> data }\nfinal\ng()",
 			`[(Select (Ident data) size) (Binary to (Ident value) (Ident key)) (Binary in (Ident open) (Ident s)) (Call (Ident f) [(Arg (Lambda [(LambdaParam data)] (Block [(Ident data)])) Trailing)]) (Ident final) (Call (Ident g))]`},
+		// context is a name where no local fun follows its ( ).
+		{"context(a)\ng()", "[(Call (Ident context) [(Arg (Ident a))]) (Call (Ident g))]"},
 		{"fun g(x: Int = 1): Int {\n    return x\n}", `[(FunDecl g [(Param x (NamedType Int) (Literal Int 1))] (NamedType Int) (Block [(Jump return (Ident x))]))]`},
 	}, stmts)
 }

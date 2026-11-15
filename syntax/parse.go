@@ -307,7 +307,7 @@ func (p *parser) decl(abstract bool) Decl {
 	case p.at("sealed") && p.peek(1).text == "class":
 		p.notKogo(p.tok.pos, "class", "a sealed class", "use a sealed interface")
 	case p.at("context") && p.peek(1).text == "(":
-		p.notKogo(p.tok.pos, "context", "a context parameter", "take the value as a parameter, or for Raise<E> return an Either and bind it")
+		p.notKogo(p.tok.pos, "context", "a context parameter", contextFix)
 	}
 	kinds := []string{"data class", "data object", "sealed interface", "interface", "enum class", "annotation class"}
 	for _, k := range kinds {
@@ -690,6 +690,8 @@ func (p *parser) stmt() Stmt {
 		p.notKogo(pos, r[0], r[1], r[2])
 	case p.typeDeclAhead():
 		p.fail(pos, "syntax", "a type is declared at the top level of a file")
+	case p.contextAhead():
+		p.notKogo(pos, "context", "a context parameter", contextFix)
 	}
 	x := p.expr()
 	if p.tok.kind == tOp && slices.Contains(assignOps, p.tok.text) && !p.nl() {
@@ -702,6 +704,28 @@ func (p *parser) stmt() Stmt {
 		return a
 	}
 	return x
+}
+
+const contextFix = "take the value as a parameter, or for Raise<E> return an Either and bind it"
+
+// contextAhead reports whether a context(...) before a local fun is
+// next, rather than a call of something named context.
+func (p *parser) contextAhead() bool {
+	if !p.at("context") || p.peek(1).text != "(" {
+		return false
+	}
+	depth := 0
+	for n := 1; p.peek(n).kind != tEOF; n++ {
+		switch p.peek(n).text {
+		case "(":
+			depth++
+		case ")":
+			if depth--; depth == 0 {
+				return p.peek(n+1).text == "fun"
+			}
+		}
+	}
+	return false
 }
 
 // typeDeclAhead reports whether a type's declaration begins here.

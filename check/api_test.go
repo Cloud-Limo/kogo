@@ -58,6 +58,7 @@ func TestOperations(t *testing.T) {
 			"wire", "f's input holds In.s: S, and no sealed interface or variant of one crosses the wire: send a data class, with an enum that says which case it is"},
 		{rpc() + "api ops { ‸f }\nsealed interface S {\n    data class A(val n: Int) : S\n}\n" + op("Unit", "List<S.A>"), "wire", "f's answer holds a S.A, and no sealed interface or variant of one crosses"},
 		{rpc() + "api ops { ‸f }\nsealed interface S {\n    data object O : S\n}\n" + op("Unit", "S.O?"), "wire", "f's answer is a S.O?, and no sealed interface or variant of one crosses"},
+		{rpc() + "api ops { ‸f }\ndata object Done\n" + op("Unit", "Done"), "wire", "f's answer is a Done, which does not cross the wire: send an enum, or Unit as the whole input or answer"},
 		{rpc() + "api ops { ‸f }\ndata class In(val u: Unit)\n" + op("In", "Unit"), "wire", "f's input holds In.u: Unit"},
 		{rpc() + "api ops { ‸f }\ndata class In(val g: () -> Int)\n" + op("In", "Unit"), "wire", "holds In.g: () -> Int, which does not cross"},
 		{rpc() + "api ops { ‸f }\ndata class Page<T>(val items: List<T>)\n" + op("Unit", "Page<Int>"), "wire", "and a type on the wire has no type parameters"},

@@ -239,10 +239,10 @@ the answer, and turns a panic into a 500. JSON is read and written by
 one walk over the emitted types, as `==` is, by the names the structs
 already carry: no reader or writer is emitted for each type. Go's
 reflection does not list an enum's constants, so the table carries each
-that its inputs reach. Reruns are
-those of `db.tx(serializable = true)`, here with a limit, since a
-person is waiting: 90 seconds unless `main` says otherwise, and past it
-the answer is 503, so that a 500 always means a bug.
+that its inputs reach. Reruns are those of `db.tx(serializable = true)`,
+here with a limit, since a person is waiting: 90 seconds unless `main`
+says otherwise, and past it the answer is 503, so that a 500 always
+means a bug.
 
 **The application's `main`** is Go that it writes once, about fifteen
 lines: read the configuration, open the pool, build the environment's

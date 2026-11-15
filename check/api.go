@@ -220,6 +220,8 @@ func (c *checker) wire(id *syntax.Ident, what string, whole Type, w *reach) {
 			walk(n.Args[0], path)
 		case d.Kind == "sealed interface" || slices.ContainsFunc(d.Supers, func(s *Named) bool { return s.Decl.Kind == "sealed interface" }):
 			bad(t, path, "and no sealed interface or variant of one crosses the wire: send a data class, with an enum that says which case it is")
+		case d.Kind == "data object":
+			bad(t, path, "which does not cross the wire: send an enum, or Unit as the whole input or answer")
 		case d.Kind != "enum class" && d.Kind != "data class":
 			bad(t, path, "which does not cross the wire: send text the server has formatted")
 		case len(d.Params) > 0:

@@ -44,14 +44,12 @@ func newReader(enums []any) reader {
 	return r
 }
 
-// name is a data class's or a data object's simple Kogo name, from its
-// tag.
+// name is a data class's simple Kogo name, from its tag.
 func name(t reflect.Type) string {
 	if t.NumField() == 0 {
 		return "Unit"
 	}
-	n, _, _ := strings.Cut(t.Field(0).Tag.Get("kogo"), ",")
-	return n
+	return t.Field(0).Tag.Get("kogo")
 }
 
 func quote(s string) string {

@@ -220,25 +220,24 @@ Each entry: what was decided, why, and what would reopen it.
   list names, a step the reader does not see, which for a `Db` operation would need a
   transaction of its own. An application that wants the context calls its builder on its
   first line. Accepted cost: four parameters on every operation.
-- **The wire carries what cusoon2 sends today** (15 Nov 2026;
-  spec 15.4): `Boolean`, `Int`, `Long`, `Double`, `String`, `Uuid`, enums, data classes,
-  `List`, `T?` and `Unit`; names as written, nothing optional, and strict reading, a
-  missing, unknown or mistyped key being a 400. cusoon2's 20 operations send 35 data
-  classes with 107 fields: 53 `String`, 14 ids, 13 data classes or enums, 12 `Int`, 7
-  lists, 4 `Boolean`, 3 `Long`, 1 `Double`; 22 may be null. Sealed interfaces were added
-  on Greg's question of what they are good for, and taken off again the same day
-  (DEV-855): cusoon2's `AcceptInviteInput` has two nullable fields whose three valid
-  combinations are stated in a comment, which a sealed input would let TypeScript and
-  `when` hold, but no operation sends one. They cost about 115 lines of code and 40 of
-  tests across the checker, the server, the emitter's table and `kogo ts`, and rules of
-  their own: the `type` key, a `data object` alone, a property named `type`, and whether
-  a variant sent alone carries `type`. A sealed interface or a variant on the wire is a
-  compile error that asks for a data class with an enum. Adding them back breaks no
-  program; taking them out once used would. Reopen when an operation's input has field
-  combinations that only a comment states. Not taken:
-  dates and times, which cusoon2 sends as text it has formatted; maps. Each can be added
-  and break nothing. Forced, not chosen: a `Double` that is `NaN` or an infinity has no
-  JSON, so an answer holding one panics.
+- **The wire carries what cusoon2 sends today** (15 Nov 2026; spec 15.4): `Boolean`,
+  `Int`, `Long`, `Double`, `String`, `Uuid`, enums, data classes, `List`, `T?` and `Unit`;
+  names as written, nothing optional, and strict reading, a missing, unknown or mistyped
+  key being a 400. cusoon2's 20 operations send 35 data classes with 107 fields: 53
+  `String`, 14 ids, 13 data classes or enums, 12 `Int`, 7 lists, 4 `Boolean`, 3 `Long`, 1
+  `Double`; 22 may be null. Sealed interfaces were added on Greg's question of what they
+  are good for, and taken off again the same day (DEV-855): cusoon2's `AcceptInviteInput`
+  has two nullable fields whose three valid combinations are stated in a comment, which a
+  sealed input would let TypeScript and `when` hold, but no operation sends one. They cost
+  about 115 lines of code and 40 of tests in the checker and the server, more in the
+  emitter's table and `kogo ts` once written, and rules of their own: the `type` key, a
+  `data object` alone, a property named `type`, and whether a variant sent alone carries
+  `type`. A sealed interface or a variant on the wire is a compile error that asks for a
+  data class with an enum. Adding them back breaks no program; taking them out once used
+  would. Reopen when an operation's input has field combinations that only a comment
+  states. Not taken: dates and times, which cusoon2 sends as text it has formatted; maps.
+  Each can be added and break nothing. Forced, not chosen: a `Double` that is `NaN` or an
+  infinity has no JSON, so an answer holding one panics.
 - **A `Long` crosses as a number, within what JavaScript holds exactly** (15 Nov 2026;
   spec 15.4). JavaScript read `9007199254740993` from JSON as `9007199254740992`, with no
   error (run in node). cusoon2 sends a `Long` as a number unguarded; its three are cents,
@@ -1160,8 +1159,8 @@ Each entry: what was decided, why, and what would reopen it.
   `trace`. A 400's problem is not logged; its body tells the caller. A panic anywhere
   in the request, its reading too, is a 500 with that line.
 - **`NewHandler` panics if the table lacks an enum's entries that some input reaches**,
-  by one walk over each input type, so a table the
-  emitter got wrong fails when the server starts, not on the first request to use it.
+  by one walk over each input type, so a table the emitter got wrong fails when the
+  server starts, not on the first request to use it.
 - **`clientAddress` is the host of the connection's address.** Behind a proxy, `main`
   sets the request's `RemoteAddr` from the proxy's header before the handler sees it,
   since only `main` knows which proxy to trust. A header's first value is its value;
@@ -1184,10 +1183,11 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken checking api lists (DEV-849), not yet discussed
 
-- **A data class on the wire has no type parameters** (spec 15.4). cusoon2's generator refuses a generic class other than `List` and its own
-  `Outcome` (`rpc/typescript.kt`), and its operations send none. Allowing one would have
-  the checker read each use of the type apart, and `kogo ts` write generic types. Reopen
-  when an application wants one page type over several kinds of item.
+- **A data class on the wire has no type parameters** (spec 15.4). cusoon2's generator
+  refuses a generic class other than `List` and its own `Outcome` (`rpc/typescript.kt`),
+  and its operations send none. Allowing one would have the checker read each use of the
+  type apart, and `kogo ts` write generic types. Reopen when an application wants one page
+  type over several kinds of item.
 - **`Unit` crosses only as the whole input or answer** (spec 15.2 and 15.4), where it
   means none; a property of type `Unit` has nothing to send.
 - **A name in a list is one fun's** (spec 15.1): where two funs of the name are in scope

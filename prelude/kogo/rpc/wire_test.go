@@ -119,8 +119,8 @@ func TestStrict(t *testing.T) {
 	}
 }
 
-// A table that lacks an enum's entries that an input reaches, or whose
-// input cannot cross the wire, fails when the server starts.
+// A table that lacks an enum's entries that an input reaches fails
+// when the server starts.
 func TestCheck(t *testing.T) {
 	job := Db("job", func(kogo.Db, env, Request, Job) kogo.Either[string, rt.Unit] { return nil })
 	for _, c := range []struct {
@@ -128,7 +128,6 @@ func TestCheck(t *testing.T) {
 		want string
 	}{
 		{Table[env]{[]Operation[env]{job}, nil}, "the table holds no constants of the enum rpc.State"},
-		{Table[env]{[]Operation[env]{Db("f", func(kogo.Db, env, Request, any) kogo.Either[string, rt.Unit] { return nil })}, nil}, "no interface {} crosses the wire"},
 	} {
 		func() {
 			defer func() {

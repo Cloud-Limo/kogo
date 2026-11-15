@@ -117,7 +117,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			fatal.Encode(syntax.Error{Code: "no-module", Message: err.Error()})
 			return 2
 		}
-		written, faults = emit.Emit(info, pre, files, root)
+		written, faults = emit.Emit(info, pre, files, root, args[2])
 	}
 	if len(faults) == 0 && args[0] == "ts" {
 		written = ts.Files(info)

@@ -63,7 +63,7 @@ func enums(t sqlpass.Type) bool {
 // from them by the checker's paths.
 func (e *emitter) reader(q *check.Query, to check.Type) string {
 	dests := make([]string, len(q.Stmt.Columns))
-	body := e.capture(func() {
+	body := e.inner(func() {
 		code, _ := e.fill(q, q.Row, nil, false, dests)
 		e.w("scan(%s)", strings.Join(dests, ", "))
 		e.w("return %s", e.convert(code, q.Row, to))

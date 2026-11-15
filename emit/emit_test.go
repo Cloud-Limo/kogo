@@ -26,7 +26,8 @@ func must[T any](v T, err error) T {
 
 // emit checks the files of a program, t1.kg and on, against the real
 // prelude and gives what the emitter makes of them, as written under
-// a directory whose import path is root.
+// a directory whose import path is root: build's, which lies in this
+// package's directory under the last element of root.
 func emit(t *testing.T, root string, sources ...string) (*emitter, map[string][]byte, []*syntax.Error) {
 	t.Helper()
 	pre, err := prelude.Files()
@@ -62,7 +63,7 @@ func emit(t *testing.T, root string, sources ...string) (*emitter, map[string][]
 	if errs != nil {
 		t.Fatalf("%s\n%v", strings.Join(sources, "\n---\n"), errs)
 	}
-	e, files, errs := emitAll(info, pre, program, root)
+	e, files, errs := emitAll(info, pre, program, root, filepath.Base(root))
 	return e, files, errs
 }
 
@@ -683,10 +684,46 @@ trace(func() { t.Divide(1, 0) })
 `)
 		return files
 	})
+	// The Go is in <out>/t/, two directories below t1.kg, which it
+	// names by a relative path that Go resolves from there.
+	src := regexp.QuoteMeta(must(filepath.Abs("t1.kg")))
 	for _, line := range []string{"5", "8"} {
-		if !regexp.MustCompile(`/t1\.kg:` + line + `\D`).MatchString(out) {
+		if !regexp.MustCompile(src + `:` + line + `\D`).MatchString(out) {
 			t.Errorf("no trace names t1.kg:%s:\n%s", line, out)
 		}
+	}
+}
+
+// The emitted Go names its source by a path relative to itself, and
+// starts each line's code at one column, after the line's directive,
+// indented a tab for each block or closure it is in.
+func TestLayout(t *testing.T) {
+	_, files, errs := emit(t, "x", "package t\n\nfun f(n: Int): Int {\n    val g = { x: Int ->\n        x + n\n    }\n    return g(2)\n}\n")
+	if errs != nil {
+		t.Fatalf("%v", errs)
+	}
+	text := string(files["t/kogo.go"])
+	if cwd := must(os.Getwd()); strings.Contains(text, cwd) {
+		t.Errorf("an absolute path, %s, in:\n%s", cwd, text)
+	}
+	column, inner := 0, ""
+	for _, line := range strings.Split(text, "\n") {
+		dir := regexp.MustCompile(`^/\*line \.\./\.\./t1\.kg:\d+\*/ +`).FindString(line)
+		if dir == "" {
+			continue
+		}
+		if column == 0 {
+			column = len(dir)
+		}
+		if len(dir) != column {
+			t.Errorf("code at column %d, not %d: %q", len(dir), column, line)
+		}
+		if strings.Contains(line, "x_ + n_") {
+			inner = line[len(dir):]
+		}
+	}
+	if column == 0 || !strings.HasPrefix(inner, "\t\treturn ") {
+		t.Errorf("no line in a closure in a fun two tabs in:\n%s", text)
 	}
 }
 
@@ -870,7 +907,7 @@ func TestPrelude(t *testing.T) {
 			t.Fatal(err)
 		}
 		info, _ := check.Check(pre, nil, nil)
-		e, _, _ := emitAll(info, pre, nil, "x")
+		e, _, _ := emitAll(info, pre, nil, "x", "x")
 		e.pkg, e.imports, e.fn = "main", map[string]string{}, &scope{names: map[any]string{}, used: map[string]bool{}}
 		uses, n := "", 0
 		fun := func(f *check.Func) {

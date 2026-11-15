@@ -32,7 +32,9 @@ constraints) is worth typing.
 4. **Postgres is the type checker for SQL.** Never re-implement SQL
    typing; ask the database.
 5. **Go is a backend, not a source language.** Nobody reads the emitted
-   Go, but `//line` directives map it back to the source.
+   Go, but line directives map it back to the source, written at the
+   start of each line: `/*line ../../src/a.kg:26*/`, padded so that
+   the code starts at one column, then indented a tab a level.
 6. **Small enough to hold in a prompt.** One way to do each thing; the
    spec replaces training data.
 7. **Precise errors.** Errors are machine-readable (file, line,
@@ -48,7 +50,7 @@ Source files ─────────────► 1 Parse
                                │
 Binding declarations ─────► 2 Type-check (nulls, when, errors, SQL)
 Dev Postgres (migrated) ──►    │
-                            3 Emit Go (with //line maps)
+                            3 Emit Go (a /*line*/ map starts each line)
                                │
                             4 go build (links pgx and Go libraries)
 ```

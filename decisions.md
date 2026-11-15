@@ -498,6 +498,29 @@ Each entry: what was decided, why, and what would reopen it.
   DEV-861). On a `Review:` or `Ruling:` that leaves nothing to change and that it agrees
   with, the lead runs the tests and merges at the reviewed sha, without a `Fixed:`. Not
   taken: a Fix session that changes nothing, which adds a step and no reader.
+- **The emitted Go names its source inline, by a relative path** (15 Nov 2026). Each line of
+  Go begins with its own position, `/*line ../../src/a.kg:26*/`, padded so that a file's
+  code starts at one column, then indented a tab for each block or closure it is in. Nobody
+  reads the Go (principle 5) until an agent chases a panic or an emitter fault, and then every
+  line it loads costs: in example 22 the `//line` lines above each line were half the file's
+  lines and 56% of its bytes. Inline and relative, the same mapping holds on half the lines
+  with about a third of the path, and the same program emits the same bytes on any machine.
+  The indentation shows which closure a line is in, where `either`, `db.tx` and the scan
+  functions nest. Go resolves a relative path from the directory of the Go file that holds
+  it. Limitation: move `<out>` or the sources relative to each other and traces name a path
+  that is not there, with the line still right; emit again. Not taken: a directive on a line
+  of its own, which doubles the lines; directives only where the line jumps, which saved 8 of
+  101 in example 22 and lets positions drift into code that has none; one at the end of the
+  line, which sets the newline's position and so must name the line before; an option to
+  omit them, which costs an agent the trace it needs most, when one `sed` strips them;
+  keeping `//line` lines and running gofmt over the output, which keeps every position
+  (checked over example 22's 156 statements, calls and closures) in about 5 lines of code,
+  but doubles the lines, and an agent's tools count lines (a read's limit, grep's context, a
+  diff's hunks), while inline each line carries its own position; gofmt cannot run over the
+  inline form, since it moves a directive before `func` or `}` to a line of its own, which
+  shifts that line by one; absolute paths, half the file's bytes and different on every
+  machine. Reopen if Go stops resolving a relative path from the file's directory, or an
+  application must move `<out>` after emitting.
 
 ## Taken in the v0 spec, not yet discussed
 
@@ -1072,7 +1095,7 @@ Each entry: what was decided, why, and what would reopen it.
   `querySingle` stop at a second row, so the text says "more than one row", not how many.
 - **`24:00` in a `time` is a panic, as is sending a `Duration` past an int64 of
   microseconds** (spec 10.4). Postgres holds `24:00:00`; `java.time.LocalTime` does not.
-  A `Duration` of over about 292,000 years would wrap to a wrong interval. The `//line` directives
+  A `Duration` of over about 292,000 years would wrap to a wrong interval. The line directives
   give the Kogo line.
 - **`db.tx(serializable = true)` reruns without a limit**, as the spec says, on SQLSTATE
   40001 and 40P01 only, whether the block or the commit met it. Without `serializable`
@@ -1362,6 +1385,23 @@ Each entry: what was decided, why, and what would reopen it.
 - **The lead does not commit.** Its decisions reach the repository through the issue or the
   PR they belong to, so every change has had a Code review; the merge it makes is of such a
   PR. Reopen if that makes small corrections slow.
+
+## Taken writing line directives inline (DEV-857), not yet discussed
+
+- **`Emit` is told the directory it writes to**, as `out` after `root`, since a path relative
+  to the Go file needs it; `kogo emit` passes its `<out>`. Not taken: giving `Emit` each
+  file's path and leaving it to the caller to make them relative, which every caller would
+  repeat.
+- **One width for a Go file, the widest of its sources' directives.** A package of several
+  `.kg` files is one Go file, and its code starts at one column. The width is that of the
+  directive naming each source's last line, found from the largest line of any node in its
+  tree, with one space after it. Not taken: a width per source, which starts a package's code
+  at a column for each file; reading the source again to count its lines, which tests that
+  parse text in memory cannot.
+- **A type's fields and a case's statements are a level in, as gofmt has them.** A struct, an
+  interface, a block, a `switch` and a closure each open a level; `} else {` and a `case`
+  close one and open the next. A line with no position (none is written today inside a
+  declaration) gets its tabs and no directive.
 
 ## Spec gaps found by the leakage ports, unresolved
 

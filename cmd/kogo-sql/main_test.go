@@ -32,7 +32,7 @@ func TestCheckExamples(t *testing.T) {
 		"10_sql_list.kg:7:27 (operatorId: Uuid) -> id: Uuid, legal_name: String, driver_share_percent: Int",
 		"11_sql_one_scalar.kg:6:26 (businessId: Uuid) -> abn: String?",
 		"11_sql_one_scalar.kg:9:28 (businessId: Uuid) -> legal_name: String",
-		"11_sql_one_scalar.kg:12:15 (personId: Uuid, businessId: Uuid) -> ?column?: Int?",
+		"11_sql_one_scalar.kg:12:15 (personId: Uuid, businessId: Uuid) -> ",
 		"12_sql_table_row.kg:17:27 (slug: String) -> id: Uuid, slug: String, legal_name: String, created_at: Instant, " +
 			"abn: String?, abn_checked_at: Instant?, payid: String?, payid_name: String?",
 		"13_sql_upsert_returning.kg:17:35 (id: Uuid, businessId: Uuid, kind: InviteKind, personId: Uuid, invitedBy: Uuid, share: Int) -> " +

@@ -111,7 +111,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		for _, lit := range tree.SQL {
 			line, column := lit.Line, lit.Column
-			st, err := checker.Check(ctx, lit.Text)
+			st, err := checker.Check(ctx, lit.Text, lit.Call == "exists" || lit.Call == "execute")
 			var fault *sqlpass.Error
 			switch {
 			case errors.As(err, &fault):

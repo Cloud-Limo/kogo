@@ -102,12 +102,20 @@ func TestSignatures(t *testing.T) {
 			`update supply_agreement set driver_share_percent = $share where driver_share_percent = any($shares::percent[])`,
 			"(share: Int, shares: List<Int>) -> "},
 	} {
-		st, err := c.Check(context.Background(), tc.literal)
+		st, err := c.Check(context.Background(), tc.literal, false)
 		if err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 		} else if got := signature(st); got != tc.want {
 			t.Errorf("%s:\n got %s\nwant %s", tc.name, got, tc.want)
 		}
+	}
+}
+
+// exists and execute discard the columns, so they need no Kogo type.
+func TestDiscardedColumns(t *testing.T) {
+	st, err := connect(t).Check(context.Background(), `select pg_advisory_xact_lock($key)`, true)
+	if err != nil || signature(st) != "(key: Long) -> " {
+		t.Errorf("got %v, %v; want (key: Long) -> ", st, err)
 	}
 }
 
@@ -118,7 +126,7 @@ func TestNoParseTreeIsAFailure(t *testing.T) {
 	if _, err := c.conn.Exec(context.Background(), "set client_min_messages = warning"); err != nil {
 		t.Fatal(err)
 	}
-	st, err := c.Check(context.Background(), `select legal_name from business`)
+	st, err := c.Check(context.Background(), `select legal_name from business`, false)
 	var e *Error
 	if err == nil || errors.As(err, &e) || !strings.Contains(err.Error(), "no parse tree") {
 		t.Errorf("got %v, %v; want a failure to check, not a fault in the literal", st, err)
@@ -158,11 +166,13 @@ func TestErrors(t *testing.T) {
 		{"braces inside an expression", `select «${ids.map { it }}`, "sql-parameter-syntax", "bind the value to a val"},
 		{"a type outside the table",
 			`«select created_at::timestamp as at from business`, "sql-unmapped-type", `column "at" has the Postgres type timestamp without time zone`},
+		{"a function returning void, when the columns are kept",
+			`«select pg_advisory_xact_lock(1)`, "sql-unmapped-type", `column "pg_advisory_xact_lock" has the Postgres type void`},
 		{"a parameter of a type outside the table",
 			`select id from business where created_at::timestamp = «$at`, "sql-unmapped-type", "parameter $at has the Postgres type timestamp without time zone"},
 	} {
 		offset := strings.Index(tc.literal, "«")
-		_, err := c.Check(context.Background(), strings.Replace(tc.literal, "«", "", 1))
+		_, err := c.Check(context.Background(), strings.Replace(tc.literal, "«", "", 1), false)
 		var e *Error
 		if !errors.As(err, &e) {
 			t.Errorf("%s: got %v, want an *Error", tc.name, err)

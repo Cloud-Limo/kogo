@@ -205,11 +205,13 @@ type StringLit struct {
 	Parts []Expr
 }
 
-// A SQL is a sql"..." or sql"""...""" literal. Text is what lies
-// between the quotes, starting at TextPos; Params are its $name and
-// ${expr} in order, each at its $.
+// A SQL is a sql"..." or sql"""...""" literal, the argument of the
+// call named Call (query, ..., execute). Text is what lies between
+// the quotes, starting at TextPos; Params are its $name and ${expr}
+// in order, each at its $.
 type SQL struct {
 	Pos
+	Call    string
 	Text    string
 	TextPos Pos
 	Params  []*SQLParam

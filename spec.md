@@ -346,7 +346,8 @@ fun suppliersOf(tx: Tx, operatorId: ID): List<SupplierRow> =
 | `tx.exists(sql"...")` | `Boolean` | true when at least one row |
 | `tx.execute(sql"...")` | `Int`, rows affected | |
 
-`insert`/`update`/`delete ... returning` go through the query calls.
+`insert`/`update`/`delete ... returning` go through the query calls. `exists` and `execute`
+discard the result's columns, so these are not typed and may have no type of section 10.4.
 
 ### 10.3 Result types
 

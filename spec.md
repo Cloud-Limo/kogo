@@ -200,7 +200,9 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
   type. Trailing-lambda call syntax as in Kotlin. Function references
   `::name` to top-level functions are allowed.
 - Lambdas with receivers (`T.() -> R`) do not exist, with one exception:
-  `Raise<E>` (section 9).
+  the block of `either { }` and of `withError`, whose receiver is a
+  `Raise<E>` (section 9). A function type with a receiver is not
+  written: take the value as a parameter, or return an `Either`.
 
 ### 5.1 Type arguments
 
@@ -409,6 +411,27 @@ scope* for `E`):
 Outside a raise scope a `Raise<E>` function cannot be called; wrap the
 call in `either { }`.
 
+- Each form fails with a type that fits the scope's `E`: `raise(e)`
+  needs an `e` that is an `E`, `bind` an `Either<E2, A>` whose `E2`
+  fits `E`, and a `Raise<E2>` function may be called where `E2` fits
+  `E`, so one that raises a variant runs where its sealed interface is
+  raised. Convert any other failure with `mapLeft` or `withError`.
+- A lambda inside a raise scope is in it, as in Kotlin:
+  `either { ids.map { load(it).bind() } }`. A local `fun` is not.
+  A lambda that fails into the scope is passed straight to the call
+  that runs it: kept as a value, in a `val` or as a result, it could
+  run outside the scope, and is refused.
+- A `Raise<E>` function is called on the raise scope as on a receiver.
+  Overloads that differ only in their `E` are chosen by the scope's,
+  and a member of `this` with the same name does not hide one, as it
+  hides an extension (section 5.2).
+- `Raise<E>` is written only as the receiver of a function, and that
+  function has no `this`. `either`'s `E` is settled as section 5.1
+  says, before its block is read: by the type wanted, or written,
+  `either<String, Int> { ... }`.
+- The forms' signatures are the checker's own, in `check/core.kg`, beside
+  `Either` itself.
+
 Working with an `Either` value:
 
 | Form | Meaning |
@@ -422,6 +445,11 @@ Working with an `Either` value:
 
 An `Either` value that is computed and then dropped is a compile error:
 bind it, fold it, return it or assign it.
+
+`Either.Left` and `Either.Right` are the variants of the sealed
+interface `Either`, each with a `value`. An `Either` is built only with
+`left()` and `right()`: `Either.Left(e)` is refused. The functions of
+this table are the prelude's, in `prelude/either.kg`.
 
 The error type `E` is any type. cusoon2 uses `String` (words for the
 user) at the RPC boundary and sealed interfaces elsewhere.

@@ -1,0 +1,12 @@
+// Working with an Either value (spec.md section 9). Either itself and
+// the forms of a raise scope are the core's, in check/core.kg.
+package kogo
+
+external fun <A> A.right(): Either<Nothing, A>
+external fun <E> E.left(): Either<E, Nothing>
+external fun <E, A, R> Either<E, A>.fold(ifLeft: (E) -> R, ifRight: (A) -> R): R
+external fun <E, A, F> Either<E, A>.mapLeft(f: (E) -> F): Either<F, A>
+external fun <E, A, B> Either<E, A>.map(f: (A) -> B): Either<E, B>
+external fun <E, A, B> Either<E, A>.flatMap(f: (A) -> Either<E, B>): Either<E, B>
+external fun <E, A> Either<E, A>.getOrElse(default: (E) -> A): A
+external fun <E, A> Either<E, A>.getOrNull(): A?

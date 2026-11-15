@@ -115,6 +115,8 @@ func (c *checker) stmt(s syntax.Stmt) Type {
 			}
 		case t != unknown && onlyValue(s):
 			c.errorf(first(s), "value-unused", "this statement is only a value, which nothing uses: assign it, return it or remove it")
+		case c.either(nonNull(t)) != nil:
+			c.errorf(first(s), "either-dropped", "this %s is dropped, and a failure with it: bind it, fold it, return it or assign it", t)
 		}
 		return t
 	}

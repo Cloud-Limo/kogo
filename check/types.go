@@ -17,10 +17,12 @@ type Named struct {
 // Nothing?.
 type Nullable struct{ Elem Type }
 
-// A FuncType is (A, B) -> R.
+// A FuncType is (A, B) -> R, or the block of a raise scope,
+// Raise<E>.() -> R, whose Receiver is Raise<E>.
 type FuncType struct {
-	Params []Type
-	Result Type
+	Receiver Type
+	Params   []Type
+	Result   Type
 }
 
 // A TypeParam is a type parameter of a declaration, read inside it.
@@ -38,7 +40,13 @@ var unknown Type = unknownType{}
 func (unknownType) String() string  { return "?" }
 func (t *TypeParam) String() string { return t.Name }
 func (t *Named) String() string     { return t.Decl.Name + list("<", t.Args, ">") }
-func (t *FuncType) String() string  { return "(" + list("", t.Params, "") + ") -> " + t.Result.String() }
+func (t *FuncType) String() string {
+	s := "(" + list("", t.Params, "") + ") -> " + t.Result.String()
+	if t.Receiver != nil {
+		return t.Receiver.String() + "." + s
+	}
+	return s
+}
 
 func (t *Nullable) String() string {
 	if f, ok := t.Elem.(*FuncType); ok {
@@ -128,7 +136,10 @@ func fits(got, want Type) bool {
 		return true
 	case *FuncType:
 		w, ok := want.(*FuncType)
-		if !ok || len(g.Params) != len(w.Params) || !fits(g.Result, w.Result) {
+		if !ok || len(g.Params) != len(w.Params) || !fits(g.Result, w.Result) || (g.Receiver == nil) != (w.Receiver == nil) {
+			return false
+		}
+		if g.Receiver != nil && !fits(g.Receiver, w.Receiver) {
 			return false
 		}
 		for i := range g.Params {
@@ -216,7 +227,7 @@ func subst(t Type, b binding) Type {
 			return &Named{t.Decl, substAll(t.Args, b)}
 		}
 	case *FuncType:
-		return &FuncType{substAll(t.Params, b), subst(t.Result, b)}
+		return &FuncType{subst(t.Receiver, b), substAll(t.Params, b), subst(t.Result, b)}
 	}
 	return t
 }
@@ -271,6 +282,9 @@ func unify(p, a Type, b binding, found func(*TypeParam, Type)) {
 		}
 	case *FuncType:
 		if af, ok := nonNull(a).(*FuncType); ok && len(af.Params) == len(p.Params) {
+			if p.Receiver != nil && af.Receiver != nil {
+				unify(p.Receiver, af.Receiver, b, found)
+			}
 			for i := range p.Params {
 				unify(p.Params[i], af.Params[i], b, found)
 			}

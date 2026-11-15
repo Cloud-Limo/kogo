@@ -621,8 +621,8 @@ func (c *checker) typ1(t syntax.Type) Type {
 		if len(args) != len(params) {
 			return c.errorf(t, "type-arguments", "%s takes %d type arguments, and %d are written here", t.Name, len(params), len(args))
 		}
-		if r = subst(r, bind(params, args)); c.raised(r) != nil && c.file != c.core {
-			e := c.raised(r)
+		r = subst(r, bind(params, args))
+		if e := c.raised(r); e != nil && c.file != c.core {
 			return c.errorf(t, "raise-receiver", "%s is not written in a program (spec.md 9): return an Either<%s, A> from either<%s, A> { ... }, and bind it where it is called", r, e, e)
 		}
 		if t.Nullable {

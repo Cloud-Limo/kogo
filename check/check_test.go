@@ -704,7 +704,7 @@ func TestFacts(t *testing.T) {
 	}
 	info, errs := Check(pre, files, nil)
 	if errs != nil {
-		t.Fatalf("examples 01 to 09 and 20: %v", errs)
+		t.Fatalf("examples 00 to 07, 09 and 20: %v", errs)
 	}
 	for _, name := range []string{"01_pay", "04_sealed_when", "06_nullable", "07_either"} {
 		i := slices.IndexFunc(files, func(f *syntax.File) bool { return f.Name == name+".kg" })

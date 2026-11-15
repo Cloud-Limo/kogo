@@ -1,5 +1,5 @@
 // The driver of TestEmittedGoRuns: it calls the Go emitted for
-// examples 01 to 06 and 20 and prints what each gives. ROOT stands
+// examples 01 to 07, 09 and 20 and prints what each gives. ROOT stands
 // for the import path of the directory the Go is written to.
 package main
 
@@ -69,6 +69,19 @@ func main() {
 	show("no mobile", example.Contact(&example.Person{Name: "Cy"}))
 	show("mobile", example.MobileOf(example.Person{Name: "Ann", Mobile: rt.Ptr("0400")}))
 	panics("mobile of none", func() { example.MobileOf(example.Person{Name: "Cy"}) })
+
+	// 07: either { }, ensure, raise and bind; the first failure wins.
+	show("signup", example.Message(example.Signup(" Ann@Example.COM ", 30)))
+	show("signup with a bad email", example.Message(example.Signup("ann", 30)))
+	show("signup too young", example.Message(example.Signup("a@b", 17)))
+	show("signup with both", example.Message(example.Signup("ann", 17)))
+	show("checked email", example.CheckedEmail("A@B"))
+
+	// 09: a failure converted at each layer.
+	show("load", example.Load(1))
+	show("load of a missing item", example.Load(2))
+	show("title of a missing item", example.Title(2))
+	show("title with missing items after", example.Title(1))
 
 	// 20: an interface, a generic fun, a loop and time.
 	var card example.Card = example.FlatCard{Label: "flat", Cents: 500}

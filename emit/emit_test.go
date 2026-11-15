@@ -645,14 +645,85 @@ trace(func() { t.Divide(1, 0) })
 	}
 }
 
+// A failure (spec.md 9) is recovered by its own raise scope: raised in
+// a lambda, through the prelude's Go that calls the lambda, and past a
+// scope of the same error type that the lambda is run inside.
+func TestFailures(t *testing.T) {
+	expect(t, [][2]string{
+		{`t.Total("12")`, "Either.Right(3)"},
+		{`t.Total("1x2")`, "Either.Left(no digit x)"},
+		{"t.Nested(1)", "Either.Left(outer)"},
+		{"t.Nested(2)", "Either.Right(Either.Right(2) Either.Left(inner))"},
+		{"t.Nested(3)", "Either.Right(Either.Right(3) Either.Right(3))"},
+		{`t.Found(rt.Ptr("abc"))`, "Either.Right(3)"},
+		{"t.Found(nil)", "Either.Left(none)"},
+		{"t.Wider(0)", "Either.Left(A(n=0))"},
+		{"t.Wider(1)", "Either.Right(2)"},
+	}, `package t
+
+fun digit(c: Char): Either<String, Int> = either {
+    ensure(c != 'x') { "no digit $c" }
+    c.digitToInt()
+}
+
+fun total(s: String): Either<String, Int> = either { s.map { digit(it).bind() }.sumOf { it } }
+
+fun <T> attempt(block: () -> T): Either<String, T> = either { block() }
+
+// The lambda given to attempt raises on nested's scope.
+fun nested(n: Int): Either<String, String> = either {
+    val passed = attempt { if (n == 1) raise("outer") else n }
+    val own = either<String, Int> { if (n == 2) raise("inner") else n }
+    "$passed $own"
+}
+
+fun found(p: String?): Either<String, Int> = either {
+    val q = p.let { ensureNotNull(it) { "none" } }
+    q.length
+}
+
+sealed interface S {
+    data class A(val n: Int) : S
+}
+
+fun a(n: Int): Either<S.A, Int> = if (n > 0) n.right() else S.A(n).left()
+
+fun wider(n: Int): Either<S, Int> = either { a(n).bind() + 1 }
+`)
+}
+
+// A panic that is not a failure is a bug (spec.md 8): it passes every
+// raise scope untouched, and its trace names the line it began at.
+func TestBugInScope(t *testing.T) {
+	out := build(t, func(root string) map[string][]byte {
+		_, files, errs := emit(t, root, "package t\n\nfun inner(n: Int): Either<String, Int> = either {\n    check(n > 0) { \"broken\" }\n    n\n}\n\nfun outer(): Either<String, Int> = either { inner(0).bind() }\n")
+		if errs != nil {
+			t.Fatalf("%v", errs)
+		}
+		files["main.go"] = []byte(`package main
+import (
+"fmt"
+"runtime/debug"
+"ROOT/t"
+)
+func main() {
+defer func() { fmt.Printf("recovered %q\n%s", recover(), debug.Stack()) }()
+t.Outer()
+}
+`)
+		return files
+	})
+	if !strings.HasPrefix(out, `recovered "broken"`) || !regexp.MustCompile(`/t1\.kg:4\D`).MatchString(out) {
+		t.Errorf("the panic of check does not reach the driver as it was, from t1.kg:4:\n%s", out)
+	}
+}
+
 // What is not emitted yet is refused where it stands, never emitted
 // wrongly, and so are two declarations that Go cannot tell apart.
 func TestRefused(t *testing.T) {
 	for _, c := range [][3]string{
-		{"fun f(n: Int): Either<String, Int> = n.right()", "1:1: not-yet-emitted", "a fun that can fail (spec.md 9)"},
-		{"fun f(n: Int): Int = either<String, Int> { n }.getOrElse { 0 }", "1:22: not-yet-emitted", "a call of either (spec.md 9 and 10)"},
-		{"fun f(tx: Tx): Int = 1", "1:1: not-yet-emitted", "a Tx (spec.md 9 and 10)"},
-		{"fun f(n: Int): Int {\n    val tx: Tx? = null\n    return if (tx == null) n else tx.execute(sql\"select 1\")\n}", "2:5: not-yet-emitted", "a Tx (spec.md 9 and 10)"},
+		{"fun f(tx: Tx): Int = 1", "1:1: not-yet-emitted", "a Tx (spec.md 10)"},
+		{"fun f(n: Int): Int {\n    val tx: Tx? = null\n    return if (tx == null) n else tx.execute(sql\"select 1\")\n}", "2:5: not-yet-emitted", "a Tx (spec.md 10)"},
 		{"fun f(x: Int?): Int? = x.takeIf { true }", "1:24: not-yet-emitted", "a nullable type argument for T, which is used as T?"},
 		{"fun <T> none(x: T?): T? = x\nfun g(): Int? = none(null)", "2:17: not-yet-emitted", "write the type arguments, none<...>(...)"},
 		{"sealed interface S<out T> {\n    data class A<T>(val v: T) : S<T>\n}\nfun f(s: S<S.A<Int>>): S<S<Int>> = s", "4:36: not-yet-emitted", "build the value with the wider type argument"},

@@ -127,12 +127,12 @@ func TestEither(t *testing.T) {
 	show := func(e any) string { return rt.ToString(e) }
 	double := func(n int32) int32 { return n * 2 }
 	for _, c := range [][2]string{
-		{show(right), "Right(value=2)"},
-		{show(Either_Map[string, int32, int32](right, double)), "Right(value=4)"},
-		{show(Either_Map[string, int32, int32](left, double)), "Left(value=no)"},
-		{show(Either_MapLeft[string, int32, int32](left, String_Length)), "Left(value=2)"},
-		{show(Either_MapLeft[string, int32, int32](right, String_Length)), "Right(value=2)"},
-		{show(Either_FlatMap[string, int32, int32](right, func(n int32) Either[string, int32] { return E_Left("gone") })), "Left(value=gone)"},
+		{show(right), "Either.Right(2)"},
+		{show(Either_Map[string, int32, int32](right, double)), "Either.Right(4)"},
+		{show(Either_Map[string, int32, int32](left, double)), "Either.Left(no)"},
+		{show(Either_MapLeft[string, int32, int32](left, String_Length)), "Either.Left(2)"},
+		{show(Either_MapLeft[string, int32, int32](right, String_Length)), "Either.Right(2)"},
+		{show(Either_FlatMap[string, int32, int32](right, func(n int32) Either[string, int32] { return E_Left("gone") })), "Either.Left(gone)"},
 		{show(Either_Fold[string, int32, int32](left, String_Length, double)), "2"},
 		{show(Either_GetOrElse[string, int32](left, String_Length)), "2"},
 		{show(Either_GetOrNull[string, int32](right)), "2"},

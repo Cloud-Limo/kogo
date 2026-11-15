@@ -36,7 +36,7 @@ func (e *emitter) typ(t check.Type) string {
 		}
 		return name
 	case *check.FuncType:
-		return "func(" + e.typs(t.Params) + ") " + e.typ(t.Result)
+		return "func(" + e.typs(ins(t)) + ") " + e.typ(t.Result)
 	case *check.Named:
 		if t.Decl.Kind == "builtin" {
 			if g := goTypes[t.Decl.Name]; g != "" {
@@ -45,7 +45,7 @@ func (e *emitter) typ(t check.Type) string {
 			return e.rt() + "." + t.Decl.Name
 		}
 		if e.later[t.Decl] {
-			e.notYet(e.at, "a "+t.Decl.Name+" (spec.md 9 and 10)", slices9and10)
+			e.notYet(e.at, "a "+t.Decl.Name+" (spec.md 10)", slice10)
 		}
 		for i, a := range t.Args {
 			if _, ok := a.(*check.Nullable); ok {
@@ -59,6 +59,16 @@ func (e *emitter) typ(t check.Type) string {
 		return s
 	}
 	panic(fmt.Sprintf("emit: no Go type for %v", t))
+}
+
+// ins gives what a Go function of the type t takes: its parameters,
+// after its receiver if it has one. Only a raise scope's block,
+// Raise<E>.() -> A, has one (spec.md 5).
+func ins(t *check.FuncType) []check.Type {
+	if t.Receiver == nil {
+		return t.Params
+	}
+	return append([]check.Type{t.Receiver}, t.Params...)
 }
 
 func (e *emitter) typs(ts []check.Type) string {
@@ -170,16 +180,21 @@ func (e *emitter) convert(code string, from, to check.Type) string {
 		// A variant as its sealed interface, or a sealed interface
 		// as itself with wider type arguments. Go converts, and the
 		// value keeps the Go type it was made with, which an is test
-		// must still find: so its type arguments may not change.
+		// must still find: so its type arguments may not change,
+		// except an Either's, which the prelude rebuilds.
 		for _, s := range f.Decl.Supers {
 			if s.Decl == t.Decl {
 				f = check.Subst(s, f.Decl.Params, f.Args).(*check.Named)
 			}
 		}
 		for i := range t.Args {
-			if f.Decl == t.Decl && !builtin(f.Args[i], "Nothing") && !e.same(f.Args[i], t.Args[i]) {
-				e.notYet(e.at, fmt.Sprintf("a %s used as a %s, whose type argument is another Go type", from, to), "build the value with the wider type argument, as "+t.Decl.Name+"<...>")
+			if f.Decl != t.Decl || builtin(f.Args[i], "Nothing") || e.same(f.Args[i], t.Args[i]) {
+				continue
 			}
+			if t.Decl == e.either {
+				return fmt.Sprintf("%s_widen(%s, %s, %s)", e.qualify(t.Decl.Pkg, e.names[t.Decl]), code, e.widener(f.Args[0], t.Args[0]), e.widener(f.Args[1], t.Args[1]))
+			}
+			e.notYet(e.at, fmt.Sprintf("a %s used as a %s, whose type argument is another Go type", from, to), "build the value with the wider type argument, as "+t.Decl.Name+"<...>")
 		}
 	case *check.FuncType:
 		t := to.(*check.FuncType)

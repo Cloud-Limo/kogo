@@ -14,11 +14,7 @@ import (
 func (e *emitter) decl(d syntax.Decl) {
 	defer e.enter(d)()
 	e.fn = &scope{names: map[any]string{}, used: map[string]bool{"this_": true}}
-	e.this, e.result, e.loops = nil, nil, nil
-	if e.info.Fails[d] != nil {
-		e.notYet(d, "a fun that can fail (spec.md 9)", slices9and10)
-		return
-	}
+	e.this, e.result, e.loops, e.raise = nil, nil, nil, nil
 	switch d := d.(type) {
 	case *syntax.ClassDecl:
 		e.class(d)
@@ -77,8 +73,11 @@ func (e *emitter) params(d *syntax.FunDecl, f *check.Func) (params string, defau
 
 // body writes a fun's body after its opening line, and closes it.
 func (e *emitter) body(d *syntax.FunDecl, f *check.Func, defaults func()) {
-	defer func(this, result check.Type, loops []*loop) { e.this, e.result, e.loops = this, result, loops }(e.this, e.result, e.loops)
-	if e.result, e.loops = f.Result, nil; f.Receiver != nil {
+	defer func(this, result check.Type, loops []*loop, r *raise) {
+		e.this, e.result, e.loops, e.raise = this, result, loops, r
+	}(e.this, e.result, e.loops, e.raise)
+	// A local fun is in no raise scope (spec.md 9).
+	if e.result, e.loops, e.raise = f.Result, nil, nil; f.Receiver != nil {
 		e.this = f.Receiver
 	}
 	defaults()

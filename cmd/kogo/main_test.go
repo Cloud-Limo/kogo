@@ -70,7 +70,7 @@ func TestExamples(t *testing.T) {
 	}
 }
 
-// The Go that kogo emit writes for examples 01 to 06 and 20 is built
+// The Go that kogo emit writes for examples 01 to 07, 09 and 20 is built
 // with testdata/driver.go and run: each result was worked out by hand
 // from the Kogo.
 func TestEmittedGoRuns(t *testing.T) {
@@ -80,7 +80,7 @@ func TestEmittedGoRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	if code, out := kogo(t, examples(t, "0[0-6]_*.kg", "20_*.kg"), dir); code != 0 || out != "" {
+	if code, out := kogo(t, examples(t, "0[0-79]_*.kg", "20_*.kg"), dir); code != 0 || out != "" {
 		t.Fatalf("exit %d, want 0\n%s", code, out)
 	}
 	driver, err := os.ReadFile("testdata/driver.go")
@@ -120,6 +120,15 @@ blank mobile: Bob
 no mobile: Cy
 mobile: 0400
 mobile of none panics: person Cy has no mobile
+signup: Welcome, ann@example.com.
+signup with a bad email: ann is not an email address.
+signup too young: You must be 18.
+signup with both: ann is not an email address.
+checked email: Either.Right(a@b)
+load: Either.Right(one)
+load of a missing item: Either.Left(Missing)
+title of a missing item: Either.Left(No item 2.)
+title with missing items after: Either.Left(No items after 1.)
 card: FlatCard(label=flat, cents=500)
 fee: 500
 label: flat
@@ -143,8 +152,8 @@ func TestEmitRefuses(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	code, out := kogo(t, map[string]string{"a.kg": "package a\n\nfun f(n: Int): Either<String, Int> = n.right()\n"}, dir)
-	want := `{"file":"a.kg","line":3,"column":1,"code":"not-yet-emitted","message":"a fun that can fail (spec.md 9) is not emitted yet: the next slices of the emitter write failures, then SQL and transactions"}
+	code, out := kogo(t, map[string]string{"a.kg": "package a\n\nfun f(tx: Tx): Int = 1\n"}, dir)
+	want := `{"file":"a.kg","line":3,"column":1,"code":"not-yet-emitted","message":"a Tx (spec.md 10) is not emitted yet: the next slice of the emitter writes SQL and transactions"}
 `
 	if written, _ := os.ReadDir(dir); code != 1 || out != want || len(written) != 0 {
 		t.Errorf("exit %d, want 1, with %d files written\n got %s\nwant %s", code, len(written), out, want)

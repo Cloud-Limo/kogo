@@ -34,8 +34,8 @@ import kogo.time.Instant
   means public. There is no `protected`.
 - Comments: `//`, `/* */` and `/** */`. KDoc is kept as a comment.
 - The declarations of package `kogo` (section 12, and the functions of
-  sections 8 and 9) are in scope in every file. `kogo.time` is imported
-  by name.
+  sections 8 and 9) are in scope in every file. `kogo.time` and
+  `kogo.text` are imported by name.
 
 ## 3. Types
 
@@ -740,6 +740,12 @@ Postgres sent, exactly: it has `toDouble`, `toString`, `==` and
 (`ofDays`, `ofMinutes`, `ofSeconds`), `Clock.now()`. There is no default
 zone: every conversion names its zone.
 
+**Text** (`kogo.text`). `plain(value: Double): String` writes a number
+as its shortest digits, with no exponent and no trailing `.0`: `5.0` is
+`5`, `12.5` is `12.5`, `1.0E7` is `10000000`. Negative zero is `0`. `NaN`
+and an infinity have no digits and are a bug: `plain` panics. The
+smallest `Double` ends in `5`, where Java's `BigDecimal` writes `49`.
+
 **Ids.** `Uuid`, `Uuid.parse(text): Uuid?`, `newId(): Uuid` (time-ordered
 random).
 
@@ -815,6 +821,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `X::class`, reflection | nothing; the only `::class` is inside `@file:OptIn(...)` |
 | annotations other than markers | nothing |
 | `String.format`, `Locale` | string templates, `padStart` |
+| `BigDecimal.valueOf(x).stripTrailingZeros().toPlainString()` | `plain(x)`, from `kogo.text` |
 | `by lazy`, delegation | compute it once and pass it |
 | `vararg`, `*spread` | a `List` |
 | `inline`, `reified`, `operator`, `infix` | a plain function |

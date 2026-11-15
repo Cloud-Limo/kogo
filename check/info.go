@@ -5,7 +5,11 @@
 // signatures, and reports errors or gives the facts the emitter needs.
 package check
 
-import "kogo/syntax"
+import (
+	"strings"
+
+	"kogo/syntax"
+)
 
 // Info is what the checker learned about a program: tables keyed by
 // the nodes of the parser's trees.
@@ -69,6 +73,10 @@ type Object interface{ object() }
 func (*Var) object()      {}
 func (*Func) object()     {}
 func (*TypeDecl) object() {}
+
+// Simple gives a type's name without the names it is nested in: Ok
+// for Outcome.Ok.
+func (d *TypeDecl) Simple() string { return d.Name[strings.LastIndexByte(d.Name, '.')+1:] }
 
 // A Call is a call as the checker settled it.
 type Call struct {

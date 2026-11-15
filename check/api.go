@@ -1,8 +1,8 @@
 package check
 
 import (
+	"fmt"
 	"slices"
-	"strings"
 
 	"kogo/syntax"
 )
@@ -31,11 +31,21 @@ type Op struct {
 
 // apis checks the api lists of the program.
 func (c *checker) apis(program []*syntax.File) {
+	lists := map[string]string{} // where each list's name is first declared
 	for _, f := range program {
 		c.enter(f, c.pkgOf(f.Package.Name))
 		for _, d := range f.APIs {
+			if at, ok := lists[d.Name]; ok {
+				c.errorf(d, "duplicate", "api %s is already declared at %s: kogo ts writes each list to the file of its name, %s.ts, so rename one (spec.md 15.1)", d.Name, at, d.Name)
+			} else {
+				lists[d.Name] = fmt.Sprintf("%s:%d", f.Name, d.Line)
+			}
+			if len(d.Funs) == 0 {
+				c.errorf(d, "operation", "api %s names no fun: name its operations, as api %s { f, g } (spec.md 15.1)", d.Name, d.Name)
+			}
 			a := &API{}
 			c.info.APIs[d] = a
+			w := &reach{API: a, list: d.Name, seen: map[*TypeDecl]bool{}, names: map[string]*TypeDecl{}}
 			named := map[string]bool{}
 			for _, id := range d.Funs {
 				if named[id.Name] {
@@ -54,10 +64,10 @@ func (c *checker) apis(program []*syntax.File) {
 				}
 				a.Ops = append(a.Ops, op)
 				if !is(op.Input, tUnit) {
-					c.wire(id, d.Name, "input", op.Input, a)
+					c.wire(id, "input", op.Input, w)
 				}
 				if !is(op.Answer, tUnit) {
-					c.wire(id, d.Name, "answer", op.Answer, a)
+					c.wire(id, "answer", op.Answer, w)
 				}
 			}
 		}
@@ -110,11 +120,17 @@ func (c *checker) operation(id *syntax.Ident) *Op {
 			bad("takes a %s first: an operation takes a Tx, or a Db to open its own transactions", t)
 		}
 	}
+	if t := f.Params[1].Type; t != unknown && (decl(t) == nil || decl(t).Kind != "data class") {
+		bad("takes a %s second: an operation's environment is a data class of the application's, of what lives as long as the server", t)
+	}
 	if t := f.Params[2].Type; t != unknown && (decl(t) == nil || decl(t).Pkg != "kogo.rpc" || decl(t).Name != "Request") {
 		bad("takes a %s third: an operation takes a Request, with import kogo.rpc.Request", t)
 	}
+	fd := f.Decl.(*syntax.FunDecl)
 	if e := c.either(f.Result); e != nil && is(e, tString) {
 		op.Answer = f.Result.(*Named).Args[1]
+	} else if fd.Result == nil && fd.Expr != nil {
+		bad("does not state its return type: an operation returns Either<String, A>, so write it, fun %s(...): Either<String, A>", id.Name)
 	} else if f.Result != unknown {
 		bad("returns %s: an operation returns Either<String, A>, its refusal in words; turn any other failure into words with mapLeft", f.Result)
 	}
@@ -131,6 +147,9 @@ func (c *checker) noOperation(id *syntax.Ident, n int) {
 		c.errorf(id, "operation", "%d funs called %s are in scope, and an operation's name is its name on the wire: rename all but one", n, id.Name)
 		return
 	}
+	notFun := func() {
+		c.errorf(id, "operation", "%s is not a top-level fun: an api list names funs declared in a file, with no receiver (spec.md 15.1)", id.Name)
+	}
 	for _, p := range c.homes(id.Name) {
 		for _, f := range p.funcs[id.Name] {
 			if !c.visible(f.vis) {
@@ -139,18 +158,53 @@ func (c *checker) noOperation(id *syntax.Ident, n int) {
 			}
 		}
 		if p.named(id.Name) != nil {
-			c.errorf(id, "operation", "%s is not a top-level fun: an api list names funs declared in a file, with no receiver (spec.md 15.1)", id.Name)
+			notFun()
 			return
 		}
+	}
+	if len(c.members[id.Name]) > 0 {
+		notFun()
+		return
 	}
 	c.missing(id, id.Name)
 }
 
-// wire checks that t, the input or the answer of the operation at id
-// in api list, crosses the wire (spec.md 15.4), and adds the types it
-// reaches to a. A type already in a is not read again, so a type that
-// holds itself ends.
-func (c *checker) wire(id *syntax.Ident, list, what string, whole Type, a *API) {
+// A reach is the wire types an api list reaches so far.
+type reach struct {
+	*API
+	list  string
+	seen  map[*TypeDecl]bool
+	names map[string]*TypeDecl // by simple name, the first of each
+}
+
+// add puts d in w.Types, reporting a name that TypeScript would take
+// twice. A sealed interface goes before any of its variants already
+// reached.
+func (c *checker) add(id *syntax.Ident, what string, w *reach, d *TypeDecl) {
+	w.seen[d] = true
+	if e := w.names[d.Simple()]; e != nil {
+		c.errorf(id, "wire-name", "%s's %s reaches %s.%s, and api %s reaches %s.%s: two wire types of one name in a list are one type in TypeScript, so rename one (spec.md 15.4)", id.Name, what, d.Pkg, d.Name, w.list, e.Pkg, e.Name)
+	} else {
+		w.names[d.Simple()] = d
+	}
+	if d.Simple() == "Outcome" {
+		c.errorf(id, "wire-name", "%s's %s reaches %s, and Outcome is the answer's own type in TypeScript: rename it (spec.md 15.4)", id.Name, what, d.Name)
+	}
+	i := -1
+	if len(d.Variants) > 0 {
+		i = slices.IndexFunc(w.Types, func(e *TypeDecl) bool { return slices.Contains(d.Variants, e) })
+	}
+	if i < 0 {
+		i = len(w.Types)
+	}
+	w.Types = slices.Insert(w.Types, i, d)
+}
+
+// wire checks that whole, the input or the answer of the operation at
+// id, crosses the wire (spec.md 15.4), and adds the types it reaches
+// to w. A type already reached is not read again, so a type that holds
+// itself ends.
+func (c *checker) wire(id *syntax.Ident, what string, whole Type, w *reach) {
 	bad := func(t Type, path, why string) {
 		where := "is a " + t.String()
 		if path != "" {
@@ -159,18 +213,6 @@ func (c *checker) wire(id *syntax.Ident, list, what string, whole Type, a *API) 
 			where = "holds a " + t.String()
 		}
 		c.errorf(id, "wire", "%s's %s %s, %s (spec.md 15.4)", id.Name, what, where, why)
-	}
-	short := func(d *TypeDecl) string { return d.Name[strings.LastIndexByte(d.Name, '.')+1:] }
-	add := func(d *TypeDecl) {
-		for _, e := range a.Types {
-			if short(e) == short(d) {
-				c.errorf(id, "wire-name", "%s's %s reaches %s.%s, and api %s reaches %s.%s: two wire types of one name in a list are one type in TypeScript, so rename one (spec.md 15.4)", id.Name, what, d.Pkg, d.Name, list, e.Pkg, e.Name)
-			}
-		}
-		if short(d) == "Outcome" {
-			c.errorf(id, "wire-name", "%s's %s reaches %s, and Outcome is the answer's own type in TypeScript: rename it (spec.md 15.4)", id.Name, what, d.Name)
-		}
-		a.Types = append(a.Types, d)
 	}
 	var walk func(t Type, path string)
 	walk = func(t Type, path string) {
@@ -183,17 +225,16 @@ func (c *checker) wire(id *syntax.Ident, list, what string, whole Type, a *API) 
 			return
 		}
 		switch d := n.Decl; {
-		case d.Kind == "builtin" && slices.Contains([]string{"Boolean", "Int", "Long", "Double", "String"}, d.Name):
-		case d.Pkg == "kogo" && d.Name == "Uuid":
+		case is(n, tBoolean), number(n), is(n, tString), d == c.prelude("Uuid"):
 		case d == c.prelude("List"):
 			walk(n.Args[0], path)
 		case d.Kind != "enum class" && d.Kind != "data class" && d.Kind != "sealed interface":
 			bad(t, path, "which does not cross the wire: send text the server has formatted")
 		case len(d.Params) > 0:
 			bad(t, path, "and a type on the wire has no type parameters: declare one type for each use")
-		case slices.Contains(a.Types, d):
+		case w.seen[d]:
 		default:
-			add(d)
+			c.add(id, what, w, d)
 			if path == "" {
 				path = d.Name
 			}
@@ -203,11 +244,11 @@ func (c *checker) wire(id *syntax.Ident, list, what string, whole Type, a *API) 
 				}
 			}
 			for _, v := range d.Variants {
-				vpath := path + "." + short(v)
+				vpath := path + "." + v.Simple()
 				switch {
 				case v.Kind == "data object":
-					if !slices.Contains(a.Types, v) {
-						add(v)
+					if !w.seen[v] {
+						c.add(id, what, w, v)
 					}
 				case slices.ContainsFunc(v.Ctor.Params, func(p *Var) bool { return p.Name == "type" }):
 					c.errorf(id, "wire", "%s's %s holds %s.type, and a variant on the wire has no property type, the key that holds its name: rename the property (spec.md 15.4)", id.Name, what, vpath)

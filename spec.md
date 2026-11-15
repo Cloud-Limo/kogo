@@ -912,6 +912,8 @@ fun updateJob(tx: Tx, env: OpsEnv, request: Request, input: UpdateJobInput): Eit
 - A fun's name is its operation's name on the wire, so a list holds no
   name twice, and the name is one fun's: not two funs of that name in
   scope. A fun may stand in more than one list.
+- A list names at least one fun. Its name is its TypeScript file's
+  (15.6), so no two lists of a program have one name.
 - An operation is an ordinary fun: any code may call it, and nothing
   but the list marks it.
 

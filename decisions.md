@@ -1142,10 +1142,17 @@ Each entry: what was decided, why, and what would reopen it.
   another file: the list is what makes it an operation, and the fun alone is correct. The
   message names the fun, and for a type that does not cross, its path from the input or
   the answer (`In.at: Instant`), the first type on the path giving its root.
+- **A list names at least one fun, and no two lists of a program share a name** (spec
+  15.1): an empty list serves nothing and has no environment to record, and `kogo ts`
+  writes each list to `<name>.ts`, so two lists of one name, even in two packages, would
+  write one file. Reopen if lists get a package-qualified output path.
+- **An operation whose result is not written is told to write it**, not that it returns
+  `Unit`: the list is checked before bodies, when an unwritten result still reads as
+  `Unit`.
 - **The facts give the environment once for a list**, not on each operation, since a list
   takes one; and the wire types the list reaches in the order first reached, a sealed
-  interface before its variants. A type is read once for each list, which ends a type
-  that holds itself.
+  interface before its variants, moved ahead of one that was reached on its own first. A
+  type is read once for each list, which ends a type that holds itself.
 
 ## Spec gaps found by the leakage ports, unresolved
 

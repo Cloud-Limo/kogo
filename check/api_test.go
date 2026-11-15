@@ -28,7 +28,7 @@ func TestOperations(t *testing.T) {
 			"enum class State { Open, Done }\nsealed interface Ask {\n    data class ForBusiness(val code: String) : Ask\n    data object Alone : Ask\n}\n"+
 			"data class Tree(val label: String, val kids: List<Tree>, val up: Tree?)",
 		// An operation of another package, imported.
-		"package kogo.rpc\nexternal class Request\n---\npackage a\nimport b.me\napi ops { me }\n---\npackage b\nimport kogo.rpc.Request\nfun me(db: Db, env: Int, request: Request, input: Unit): Either<String, Unit> = either { }",
+		"package kogo.rpc\nexternal class Request\n---\npackage a\nimport b.me\napi ops { me }\n---\npackage b\nimport kogo.rpc.Request\ndata class E(val n: Int)\nfun me(db: Db, env: E, request: Request, input: Unit): Either<String, Unit> = either { }",
 	)
 	time := "\n---\npackage kogo.time\nexternal class Instant"
 	refused(t, [][3]string{
@@ -42,7 +42,14 @@ func TestOperations(t *testing.T) {
 		{rpc() + "fun f(tx: Tx, env: Env, request: Request, input: Unit): Either<Int, Unit> = either { }\napi ops { ‸f }", "operation", "returns Either<Int, Unit>: an operation returns Either<String, A>"},
 		{rpc() + "fun <T> f(tx: Tx, env: Env, request: Request, input: Unit): Either<String, Unit> = either { }\napi ops { ‸f }", "operation", "has type parameters"},
 		{rpc() + "fun f(tx: Tx, env: Env, request: Request, input: Int = 1): Either<String, Unit> = either { }\napi ops { ‸f }", "operation", "gives input a default value"},
-		{rpc() + "fun f(tx: Tx, env: Int, request: Request, input: Unit): Either<String, Unit> = either { }\napi ops { me, ‸f }", "operation", "f takes the environment Int, and me takes Env"},
+		{rpc() + "data class E(val n: Int)\nfun f(tx: Tx, env: E, request: Request, input: Unit): Either<String, Unit> = either { }\napi ops { me, ‸f }", "operation", "f takes the environment E, and me takes Env"},
+		{rpc() + "fun f(tx: Tx, env: Env?, request: Request, input: Unit): Either<String, Unit> = either { }\napi ops { ‸f }", "operation", "f takes a Env? second: an operation's environment is a data class"},
+		{rpc() + "fun f(tx: Tx, env: (Int) -> Int, request: Request, input: Unit): Either<String, Unit> = either { }\napi ops { ‸f }", "operation", "takes a (Int) -> Int second"},
+		{rpc() + "fun f(tx: Tx, env: Env, request: Request, input: Unit) = Unit\napi ops { ‸f }", "operation", "f does not state its return type: an operation returns Either<String, A>"},
+		{rpc() + "api ops { ‸tx }", "operation", "tx is not a top-level fun"},
+		{rpc() + "‸api ops { }", "operation", "api ops names no fun"},
+		{rpc() + "api ops { me }\n‸api ops { me }", "duplicate", "api ops is already declared at f2.kg:5: kogo ts writes each list to the file of its name, ops.ts"},
+		{rpc() + "api ops { me }\n---\npackage b\nimport t.me\n‸api ops { me }", "duplicate", "api ops is already declared at f2.kg:5"},
 		{rpc("import kogo.time.Instant\n") + "api ops { ‸f }\ndata class In(val n: Int, val at: Instant)\n" + op("In", "Unit") + time,
 			"wire", "f's input holds In.at: Instant, which does not cross the wire: send text the server has formatted"},
 		{rpc() + "api ops { ‸f }\n" + op("Unit", "List<Map<String, Int>>"), "wire", "f's answer holds a Map<String, Int>, which does not cross"},
@@ -62,10 +69,21 @@ func TestOperations(t *testing.T) {
 	})
 }
 
+// An operation whose result is not written gets the error of its
+// body, not one that says it returns Unit.
+func TestOperationResultUnwritten(t *testing.T) {
+	_, errs := run(t, rpc()+"api ops { f }\nfun f(tx: Tx, env: Env, request: Request, input: Unit) = either<String, Unit> { }")
+	if len(errs) != 2 || errs[0].Code != "operation" || !strings.Contains(errs[0].Message, "f does not state its return type") || errs[1].Code != "return-type" {
+		t.Errorf("got %v", errs)
+	}
+}
+
 // The facts of a list: its operations in order, their kinds, and the
-// wire types they reach.
+// wire types they reach, a sealed interface before its variants even
+// where a variant is reached first.
 func TestOperationFacts(t *testing.T) {
-	info, errs := run(t, rpc()+"api ops { f, me }\n"+op("Ask", "List<Job>?")+"data class Job(val state: State, val next: Job?)\n"+
+	info, errs := run(t, rpc()+"api ops { g, f, me }\n"+op("Ask", "List<Job>?")+
+		"fun g(tx: Tx, env: Env, request: Request, input: Ask.ByCode): Either<String, Unit> = either { }\n"+"data class Job(val state: State, val next: Job?)\n"+
 		"enum class State { Open }\nsealed interface Ask {\n    data class ByCode(val code: String) : Ask\n    data object Alone : Ask\n}")
 	if errs != nil || len(info.APIs) != 1 {
 		t.Fatalf("got %v and %d lists", errs, len(info.APIs))
@@ -80,7 +98,7 @@ func TestOperationFacts(t *testing.T) {
 			got = append(got, d.Kind+" "+d.Name)
 		}
 	}
-	want := "env Env; f tx=true Ask -> List<Job>?; me tx=true Unit -> Unit; sealed interface Ask; data class Ask.ByCode; data object Ask.Alone; data class Job; enum class State"
+	want := "env Env; g tx=true Ask.ByCode -> Unit; f tx=true Ask -> List<Job>?; me tx=true Unit -> Unit; sealed interface Ask; data class Ask.ByCode; data object Ask.Alone; data class Job; enum class State"
 	if strings.Join(got, "; ") != want {
 		t.Errorf("got  %s\nwant %s", strings.Join(got, "; "), want)
 	}

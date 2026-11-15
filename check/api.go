@@ -3,6 +3,8 @@ package check
 import (
 	"fmt"
 	"slices"
+	"unicode"
+	"unicode/utf8"
 
 	"kogo/syntax"
 )
@@ -167,6 +169,13 @@ func (c *checker) noOperation(id *syntax.Ident, n int) {
 	c.missing(id, id.Name)
 }
 
+// Interface gives the name of the TypeScript interface of the api
+// list called list (spec.md 15.6): Ops for ops.
+func Interface(list string) string {
+	r, n := utf8.DecodeRuneInString(list)
+	return string(unicode.ToUpper(r)) + list[n:]
+}
+
 // A reach is the wire types an api list reaches so far.
 type reach struct {
 	*API
@@ -186,6 +195,9 @@ func (c *checker) add(id *syntax.Ident, what string, w *reach, d *TypeDecl) {
 	}
 	if d.Simple() == "Outcome" {
 		c.errorf(id, "wire-name", "%s's %s reaches %s, and Outcome is the answer's own type in TypeScript: rename it (spec.md 15.4)", id.Name, what, d.Name)
+	}
+	if s := Interface(w.list); d.Simple() == s {
+		c.errorf(id, "wire-name", "%s's %s reaches %s, and %s is api %s's interface in TypeScript: rename it (spec.md 15.4)", id.Name, what, d.Name, s, w.list)
 	}
 	w.Types = append(w.Types, d)
 }

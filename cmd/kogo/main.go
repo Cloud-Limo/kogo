@@ -1,7 +1,9 @@
-// Command kogo checks Kogo programs and writes their Go.
+// Command kogo checks Kogo programs and writes their Go and the
+// TypeScript of their operations.
 //
 //	kogo check <dir>        check the .kg files under dir as one program
 //	kogo emit <dir> <out>   check them and, when they pass, write their Go under out
+//	kogo ts <dir> <out>     check them and, when they pass, write out/<name>.ts for each api list
 //
 // It prints one JSON object a line for each error (file, line, column,
 // code, message) and exits 0 when there are none, 1 when there are
@@ -36,6 +38,7 @@ import (
 	"kogo/prelude"
 	"kogo/sqlpass"
 	"kogo/syntax"
+	"kogo/ts"
 )
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
@@ -45,8 +48,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	out, fatal := json.NewEncoder(stdout), json.NewEncoder(stderr)
 	out.SetEscapeHTML(false)
 	fatal.SetEscapeHTML(false)
-	if !(len(args) == 2 && args[0] == "check" || len(args) == 3 && args[0] == "emit") {
-		fatal.Encode(syntax.Error{Code: "usage", Message: "usage: kogo check <dir>, or kogo emit <dir> <out>"})
+	if !(len(args) == 2 && args[0] == "check" || len(args) == 3 && (args[0] == "emit" || args[0] == "ts")) {
+		fatal.Encode(syntax.Error{Code: "usage", Message: "usage: kogo check <dir>, kogo emit <dir> <out>, or kogo ts <dir> <out>"})
 		return 2
 	}
 	pre, err := prelude.Files()
@@ -115,6 +118,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return 2
 		}
 		written, faults = emit.Emit(info, pre, files, root)
+	}
+	if len(faults) == 0 && args[0] == "ts" {
+		written = ts.Files(info)
 	}
 	for _, f := range faults {
 		out.Encode(f)

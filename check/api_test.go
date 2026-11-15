@@ -66,6 +66,7 @@ func TestOperations(t *testing.T) {
 			"\n---\npackage b\ndata class Box(val i: Item)\nenum class Item { One }",
 			"wire-name", "f's answer reaches b.Item, and api ops reaches t.Item: two wire types of one name in a list are one type in TypeScript"},
 		{rpc() + "api ops { ‸f }\ndata class Outcome(val n: Int)\n" + op("Unit", "Outcome"), "wire-name", "Outcome is the answer's own type in TypeScript"},
+		{rpc() + "api ops { ‸f }\ndata class In(val ops: Ops)\nenum class Ops { One }\n" + op("In", "Unit"), "wire-name", "f's input reaches Ops, and Ops is api ops's interface in TypeScript: rename it"},
 	})
 }
 

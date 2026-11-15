@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -196,6 +197,37 @@ func TestEmitRefuses(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if code := run([]string{"emit", src, t.TempDir()}, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), `"code":"no-module"`) {
 		t.Errorf("no go.mod above the out directory: exit %d, stderr %s", code, &stderr)
+	}
+}
+
+// kogo ts writes a file for each api list, the same bytes each time it
+// runs, and nothing for a program with errors.
+func TestTS(t *testing.T) {
+	src := t.TempDir()
+	prog := "package a\nimport kogo.rpc.Request\ndata class Env(val n: Int)\nenum class State { On }\napi ops { f }\napi more { f }\n" +
+		"fun f(tx: Tx, env: Env, request: Request, input: Unit): Either<String, State> = either { State.On }\n"
+	ts := func(prog string) (code int, written map[string]string) {
+		os.WriteFile(filepath.Join(src, "a.kg"), []byte(prog), 0o644)
+		out := t.TempDir()
+		var stdout, stderr bytes.Buffer
+		code = run([]string{"ts", src, out}, &stdout, &stderr)
+		names, _ := os.ReadDir(out)
+		written = map[string]string{}
+		for _, name := range names {
+			text, _ := os.ReadFile(filepath.Join(out, name.Name()))
+			written[name.Name()] = string(text)
+		}
+		return code, written
+	}
+	code, first := ts(prog)
+	if code != 0 || len(first) != 2 || !strings.Contains(first["ops.ts"], `export type State = "On"`) || !strings.Contains(first["more.ts"], "export interface More {") {
+		t.Fatalf("exit %d, wrote %v", code, first)
+	}
+	if _, again := ts(prog); !maps.Equal(first, again) {
+		t.Errorf("wrote %v, then %v", first, again)
+	}
+	if code, written := ts(prog + "val v: Int = \"no\"\n"); code != 1 || len(written) != 0 {
+		t.Errorf("a program with errors: exit %d, wrote %v", code, written)
 	}
 }
 

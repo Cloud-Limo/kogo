@@ -21,6 +21,7 @@ server yet.
 mise exec -- go build -o bin/kogo ./cmd/kogo
 bin/kogo check <dir>
 bin/kogo emit <dir> <out>
+bin/kogo ts <dir> <out>
 ```
 
 `kogo check` checks the `.kg` files under a directory as one program and
@@ -29,6 +30,8 @@ exits 0 when there are none. A program with a `sql"""` literal is checked
 against the database `DATABASE_URL` names, as below. `kogo emit` checks
 them and then writes one Go package for each Kogo package, `a.b`'s at
 `<out>/a/b/kogo.go`; `<out>` lies in a Go module that requires this one.
+`kogo ts` checks them and then writes `<out>/<name>.ts` for each `api`
+list: its wire types and an interface of its operations (spec.md 15.6).
 
 ```
 mise exec -- go build -o bin/kogo-sql ./cmd/kogo-sql

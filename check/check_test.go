@@ -481,6 +481,7 @@ func TestFailures(t *testing.T) {
 		{"fun ‸Raise<String>.f(): Int = raise(\"no\")", "raise-receiver", "Raise<String> is not written in a program (spec.md 9): return an Either<String, A> from either<String, A> { ... }, and bind it where it is called"},
 		{"fun f(r: ‸Raise<String>) {}", "raise-receiver", "return an Either<String, A>"},
 		{"fun g(): Either<Int, Int> = either { 1 }\nfun f(): Either<String, Int> = either { ‸withError({ n: Int -> \"$n\" }) { g().bind() } }", "with-error", "withError is not Kogo: convert the failure of a block with either<E2, A> { ... }.mapLeft { e -> ... }.bind()"},
+		{"package b\nfun withError(x: Int): Int = x\n---\nfun f(): Int = ‸withError(1)", "unknown-name", "withError is not in scope: add import b.withError"},
 		{"fun f(g: ‸Raise<String>.() -> Int) {}", "function-receiver", "a function type has no receiver (spec.md 5): take the value as a parameter, or for Raise<E> return an Either<E, A>"},
 		{"fun f(g: ‸Int.() -> Int) {}", "function-receiver", "take the value as a parameter"},
 		{"fun f(): Either<String, Int> = Either.‸Left(\"no\")", "either-constructor", "an Either is built with e.left() or a.right()"},

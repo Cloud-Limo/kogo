@@ -154,11 +154,10 @@ var notKogo = map[string][2]string{
 	"withError": {"with-error", "convert the failure of a block with either<E2, A> { ... }.mapLeft { e -> ... }.bind()"},
 }
 
-// missing reports a name that nothing in scope declares.
+// missing reports a name that nothing in scope declares. One that
+// is Kotlin's and not Kogo's is refused only where no package of the
+// program declares it.
 func (c *checker) missing(at syntax.Node, name string) Type {
-	if r, ok := notKogo[name]; ok {
-		return c.errorf(at, r[0], "%s is not Kogo: %s", name, r[1])
-	}
 	var homes []string
 	for _, p := range c.pkgs {
 		if p.named(name) != nil {
@@ -167,6 +166,9 @@ func (c *checker) missing(at syntax.Node, name string) Type {
 	}
 	if slices.Sort(homes); homes != nil {
 		return c.errorf(at, "unknown-name", "%s is not in scope: add import %s", name, strings.Join(homes, " or import "))
+	}
+	if r, ok := notKogo[name]; ok {
+		return c.errorf(at, r[0], "%s is not Kogo: %s", name, r[1])
 	}
 	return c.errorf(at, "unknown-name", "nothing named %s is declared here, in package %s or in the prelude", name, c.pkg.name)
 }

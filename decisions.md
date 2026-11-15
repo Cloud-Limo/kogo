@@ -594,6 +594,10 @@ Each entry: what was decided, why, and what would reopen it.
   the scope's first, as Kotlin does, since spec 5.2 ranks nothing, and suggesting
   `this.raise(...)` for the member, which in Kotlin is the scope's. The choice among
   overloads by the scope's `E` went with receiver funs.
+- **A name Kogo refuses from Kotlin is refused only where no package declares it.** A
+  program's own `withError`, or `run`, in a package the file does not import gets the
+  "add import" hint, not "is not Kogo". One order for the whole table, not a case for
+  `withError`.
 
 ## Spec gaps found by the leakage ports, unresolved
 

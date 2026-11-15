@@ -479,6 +479,13 @@ Each entry: what was decided, why, and what would reopen it.
   named `Outcome` is. Not taken: a list of TypeScript's global names to refuse, which is
   long, changes with TypeScript, and only `Record` was ever written. Reopen if the file
   must name another built-in.
+- **Kogo's async runs are `opus medium 40m`, `fable high 40m` for heavy design** (16 Nov
+  2026). Greg set these for Kogo, reviews included at 40m; cusoon2's `pr opus high 40m` is
+  cusoon2's default, not Kogo's. `doc/lead.md` has the table.
+- **The Linear tasks run from `~/Dev/cusoon2-tasks`** (16 Nov 2026), a cusoon2 checkout on
+  `renew` used for nothing else, which the lead pulls when it starts. Not taken:
+  `~/Dev/cusoon2`, where other sessions switch branches and the tasks vanish on any branch
+  older than cusoon2 PR 1486. Reopen if the tasks move out of cusoon2.
 
 ## Taken in the v0 spec, not yet discussed
 
@@ -1321,6 +1328,28 @@ Each entry: what was decided, why, and what would reopen it.
   held one. It counts only looks for an invoice there is not, as spec 15.3 counts
   failed logins, so an address that knows its numbers is never refused. The example is package `example.ops`, so that its `InvoiceStatus`, whose
   constants are the Postgres labels, is not example 05's.
+
+## Taken writing the workflow (DEV-858), not yet discussed
+
+- **A branch has the name Linear gives its issue.** An async run checks out the issue's pushed
+  branch by that name and starts from `main` when it finds none, so a branch an agent named
+  itself (`dev-852-kogo-ts`) would be missed by a run sent to review or fix it. Not taken:
+  short names with the wrapper searching for `dev-NNN-*`, which is more code in cusoon2 for
+  shorter names nobody types. Reopen if the long names get in the way.
+- **Handoff and Review comments go on the PR as well as the issue.** A run has no Linear
+  access and is shown none of the issue's earlier comments; the PR is the one place both a
+  run and a Zed session can read. Reopen if runs are given the issue's comments.
+- **A Question without a Ruling stops the merge, not the fixes.** "Fix and merge" makes the
+  fixes and pushes, then stops. Not taken: refusing to start, which loses the fixes for one
+  open point; merging and filing the Question, which merges what the review doubted.
+- **The lead removes worktrees and deletes merged branches, not the session that merges.**
+  That session is standing in the worktree, and an async merge has no session here at all;
+  a run's last push would recreate a remote branch it had deleted. `git push origin
+  --delete`, not `gh pr merge --delete-branch`, which tries to check out `main` in the
+  worktree and fails because `~/Dev/kogo` holds it.
+- **The lead does not commit.** Its decisions reach the repository through the issue or the
+  PR they belong to, so every change has had a Code review. Reopen if that makes small
+  corrections slow.
 
 ## Spec gaps found by the leakage ports, unresolved
 

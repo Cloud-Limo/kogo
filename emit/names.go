@@ -16,7 +16,17 @@ import (
 // receiver follows the receiver's type: Booking_SupplierPay. Where
 // two declarations of a package come out the same, each fun among
 // them is spelled in full, with its receiver's type arguments and its
-// parameters' types, and each val adds _val; a type keeps its name.
+// parameters' types, each val adds _val and each api list's table
+// _api; a type keeps its name, and so does an enum's entries,
+// Kind_entries.
+
+// entries is the key of an enum's entries in emitter.names.
+type entries struct{ td *check.TypeDecl }
+
+// entries gives the Go name of the slice of an enum's constants.
+func (e *emitter) entries(td *check.TypeDecl) string {
+	return e.qualify(td.Pkg, e.names[entries{td}])
+}
 
 // export gives a Kogo name as a Go name that other packages can use
 // and that no local has: it begins with an upper-case letter and does
@@ -131,6 +141,9 @@ func (e *emitter) name(files []*syntax.File) {
 				return
 			}
 			add(td, d, d.Mods.Visibility, n, n)
+			if d.Kind == "enum class" {
+				add(entries{td}, d, d.Mods.Visibility, n+"_entries", n+"_entries")
+			}
 			for _, v := range td.Entries {
 				add(v, v.Decl, d.Mods.Visibility, n+"_"+v.Name, n+"_"+v.Name)
 			}
@@ -155,6 +168,9 @@ func (e *emitter) name(files []*syntax.File) {
 					add(vs[0], d, d.Mods.Visibility, export(d.Name), export(d.Name)+"_val")
 				}
 			}
+		}
+		for _, d := range f.APIs {
+			add(d, d, "", export(d.Name), export(d.Name)+"_api")
 		}
 	}
 	for _, pkg := range pkgs {

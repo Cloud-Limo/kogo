@@ -63,8 +63,8 @@ func examples(t *testing.T, patterns ...string) map[string]string {
 func TestExamples(t *testing.T) {
 	testDB(t)
 	files := examples(t, "*.kg")
-	if len(files) != 22 {
-		t.Fatalf("%d examples, want 22", len(files))
+	if len(files) != 23 {
+		t.Fatalf("%d examples, want 23", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)
@@ -72,9 +72,9 @@ func TestExamples(t *testing.T) {
 }
 
 // The Go that kogo emit writes for the examples is built with
-// testdata/driver.go and run, 10 to 19 and 21 against the test
-// database: each result was worked out by hand from the Kogo and the
-// rows the driver begins with.
+// testdata/driver.go and run, 10 to 19, 21 and 22 against the test
+// database, 22 served over HTTP: each result was worked out by hand
+// from the Kogo and the rows the driver begins with.
 func TestEmittedGoRuns(t *testing.T) {
 	testDB(t)
 	// Inside the module, which holds the rt and the prelude it imports.
@@ -171,6 +171,18 @@ the same invite: true
 accept: Either.Right(kotlin.Unit)
 accept again: Either.Left(NoInvite)
 suppliers after: [SupplierRow(id=00000000-0000-0000-0000-000000000002, legalName=Bolt Couriers, driverSharePercent=25)]
+invoices: 200 {"type":"ok","value":[{"number":"INV-1","status":"paid","totalCents":1000},{"number":"INV-2","status":"sent","totalCents":null}]}
+paid with no total: 200 {"type":"refused","message":"Invoice INV-2 has no total, so it cannot be paid."}
+invoices after the refusal: 200 {"type":"ok","value":[{"number":"INV-1","status":"paid","totalCents":1000},{"number":"INV-2","status":"sent","totalCents":null}]}
+back to a draft: 200 {"type":"ok","value":{"number":"INV-2","status":"draft","totalCents":null}}
+no status: 400 setStatus: input.status is missing
+not a status: 400 setStatus: input.status is not one of draft, sent, paid
+no such operation: 404
+look up: 200 {"type":"ok","value":{"number":"INV-1","status":"paid","totalCents":1000}}
+look up again: 200 {"type":"ok","value":{"number":"INV-1","status":"paid","totalCents":1000}}
+look up a missing invoice: 200 {"type":"refused","message":"There is no invoice INV-9."}
+look up another missing invoice: 200 {"type":"refused","message":"There is no invoice INV-8."}
+look up after two misses: 200 {"type":"refused","message":"Too many looks. Try again later."}
 `
 	if err != nil || string(out) != want {
 		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)

@@ -1297,6 +1297,31 @@ Each entry: what was decided, why, and what would reopen it.
   union is not TypeScript. No value of it can cross, so the type says so. Not taken:
   refusing it on the wire, a rule for a case no program writes.
 
+## Taken emitting the table of an api list (DEV-851), not yet discussed
+
+- **A list's table is named by the naming rule, as a top-level name of its package**:
+  `api ops` is `Ops`, and where another declaration of the package is `Ops` too, a type or
+  a fun, the table is `Ops_api`, as a val would be `Ops_val`. The driver of an
+  application reads it by that name; nothing on the wire does.
+- **An enum's entries take part in the naming rule as a type does**: `Kind_entries` keeps
+  its name, so a val `kind_entries` beside `enum class Kind` is `Kind_entries_val`, and a
+  constant `entries` is the error `go-name`, not a Go build that fails. The emitter
+  writes the slice for the table as well as for `Kind.entries`, so the name has one
+  source.
+- **A table holds an enum with no constants**: the server records its type though it
+  has no names, so `enum class Kind {}` reached by an input starts, and any value for
+  it is refused as not one of its names. Not taken: refusing an empty enum on the wire
+  in the checker, which Kotlin allows and the server can serve.
+- **The table holds the entries of every enum the list's operations reach**, the answers'
+  too, from the checker's one list of wire types. The server needs only the inputs'; an
+  answer's enum costs a slice it never reads. Not taken: a walk over the inputs alone, in
+  the checker or the emitter, for no change in what is served.
+- **Example 22 counts looks in a table of its own, `look`, added to the test schema**: a
+  count that stays after a refusal needs a row to keep it, and no table of the schema
+  held one. It counts only looks for an invoice there is not, as spec 15.3 counts
+  failed logins, so an address that knows its numbers is never refused. The example is package `example.ops`, so that its `InvoiceStatus`, whose
+  constants are the Postgres labels, is not example 05's.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, workers, and an

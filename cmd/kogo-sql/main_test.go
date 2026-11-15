@@ -82,9 +82,13 @@ func TestWrongStatements(t *testing.T) {
 		`14:84 sql-rejected invalid input value for enum invoice_status: "payed"`,
 		`20:73 sql-rejected operator does not exist: uuid = citext`,
 		`24:65 sql-rejected operator does not exist: text < integer`,
-		`26:40 sql-unterminated this sql literal has no closing quote`,
 	}
 	_, lines, code := kogoSQL(t, "check", "testdata")
+	unclosed := `{"file":"testdata/unclosed.kg","line":4,"column":40,"code":"sql-unterminated","message":"this sql literal has no closing quote"}`
+	if lines[0] != unclosed {
+		t.Errorf("\n got %s\nwant %s", lines[0], unclosed)
+	}
+	lines = lines[1:]
 	if !strings.Contains(lines[4], "text < integer") {
 		t.Errorf("a message is escaped: %s", lines[4])
 	}

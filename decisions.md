@@ -65,8 +65,9 @@ Each entry: what was decided, why, and what would reopen it.
   fails) or when `"name!"` on CTE columns becomes a habit (following a CTE is about 15 lines).
 - **A name is one parameter, an expression one per occurrence.** `$active` twice is `$1` twice,
   so Postgres types it once and the cast in 10.6's idiom is optional; `${newId()}` twice is
-  two values, as a string template would evaluate it. `${...}` may not contain braces until
-  the parser reads it. There is no way to write the text `$name`, and so no tagged dollar
+  two values, as a string template would evaluate it. `${...}` may not contain braces: the
+  parser reads them, but the SQL pass scans the literal itself until the checker hands it
+  parsed parameters. There is no way to write the text `$name`, and so no tagged dollar
   quoting.
 - **The emitted Go is a shape for the emitter to replace.** One function per literal over a
   `pgx.Tx`, returning `([]Row, error)` or the rows affected, named `Q<path>L<line>C<column>`
@@ -79,8 +80,7 @@ Each entry: what was decided, why, and what would reopen it.
 - **An enum's Kogo name is its Postgres name in PascalCase** (`invite_kind` is `InviteKind`) in
   a signature. The spec matches enums by their constants; the checker will do that.
 - **Layout.** Module path `kogo` until there is a remote to name it after. `sqlpass` is the
-  pass; `cmd/kogo-sql` is the command and holds the literal finder, a stand-in for the parser
-  that reads no Kogo, so it also finds a literal inside a comment or a string.
+  pass; `cmd/kogo-sql` is the command, and since DEV-819 finds literals through the parser.
 - **Errors** are one JSON object a line with a code such as `sql-rejected`; the command exits
   0 when all pass, 1 when a literal fails and 2 when it could not run. Postgres's message is
   kept, with its detail, hint and SQLSTATE, and `$1` spelt as the literal spells it.
@@ -94,6 +94,56 @@ Each entry: what was decided, why, and what would reopen it.
   (dollar quoting, `E''` strings and nested comments are Postgres's to know, principle 1).
   Reopen if the extra round trip, one per such parameter, shows in check time.
 
+## Taken building the parser (DEV-819), not yet discussed
+
+- **One package, `syntax`, holds the tree, the lexer and the parser.** The checker and the
+  emitter import the tree and always get it from the parser, so a separate tree package would
+  only add a name to import. Reopen when something builds trees without parsing.
+- **The parser stops at the first fault in a file.** Recovery would guess at what was meant,
+  and the guesses produce follow-on errors that an author then has to tell from real ones.
+  `kogo-sql` reports the file, checks none of its literals, and goes on to the next. Reopen
+  if fixing one error at a time makes the edit loop slow.
+- **Line ends follow Kotlin's parser, not its published grammar** (spec 6.1). The grammar
+  says a line end may come before `?:`, `&&`, `||`, `.` and `?.` and after any operator; the
+  parser also ignores line ends inside `( )` and `[ ]`, and Kotlin code relies on that. Each
+  token records whether a line end came before it, and the parser asks only where a statement
+  could end. A line end inside a block comment does not count, as in Kotlin.
+- **Precedence is Kotlin's, and comparisons do not chain**, as Kotlin rejects `a < b < c`.
+  Unary minus is an operator, as in Kotlin, so a negative literal is `-` and a literal.
+- **`<` opens type arguments when they parse and are closed by `>`, then `(` or `{` on the
+  same line**; the parser tries that and otherwise reads less than. Where it stops:
+  `a < b > (c)` is a call, which is also Kotlin's reading.
+- **Destructuring in lambda parameters is in**: example 03's `sumOf { (d, w) -> d * w }`
+  uses it, and it means the same as in Kotlin.
+- **Escapes are Kotlin's** (`\t \b \n \r \' \" \\ \$ \uXXXX`), and raw strings have none.
+  A `$` that begins no template is text, as in Kotlin.
+- **A surrogate escape is half of a pair, and the pair is one character.** Kotlin allows a
+  lone half; a Go string is UTF-8 and cannot hold one, so the lexer refuses it rather than
+  emit U+FFFD. A pair is two UTF-16 units, so it is not a `Char`. Reopen if Go output ever
+  needs raw UTF-16.
+- **`data`, `enum`, `sealed` and the refused modifiers are names unless a declaration
+  follows**, as in Kotlin: `data.size` and `value to key` are expressions. A word followed
+  by `in`, `is`, `to`, `until` or `as`, or by a line end in a body, is not a modifier.
+- **What Kotlin has and the spec does not is refused with a message that names the
+  replacement.** Section 14's rows that syntax can see have codes `kotlin-<row>`
+  (`kotlin-not-null-assertion`, `kotlin-try`, ...); so do `public` and `protected`, which
+  section 2 rules out (`kotlin-visibility`). Others outside the spec (`!in`, `!is`, `as`,
+  `===`, `++`, `do`-`while`, an infix call) get code `syntax` and the Kogo spelling. The rows
+  that need to know what a name refers to (`println`, `apply`, `runCatching`, `java.time`,
+  `Sequence`) are left to the checker, and so is whether an annotation names a marker. The
+  parser refuses only annotations that cannot be markers: ones with arguments other than
+  `@go("...")`, with a use-site target other than the file's `@file:OptIn`, or inside a
+  function body.
+- **A sql literal is parsed only as the one argument of `.query<R>`, `.queryOne<R>`,
+  `.querySingle<R>`, `.exists` or `.execute`**, called on something; that the receiver is a
+  `Tx` is the checker's to say. Its `${expr}` parts are parsed as Kogo, and it ends at the
+  first closing quote not inside a `${}`. The parser does not refuse `$1`: the SQL pass does.
+- **A file's tree lists its sql literals** (`File.SQL`, in source order), so `kogo-sql` needs no
+  walk over the tree. Reopen when a general walker exists anyway.
+- **Some section 3 rules are checked by the parser**, because they are about shape: a data
+  class's properties are `val`s, its body holds only `override fun`s, an interface's members
+  have no body, an enum has no constructor or body, and a type parameter has no bound.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - A `select` of a function returning `void` (`pg_advisory_xact_lock`, cusoon2's `bind_tenant`)
@@ -102,8 +152,8 @@ Each entry: what was decided, why, and what would reopen it.
 
 - A join returning two whole rows needs every column aliased by hand.
 - No mapping for composite types (`charge`).
-- `Long * Double`, unary minus, smart casts through `&&` and `||`, and destructuring in
-  lambda parameters are unspecified.
+- `Long * Double` and smart casts through `&&` and `||` are unspecified. (DEV-819 settled
+  unary minus and destructuring in lambda parameters.)
 - `db.tx` cannot finish and roll back (the fees dry run).
 - No typed way to turn a named constraint violation into an expected failure.
 - `Console`, `Decimal` and the text form of dates and instants have no stated members.

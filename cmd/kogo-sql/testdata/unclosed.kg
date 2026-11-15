@@ -1,0 +1,4 @@
+// A literal that never closes: the file does not parse.
+package wrong
+
+fun unclosed(tx: Tx): Int = tx.execute(sql"delete from invite)

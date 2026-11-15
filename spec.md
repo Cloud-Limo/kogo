@@ -51,7 +51,7 @@ import kogo.time.Instant
 | `Either<E, A>` | a failure `E` or a value `A`, section 9 |
 
 Numeric literals: `1` is `Int`, `1L` is `Long`, `1.0` is `Double`,
-`10_000` allowed. There are no implicit numeric conversions; write
+`10_000` allowed; there are no hex, binary or exponent forms. There are no implicit numeric conversions; write
 `.toLong()`, `.toInt()`, `.toDouble()`. `Int / Int` and `Long / Long`
 truncate toward zero. `Long * Int` and the other mixed `Int`/`Long`
 operators give `Long`, as in Kotlin.
@@ -150,7 +150,9 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
   `reified`, no `inline`.
 - Overloading by parameter types is allowed.
 - No `operator`, `infix`, `tailrec` or `suspend`.
-- Lambdas: `{ a, b -> ... }` and `it`. A lambda is a value of a function
+- Lambdas: `{ a, b -> ... }` and `it`. A parameter may state its type,
+  `{ e: StoreError -> ... }`, and a pair or a data class may be
+  destructured, `{ (d, w) -> d * w }`. A lambda is a value of a function
   type. Trailing-lambda call syntax as in Kotlin. Function references
   `::name` to top-level functions are allowed.
 - Lambdas with receivers (`T.() -> R`) do not exist, with one exception:
@@ -178,6 +180,41 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
 - Scope functions: `let`, `also` and `takeIf` only. `apply`, `run`, `with`
   and `takeUnless` do not exist.
 - `to` builds a `Pair`: `a to b`.
+
+### 6.1 Lines, operators and literals
+
+Where Kotlin's own parser and its published grammar differ, Kogo follows
+the parser.
+
+- A statement ends at the end of its line or at `;`. It goes on to the
+  next line when that line begins with `.`, `?.`, `?:`, `&&`, `||` or
+  `else`, when its own line ends with an operator or a comma, and
+  anywhere inside `( )` or `[ ]`. Inside `{ }` (a block or a lambda)
+  lines end statements again, even within parentheses. So `a` and `- b`
+  on two lines are two statements, and a call's `(`, `[`, `<` or trailing
+  lambda starts on the line of what it applies to.
+- Precedence, tightest first, as in Kotlin: postfix (`.`, `?.`, a call,
+  `[i]`); prefix `-` and `!`; `* / %`; `+ -`; `..`; `until` and `to`;
+  `?:`; `in` and `is`; `< <= > >=`; `== !=`; `&&`; `||`. Binary
+  operators group to the left; comparisons do not chain (`a < b < c` is
+  an error). Unary minus is an operator, so `-1` is `-` applied to `1`.
+  There is no unary `+`, `++`, `--`, `!in`, `!is`, `as` or `===`.
+- After a name, `<` opens type arguments when what follows reads as
+  types closed by `>` and then `(` or `{`, as in `tx.query<Row>(...)`
+  and `either<E, A> { }`; otherwise it is less than. As in Kotlin,
+  `a < b > (c)` is therefore a call.
+- A `{` after a call or a name on the same line is a trailing lambda;
+  after the `)` of `if`, `for`, `while` or `when (...)`, or after `else`
+  or `->`, it opens a block.
+- `"..."` strings and `Char` literals (`'a'`) have Kotlin's escapes:
+  `\t \b \n \r \' \" \\ \$` and `\uXXXX`. A raw string has none.
+  A surrogate is written as a pair, `"\uD83D\uDE00"`, which only a string
+  holds; half of one is refused.
+  A `$` that does not begin a template is text. Templates nest:
+  `"${if (a) "x" else "y"}"`.
+- A list (arguments, parameters, type arguments, `when` conditions) may
+  end with a comma. `;` also separates `when` branches. Block comments
+  nest.
 
 ## 7. Effects
 

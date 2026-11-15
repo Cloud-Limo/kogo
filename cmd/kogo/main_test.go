@@ -94,7 +94,13 @@ func TestEmittedGoRuns(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "main.go"), driver, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.Command("go", "run", "./"+dir).CombinedOutput()
+	// Built apart from the run: what go says about the build, such as
+	// the modules it downloads, is not the program's output.
+	prog := filepath.Join(dir, "prog")
+	if out, err := exec.Command("go", "build", "-o", prog, "./"+dir).CombinedOutput(); err != nil {
+		t.Fatalf("the emitted Go does not build: %v\n%s", err, out)
+	}
+	out, err := exec.Command(prog).CombinedOutput()
 	want := `worth by card: 10237
 worth: 10500
 worth with no price: null

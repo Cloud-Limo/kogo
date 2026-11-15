@@ -121,6 +121,60 @@ Each entry: what was decided, why, and what would reopen it.
   emitter handles every surface form, perhaps 15 to 20 extra cases, tested only through the
   Go they produce. Reopen when the emitter's cases tangle; a simplifying step can then be
   added between the two without changing the checker.
+- **The first emitter writes a Go library, in three slices, each proven by running**
+  (15 Nov 2026; `doc/design.md` "The emitter"): pure code, failures, SQL. A hand-written
+  driver calls it, and the first side-by-side run with Kotlin follows the first slice.
+  Not taken: an entry point in the language (`fun main`, `kogo run`), a language change
+  before anything has run; the server first, which puts the emitter's first test behind a
+  second design.
+- **A failure is a panic that its own raise scope recovers** (15 Nov 2026). Early return,
+  as hand-written Go does it, cannot leave a lambda (`xs.map { parse(it).bind() }`), so
+  failures in lambdas would be refused or every prelude function taking a lambda doubled;
+  and it needs statements where Kogo has values. Measured through four calls: a failure
+  costs 193 ns against 4 ns, a success 14 ns against 6 ns, beside a database round trip of
+  about 500,000 ns. A Kogo failure is typed, in the signature and caught in exactly one
+  place the checker has proved, so the panic is plumbing and not an exception in the
+  source. Accepted costs: the Go is not idiomatic, a failure shows as a panic in a
+  debugger, and the prelude's Go must be safe to unwind through.
+- **`T?` is a pointer, for every `T`** (15 Nov 2026). It is what the Postgres driver reads
+  a nullable column into. Not taken: a struct with a "present" flag, which allocates
+  nothing but needs adapting wherever values come from outside. Reopen if a profile shows
+  the allocations.
+- **`==` is Go's where the type is a number, string, `Boolean` or enum, and a runtime walk
+  elsewhere** (15 Nov 2026). Go compares a pointer by address and not slices at all. Not
+  taken: generated comparison code for every data class, which is fast, large, and awkward
+  for a type parameter. Reopen if the walk shows in a profile.
+- **A `String` is a Go string counted in UTF-16 units, as Kotlin counts** (15 Nov 2026;
+  spec 3), because `"😀".length` is valid in both languages (principle 3) and the emitter
+  is proved side by side with Kotlin. Half a surrogate pair becomes U+FFFD: a Go string
+  cannot hold one, and a panic would fail a request on `name.substring(0, 20)`. Not taken:
+  counting whole characters, which is simpler and agrees with Postgres's `char_length`
+  but changes what valid Kotlin means; storing UTF-16, which converts at every boundary.
+  Accepted cost: `length` walks the string.
+- **A value-producing `if`, `when`, `?:` or `?.` is written toward where its value goes,
+  and wrapped in a function elsewhere** (15 Nov 2026; spec 6). A `return`, `break` or
+  `continue` buried in a larger expression is refused, though Kotlin allows it; the
+  examples and both stage-1 ports hold two jumps in a value's place, both
+  `val x = y ?: return z`. Not taken: flattening every expression into statements and
+  temporaries, about 400 lines and the simplified tree under another name.
+- **The prelude's Go is our own package with no new dependency** (15 Nov 2026). `Decimal`
+  holds what Postgres sent and has no arithmetic: the ports use it once and convert it to a
+  `Double`, and cusoon2 keeps money in cents. Reopen when a port needs decimal arithmetic,
+  and choose then between a library and our own.
+- **`Map` and `Set` are one ordered implementation that compares keys by value**
+  (15 Nov 2026; spec 12). A lookup asks whether two keys are equal, so it must answer as
+  `==` does: Go's own map would not find `Leg("A", "B")` under an equal key whose `String?`
+  is another allocation. Not taken: Go's map with keys restricted to plain types, which
+  puts a Go limit in the spec and makes the checker follow type parameters to see which
+  become keys. The examples use no `Map` and the ports one `Set`.
+- **The request's context is held by `Tx` and `Db`, not passed as a hidden parameter**
+  (15 Nov 2026). A request belongs to one shape of program and so to the prelude
+  (principle 8): a hidden parameter would put it on every function of every program, a
+  Kogo compiler written in Kogo included, and would give the prelude's Go an ambient
+  channel that section 7 says does not exist. Go's convention against storing a context
+  was weighed and set aside, since nobody reads the Go. Not gained: stopping pure code
+  when its request is cancelled, and request-wide data without a handle. Reopen if either
+  is needed; Kogo source does not change either way.
 
 ## Taken in the v0 spec, not yet discussed
 
@@ -377,6 +431,19 @@ Each entry: what was decided, why, and what would reopen it.
 - **Not handled**: a generic `fun <E> Raise<E>.f()` whose `E` nothing but the scope
   settles, called outside a raise scope, is refused with "nothing settles E" rather than
   with the advice to wrap it in `either { }`.
+
+## Taken writing the emitter's design (DEV-829), not yet discussed
+
+- **A data class is a Go struct passed by value, an enum a named string, and `Either` an
+  interface with two variants** like any sealed interface. The enum follows Postgres,
+  which sends one as text.
+- **Ids, instants and dates are our own small Go types.** Go's time value carries a
+  location and a monotonic reading that break comparison by value.
+- **One naming rule gives every overload its Go name**, the prelude's and a program's; its
+  spelling is left to whoever builds the emitter, to record here.
+- **Section 13's `external object http` contradicts section 7**, which says outbound calls
+  arrive as parameters, and a global has no context to use. Left as it is, since no example
+  makes an outbound call; when they are designed, the binding becomes a handle.
 
 ## Spec gaps found by the leakage ports, unresolved
 

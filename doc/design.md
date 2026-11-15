@@ -45,9 +45,10 @@ Dev Postgres (migrated) ──►    │
 ```
 
 Only the type-check stage reads bindings and talks to Postgres. Sealed
-types become an interface plus a type switch; `T?` becomes a pointer or
-an option struct; `Either<E, A>` becomes `(A, error)`; `context.Context`
-is threaded by the compiler and never appears in source.
+types become an interface plus a type switch; `T?` becomes a pointer; a
+failure is a panic that its own raise scope recovers; `context.Context`
+rides in the `Tx` and `Db` handles and never appears in source. "The
+emitter" below has the rest.
 
 ## The SQL pass
 
@@ -101,6 +102,79 @@ There is no second, simplified tree, because its right shape depends on
 the Go to be emitted. The emitter therefore handles every surface form.
 A simplifying step can be added between the two later, reading the same
 facts.
+
+## The emitter
+
+The emitter writes Go from a checked program and the checker's facts.
+Nobody reads the Go (principle 5), so where Go's idiom and a simpler
+emitter differ, the simpler emitter wins.
+
+**What it produces first.** A library: one Go package per Kogo package,
+called by a hand-written Go driver that compares results with expected
+ones. No server, no RPC, no `kogo run`. It is built in three slices,
+each proven by running: pure code (examples 01 to 06 and 20), failures
+(07 to 09), then SQL and transactions (10 to 19 and 21, against the test
+database). Examples 01 and 02 are cusoon2's pay and discount arithmetic,
+so the first side-by-side run with the Kotlin original can follow the
+first slice. Emitted names must be ones a driver can call.
+
+**Values.**
+
+| Kogo | Go |
+| --- | --- |
+| `Int`, `Long`, `Double`, `Boolean` | `int32`, `int64`, `float64`, `bool` |
+| `T?` | a pointer, nil for `null`, for every `T` |
+| data class | a struct, passed by value |
+| sealed interface, and `Either` | an interface; `when` is a type switch |
+| enum | a named string |
+| `List<T>` | a slice, never changed once built |
+| lambda | a function value |
+| generic function | a generic function, its type arguments written out |
+
+`==` is Go's `==` where the checker knows the type is a number, a
+string, a `Boolean` or an enum, and one runtime function that walks both
+values everywhere else: Go compares a pointer by address and does not
+compare slices. The same walk gives `toString()` its text. Go has no
+wider type for a container, so a `List<Ok<Int>>` used as a
+`List<Outcome<Int>>` is copied; one value widening is free or takes an
+address.
+
+**Failures.** `raise` and `bind` are ordinary calls that panic; the
+`either { }` block recovers and gives the failure as a value, as Arrow
+does with an exception. Each scope has a handle, a `Raise<E>` function
+takes it as a hidden first parameter, and a failure carries the handle
+it was raised on, so a scope recovers only its own. A panic of any other
+kind is a bug (section 8 of the spec) and passes through untouched. So a
+failure works anywhere inside its scope, lambdas included, and the
+prelude needs no failure-aware copies. The prelude's Go must hold no
+lock and leave nothing half done while it calls a lambda.
+
+**Strings** are Go strings counted as Kotlin counts: UTF-16 units. An
+operation that would leave half a surrogate pair leaves U+FFFD.
+
+**`if`, `when`, `?:` and `?.` as values.** Go's are statements. Where
+the value goes straight into a `val`, an assignment or a `return`, or is
+the result of a function or lambda, the emitter writes a Go `if` or
+`switch` whose branches store or return. Anywhere else it wraps the
+expression in a function called on the spot. A wrapper cannot hold a
+`return`, `break` or `continue` of the Kogo function, so the checker
+refuses one buried in a larger expression. Evaluation stays left to
+right, which Go does not promise for every operand: tests must show it.
+
+**The prelude's Go** is a hand-written package in this repo with its own
+tests. One test emits a file that uses every declaration of `prelude/`
+and compiles it. It depends on nothing but the Postgres driver: ids and
+times are small types of our own over the standard library, `Regex` is
+Go's, and `Decimal` holds what Postgres sent and has no arithmetic.
+`Map` and `Set` are one ordered implementation that compares keys by the
+runtime walk of `==`, so no key type is refused. Go has no overloading;
+one naming rule gives each overload, the prelude's and a program's, its
+Go name.
+
+**The request's context** is held by the `Tx` and `Db` handles. Section
+7 of the spec puts a handle wherever the database is touched, so no
+function takes a hidden context, and a program with no requests carries
+none.
 
 ## MVP steps
 

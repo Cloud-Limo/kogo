@@ -106,6 +106,9 @@ func TestFaults(t *testing.T) {
 		{"fun f() = when (‸val x = g()) { else -> x }", "syntax", "declare the val before"},
 		{"fun String‸?.f(): String = this", "nullable-receiver", "take the value as a parameter"},
 		{"val List<Int>‸?.n: Int\n    get() = 1", "nullable-receiver", "take the value as a parameter"},
+		{"fun (‸String?).f(): String = this", "nullable-receiver", "take the value as a parameter"},
+		{"fun ‸String? .f(): String = this", "nullable-receiver", "take the value as a parameter"},
+		{"fun (‸(Int) -> Int)? .f(): Int = 1", "nullable-receiver", "take the value as a parameter"},
 	} {
 		e, line, column := fault(t, c.src)
 		if e.Line != line || e.Column != column || e.Code != c.code || !strings.Contains(e.Message, c.message) {

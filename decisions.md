@@ -1489,6 +1489,10 @@ Each entry: what was decided, why, and what would reopen it.
   which the prelude's `pgxpool` does. Not taken: `go mod download` in `mise run testdb`,
   which leaves the tests wrong wherever the cache is cold for another reason; or a filter
   on `go:` lines, which hides what a program prints.
+- **`emit`'s `build` appends the binary's exit status when not 0**, as `exit status N`,
+  the line `go run` added, so a program that prints the expected lines and then exits
+  non-zero still fails the comparison. Not taken: dropping it because nothing exits quietly
+  today; a test made to stop failing wrongly should not let one pass wrongly.
 
 ## Spec gaps found by the leakage ports, unresolved
 

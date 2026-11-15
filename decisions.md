@@ -613,7 +613,9 @@ Each entry: what was decided, why, and what would reopen it.
   imports `p1`. No local can then be a Go keyword (`type`, `func`) or hide a top-level name.
 - **A property is a Go field, and an interface's val a method `GetName()`**, since Go
   refuses a field and a method of one name; a data class that implements the interface
-  gets the method. Kotlin has the same clash between `val label` and `fun getLabel()`.
+  gets the method. Kotlin has the same clash between `val label` and `fun getLabel()`;
+  a property `getLabel` beside it is refused (`go-name`), since the struct would then not
+  implement the interface.
 - **Layout.** `kogo emit <dir> <out>` writes one Go file for each Kogo package, `a.b`'s at
   `<out>/a/b/kogo.go` in Go package `b`, and nothing else. The import path of `<out>` is
   read from the `go.mod` above it, and the Go imports `kogo/rt` and `kogo/prelude/...`, so

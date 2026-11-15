@@ -167,12 +167,14 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 		}
 		e.w("}")
 		recv := fmt.Sprintf("func (this_ %s%s) ", name, args)
+		getters := map[string]bool{} // one for a val that two interfaces declare
 		for _, s := range td.Supers {
 			for _, p := range s.Decl.Props {
 				i := slices.IndexFunc(td.Props, func(v *check.Var) bool { return v.Name == p.Name })
-				if n := "Get" + export(p.Name); i >= 0 && !members[n] {
+				if n := "Get" + export(p.Name); i >= 0 && !getters[n] {
+					getters[n] = true
 					want := check.Subst(p.Type, s.Decl.Params, s.Args)
-					e.w("%s%s() %s { return %s }", recv, claim(d, n), e.typ(want), e.convert("this_."+export(p.Name), td.Props[i].Type, want))
+					e.w("%s%s() %s { return %s }", recv, claim(td.Props[i].Decl, n), e.typ(want), e.convert("this_."+export(p.Name), td.Props[i].Type, want))
 				}
 			}
 		}

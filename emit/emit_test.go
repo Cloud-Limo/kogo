@@ -660,6 +660,7 @@ func TestRefused(t *testing.T) {
 		{"interface I {\n    fun <T> id(x: T): T\n}", "2:5: not-yet-emitted", "make it a top-level fun"},
 		{"fun a(x: Int): Int = x\nfun A(x: Int): Int = x", "2:1: go-name", "are both A_Int in Go"},
 		{"data class D(val a: Int, val A: Int)", "1:26: go-name", "two members of D are both A in Go"},
+		{"interface I {\n    val name: String\n}\ndata class D(override val name: String, val getName: String) : I", "4:14: go-name", "two members of D are both GetName in Go"},
 	} {
 		_, files, errs := emit(t, "x", "package t\n"+c[0])
 		got := ""

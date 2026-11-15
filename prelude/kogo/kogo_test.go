@@ -228,8 +228,8 @@ func TestPortCalls(t *testing.T) {
 	for _, c := range [][2]string{
 		{String_Replace("a1b22", re(`([a-z])(\d+)`), `<$2\$1>`), "<1$1><22$1>"},
 		{String_Replace("a1b22", re(`(?P<l>[a-z])(\d+)`), `${l}$12`), "aa2bb2"},
-		{String_Replace("Airport Carz Pty Ltd", re(`\bpty\.?\s+ltd\.?$`), ""), "Airport Carz Pty Ltd"},
-		{String_Replace("airport carz pty ltd", re(`\bpty\.?\s+ltd\.?$`), ""), "airport carz "},
+		{String_Replace("Heron Draft", re(`\bdraft$`), ""), "Heron Draft"},
+		{String_Replace("heron draft", re(`\bdraft$`), "") + "|" + String_Replace("herondraft", re(`\bdraft$`), ""), "heron |herondraft"},
 		{String_Trim_Char("--a-b--", '-'), "a-b"},
 		{String_IfEmpty("", func() string { return "e" }) + String_IfEmpty("x", func() string { return "e" }), "ex"},
 		{String_FilterNot("1 2\t3", ws) + String_FilterNot("a😀b", func(c rt.Char) bool { return c == 'b' }), "123a😀"},
@@ -258,6 +258,11 @@ func TestPortCalls(t *testing.T) {
 	}
 	if rt.Equal(Decimal{"1.50"}, Decimal{"1.5"}) || !rt.Equal(Decimal{"1.50"}, Decimal{"1.50"}) {
 		t.Error("a Decimal's == is not Java's, which counts the scale")
+	}
+	list := ListOf[int32](1, 2)
+	*List_FirstOrNull(list), *List_SingleOrNull(list[1:]) = 8, 9
+	if !slices.Equal(list, []int32{1, 2}) {
+		t.Errorf("firstOrNull or singleOrNull gives a pointer into the list, which now holds %v", list)
 	}
 	var seen []int32
 	List_ForEach(ListOf[int32](1, 2), func(x int32) rt.Unit { seen = append(seen, x); return rt.Unit{} })

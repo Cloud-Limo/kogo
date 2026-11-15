@@ -774,13 +774,13 @@ fun taken(stock: Long, amount: Long): Long {
 // What the stage-1 ports call, through the Go each becomes.
 func TestPortCalls(t *testing.T) {
 	expect(t, [][2]string{
-		{`t.Slug(" Airport Carz Pty Ltd ")`, "airport-carz"},
-		{`t.Slug("!!")`, "business"},
+		{`t.Handle(" Blue Heron Draft ")`, "blue-heron"},
+		{`t.Handle("!!")`, "untitled"},
 		{`t.Tally([]string{"a", " ", "b"})`, "(2, a b)"},
 	}, `package t
 
-fun slug(name: String): String =
-    name.trim().lowercase().replace(Regex("""\bpty\.?\s+ltd\.?$"""), "").replace(Regex("[^a-z0-9]+"), "-").trim('-').ifEmpty { "business" }
+fun handle(name: String): String =
+    name.trim().lowercase().replace(Regex("""\bdraft$"""), "").replace(Regex("[^a-z0-9]+"), "-").trim('-').ifEmpty { "untitled" }
 
 fun tally(words: List<String>): Pair<Int, String> {
     var n = 0

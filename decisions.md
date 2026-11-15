@@ -349,7 +349,8 @@ Each entry: what was decided, why, and what would reopen it.
   two values, as a string template would evaluate it. Since DEV-827 the parser tells the pass
   where each parameter lies, so `${...}` holds any expression. There is no way to write the text `$name`, and so no tagged dollar
   quoting.
-- **The emitted Go is a shape for the emitter to replace.** One function per literal over a
+- **The emitted Go is a shape for the emitter to replace.** (Replaced by DEV-832, which
+  removed `sqlpass.Emit` and `kogo-sql emit`; see its section below.) One function per literal over a
   `pgx.Tx`, returning `([]Row, error)` or the rows affected, named `Q<path>L<line>C<column>`
   with `_2`, `_3` added when two paths map to one Go name. The row count rules of the five
   calls and turning an error into a panic belong to the emitter, which knows the call. Every
@@ -709,6 +710,7 @@ Each entry: what was decided, why, and what would reopen it.
     `prelude/` declares them.
   - SQL and transactions (spec 10): a `Tx` or a `Db` wherever one is written, and each of
     the five calls. Spec 7 puts one of the two in every fun that touches the database.
+    (Emitted since DEV-832.)
   - a type argument that is nullable where the type parameter is used as `T?`
     (`x.takeIf { }` on an `Int?`): two pointers in Go, and the outer one would not be null
     when the value is.
@@ -857,7 +859,85 @@ Each entry: what was decided, why, and what would reopen it.
   without the cast or `"name!"` fix, which Postgres has not for a field.
 - **Not done: reading a composite at run time.** DEV-832 is not done, so the issue leaves
   it out; `sqlpass.Emit` refuses a composite column, as `kogo-sql emit` then does with
-  `sql-emit`, rather than write Go that does not build.
+  `sql-emit`, rather than write Go that does not build. (DEV-832 reads one, and removed
+  both.)
+
+## Taken emitting SQL and transactions (DEV-832), not yet discussed
+
+- **A row is read by Go the emitter writes, not by reflection.** Each of the three query
+  calls passes the prelude's Go a function that scans every column into a variable of its
+  own and builds `R` from them by the checker's paths. Go's compiler then checks each row
+  type against its columns, which a run-time walk of `R` would find only when the
+  statement runs. Not taken: one reflecting reader in the prelude, a smaller emitter and
+  the same logic unchecked.
+- **A column that may be null is read as a pointer, any other as it is.** The driver
+  refuses a null read into what is not a pointer, and that refusal is the panic of a
+  column named `"name!"` (spec 10.5): the SQL pass strips the `!`, so the emitter cannot
+  tell such a column from one Postgres declares `NOT NULL`, and need not. Inside a
+  nullable nested data class every column is a pointer; the data class is `null` when all
+  are, and a null beside one that is not panics, naming the column (spec 10.3, the hole
+  DEV-827 accepted).
+- **The prelude's types take themselves to and from the driver's**, by the interfaces pgx
+  reads and writes its own types through, so a `Uuid`, an `Instant` or a `Decimal` is an
+  argument and a scan target as it stands, alone, in a `T?` and in a list. Each refuses a
+  null. `prelude/kogo` and `prelude/kogo/time` now import pgx's `pgtype`, and `Db` its
+  `pgxpool`, which brings pgx's own `puddle` and `x/sync` into `go.mod`.
+- **`Decimal` is the text Postgres writes**, `12.50`, `NaN`, `Infinity`: a Go string. Two
+  are equal when their text is, so `1.5` is not `1.50`, as with Java's `BigDecimal.equals`.
+  `LocalTime` is the nanoseconds since midnight and `Duration` seconds and nanoseconds, as
+  java.time holds them, each writing itself as java.time does. They are declared with no
+  members yet: nothing uses one, and the test of every type reads them from a row.
+- **An `interval` with months is a panic, and its day is 24 hours** (spec 10.4). A month
+  has no length, and `java.time.Duration` counts a day as 24 hours. A `Duration` is sent
+  as microseconds alone, so `ofDays(1)` is stored as `24:00:00`, which Postgres compares
+  equal to `1 day` and adds to a timestamp across a clock change as 24 hours, as Kotlin
+  would. `infinity` in a `timestamptz` or a `date` is a panic. Sub-microsecond digits are
+  cut, not rounded, as the driver does. Reopen if a port stores calendar intervals.
+- **A panic from the database carries the driver's error unchanged**, so `db.tx` can tell
+  a serialization failure by its code and a server can log Postgres's own message. A
+  wrong row count panics with a text that holds the statement. The `//line` directives
+  give the Kogo line.
+- **`db.tx(serializable = true)` reruns without a limit**, as the spec says, on SQLSTATE
+  40001 and 40P01 only, whether the block or the commit met it. Without `serializable`
+  neither is rerun. Reopen with a limit if a workload livelocks.
+- **`tx.atomically` is the driver's nested transaction**, a savepoint, rolled back on any
+  panic that leaves the block, a failure or a bug. The block keeps using the outer `Tx`.
+- **The raising `db.tx` is `either` around the plain one**: the scope is made once, so a
+  rerun raises on the same handle.
+- **The driver is told of a composite type on the connection that first reads one**
+  (`Tx_Known`, called where a statement has a column of one). The types its fields are
+  made of come with it. A `Db` is made from a pool that already exists, so there is no
+  hook when a connection opens; the cost is a map lookup for each such statement. `citext`
+  is an extension's type that the driver cannot derive, and a table's row may hold one, so
+  it is registered as text on the same occasion.
+- **Postgres sends the absent side of an outer join as NULL, not as a row of nulls**: the
+  run-time reading confirms what DEV-837 assumed, and a whole row that an outer join nulls
+  is `null`.
+- **A list of an enum is refused** (`not-yet-emitted`), as a parameter or a column, with
+  the cast to write instead. The driver knows no enum's array type until it is told, and
+  the SQL pass keeps an enum's Kogo name, not its Postgres one, so there is nothing to
+  tell it with. A list of `citext` reads and writes as text. Reopen when a port needs one:
+  carry the Postgres name in `sqlpass.Type` and tell the driver as for a composite.
+- **An empty `List` is sent as an empty array.** Go's nil slice is an empty list, and the
+  driver would send it as `NULL`.
+- **The five calls on `tx?.` have no Go**: the checker already refuses a `Tx?` before the
+  dot, so the emitter has no case for it.
+- **`check.Snake` is exported**: a field of a composite type fills the property of its
+  name, and the facts hold a path for a column but none for a field.
+- **A test that runs statements has a schema of its own** (`internal/testdb`): a
+  transaction commits, and `go test ./...` runs packages side by side, so in one schema
+  each would read the rows another commits. The schema is `testdata/schema.sql` loaded
+  again under a name of the driver's process, first on the pool's search path; a literal
+  is checked against the tables of `public` and run against the copy. A driver that is
+  killed leaves its schema behind until `mise run testdb`.
+- **Not tested: a function type with a `Raise<E>` receiver converted to a wider one**
+  (`convert`, DEV-831). The issue expected the raising `db.tx` to reach it. It does not:
+  the checker gives the block exactly the parameter's type, the wanted result included,
+  and refuses any other function value there (`type-mismatch`), so no program converts
+  one. The nearest case, a block that gives an `Int` where `db.tx` gives an
+  `Either<String, Int?>`, is tested and converts the value inside the block.
+- **Not handled**: a deadline for a statement or a rerun, a statement cache across
+  builds, and `kogo schema` (the issue leaves them out).
 
 ## Taken adding what the invoice ledger calls (DEV-841), not yet discussed
 

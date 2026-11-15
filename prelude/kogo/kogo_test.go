@@ -8,6 +8,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"kogo/rt"
 )
 
@@ -217,5 +219,20 @@ func TestEither(t *testing.T) {
 		if c[0] != c[1] {
 			t.Errorf("got %s, want %s", c[0], c[1])
 		}
+	}
+}
+
+// A Decimal is a numeric as Postgres writes it, digit for digit, and
+// goes back as it came. A null is no Decimal and no Uuid. The rest of
+// db.go needs a database: emit's tests run it.
+func TestPostgres(t *testing.T) {
+	for _, text := range []string{"12.50", "-0.001", "1500", "NaN", "Infinity", "-Infinity"} {
+		var back Decimal
+		if n, err := Decimal(text).NumericValue(); err != nil || back.ScanNumeric(n) != nil || string(back) != text {
+			t.Errorf("%s comes back as %s (%v)", text, back, err)
+		}
+	}
+	if new(Decimal).ScanNumeric(pgtype.Numeric{}) == nil || new(Uuid).ScanUUID(pgtype.UUID{}) == nil {
+		t.Error("a null is read as a value")
 	}
 }

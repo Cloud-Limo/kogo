@@ -75,7 +75,8 @@ asking Postgres to prepare it.
 5. Decide nullability by section 10.5: non-null only for a plain
    reference to a `NOT NULL` column not on the nullable side of an outer
    join; `as "name!"` and `as "name?"` override.
-6. Emit a pgx call with a scan struct.
+6. Hand the signature to the checker, whose facts the emitter writes
+   the call from ("The emitter" below).
 
 Postgres does not report result nullability; that is the pass's own
 work. A later step caches results by statement text and schema hash so
@@ -194,7 +195,21 @@ Go name.
 **The request's context** is held by the `Tx` and `Db` handles. Section
 7 of the spec puts a handle wherever the database is touched, so no
 function takes a hidden context, and a program with no requests carries
-none.
+none. A driver makes a `Db` from a connection pool and a context.
+
+**SQL.** Each of the five calls is a call of the prelude's Go, given the
+`Tx`, the statement as Postgres takes it, and what each parameter
+binds. A call that reads rows also passes a function, written from the
+checker's facts, that scans each column into a variable of its own and
+builds `R` from them: Go's compiler checks every row type against its
+columns, and nothing is found by reflection. A column that may be null
+is read as a pointer and any other as it is, so the driver refuses a
+null where the row type has none. The prelude's types take themselves
+to and from the driver's. A composite type is read field by field, once
+the connection's driver has been told of the type. `db.tx` begins,
+commits and rolls back around its block, and `tx.atomically` is a
+savepoint; whatever Postgres refuses is a panic, which rolls back on
+its way out as a failure does.
 
 ## MVP steps
 

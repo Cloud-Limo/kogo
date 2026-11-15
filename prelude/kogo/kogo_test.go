@@ -118,6 +118,20 @@ func TestIds(t *testing.T) {
 	Check(false, func() string { return "no" })
 }
 
+// A raise scope recovers only the failures raised on its own handle: one
+// raised on an outer scope's, inside an inner scope of the same E,
+// passes the inner one. The checker keeps a program from writing it,
+// but db.tx's raise scope may run inside another's.
+func TestRaiseScopes(t *testing.T) {
+	got := Either_RaiseEToA(func(outer Raise[string]) string {
+		inner := Either_RaiseEToA(func(Raise[string]) int32 { Raise_Raise(outer, "outer"); return 1 })
+		return "inner gave " + rt.ToString(inner)
+	})
+	if s := rt.ToString(got); s != "Either.Left(outer)" {
+		t.Errorf("got %s, want Either.Left(outer)", s)
+	}
+}
+
 // The functions on an Either value (spec.md section 9). Go cannot
 // read E and A off an Either, so a call writes them, as the emitter
 // always does.
@@ -127,12 +141,12 @@ func TestEither(t *testing.T) {
 	show := func(e any) string { return rt.ToString(e) }
 	double := func(n int32) int32 { return n * 2 }
 	for _, c := range [][2]string{
-		{show(right), "Right(value=2)"},
-		{show(Either_Map[string, int32, int32](right, double)), "Right(value=4)"},
-		{show(Either_Map[string, int32, int32](left, double)), "Left(value=no)"},
-		{show(Either_MapLeft[string, int32, int32](left, String_Length)), "Left(value=2)"},
-		{show(Either_MapLeft[string, int32, int32](right, String_Length)), "Right(value=2)"},
-		{show(Either_FlatMap[string, int32, int32](right, func(n int32) Either[string, int32] { return E_Left("gone") })), "Left(value=gone)"},
+		{show(right), "Either.Right(2)"},
+		{show(Either_Map[string, int32, int32](right, double)), "Either.Right(4)"},
+		{show(Either_Map[string, int32, int32](left, double)), "Either.Left(no)"},
+		{show(Either_MapLeft[string, int32, int32](left, String_Length)), "Either.Left(2)"},
+		{show(Either_MapLeft[string, int32, int32](right, String_Length)), "Either.Right(2)"},
+		{show(Either_FlatMap[string, int32, int32](right, func(n int32) Either[string, int32] { return E_Left("gone") })), "Either.Left(gone)"},
 		{show(Either_Fold[string, int32, int32](left, String_Length, double)), "2"},
 		{show(Either_GetOrElse[string, int32](left, String_Length)), "2"},
 		{show(Either_GetOrNull[string, int32](right)), "2"},

@@ -72,6 +72,16 @@ func (c *checker) fails(e *syntax.Call, call *Call) {
 	}
 }
 
+// kept refuses a lambda that fails into the raise scope around it as
+// the argument of a fun of the program's, which could keep it and run
+// it outside the scope. The prelude's funs run their blocks before
+// they return.
+func (c *checker) kept(f *Func, a syntax.Expr) {
+	if l, ok := a.(*syntax.Lambda); ok && !f.External && c.info.Fails[l] != nil {
+		c.errorf(l, "raise-escape", "this lambda fails into the raise scope around it, and is passed to %s, which could keep it and run it outside the scope: only the prelude's funs are known to run it first; make it return an Either<%s, A>, and bind what %s gives", f.Name, c.info.Fails[l], f.Name)
+	}
+}
+
 // txRaise reports whether f is the core's db.tx whose block is a
 // raise scope (spec.md 10.7).
 func (c *checker) txRaise(f *Func) bool {

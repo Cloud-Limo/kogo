@@ -774,6 +774,46 @@ Each entry: what was decided, why, and what would reopen it.
   receiver function types return. Also `private` or `internal` on a binding with a
   receiver, which is accepted and hides nothing.
 
+## Taken emitting expected failures (DEV-831), not yet discussed
+
+- **A raise scope's block is a Go function whose first parameter is the scope's handle**,
+  a `kogo.Raise[E]`, and `either` is an ordinary call of the prelude's Go, under the name
+  the naming rule gives it (`Either_RaiseEToA`, beside the type `Either`). The lambdas
+  inside capture the handle. `raise`, `ensure`, `ensureNotNull` and `bind` are given the
+  handle of the innermost scope they are written in, which is the one the checker read
+  them against. Not taken: writing each block inline with its own `defer`, more emitter
+  for the same Go. The raising `db.tx` can take its handle the same way.
+- **The forms fail with the scope's `E`, converted where they are written.** `raise(e)`
+  is called with the scope's `E` as its type argument and `e` converted to it; `bind` is
+  given a function that widens its own `E` to the scope's. The scope then only asserts the
+  value's Go type, and an `Either<S.A, X>` bound in a scope of `S` gives a `Left` of `S`.
+- **A panic a scope does not own is panicked again, unchanged**: another scope's failure
+  and a bug alike. Go keeps the frames of the first panic in the trace, so it still names
+  the Kogo line, and a driver recovers the same value; a test shows both.
+- **The handle points to a struct of one byte**, since Go may give every new value of an
+  empty struct the same address, and two scopes would then share a handle.
+- **An `Either` used with wider type arguments is rebuilt** by the prelude's
+  `Either_widen`, as a list is copied by `List_widen`. `StoreError.Missing.left()` settles
+  `E` as `StoreError.Missing`, and example 09 returns it as an `Either<StoreError, String>`;
+  DEV-830 refused that for every sealed type. Other sealed types are still refused: no
+  example needs them, and rebuilding one means code for each of its variants.
+- **An `Either` writes itself as Arrow does, `Either.Left(value)`**, where the rule for
+  data classes gave `Left(value=...)`. `"$result"` is valid in both languages and must
+  read the same (principle 3).
+- **A lambda that fails into a raise scope is passed only to the prelude's funs**, which
+  run their blocks before they return. A fun of the program's could keep the lambda, as
+  `fun <T> later(b: () -> T) = b` does, and a failure raised after its scope has returned
+  would be a panic no scope recovers: a 500 where section 9 promises a value. Kotlin
+  allows it, and Arrow throws when it happens. Not taken: following each function-typed
+  parameter through its fun's body to see that it is only called, which makes a call's
+  legality depend on a body elsewhere (principle 2). Reopens when a program needs its own
+  fun to run a failing block, and then by Kotlin's marker on the signature, `inline fun`,
+  which forbids keeping the parameter, at the cost of a keyword Kogo does not have.
+- **The prelude's Go is safe to unwind through**, a rule stated at the top of
+  `prelude/kogo/kogo.go`: a function that calls a lambda holds no lock and leaves nothing
+  half done while it runs. Every one there already keeps what it builds to itself until it
+  returns.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - A join returning two whole rows needs every column aliased by hand, and composite types

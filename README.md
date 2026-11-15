@@ -11,9 +11,9 @@ against the real schema at build time.
 
 Built so far: the parser (`syntax`), the SQL pass (`sqlpass`) with its
 command, the prelude's first declarations (`prelude`), the checker
-(`check`), spec sections 2 to 11, and the emitter's first slice
-(`emit`), which writes Go for pure code, sections 2 to 6, on the Go of
-`rt` and `prelude/kogo`.
+(`check`), spec sections 2 to 11, and the emitter's first two slices
+(`emit`), which write Go for pure code, sections 2 to 6, and expected
+failures, section 9, on the Go of `rt` and `prelude/kogo`.
 
 ```
 mise exec -- go build -o bin/kogo ./cmd/kogo

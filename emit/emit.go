@@ -1,6 +1,7 @@
 // Package emit writes Go from a checked Kogo program: doc/design.md,
-// "The emitter". This is its first slice, pure code, spec.md sections
-// 2 to 6; what can fail (section 9) is refused as not yet emitted.
+// "The emitter". It writes pure code, spec.md sections 2 to 6, and
+// expected failures, section 9; SQL and transactions, sections 7 and
+// 10, are refused as not yet emitted.
 //
 // Nobody reads the Go. Each line of it is preceded by a //line
 // directive, so that a Go panic's trace names the Kogo file and line.
@@ -45,10 +46,15 @@ func emitAll(info *check.Info, prelude, program []*syntax.File, root string) (*e
 	for _, f := range bindings {
 		e.bound[f.Package.Name] = true
 	}
+	// The core's section 9 is emitted. Whatever else it declares, Db,
+	// Tx and their funs now, is refused until its slice writes it.
+	emitted := map[string]bool{"Raise": true, "either": true, "raise": true, "ensure": true, "ensureNotNull": true, "bind": true}
 	for _, d := range info.Core.Decls {
-		if c, ok := d.(*syntax.ClassDecl); ok && c.Kind == "external class" {
+		if c, ok := d.(*syntax.ClassDecl); ok && c.Name == "Either" {
+			e.either = info.Classes[c]
+		} else if ok && c.Kind == "external class" && !emitted[c.Name] {
 			e.later[info.Classes[c]] = true
-		} else if f, ok := d.(*syntax.FunDecl); ok {
+		} else if f, ok := d.(*syntax.FunDecl); ok && !emitted[f.Name] {
 			e.later[info.Funcs[f]] = true
 		}
 	}
@@ -119,7 +125,8 @@ type emitter struct {
 	bound    map[string]bool           // the Kogo packages that Go implements: the prelude's
 	nullable map[*check.TypeParam]bool // the type parameters used as T?
 	scanned  map[*check.Func]bool      // the funs whose signatures are read for that
-	later    map[any]bool              // the core's Raise, Tx and Db and its funs: sections 9 and 10
+	later    map[any]bool              // the core's declarations not emitted yet: Db, Tx and their funs
+	either   *check.TypeDecl           // the core's Either
 	insts    []inst
 
 	pkg     string            // the Kogo package being written
@@ -136,6 +143,14 @@ type emitter struct {
 	this   check.Type // the type of this, or nil
 	result check.Type
 	loops  []*loop
+	raise  *raise // the raise scope written in, or nil
+}
+
+// A raise is a raise scope as the Go inside it sees it: its handle,
+// the first parameter of its block, and the type Raise<E>.
+type raise struct {
+	handle string
+	typ    *check.Named
 }
 
 // An inst is a nullable type argument, and the type parameter it
@@ -169,8 +184,8 @@ func (e *emitter) notYet(at syntax.Node, what, fix string) {
 	e.refuse(at, "not-yet-emitted", "%s is not emitted yet: %s", what, fix)
 }
 
-// The fix for what belongs to the slices that follow this one.
-const slices9and10 = "the next slices of the emitter write failures, then SQL and transactions"
+// The fix for what belongs to the slice that follows this one.
+const slice10 = "the next slice of the emitter writes SQL and transactions"
 
 // first gives where a node's text begins: an operator and a call are
 // positioned further in.

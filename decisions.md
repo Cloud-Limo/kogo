@@ -472,6 +472,13 @@ Each entry: what was decided, why, and what would reopen it.
   the receiver of `raise`, `ensure` and `ensureNotNull` and of either's block. Accepted
   cost: cusoon2's 26 receiver functions each become `= either { ... }`, with `.bind()` at
   their calls. Reopen if ports read worse for `.bind()` at every call.
+- **The TypeScript file names no built-in, and no wire type takes its list's interface
+  name** (15 Nov 2026; spec 15.4, 15.6). A type the file declares shadows TypeScript's own
+  of that name, so `Unit` is written `{[k: string]: never}`, not `Record<string, never>`,
+  and a wire type named like the list's interface (`Ops` for `api ops`) is refused, as one
+  named `Outcome` is. Not taken: a list of TypeScript's global names to refuse, which is
+  long, changes with TypeScript, and only `Record` was ever written. Reopen if the file
+  must name another built-in.
 
 ## Taken in the v0 spec, not yet discussed
 
@@ -1258,6 +1265,37 @@ Each entry: what was decided, why, and what would reopen it.
 - **The facts give the environment once for a list**, not on each operation, since a list
   takes one; and the wire types the list reaches in the order first reached. A type is
   read once for each list, which ends a type that holds itself.
+
+## Taken writing TypeScript for api lists (DEV-852), not yet discussed
+
+- **A list's types stand in the order of their names** (spec 15.6), not the order the
+  operations reach them: reordering a list or a data class's properties then moves no type
+  in the file, so `git diff` after `kogo ts` shows only what changed. The interface keeps
+  the list's order, as the author wrote it. Names are unique in a list (15.4), so the order
+  is total.
+- **The first line names the list and not its file or package**: a list's name is unique in
+  the program (15.1), and a path would change the bytes with the directory `kogo ts` is run
+  from.
+- **The interface is the list's name with its first letter in upper case** (spec 15.6),
+  `Ops` for `ops`, as 15.6's example had it. The function lives in `check`, which refuses a
+  wire type of that name, and `ts` calls it, so the two cannot drift.
+- **A wire type's name begins with an upper-case letter** (spec 15.4). TypeScript refuses
+  `type string = ...`, and `string`, `never` and the rest of its own type names and
+  reserved words all begin in lower case, so one rule covers them, and Kotlin names classes
+  in upper case anyway. Not taken: a list of TypeScript's reserved names, which is long and
+  refuses a lower-case name only when it clashes. Reopen if a program needs a lower-case
+  wire type.
+- **List names that differ only in case are refused, and so are `outcome` and `Outcome`**
+  (spec 15.1): `ops.ts` and `Ops.ts` are one file on macOS, and either of the second pair
+  would name its interface as the answer's type.
+- **`kogo ts` removes nothing from `<out>`**, as `kogo emit` does not: a renamed list leaves
+  its old file. An application that wants `<out>` to hold only what Kogo wrote empties it
+  before running `kogo ts`. Not taken: removing `.ts` files that start with the generated
+  line, which lets a tool delete files it was not asked to. Reopen if a stale file misleads
+  a frontend in practice.
+- **An enum with no constants is written `never`**: Kotlin and Kogo accept one, and an empty
+  union is not TypeScript. No value of it can cross, so the type says so. Not taken:
+  refusing it on the wire, a rule for a case no program writes.
 
 ## Taken emitting the table of an api list (DEV-851), not yet discussed
 

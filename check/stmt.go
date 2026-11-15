@@ -68,6 +68,9 @@ func (c *checker) stmt(s syntax.Stmt, unit bool) Type {
 		if s.Receiver != nil {
 			c.errorf(s, "unknown-name", "a local fun has no receiver: declare an extension at the top level")
 		}
+		if s.TypeParams != nil {
+			c.errorf(s, "local-fun", "a local fun takes no type parameters (spec.md 5): declare %s at the top level", s.Name)
+		}
 		c.signature(f, s, nil)
 		c.define(s, f)
 		c.body(f, s)

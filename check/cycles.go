@@ -110,3 +110,62 @@ func (c *checker) cycles(program []*syntax.File) {
 			strings.Join(told, "; "))
 	}
 }
+
+// vals refuses a top-level val whose value refers, directly or through
+// the vals and funs it refers to, to itself or to a val declared below
+// it in its file (spec.md 6). Kotlin reads such a val before it holds
+// its value, or refuses it; Go orders the vals by what they refer to
+// and refuses a cycle. A cycle is told once, at its first val.
+func (c *checker) vals(program []*syntax.File) {
+	told := map[Object]bool{}
+	for _, f := range program {
+		c.file = f
+		for _, d := range f.Decls {
+			vs := c.info.Vars[d]
+			if len(vs) == 0 || told[vs[0]] {
+				continue
+			}
+			g := vs[0]
+			// A search from g, keeping the way to each object reached.
+			way, queue := map[Object]Object{g: nil}, []Object{g}
+		search:
+			for len(queue) > 0 {
+				o := queue[0]
+				queue = queue[1:]
+				for _, r := range c.reads[o] {
+					if v, ok := r.(*Var); ok && v.file == f && v.Decl.At().Offset >= d.At().Offset {
+						c.badRead(g, v, o, way, told)
+						break search
+					}
+					if _, seen := way[r]; !seen {
+						way[r], queue = o, append(queue, r)
+					}
+				}
+			}
+		}
+	}
+}
+
+// badRead reports that g's value reaches v, through o and the way to it.
+func (c *checker) badRead(g, v *Var, o Object, way map[Object]Object, told map[Object]bool) {
+	var through []string
+	for ; o != g; o = way[o] {
+		if v == g {
+			told[o] = true
+		}
+		if f, ok := o.(*Func); ok {
+			through = append([]string{f.Name}, through...)
+		} else {
+			through = append([]string{o.(*Var).Name}, through...)
+		}
+	}
+	by := ""
+	if through != nil {
+		by = ", through " + strings.Join(through, ", ")
+	}
+	if v == g {
+		c.errorf(g.Decl, "val-order", "the value of %s refers to %s itself%s (spec.md 6): compute it without %s, or make one of these a fun", g.Name, g.Name, by, g.Name)
+	} else {
+		c.errorf(g.Decl, "val-order", "the value of %s refers to %s%s, which is declared below it in this file (spec.md 6): declare %s above %s", g.Name, v.Name, by, v.Name, g.Name)
+	}
+}

@@ -53,6 +53,11 @@ Dev Postgres (migrated) ──►    │
                             4 go build (links pgx and Go libraries)
 ```
 
+`kogo check` is the only gate. A program that passes it builds and runs.
+A limit that stands is a checker error with a line of the spec; where the
+emitter cannot yet write a form the checker accepts, it refuses with
+`not-yet-emitted`, which is a debt with an issue.
+
 Only the type-check stage reads bindings and talks to Postgres. Sealed
 types become an interface and `when` a switch; `T?` becomes a pointer; a
 failure is a panic that its own raise scope recovers; `context.Context`

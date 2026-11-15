@@ -66,7 +66,12 @@ operators give `Long`, as in Kotlin, and `< <= > >=` compare an `Int`
 with a `Long`; `==` between them is an error, as in Kotlin. A
 whole-number literal is a `Long` where a `Long` is expected (a declared
 type, a parameter, a return): `val total: Cents = 0`. Everywhere else it
-is an `Int`, so `cents == 0L`. `Int` or `Long` mixed with `Double` is an
+is an `Int`, so `cents == 0L`. A whole-number literal must fit the type
+it is read as: `3000000000` read as an `Int` is an error, though Kotlin
+reads it as a `Long`; write `3000000000L`. A minus is taken with its
+literal, so `-2147483648` is an `Int`. Digits past 9223372036854775807
+are an error, as in Kotlin, even after a minus: `-9223372036854775808L`
+is refused. `Int` or `Long` mixed with `Double` is an
 error in arithmetic and in comparison, though Kotlin allows it: write
 `.toDouble()`, so that the place where a whole number becomes a
 floating-point one is visible.
@@ -142,7 +147,10 @@ interface Regime<K> {
 }
 ```
 
-An interface declares abstract `val`s and `fun`s. No default bodies. Only
+An interface declares abstract `val`s and `fun`s. No default bodies. An
+interface's `fun` takes no type parameters and has no default values,
+though Kotlin allows both: make it a top-level fun that takes the value,
+or state the argument at each call. Only
 data classes and `data object`s implement interfaces. A `data object` has no
 constructor to implement a `val` in, so it implements only interfaces
 that declare `fun`s alone. There are no other
@@ -196,7 +204,9 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
 ```
 
 - Top-level functions, extension functions and extension `val`s with a
-  getter. Local functions are allowed inside a function body. An
+  getter. Local functions are allowed inside a function body, without
+  type parameters, though Kotlin allows them: declare a generic one at
+  the top level. An
   extension's receiver is not nullable: `fun String?.f()` does not exist;
   take the value as a parameter.
 - Every top-level function states its parameter types and its return type.
@@ -295,6 +305,12 @@ interface `fun` before an extension of the same name.
 - `val` everywhere. `var` only for locals inside a function body.
   Top-level `val` and `const val` hold constants; there is no top-level
   `var` and no other global state.
+- A top-level `val`'s value may not refer to the `val` itself, or to a
+  `val` declared below it in its file, directly or through the `val`s
+  and functions it refers to. A reference counts wherever it is
+  written, in a lambda too, whether or not it runs. Kotlin refuses a
+  direct read of a `val` below, and through a function reads it before
+  it holds its value: declare the one it reads above it.
 - `if`/`else` and `when` are expressions.
 - `when (x) { ... }` over a sealed interface, an enum or a `Boolean` must
   cover every case or have `else`; the compiler rejects a missing case.
@@ -884,6 +900,10 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `println`, `readln` | a `Console` parameter, from `kogo.io` |
 | value classes | `typealias`, in v0 |
 | packages that import each other, directly or through others | move what one takes from the other into a package both may import |
+| `fun <T> f(...)` or a default value in an interface's `fun` | a top-level fun that takes the value, or the argument at each call |
+| `fun <T> f(...)` inside a function | declare it at the top level |
+| `val n = 3000000000`, a `Long` | `3000000000L` |
+| a top-level `val` that reads one below it through a function | declare the one it reads above it |
 
 ## 15. Operations
 

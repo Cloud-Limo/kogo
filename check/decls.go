@@ -32,7 +32,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{}, SQL: map[*syntax.SQL]*Query{}, Core: core,
 		},
 		pkgs: map[string]*pkg{}, members: map[string][]*Func{}, imports: map[*syntax.File]map[string]*pkg{},
-		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{},
+		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{}, reads: map[Object][]Object{},
 	}
 	order := map[string]int{}
 	for i, f := range files {
@@ -58,6 +58,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 	for i := 0; i < len(c.bodies); i++ {
 		c.bodies[i]()
 	}
+	c.vals(program)
 	slices.SortStableFunc(c.errs, func(a, b *syntax.Error) int {
 		return cmp.Or(cmp.Compare(order[a.File], order[b.File]), cmp.Compare(a.Line, b.Line), cmp.Compare(a.Column, b.Column))
 	})
@@ -75,8 +76,10 @@ type checker struct {
 	core    *syntax.File
 	signer  Signatures
 	optIns  map[*syntax.File]map[*TypeDecl]bool // the markers each file opts in to
+	reads   map[Object][]Object                 // the top-level vals and the funs each val's value and each fun refers to
 
 	// Where the checker is.
+	owner      Object // the val whose value, or the fun whose body, is being read
 	file       *syntax.File
 	pkg        *pkg
 	scope      *scope
@@ -142,7 +145,9 @@ func (p *pkg) named(name string) []vis {
 	return out
 }
 
-func (c *checker) enter(f *syntax.File, p *pkg) { c.file, c.pkg, c.scope = f, p, &scope{} }
+func (c *checker) enter(f *syntax.File, p *pkg) {
+	c.file, c.pkg, c.scope, c.owner = f, p, &scope{}, nil
+}
 
 // later queues work to be done where the checker is now.
 func (c *checker) later(queue *[]func(), work func()) {
@@ -333,6 +338,7 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 				g.markers = c.marks(d.Mods)
 				g.Type = c.declared(d)
 				c.later(&c.bodies, func() {
+					c.owner = g
 					if d.Value != nil {
 						c.value(d.Value, g.Type)
 					} else if !d.Mods.External {
@@ -494,6 +500,7 @@ func (c *checker) getter(f *Func, d *syntax.ValDecl) {
 	f.markers = c.marks(d.Mods)
 	c.failing(d, f)
 	c.later(&c.bodies, func() {
+		c.owner = f
 		c.open(f.TypeParams)
 		defer c.pop()
 		c.define(d, &Var{Kind: Param, Name: "this", Type: f.Receiver})
@@ -537,6 +544,8 @@ func (c *checker) signature(f *Func, d *syntax.FunDecl, owner *TypeDecl) {
 // body checks a fun's default values and its body. Where its receiver
 // is a Raise<E>, refused, what it raises says no more.
 func (c *checker) body(f *Func, d *syntax.FunDecl) {
+	defer func(o Object) { c.owner = o }(c.owner)
+	c.owner = f
 	c.open(f.TypeParams)
 	defer c.pop()
 	var raise Type
@@ -632,6 +641,14 @@ func (c *checker) class(td *TypeDecl) {
 			f.markers = c.marks(m.Mods)
 			if d.Kind == "interface" || d.Kind == "sealed interface" {
 				f.Kind = Method
+				if m.TypeParams != nil {
+					c.errorf(m, "interface-fun", "an interface's fun takes no type parameters (spec.md 3.4): make %s a top-level fun that takes the value", m.Name)
+				}
+				for _, p := range m.Params {
+					if p.Default != nil {
+						c.errorf(p, "interface-fun", "an interface's fun has no default values (spec.md 3.4): state %s at each call, or add a top-level fun that does", p.Name)
+					}
+				}
 			}
 			c.info.Funcs[m] = f
 			c.signature(f, m, td)
@@ -653,6 +670,9 @@ func (c *checker) class(td *TypeDecl) {
 func (c *checker) conform(td *TypeDecl) {
 	c.open(td.Params)
 	defer c.pop()
+	if td.Ctor != nil {
+		c.owner = td.Ctor
+	}
 	for _, p := range td.Decl.Params {
 		if p.Default != nil {
 			c.value(p.Default, c.info.Vars[p][0].Type)

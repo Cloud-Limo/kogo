@@ -19,7 +19,14 @@ constraints) is worth typing.
    signatures it calls. No macros, reflection, annotation magic or
    ambient state.
 3. **A strict subset where it overlaps Kotlin.** Valid in both means the
-   same in both. Additions look unlike Kotlin.
+   same in both. Additions look unlike Kotlin. In the core (syntax,
+   numbers, `null`, `when`, equality, data classes, failures) this is
+   strict. In the prelude a Kotlin name means Kotlin's behaviour in
+   ordinary use; a difference is allowed only in corners, when matching
+   would mean reimplementing a JVM algorithm or table and no ported
+   module's side-by-side run depends on it, and each is stated in
+   `spec.md` section 12. A function that would differ in ordinary use
+   takes another name.
 4. **Postgres is the type checker for SQL.** Never re-implement SQL
    typing; ask the database.
 5. **Go is a backend, not a source language.** Nobody reads the emitted
@@ -182,6 +189,22 @@ none.
 2. Parser and checker for what the first ported module uses.
 3. Go emitter.
 4. A differential run of a ported module against its Kotlin original.
+
+The run is side by side: one file of cases, hand-picked edges and a few
+thousand random ones from a fixed seed, feeds both the Kotlin and the
+emitted Go. Every result is compared exactly: whole numbers digit for
+digit, a `Double` bit for bit, text character for character, `null`,
+lists in order, data classes field by field; a case that throws in
+Kotlin must panic in Kogo with the same message. There is no tolerance,
+and passing is zero differences. Each difference is a mistake in the
+port, a fault in the emitter or the prelude, or a language difference
+to state. The first module is cusoon2's invoice ledger and pay
+arithmetic, which needs only the emitter's first slice; the second,
+once SQL runs, is suppliers and businesses, where the same result also
+means the same rows changed from identical copies of a database, with
+the clock and new ids supplied alike. The port, the drivers and the
+cases live in cusoon2, since nothing specific to it enters this repo,
+and the port names the cusoon2 commit it matches.
 
 ## Keeping the general language open
 

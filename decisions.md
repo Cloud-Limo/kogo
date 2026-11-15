@@ -223,6 +223,70 @@ Each entry: what was decided, why, and what would reopen it.
   small rule as type arguments (spec 5.1), since there is no `Any` for them to widen to.
 - **Type arguments are written all or none**, as in Kotlin.
 
+## Taken building the checker (DEV-825), not yet discussed
+
+- **An operator on anything but a number is a binding** (spec 6): `a + b` is the prelude's
+  `plus`, `a < b` its `compareTo`, `x in c` its `contains`, `c[i]` its `get`, `a to b` its
+  `to`, and only an `external fun` counts, so application code still defines no operator.
+  This narrows the list in "The prelude's signatures are Kogo declarations" above, which had
+  the operators built into the checker: numbers, `==`, `&& || !`, `?:`, ranges, `for` and
+  destructuring still are. `Decimal + Decimal` and `Instant < Instant` then take a line of
+  prelude and no checker change, and the emitter sees an ordinary call. About 25 lines
+  against about 60. Reopen if an operator's meaning comes to depend on more than its
+  receiver's and its argument's types.
+- **A binding may take `vararg`** (spec 13), the third thing only a binding may write:
+  `listOf(10, 1, 3)` cannot be declared without it, and 5.1's "common type of several
+  arguments" assumes it. Application code still takes a `List`.
+- **A binding with a receiver is a member, in scope with no import** (spec 13). Example 20
+  calls `clock.now()` importing only `Clock`, as Kotlin code does of a class's members.
+- **A package is the files that share a package line** (spec 2); directories are not
+  checked. `examples/` holds three packages in one directory.
+- **A range is not a value** (spec 6): `a..b` and `a until b` are written only after `in`.
+  Section 3 has no range type and this keeps it so, at the cost of `(1..10).map { }`. No
+  example or stage-1 port writes one elsewhere. Reopen when a port wants to pass one.
+- **The common type is the wider of two types when one fits the other** (spec 5.1), as well
+  as the sealed interface of two variants. As first written, `Int` and `Int?` had none.
+- **A whole-number literal is an `Int` wherever no parameter or declared type asks for a
+  `Long`**, as section 3 says, and that includes an argument that settles a type parameter
+  and one side of `?:` or `if` with nothing wanted: `listOf(n, 0)`, `firstOr(longs, 0)` and
+  `val x = cents ?: 0` are refused with "write 0L". Kotlin takes all three. Not taken:
+  letting a literal follow a `Long` beside it, about 5 lines, which is a second rule for
+  what a literal is. Reopen if ports trip on it often.
+- **`==` needs one side to fit the other, `?` aside** (spec 3). This is the rule that makes
+  `Int == Long` an error and lets `x == null` through.
+- **A nested variant is named in full, `Outcome.Ok`, everywhere** (spec 3.2), also inside
+  its sealed interface, where Kotlin allows `Ok`: one table of names for each package.
+- **`when (x)` over a type that is not sealed, an enum or `Boolean` needs `else` only when
+  used as a value**, as in Kotlin (spec 6). An `if` with no `else` that ends a lambda whose
+  result nothing wants is a statement, as in Kotlin.
+- **A top-level `val` states its type** (spec 5): "inference works inside a function body
+  only", applied to vals. Both stage-1 ports already do.
+- **Overloads: a local hides what is outside; otherwise every function of the name that
+  the file can see is a candidate** (spec 5.2), its own package's, imported or the
+  prelude's alike, and another file's `private` one is not. A value's property comes before
+  an extension val, and its interface's `fun` before an extension fun, as in Kotlin. Where
+  the receiver, the count and the names leave one candidate its parameters type the
+  arguments; where they leave several, each argument is read on its own, and a
+  whole-number literal still fits a `Long` parameter.
+- **The facts are tables keyed by tree node** (`check.Info`): `Types`, `Uses`, `Calls`,
+  `Narrowed`, and what each declaration declares. `Calls` also holds a read of an
+  extension val and an operator that is a binding, so the emitter has one notion of a
+  call. A failed expression has an unknown type that fits anything, and an error is
+  reported once, at the start of the expression it is about.
+- **The checker knows four prelude types by name**: `List`, `Set` and `Map` for `for`,
+  `Pair` for destructuring and for a map's entries, `List` for an enum's `entries`.
+- **The tree marks a trailing lambda** (`Arg.Trailing`): it fills the last parameter, where
+  a lambda inside the parentheses fills the next one, and the two differ when a default is
+  skipped.
+- **Sections 9 to 11 are named, not checked**: `Either`, `Raise`, `Tx`, `Db`, the forms of
+  section 9, a sql literal and a marker each give `not-yet-checked`. DEV-826 and DEV-827
+  replace that.
+- **Not refused yet: `external` in application code** (spec 13). Nothing tells a binding's
+  file from an application's until `kogo check` is told where bindings live. Nor: a `val`
+  in an interface that a data object implements (it has no constructor to override it in),
+  an `out` type parameter used as a parameter's type, and two functions with one signature,
+  which are an error only when called.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - A join returning two whole rows needs every column aliased by hand.

@@ -59,6 +59,7 @@ type Modifiers struct {
 	Visibility  string // "", "private" or "internal"
 	Override    bool
 	Const       bool
+	External    bool // a binding: spec.md section 13
 }
 
 // A FunDecl is a function. A body is a block, an = expression, or in
@@ -76,11 +77,12 @@ type FunDecl struct {
 }
 
 // A Param is a parameter of a function or a data class's constructor;
-// Val is set for the latter.
+// Val is set for the latter. Only a binding's may be Vararg.
 type Param struct {
 	Pos
 	Override bool
 	Val      bool
+	Vararg   bool
 	Name     string
 	Type     Type
 	Default  Expr
@@ -95,11 +97,12 @@ type TypeParam struct {
 
 // A ValDecl is a val or a var. One of the form val (a, b) = x has
 // Destructure set and no Name. An extension val has a Receiver and a
-// Getter, the expression of its get() = ...
+// Getter, the expression of its get() = ...; a binding's has neither.
 type ValDecl struct {
 	Pos
 	Mods        Modifiers
 	Var         bool
+	TypeParams  []*TypeParam
 	Receiver    Type
 	Name        string
 	Destructure []string
@@ -110,7 +113,7 @@ type ValDecl struct {
 
 // A ClassDecl is a type with a body: Kind is "data class", "data
 // object", "interface", "sealed interface", "enum class", "annotation
-// class" or "external object".
+// class", "external class" or "external object".
 type ClassDecl struct {
 	Pos
 	Mods       Modifiers
@@ -262,11 +265,13 @@ type Call struct {
 	Args     []*Arg
 }
 
-// An Arg is an argument, named or not.
+// An Arg is an argument, named or not. Trailing marks a lambda written
+// after the parentheses, which fills the last parameter.
 type Arg struct {
 	Pos
-	Name  string
-	Value Expr
+	Name     string
+	Value    Expr
+	Trailing bool
 }
 
 // A Select is x.name or x?.name, positioned at name.

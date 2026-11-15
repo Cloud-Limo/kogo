@@ -1,0 +1,90 @@
+  7:1   FunDecl declares fun jobWorth(booking: Booking, extras: List<BookingExtraCharge>, card: Boolean): Long?
+  7:14  Param declares parameter booking: Booking
+  7:23  NamedType : Booking
+  7:32  Param declares parameter extras: List<BookingExtraCharge>
+  7:40  NamedType : List<BookingExtraCharge>
+  7:45  NamedType : BookingExtraCharge
+  7:66  Param declares parameter card: Boolean
+  7:72  NamedType : Boolean
+  7:82  NamedType : Long?
+  8:13  Select : Price?; is property Booking.price
+  8:20  Select is fun <T, R> T.let(block: (T) -> R): R
+  8:24  Call : Long?; calls fun <T, R> T.let(block: (T) -> R): R with <Price, Long?>, on its receiver, arguments per parameter [1]
+  8:24  Lambda : (Price) -> Long?
+  8:26  LambdaParam declares local price: Price
+  8:5   Ident : Booking; is parameter booking
+  9:21  Ident : Price; is local price
+  9:27  Select : Long; is property Price.amount
+  9:34  Binary : Long
+  9:36  Ident : List<BookingExtraCharge>; is parameter extras
+  9:43  Select is fun <T> List<T>.sumOf(selector: (T) -> Long): Long
+  9:49  Call : Long; calls fun <T> List<T>.sumOf(selector: (T) -> Long): Long with <BookingExtraCharge>, on its receiver, arguments per parameter [1]
+  9:49  Lambda : (BookingExtraCharge) -> Long; declares local it: BookingExtraCharge
+  9:51  Ident : BookingExtraCharge; is local it
+  9:54  Select : Long; is property BookingExtraCharge.amount
+  9:9   ValDecl declares local total: Long
+ 10:13  Ident : Boolean; is parameter card
+ 10:19  Ident is fun discountedCents(amount: Long, discountPercent: Double): Long
+ 10:34  Call : Long; calls fun discountedCents(amount: Long, discountPercent: Double): Long, no receiver, arguments per parameter [1 1]
+ 10:35  Ident : Long; is local total
+ 10:42  Ident : Double; is top-level val autoChargeDiscount
+ 10:67  Ident : Long; is local total
+ 10:9   If : Long
+ 13:1   FunDecl declares fun shareOf(cents: Long, percent: Int): Long
+ 13:13  Param declares parameter cents: Long
+ 13:20  NamedType : Long
+ 13:27  Param declares parameter percent: Int
+ 13:36  NamedType : Int
+ 13:42  NamedType : Long
+ 13:50  Ident : Long; is parameter cents
+ 13:56  Binary : Long
+ 13:58  Ident : Int; is parameter percent
+ 13:66  Binary : Long
+ 13:68  Literal : Int
+ 15:1   FunDecl declares fun supplierPay(worth: Long?, sharePercent: Int, fixedPayCents: Long?): Long?
+ 15:17  Param declares parameter worth: Long?
+ 15:24  NamedType : Long?
+ 15:32  Param declares parameter sharePercent: Int
+ 15:46  NamedType : Int
+ 15:51  Param declares parameter fixedPayCents: Long?
+ 15:66  NamedType : Long?
+ 15:75  NamedType : Long?
+ 16:19  Binary : Long?
+ 16:22  Ident : Long?; is parameter worth
+ 16:29  Select is fun <T, R> T.let(block: (T) -> R): R
+ 16:33  Call : Long?; calls fun <T, R> T.let(block: (T) -> R): R with <Long, Long?>, on its receiver, arguments per parameter [1]
+ 16:33  Lambda : (Long) -> Long?; declares local it: Long
+ 16:35  Ident is fun shareOf(cents: Long, percent: Int): Long
+ 16:42  Call : Long; calls fun shareOf(cents: Long, percent: Int): Long, no receiver, arguments per parameter [1 1]
+ 16:43  Ident : Long; is local it
+ 16:47  Ident : Int; is parameter sharePercent
+ 16:5   Ident : Long?; is parameter fixedPayCents
+ 18:1   FunDecl declares fun Booking.supplierPay(extras: List<BookingExtraCharge>): Long?
+ 18:25  Param declares parameter extras: List<BookingExtraCharge>
+ 18:33  NamedType : List<BookingExtraCharge>
+ 18:38  NamedType : BookingExtraCharge
+ 18:5   NamedType : Booking
+ 18:60  NamedType : Long?
+ 19:17  Ident : Int?; is property Booking.sharePercentWhenGiven
+ 19:39  Binary : Int
+ 19:42  Jump : Nothing
+ 19:49  Literal : Nothing?
+ 19:5   ValDecl declares local share: Int
+ 20:16  Ident : Boolean?; is property Booking.hadCardWhenGiven
+ 20:33  Binary : Boolean
+ 20:36  Literal : Boolean
+ 20:41  Binary : Boolean
+ 20:44  Ident : String?; is property Booking.stripeCardId
+ 20:5   ValDecl declares local card: Boolean
+ 20:57  Binary : Boolean
+ 20:60  Literal : Nothing?
+ 21:12  Ident is fun supplierPay(worth: Long?, sharePercent: Int, fixedPayCents: Long?): Long?
+ 21:23  Call : Long?; calls fun supplierPay(worth: Long?, sharePercent: Int, fixedPayCents: Long?): Long?, no receiver, arguments per parameter [1 1 1]
+ 21:24  Ident is fun jobWorth(booking: Booking, extras: List<BookingExtraCharge>, card: Boolean): Long?
+ 21:32  Call : Long?; calls fun jobWorth(booking: Booking, extras: List<BookingExtraCharge>, card: Boolean): Long?, no receiver, arguments per parameter [1 1 1]
+ 21:33  Ident : Booking; is parameter this
+ 21:39  Ident : List<BookingExtraCharge>; is parameter extras
+ 21:47  Ident : Boolean; is local card
+ 21:5   Jump : Nothing
+ 21:54  Ident : Int; is local share
+ 21:61  Ident : Long?; is property Booking.fixedPayCents

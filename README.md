@@ -5,17 +5,28 @@ backends that serve web front ends. SQL is written as SQL and checked
 against the real schema at build time.
 
 - `spec.md`: the language, v0.
-- `examples/`: twenty programs.
+- `examples/`: programs in it.
 - `decisions.md`: what was decided and why.
 - `doc/design.md`: principles and how it compiles.
 
-Built so far: the parser (`syntax`), and the SQL pass (`sqlpass`) with its command.
+Built so far: the parser (`syntax`), the SQL pass (`sqlpass`) with its
+command, the prelude's first declarations (`prelude`), and the checker's
+core (`check`): names, types, nulls and `when`, spec sections 2 to 6.
+
+```
+mise exec -- go build -o bin/kogo ./cmd/kogo
+bin/kogo check <dir>
+```
+
+`kogo check` checks the `.kg` files under a directory as one program and
+prints one JSON error a line (file, line, column, code, message). It
+exits 0 when there are none.
 
 ```
 mise exec -- go build -o bin/kogo-sql ./cmd/kogo-sql
 DATABASE_URL=postgres://kogo:kogo@127.0.0.1/kogo_test bin/kogo-sql check examples
 ```
 
-`check` prints each `sql"""` literal's signature, or its error, as one JSON
+`kogo-sql check` prints each `sql"""` literal's signature, or its error, as one JSON
 object a line; `emit <dir> <package>` prints a Go function per literal. It
 needs Postgres 18. `mise run testdb` creates the database the tests use.

@@ -245,6 +245,9 @@ func (p *parser) modifiers() Modifiers {
 		case p.modifier() && p.at("const"):
 			m.Const = true
 			p.next()
+		case p.modifier() && p.at("external"):
+			m.External = true
+			p.next()
 		default:
 			return m
 		}
@@ -276,18 +279,24 @@ func (p *parser) decl(abstract bool) Decl {
 	pos := p.tok.pos
 	m := p.modifiers()
 	switch {
+	case m.External && (p.at("class") || p.at("object")):
+		kind := "external " + p.tok.text
+		p.next()
+		return p.classDecl(&ClassDecl{Pos: pos, Mods: m, Kind: kind})
+	case m.External && !p.at("fun") && !p.at("val"):
+		p.fail(p.tok.pos, "syntax", "external goes before class, object, fun or val")
 	case p.at("fun"):
-		return p.funDecl(m, abstract)
+		return p.funDecl(m, abstract || m.External)
 	case p.at("val") || p.at("var"):
 		if p.at("var") { // a local is read by stmt
 			p.notKogo(p.tok.pos, "top-level-var", "a var outside a function body", "pass the value as a parameter")
 		}
-		return p.valDecl(m, abstract)
+		return p.valDecl(m, abstract || m.External)
 	case p.at("typealias"):
 		p.next()
 		d := &TypeAlias{Pos: pos, Mods: m}
 		_, d.Name = p.ident()
-		d.TypeParams = p.typeParams()
+		d.TypeParams = p.typeParams(false)
 		p.want("=")
 		d.Type = p.typ()
 		return d
@@ -298,7 +307,7 @@ func (p *parser) decl(abstract bool) Decl {
 	case p.at("sealed") && p.peek(1).text == "class":
 		p.notKogo(p.tok.pos, "class", "a sealed class", "use a sealed interface")
 	}
-	kinds := []string{"data class", "data object", "sealed interface", "interface", "enum class", "annotation class", "external object"}
+	kinds := []string{"data class", "data object", "sealed interface", "interface", "enum class", "annotation class"}
 	for _, k := range kinds {
 		words := strings.Fields(k)
 		if p.at(words[0]) && (len(words) == 1 || p.peek(1).text == words[1]) {
@@ -313,15 +322,23 @@ func (p *parser) decl(abstract bool) Decl {
 	return nil
 }
 
-// receiverAndName reads Name, or Receiver.name for an extension.
-func (p *parser) receiverAndName() (Type, string) {
+// receiverAndName reads Name, or Receiver.name for an extension. Only
+// a binding's receiver may be nullable.
+func (p *parser) receiverAndName(external bool) (Type, string) {
 	t := p.typ()
-	if p.at("?.") {
-		p.fail(p.tok.pos, "nullable-receiver", "an extension's receiver is not nullable: take the value as a parameter")
+	refuse := func(pos Pos) {
+		if !external {
+			p.fail(pos, "nullable-receiver", "an extension's receiver is not nullable: take the value as a parameter")
+		}
+	}
+	if p.at("?.") { // Receiver?.name: the ? is the receiver's
+		refuse(p.tok.pos)
+		setNullable(t)
+		p.tok.text = "."
 	}
 	if p.got(".") {
 		if nullable(t) {
-			p.fail(t.At(), "nullable-receiver", "an extension's receiver is not nullable: take the value as a parameter")
+			refuse(t.At())
 		}
 		_, name := p.ident()
 		return t, name
@@ -337,6 +354,15 @@ func (p *parser) receiverAndName() (Type, string) {
 	return &NamedType{Pos: n.Pos, Name: n.Name[:i]}, n.Name[i+1:]
 }
 
+func setNullable(t Type) {
+	switch t := t.(type) {
+	case *NamedType:
+		t.Nullable = true
+	case *FuncType:
+		t.Nullable = true
+	}
+}
+
 // nullable reports whether t is written with a trailing ?.
 func nullable(t Type) bool {
 	switch t := t.(type) {
@@ -350,9 +376,9 @@ func nullable(t Type) bool {
 
 func (p *parser) funDecl(m Modifiers, abstract bool) *FunDecl {
 	d := &FunDecl{Pos: p.want("fun"), Mods: m}
-	d.TypeParams = p.typeParams()
-	d.Receiver, d.Name = p.receiverAndName()
-	d.Params = p.params(false)
+	d.TypeParams = p.typeParams(false)
+	d.Receiver, d.Name = p.receiverAndName(m.External)
+	d.Params = p.params(false, m.External)
 	if p.got(":") {
 		d.Result = p.typ()
 	}
@@ -370,7 +396,9 @@ func (p *parser) funDecl(m Modifiers, abstract bool) *FunDecl {
 	return d
 }
 
-func (p *parser) typeParams() []*TypeParam {
+// typeParams reads <A, B>. Only a sealed interface and an external
+// class take out.
+func (p *parser) typeParams(out bool) []*TypeParam {
 	var tps []*TypeParam
 	if !p.got("<") {
 		return nil
@@ -379,7 +407,11 @@ func (p *parser) typeParams() []*TypeParam {
 		if r := refused["reified"]; p.at("reified") {
 			p.notKogo(p.tok.pos, r[0], r[1], r[2])
 		}
-		tp := &TypeParam{Pos: p.tok.pos, Out: p.got("out")}
+		pos := p.tok.pos
+		tp := &TypeParam{Pos: pos, Out: p.peek(1).kind == tIdent && p.got("out")}
+		if tp.Out && !out {
+			p.fail(tp.Pos, "syntax", "out goes only on a sealed interface's type parameter")
+		}
 		if p.at("in") {
 			p.fail(p.tok.pos, "syntax", "a type parameter is plain, or out on a sealed interface")
 		}
@@ -392,18 +424,20 @@ func (p *parser) typeParams() []*TypeParam {
 	return tps
 }
 
-// params reads a parameter list; a data class's are vals.
-func (p *parser) params(ctor bool) []*Param {
+// params reads a parameter list; a data class's are vals, and a
+// binding's may be vararg.
+func (p *parser) params(ctor, external bool) []*Param {
 	var ps []*Param
 	p.want("(")
 	p.nested(true, func() {
 		p.list(")", func() {
 			pos := p.tok.pos
+			vararg := external && p.modifier() && p.got("vararg")
 			m := p.modifiers()
-			if m.Annotations != nil || m.Visibility != "" || m.Const {
+			if m.Annotations != nil || m.Visibility != "" || m.Const || m.External {
 				p.fail(pos, "syntax", "a parameter takes no modifier")
 			}
-			par := &Param{Pos: pos, Override: m.Override, Val: p.got("val")}
+			par := &Param{Pos: pos, Override: m.Override, Val: p.got("val"), Vararg: vararg}
 			if ctor && (!par.Val || p.at("var")) {
 				p.fail(pos, "syntax", "each property of a data class is a val: val name: Type")
 			}
@@ -425,10 +459,13 @@ func (p *parser) params(ctor bool) []*Param {
 func (p *parser) valDecl(m Modifiers, abstract bool) *ValDecl {
 	d := &ValDecl{Pos: p.tok.pos, Mods: m, Var: p.at("var")}
 	p.next()
+	if p.at("<") {
+		d.TypeParams = p.typeParams(false)
+	}
 	if p.at("(") {
 		d.Destructure = p.names()
 	} else {
-		d.Receiver, d.Name = p.receiverAndName()
+		d.Receiver, d.Name = p.receiverAndName(m.External)
 	}
 	if p.got(":") {
 		d.Type = p.typ()
@@ -466,14 +503,20 @@ func (p *parser) classDecl(d *ClassDecl) *ClassDecl {
 	_, d.Name = p.ident()
 	switch d.Kind {
 	case "data class":
-		d.TypeParams = p.typeParams()
+		d.TypeParams = p.typeParams(false)
 		if !p.at("(") {
 			d.Ctor = p.modifiers()
 			p.want("constructor")
 		}
-		d.Params = p.params(true)
+		d.Params = p.params(true, false)
 	case "interface", "sealed interface":
-		d.TypeParams = p.typeParams()
+		d.TypeParams = p.typeParams(d.Kind == "sealed interface")
+	case "external class":
+		d.TypeParams = p.typeParams(true)
+		if p.at("{") || p.at("(") {
+			p.fail(p.tok.pos, "syntax", "an external class has no constructor and no body: declare each member as an external fun or val with the class as its receiver")
+		}
+		return d
 	case "enum class":
 		if p.at("(") {
 			p.fail(p.tok.pos, "syntax", "an enum is constants only: no constructor and no body")
@@ -582,14 +625,8 @@ func (p *parser) typ() Type {
 			return f
 		}
 	}
-	if p.at("?") {
-		p.next()
-		switch t := t.(type) {
-		case *NamedType:
-			t.Nullable = true
-		case *FuncType:
-			t.Nullable = true
-		}
+	if p.got("?") {
+		setNullable(t)
 	}
 	return t
 }
@@ -879,7 +916,7 @@ func (p *parser) call(fun Expr, pos Pos, typeArgs []Type) Expr {
 			p.fail(p.tok.pos, "sql-placement", "a sql literal is the only argument of %s", sel.Name)
 		}
 		l := p.lambda()
-		c.Args = append(c.Args, &Arg{Pos: l.Pos, Value: l})
+		c.Args = append(c.Args, &Arg{Pos: l.Pos, Value: l, Trailing: true})
 	}
 	return c
 }

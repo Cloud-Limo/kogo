@@ -26,8 +26,9 @@ constraints) is worth typing.
    Go, but `//line` directives map it back to the source.
 6. **Small enough to hold in a prompt.** One way to do each thing; the
    spec replaces training data.
-7. **A fast loop.** Check and build in seconds; errors are
-   machine-readable and name the fix.
+7. **Precise errors.** Errors are machine-readable (file, line,
+   column, code) and name the fix. The loop must stay no slower than
+   the warm Kotlin build it replaces; speed is a floor, not a claim.
 8. **Core apart from prelude.** Nothing specific to one application
    lives in the core.
 

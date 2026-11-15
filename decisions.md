@@ -27,6 +27,11 @@ Each entry: what was decided, why, and what would reopen it.
   signatures and never declared twice. cusoon2's GraphQL layer is not ported; it moves to its
   typed RPC first. Accepted cost: no client-chosen field selection, so each screen's answer is
   its own type.
+- **Principle 7 is precise errors, not a fast loop** (15 Nov 2026). Stage 1 measured
+  cusoon2's warm Gradle loop at 1.1 s for a one-line edit and 4.4 s through one database
+  spec; Go saves a second per edit at most, and Kogo adds a parse, a check and a prepare of
+  its own. Kogo's case rests on what it leaves out, not on build speed. Reopen if a measured
+  loop (CI, cold start, the full suite) shows Kogo winning by more than seconds.
 
 ## Taken in the v0 spec, not yet discussed
 

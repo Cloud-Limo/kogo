@@ -52,8 +52,9 @@ is building it because he wants to; do not argue whether it is practical.
   more work lands on the branch, rewrite the description; don't append.
 - Commit subject <= 50 chars, body lines <= 72, with a short body saying
   why.
-- No AI attribution anywhere: no Co-Authored-By trailers, no "generated
-  with" lines in commits, PR bodies, issues or Linear comments.
+- No AI attribution anywhere: no AI Co-Authored-By trailers, no
+  "generated with" lines in commits, PR bodies, PR comments, issues or
+  Linear comments.
   `.claude/settings.json` turns off the harness's own attribution.
 - Go is pinned in `.mise.toml`; run it as `mise exec -- go ...`. Prefer
   a dependency release at least seven days old.

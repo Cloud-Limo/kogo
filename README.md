@@ -11,10 +11,9 @@ against the real schema at build time.
 
 Built so far: the parser (`syntax`), the SQL pass (`sqlpass`) with its
 command, the prelude's first declarations (`prelude`), the checker
-(`check`): names, types, nulls, `when` and expected failures, spec
-sections 2 to 6 and 9; and the emitter's first slice (`emit`), which
-writes Go for pure code, sections 2 to 6, on the Go of `rt` and
-`prelude/kogo`.
+(`check`), spec sections 2 to 11, and the emitter's first slice
+(`emit`), which writes Go for pure code, sections 2 to 6, on the Go of
+`rt` and `prelude/kogo`.
 
 ```
 mise exec -- go build -o bin/kogo ./cmd/kogo
@@ -24,9 +23,10 @@ bin/kogo emit <dir> <out>
 
 `kogo check` checks the `.kg` files under a directory as one program and
 prints one JSON error a line (file, line, column, code, message). It
-exits 0 when there are none. `kogo emit` checks them and then writes
-one Go package for each Kogo package, `a.b`'s at `<out>/a/b/kogo.go`;
-`<out>` lies in a Go module that requires this one.
+exits 0 when there are none. A program with a `sql"""` literal is checked
+against the database `DATABASE_URL` names, as below. `kogo emit` checks
+them and then writes one Go package for each Kogo package, `a.b`'s at
+`<out>/a/b/kogo.go`; `<out>` lies in a Go module that requires this one.
 
 ```
 mise exec -- go build -o bin/kogo-sql ./cmd/kogo-sql

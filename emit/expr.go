@@ -189,7 +189,7 @@ func (e *emitter) sel(x *syntax.Select, recv *operand, rt check.Type) (string, c
 func (e *emitter) lambda(l *syntax.Lambda) string {
 	ft := e.info.Types[l].(*check.FuncType)
 	if e.info.Fails[l] != nil {
-		e.notYet(l, "a lambda that can fail (spec.md 9)", "the next slice of the emitter writes Either and Raise")
+		e.notYet(l, "a lambda that can fail (spec.md 9)", slices9and10)
 	}
 	var params []string
 	var destructured []func()
@@ -369,10 +369,16 @@ func (e *emitter) callExpr(x *syntax.Call, recv *operand, rt check.Type) (string
 // stands for one. recv, when set, stands for the receiver, of type
 // rt: that of a ?. once it is known not to be null.
 func (e *emitter) call(at syntax.Node, c *check.Call, recv *operand, rt check.Type) (string, check.Type) {
-	if e.info.Fails[at] != nil {
-		e.notYet(at, "a call that can fail (spec.md 9)", "the next slice of the emitter writes Either and Raise")
+	if c == nil { // one of the five calls of spec.md 10.2, which the checker settles apart
+		e.notYet(at, "a call that takes a sql literal (spec.md 10)", slices9and10)
+		return "nil", e.info.Types[at]
 	}
 	f := c.Func
+	if e.info.Fails[at] != nil {
+		e.notYet(at, "a call that can fail (spec.md 9)", slices9and10)
+	} else if e.later[f] {
+		e.notYet(at, "a call of "+f.Name+" (spec.md 9 and 10)", slices9and10)
+	}
 	var ops []operand
 	if f == nil { // a value of a function type is called
 		x := at.(*syntax.Call)

@@ -225,11 +225,14 @@ type SQL struct {
 // execute discard them.
 func (s *SQL) Typed() bool { return sqlCalls[s.Call] }
 
-// A SQLParam is $name, with Name set, or ${expr}, with Expr set.
+// A SQLParam is $name, with Name set, or ${expr}. Expr is the value
+// bound: for $name, an *Ident of the name. End is just past the name
+// or the closing }.
 type SQLParam struct {
 	Pos
 	Name string
 	Expr Expr
+	End  Pos
 }
 
 // A Unary is -x or !x.

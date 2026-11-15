@@ -31,6 +31,15 @@ func kogo(t *testing.T, files map[string]string, out ...string) (code int, stdou
 	return code, strings.ReplaceAll(stdoutText.String(), dir+string(filepath.Separator), "")
 }
 
+// testDB names the database the tests check sql literals against.
+func testDB(t *testing.T) {
+	url := os.Getenv("KOGO_TEST_DATABASE_URL")
+	if url == "" {
+		url = "postgres://kogo:kogo@127.0.0.1/kogo_test"
+	}
+	t.Setenv("DATABASE_URL", url)
+}
+
 // examples gives the examples whose names match the patterns.
 func examples(t *testing.T, patterns ...string) map[string]string {
 	files := map[string]string{}
@@ -47,12 +56,14 @@ func examples(t *testing.T, patterns ...string) map[string]string {
 	return files
 }
 
-// kogo check passes examples 01 to 09 and 20, with the two files that
-// hold what 01 refers to, as one program against the real prelude.
+// kogo check passes every example, with the two files that hold what
+// 01 refers to, as one program against the real prelude and, through
+// the SQL pass, the test database.
 func TestExamples(t *testing.T) {
-	files := examples(t, "0[0-9]_*.kg", "20_*.kg")
-	if len(files) != 12 {
-		t.Fatalf("%d examples, want 12", len(files))
+	testDB(t)
+	files := examples(t, "*.kg")
+	if len(files) != 23 {
+		t.Fatalf("%d examples, want 23", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)
@@ -133,7 +144,7 @@ func TestEmitRefuses(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 	code, out := kogo(t, map[string]string{"a.kg": "package a\n\nfun f(n: Int): Either<String, Int> = n.right()\n"}, dir)
-	want := `{"file":"a.kg","line":3,"column":1,"code":"not-yet-emitted","message":"a fun that can fail (spec.md 9) is not emitted yet: the next slice of the emitter writes Either and Raise"}
+	want := `{"file":"a.kg","line":3,"column":1,"code":"not-yet-emitted","message":"a fun that can fail (spec.md 9) is not emitted yet: the next slices of the emitter write failures, then SQL and transactions"}
 `
 	if written, _ := os.ReadDir(dir); code != 1 || out != want || len(written) != 0 {
 		t.Errorf("exit %d, want 1, with %d files written\n got %s\nwant %s", code, len(written), out, want)
@@ -167,11 +178,37 @@ func TestErrors(t *testing.T) {
 	if code != 1 || out != want {
 		t.Errorf("exit %d, want 1\n got %s\nwant %s", code, out, want)
 	}
+	// A literal is checked against the database, and its fault
+	// reported at its place.
+	testDB(t)
+	code, out = kogo(t, map[string]string{
+		"a.kg": "package a\n\nfun f(tx: Tx): Int = tx.execute(sql\"\"\"\n    delete from business\n    where nam = 'x'\"\"\")\n",
+	})
+	want = `{"file":"a.kg","line":5,"column":11,"code":"sql-rejected","message":"column \"nam\" does not exist (Postgres 42703)"}
+`
+	if code != 1 || out != want {
+		t.Errorf("exit %d, want 1\n got %s\nwant %s", code, out, want)
+	}
 	var stdout, stderr bytes.Buffer
 	if code := run([]string{"check"}, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), `"code":"usage"`) {
 		t.Errorf("no directory: exit %d, stderr %s", code, &stderr)
 	}
 	if code := run([]string{"check", filepath.Join(t.TempDir(), "none")}, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), `"code":"read"`) {
 		t.Errorf("a missing directory: exit %d, stderr %s", code, &stderr)
+	}
+}
+
+// A program with no sql literal is checked without a database; one
+// with a literal and no database cannot be.
+func TestNoDatabase(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://nobody@127.0.0.1:1/none")
+	if code, out := kogo(t, map[string]string{"a.kg": "package a\n\nfun f(): Int = 1\n"}); code != 0 || out != "" {
+		t.Errorf("no literal: exit %d, want 0\n%s", code, out)
+	}
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "a.kg"), []byte("package a\n\nfun f(tx: Tx): Int = tx.execute(sql\"select 1\")\n"), 0o644)
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"check", dir}, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), `"code":"sql-connect"`) {
+		t.Errorf("a literal and no database: exit %d, stderr %s", code, &stderr)
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	"kogo/check"
 	"kogo/prelude"
+	"kogo/sqlpass"
 	"kogo/syntax"
 )
 
@@ -38,7 +39,8 @@ func emit(t *testing.T, root string, sources ...string) (*emitter, map[string][]
 		}
 		program = append(program, f)
 	}
-	info, errs := check.Check(pre, program)
+	// A sql literal's signature is the test's own: no parameters, no columns.
+	info, errs := check.Check(pre, program, func(*syntax.SQL) (*sqlpass.Statement, error) { return &sqlpass.Statement{}, nil })
 	if errs != nil {
 		t.Fatalf("%s\n%v", strings.Join(sources, "\n---\n"), errs)
 	}
@@ -311,6 +313,7 @@ func TestLanguage(t *testing.T) {
 		{"t.Through()", "4"},
 		{"t.Next(nil)", "0"},
 		{"t.Next(rt.Ptr[int32](4))", "5"},
+		{"t.Scoped()", "9"},
 	}, `package t
 
 import b.make
@@ -445,7 +448,9 @@ fun pick(type: Boolean): Int {
 
 private fun helper(): Int = 2
 fun other(): Int = helper()
-`, "package b\n\nimport c.Thing\n\nfun make(): Thing = Thing(4)\nfun take(x: Thing): Int = x.n\n", "package c\n\ndata class Thing(val n: Int)\n")
+`, "package b\n\nimport c.Thing\n\nfun make(): Thing = Thing(4)\nfun take(x: Thing): Int = x.n\n", "package c\n\ndata class Thing(val n: Int)\n",
+		// A marker is checked and then written nowhere (spec.md 11).
+		"@file:OptIn(Unscoped::class)\npackage t\n\n@RequiresOptIn\nannotation class Unscoped\n\n@Unscoped\nfun unscoped(): Int = 9\nfun scoped(): Int = unscoped()\n")
 }
 
 // A panic's trace names the Kogo file and line (principle 5): the
@@ -486,6 +491,9 @@ trace(func() { t.Divide(1, 0) })
 func TestRefused(t *testing.T) {
 	for _, c := range [][3]string{
 		{"fun f(n: Int): Either<String, Int> = n.right()", "1:1: not-yet-emitted", "a fun that can fail (spec.md 9)"},
+		{"fun f(n: Int): Int = either<String, Int> { n }.getOrElse { 0 }", "1:22: not-yet-emitted", "a call of either (spec.md 9 and 10)"},
+		{"fun f(tx: Tx): Int = 1", "1:1: not-yet-emitted", "a Tx (spec.md 9 and 10)"},
+		{"fun f(n: Int): Int {\n    val tx: Tx? = null\n    return if (tx == null) n else tx.execute(sql\"select 1\")\n}", "2:5: not-yet-emitted", "a Tx (spec.md 9 and 10)"},
 		{"fun f(xs: List<Int>): Int {\n    xs.filter { return 1 }\n    return 0\n}", "2:17: not-yet-emitted", "end the lambda with its value, and return after the call"},
 		{"fun f(x: Int?): Int? = x.takeIf { true }", "1:24: not-yet-emitted", "a nullable type argument for T, which is used as T?"},
 		{"fun <T> none(x: T?): T? = x\nfun g(): Int? = none(null)", "2:17: not-yet-emitted", "write the type arguments, none<...>(...)"},
@@ -497,8 +505,14 @@ func TestRefused(t *testing.T) {
 	} {
 		_, files, errs := emit(t, "x", "package t\n"+c[0])
 		got := ""
-		if len(errs) == 1 {
+		if len(errs) > 0 {
 			got = fmt.Sprintf("%d:%d: %s: %s", errs[0].Line-1, errs[0].Column, errs[0].Code, errs[0].Message)
+		}
+		// One refusal, or with it those of what it holds.
+		for _, err := range errs {
+			if err.Code != "not-yet-emitted" && len(errs) > 1 {
+				got = ""
+			}
 		}
 		if files != nil || !strings.HasPrefix(got, c[1]) || !strings.Contains(got, c[2]) {
 			t.Errorf("%s\n got %v\nwant %s ... %s", c[0], errs, c[1], c[2])
@@ -515,7 +529,7 @@ func TestPrelude(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		info, _ := check.Check(pre, nil)
+		info, _ := check.Check(pre, nil, nil)
 		e, _, _ := emitAll(info, pre, nil, "x")
 		e.pkg, e.imports, e.fn = "main", map[string]string{}, &scope{names: map[any]string{}, used: map[string]bool{}}
 		uses, n := "", 0

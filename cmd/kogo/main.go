@@ -6,7 +6,10 @@
 // It prints one JSON object a line for each error (file, line, column,
 // code, message) and exits 0 when there are none, 1 when there are
 // some, 2 when it could not run. A file that does not parse stops the
-// check: the files that parse are only parsed.
+// check: the files that parse are only parsed. A program that holds a
+// sql literal is checked against the database $DATABASE_URL names, or
+// the PG* variables when that is unset; one that holds none, against
+// none.
 //
 // emit writes one Go package for each Kogo package, a.b's at
 // <out>/a/b/kogo.go. The Go imports kogo/rt and kogo/prelude/..., and
@@ -16,6 +19,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,11 +28,13 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"kogo/check"
 	"kogo/emit"
 	"kogo/prelude"
+	"kogo/sqlpass"
 	"kogo/syntax"
 )
 
@@ -76,7 +82,31 @@ func run(args []string, stdout, stderr io.Writer) int {
 		// false errors: each name it declares would be unknown.
 		return 1
 	}
-	info, faults := check.Check(pre, files)
+	var sigs check.Signatures
+	var lost error // a failure to ask the database, which stops the check
+	if slices.ContainsFunc(files, func(f *syntax.File) bool { return f.SQL != nil }) {
+		ctx := context.Background()
+		db, err := sqlpass.Connect(ctx, os.Getenv("DATABASE_URL"))
+		if err != nil {
+			fatal.Encode(syntax.Error{Code: "sql-connect", Message: fmt.Sprintf("no development database, set DATABASE_URL or the PG* variables: %v", err)})
+			return 2
+		}
+		defer db.Close(ctx)
+		ask := check.Signer(ctx, db)
+		sigs = func(lit *syntax.SQL) (*sqlpass.Statement, error) {
+			st, err := ask(lit)
+			var fault *sqlpass.Error
+			if err != nil && !errors.As(err, &fault) && lost == nil {
+				lost = err
+			}
+			return st, err
+		}
+	}
+	info, faults := check.Check(pre, files, sigs)
+	if lost != nil {
+		fatal.Encode(syntax.Error{Code: "sql-check", Message: lost.Error()})
+		return 2
+	}
 	var written map[string][]byte
 	if len(faults) == 0 && args[0] == "emit" {
 		root, err := importPath(args[2])

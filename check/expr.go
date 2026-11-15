@@ -184,10 +184,10 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 			c.expr(p, nil)
 		}
 		return tString
-	case *syntax.SQL:
-		return c.notYet(e, "a sql literal", 10)
-	case *syntax.ClassRef:
-		return c.notYet(e, "::class", 11)
+	case *syntax.SQL: // the parser reads one only as the argument of the five calls
+		return c.errorf(e, "sql-placement", "a sql literal is only the argument of tx.query<R>, queryOne<R>, querySingle<R>, exists or execute")
+	case *syntax.ClassRef: // the parser reads one only in @file:OptIn(...)
+		return c.errorf(e, "class-ref", "%s::class is written only in @file:OptIn(...)", e.Name)
 	case *syntax.Ident:
 		return c.ident(e)
 	case *syntax.Select:
@@ -238,6 +238,7 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 			return c.errorf(e, "unknown-name", "::%s needs one top-level fun %s with no receiver and no type parameters, and %d are in scope", e.Name, e.Name, len(found))
 		}
 		c.info.Uses[e] = found[0]
+		c.demand(e, e.Name, found[0].vis)
 		ft := &FuncType{Result: found[0].Result}
 		for _, p := range found[0].Params {
 			ft.Params = append(ft.Params, p.Type)
@@ -293,6 +294,7 @@ func (c *checker) ident(e *syntax.Ident) Type {
 	for _, p := range c.homes(e.Name) {
 		if v := p.vals[e.Name]; v != nil {
 			c.see(e, e.Name, v.vis)
+			c.demand(e, e.Name, v.vis)
 			c.info.Uses[e] = v
 			return v.Type
 		}

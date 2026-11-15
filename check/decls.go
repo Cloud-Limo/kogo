@@ -14,9 +14,10 @@ import (
 var coreSource []byte
 
 // Check checks the files of a program against the prelude's, which
-// alone may declare bindings (spec.md 13). It gives what it learned
-// and the errors it found, file by file, the prelude's first.
-func Check(prelude, program []*syntax.File) (*Info, []*syntax.Error) {
+// alone may declare bindings (spec.md 13), asking sigs for the
+// signature of each sql literal. It gives what it learned and the
+// errors it found, file by file, the prelude's first.
+func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.Error) {
 	core, err := syntax.Parse("check/core.kg", coreSource)
 	if err != nil {
 		panic(err) // every test of the checker parses it
@@ -27,18 +28,15 @@ func Check(prelude, program []*syntax.File) (*Info, []*syntax.Error) {
 		info: &Info{
 			Types: map[syntax.Node]Type{}, Uses: map[syntax.Node]Object{}, Calls: map[syntax.Node]*Call{},
 			Narrowed: map[*syntax.Ident]Type{}, Vars: map[syntax.Node][]*Var{}, Funcs: map[syntax.Node]*Func{},
-			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{}, Core: core,
+			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{}, SQL: map[*syntax.SQL]*Query{}, Core: core,
 		},
 		pkgs: map[string]*pkg{}, members: map[string][]*Func{}, imports: map[*syntax.File]map[string]*pkg{},
-		core: core,
+		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{},
 	}
 	order := map[string]int{}
 	for i, f := range files {
 		order[f.Name] = i
 		c.enter(f, c.pkgOf(f.Package.Name))
-		for _, a := range f.OptIn {
-			c.notYet(a, "@file:OptIn", 11)
-		}
 		for _, d := range f.Decls {
 			if i >= len(prelude) && external(d) {
 				c.errorf(d, "external", "only the prelude declares bindings (spec.md 13): give this a body in Kogo")
@@ -49,6 +47,7 @@ func Check(prelude, program []*syntax.File) (*Info, []*syntax.Error) {
 	for _, f := range files {
 		c.enter(f, c.pkgOf(f.Package.Name))
 		c.importAll(f)
+		c.optIn(f)
 	}
 	for i := 0; i < len(c.sigs); i++ {
 		c.sigs[i]()
@@ -71,6 +70,8 @@ type checker struct {
 	sigs    []func() // reads each declaration's signature, once every name is declared
 	bodies  []func() // checks each body, once every signature is read
 	core    *syntax.File
+	signer  Signatures
+	optIns  map[*syntax.File]map[*TypeDecl]bool // the markers each file opts in to
 
 	// Where the checker is.
 	file       *syntax.File
@@ -153,14 +154,6 @@ func (c *checker) errorf(at syntax.Node, code, format string, args ...any) Type 
 	return unknown
 }
 
-func (c *checker) notYet(at syntax.Node, what string, section int) Type {
-	return c.errorf(at, "not-yet-checked", "%s belongs to spec.md section %d, which is not checked yet", what, section)
-}
-
-// The names of section 10 that a program can write without their
-// declarations existing yet.
-var later = map[string]int{"Tx": 10, "Db": 10}
-
 // Kotlin's scope functions that section 6 leaves out.
 var notKogo = map[string]string{
 	"apply": "name the value and call it", "run": "name the value and call it", "with": "name the value and call it",
@@ -169,9 +162,6 @@ var notKogo = map[string]string{
 
 // missing reports a name that nothing in scope declares.
 func (c *checker) missing(at syntax.Node, name string) Type {
-	if s := later[name]; s != 0 {
-		return c.notYet(at, name, s)
-	}
 	if fix := notKogo[name]; fix != "" {
 		return c.errorf(at, "kotlin-scope-function", "%s is not Kogo: %s", name, fix)
 	}
@@ -260,16 +250,6 @@ func self(d *TypeDecl) *Named {
 	return n
 }
 
-// marks reports the markers among a declaration's annotations; a
-// binding's @go is the emitter's to read.
-func (c *checker) marks(m syntax.Modifiers) {
-	for _, a := range m.Annotations {
-		if a.Name != "go" {
-			c.notYet(a, "the marker @"+a.Name, 11)
-		}
-	}
-}
-
 // declare enters a declaration's name in its package and queues the
 // reading of its signature. outer is the name of the type it is
 // nested in, with a dot.
@@ -284,12 +264,16 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 	}
 	switch d := d.(type) {
 	case *syntax.ClassDecl:
+		v.visibility = d.Mods.Visibility
 		if d.Kind == "annotation class" {
-			c.notYet(d, "a marker", 11)
+			c.declareMarker(d, outer+d.Name, v, taken)
 			return
 		}
-		c.marks(d.Mods)
-		v.visibility = d.Mods.Visibility
+		for _, a := range d.Mods.Annotations {
+			if a.Name != "go" {
+				c.errorf(a, "marker", "a marker goes on a fun, a val or a constructor, not a type: data class %s @%s constructor(...)", d.Name, a.Name)
+			}
+		}
 		td := &TypeDecl{Kind: d.Kind, Name: outer + d.Name, Params: typeParams(d.TypeParams), Decl: d, vis: v}
 		c.info.Classes[d] = td
 		if d.Kind == "external object" {
@@ -314,16 +298,15 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 		}
 		c.later(&c.sigs, func() { c.aliased(a) })
 	case *syntax.FunDecl:
-		c.marks(d.Mods)
 		v.visibility = d.Mods.Visibility
 		f := &Func{Kind: Fun, Name: d.Name, External: d.Mods.External, Decl: d, vis: v}
 		c.addFunc(f, d.Receiver != nil)
 		c.later(&c.sigs, func() {
+			f.markers = c.marks(d.Mods)
 			c.signature(f, d, nil)
 			c.later(&c.bodies, func() { c.body(f, d) })
 		})
 	case *syntax.ValDecl:
-		c.marks(d.Mods)
 		v.visibility = d.Mods.Visibility
 		switch {
 		case d.Destructure != nil:
@@ -339,6 +322,7 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 				c.pkg.vals[d.Name] = g
 			}
 			c.later(&c.sigs, func() {
+				g.markers = c.marks(d.Mods)
 				g.Type = c.declared(d)
 				c.later(&c.bodies, func() {
 					if d.Value != nil {
@@ -387,6 +371,7 @@ func (c *checker) getter(f *Func, d *syntax.ValDecl) {
 	c.open(f.TypeParams)
 	defer c.pop()
 	f.Receiver, f.Result = c.typ(d.Receiver), c.declared(d)
+	f.markers = c.marks(d.Mods)
 	c.failing(d, f)
 	c.later(&c.bodies, func() {
 		c.open(f.TypeParams)
@@ -490,8 +475,8 @@ func (c *checker) class(td *TypeDecl) {
 	}
 	switch d.Kind {
 	case "data class":
-		c.marks(d.Ctor)
 		td.Ctor = &Func{Kind: Constructor, Name: td.Name, TypeParams: td.Params, Params: td.Props, Result: self(td), Owner: td, Decl: d, vis: td.vis}
+		td.Ctor.markers = c.marks(d.Ctor)
 		if d.Ctor.Visibility != "" {
 			td.Ctor.visibility = d.Ctor.Visibility
 		}
@@ -513,6 +498,7 @@ func (c *checker) class(td *TypeDecl) {
 			c.info.Vars[m] = []*Var{v}
 		case *syntax.FunDecl:
 			f := &Func{Kind: Fun, Name: m.Name, External: d.Kind == "external object", Decl: m, vis: td.vis}
+			f.markers = c.marks(m.Mods)
 			if d.Kind == "interface" || d.Kind == "sealed interface" {
 				f.Kind = Method
 			}
@@ -656,6 +642,8 @@ func (c *checker) named(at syntax.Node, name string) (Type, []*TypeParam) {
 	if d, a := c.findType(name); a != nil {
 		c.see(at, name, a.vis)
 		return c.aliased(a), a.params
+	} else if d != nil && d.Kind == "annotation class" {
+		return c.errorf(at, "not-a-type", "%s is a marker, not a type: it is written only as @%s and in @file:OptIn(%s::class)", name, name, name), nil
 	} else if d != nil {
 		c.see(at, name, d.vis)
 		return self(d), d.Params

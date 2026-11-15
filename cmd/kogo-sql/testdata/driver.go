@@ -54,14 +54,14 @@ func main() {
 		fmt.Println("administered:", r.LegalName, "storefront:", storefront)
 	}
 	id, kind, share, inactive := [16]byte{15: 7}, "outside", int32(25), false
-	invite := must(Q13_sql_upsert_returningL17C35(ctx, tx, &id, &acme, &kind, &ann, &ann, nil))[0]
+	invite := must(Q13_sql_upsert_returningL19C35(ctx, tx, &id, &acme, &kind, &ann, &ann, nil))[0]
 	fmt.Println("invite:", invite.Kind, "share is null:", invite.DriverSharePercent == nil)
-	invite = must(Q13_sql_upsert_returningL17C35(ctx, tx, &id, &acme, &kind, &ann, &ann, &share))[0]
+	invite = must(Q13_sql_upsert_returningL19C35(ctx, tx, &id, &acme, &kind, &ann, &ann, &share))[0]
 	fmt.Println("invite again:", invite.Kind, *invite.DriverSharePercent)
 	fmt.Println("drivers, any:", len(must(Q15_sql_optional_filterL7C28(ctx, tx, nil))),
 		"inactive:", len(must(Q15_sql_optional_filterL7C28(ctx, tx, &inactive))))
 	at, reference := time.Now(), "REF-1"
-	fmt.Println("fees accounted:", must(Q16_sql_update_anyL6C20(ctx, tx, &at, &reference, [][16]byte{{15: 5}, {15: 6}, {15: 9}})))
+	fmt.Println("fees accounted:", must(Q16_sql_update_anyL8C20(ctx, tx, &at, &reference, [][16]byte{{15: 5}, {15: 6}, {15: 9}})))
 	fmt.Println("paid invoices:", must(Q17_sql_two_statementsL14C26(ctx, tx))[0].N)
 	nobody := [16]byte{15: 9}
 	fmt.Println("ann administers acme:", must(Q11_sql_one_scalarL12C15(ctx, tx, &ann, &acme)),

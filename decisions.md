@@ -47,6 +47,63 @@ Each entry: what was decided, why, and what would reopen it.
   `select exists(...)` refuses `insert ... returning` and changes `for update`. pgx still
   drains the remaining rows, so Postgres produces them all: write `limit 1` where there may
   be many. Reopen if that cost shows up in a port.
+- **Outer-join nullability is read from Postgres's own parse tree** (15 Nov 2026). The
+  checker's session sets
+  `debug_print_parse` and `client_min_messages = log`, so preparing a statement also returns
+  the analysed tree as a notice. In it Postgres marks every column reference with the outer
+  joins and grouping sets that can null it (`varnullingrels`), which is section 10.5's rule
+  computed by Postgres, not by us. Nothing is written to the database. Not taken: reading the
+  plan as sqlx does. A spike of it over eight statements (not kept) called two columns non-null
+  that can be null, a left-joined column selected through a materialized CTE and a `rollup`
+  column, and each fix would be a rule of ours about plans. It got one right that the tree
+  does not: a `where` that excludes the null rows, which the planner turns into an inner join.
+  Also not taken: a cgo parser (build speed, and its raw tree has no names resolved, so we would
+  redo the analysis); our own parser (principle 4). Costs: the tree is an undocumented text
+  format tied to the major version, so the checker refuses Postgres before 18 (17 does not mark
+  grouping sets, 15 has no marks); and each check also writes the tree to the server's log.
+  A statement that comes back without a tree stops the check with an error: passing every
+  column as nullable would hide that the session, through a pooler say, lost its settings.
+  Where it stops is spec 10.5: a reference is followed through a subquery in `from` and a
+  `group by`, and no further. Reopen when a Postgres release changes the tree (`TestSignatures`
+  fails) or when `"name!"` on CTE columns becomes a habit (following a CTE is about 15 lines).
+- **The module stays `module kogo` for now** (15 Nov 2026). Everything planned builds on
+  one machine, where a local override reaches it, and the rename to the remote's path is a
+  search and replace. The emitter keeps the import path of the prelude's Go in one place,
+  so the rename is one line there. Not taken: renaming at once, which collides with the
+  branches in flight. Reopen when emitted Go must build where a local override cannot
+  reach (CI, another machine), or when the repo's home changes.
+- **An application may have binding files of its own** (15 Nov 2026), in a directory it
+  names to the compiler; the Go behind them lives with the application. Only the prelude
+  may declare a binding today, and a Stripe client cannot go there (principle 8). Not
+  taken: every binding in the prelude; or none for applications, with outbound calls
+  written in Kogo over a general HTTP handle, which means signing, JSON and retries in a
+  language built for none of them. Accepted cost: a binding is Go the checker cannot see
+  into, so a careless one can bring in the hidden state section 7 rules out. Not built:
+  no example makes an outbound call. Build it with the handle design for outbound calls
+  (see the gaps below) when a port first needs one.
+- **`db.tx` keeps its two outcomes: commit when the block finishes, roll back on a failure
+  or a panic** (15 Nov 2026). cusoon2's `commit = false` appears five times and every block
+  under it only reads, where rolling back and committing are the same. A true dry run,
+  writes that are looked at and undone, needs no new form: the block raises a failure that
+  carries the preview, `raise(Preview(changed))`, and the caller reads it. Not taken:
+  `db.tx(commit = false)`, a second switch no port needs; `db.read { }`, a read-only
+  transaction Postgres would enforce. Reopen if dry runs become common, since the idiom
+  calls a success a failure, or if a code path should be held to reading by Postgres.
+- **A constraint violation gets no construct; an expected conflict is written in SQL**
+  (15 Nov 2026; spec 10.6). cusoon2 handles a possible conflict with `on conflict` in 11
+  places and by catching the violation and reading its constraint's name in one. Not
+  taken: a block in a savepoint whose violation comes back as a failure naming the
+  constraint, a new construct whose names are strings the compiler would have to check
+  against the database. Accepted cost: an `update` has no `on conflict`, so its guard is an
+  `exists` first, and a request that slips between the two still panics. Reopen if a port
+  has several such sites or that window causes trouble.
+- **An outbound capability is a handle, and an `external object` has no effect**
+  (15 Nov 2026; spec 13). Section 13 bound HTTP as a global while section 7 says outbound
+  calls arrive as parameters, and a global has no handle to carry the request's context.
+  cusoon2 calls out from five of its hundred files, and mail goes through an outbox table
+  that a worker reads, so most request code writes rows. Not designed, on purpose:
+  timeouts, retries, and whether workers are written in Kogo; they wait, with an
+  application's own binding files, for the first port that calls out.
 - **The prelude's signatures are Kogo declarations, read by the checker like any other
   source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
@@ -175,12 +232,22 @@ Each entry: what was decided, why, and what would reopen it.
   was weighed and set aside, since nobody reads the Go. Not gained: stopping pure code
   when its request is cancelled, and request-wide data without a handle. Reopen if either
   is needed; Kogo source does not change either way.
+- **`copy` and a sql row need whatever the constructor needs** (15 Nov 2026; spec 3.1, 10.3
+  and 11): its visibility, `private` or `internal`, and its marker. Each builds a value
+  without calling the constructor, and the access walls rest on who may construct the
+  type: otherwise `held.copy(business = other)`, or `tx.queryOne<HeldBusiness>(...)`, makes
+  a `HeldBusiness` in a file with no opt-in. The refusal is the one a call of the
+  constructor gets. Kotlin follows the constructor's visibility for `copy` in recent
+  versions and, as far as we know, not its marker; refusing is the safe direction.
+  Destructuring and `==` read a value and build none.
 
 ## Taken in the v0 spec, not yet discussed
 
 - Both Arrow spellings are in (`Either` values and `Raise<E>` receivers): cusoon2 uses both.
 - Markers (`@RequiresOptIn`, `@file:OptIn`) are the one annotation form, so the access walls
-  port. Known hole: without inheritance, any file can implement the `HeldBusiness` interface.
+  port. Known hole: without inheritance, any file can implement an interface, so a wall is a
+  data class with a marked constructor, as example 19's `HeldBusiness` is. `copy` and a sql
+  row no longer get round that constructor (see "Agreed with Greg").
 - Value classes are out: cusoon2 has none, and binding distinct id types to SQL columns needs
   a design (foreign keys could supply it).
 - No `apply`/`run`/`with`, no labelled returns, no `object`, no classes beyond data classes.
@@ -188,29 +255,10 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken building the SQL pass (DEV-818), not yet discussed
 
-- **Outer-join nullability is read from Postgres's own parse tree.** The checker's session sets
-  `debug_print_parse` and `client_min_messages = log`, so preparing a statement also returns
-  the analysed tree as a notice. In it Postgres marks every column reference with the outer
-  joins and grouping sets that can null it (`varnullingrels`), which is section 10.5's rule
-  computed by Postgres, not by us. Nothing is written to the database. Not taken: reading the
-  plan as sqlx does. A spike of it over eight statements (not kept) called two columns non-null
-  that can be null, a left-joined column selected through a materialized CTE and a `rollup`
-  column, and each fix would be a rule of ours about plans. It got one right that the tree
-  does not: a `where` that excludes the null rows, which the planner turns into an inner join.
-  Also not taken: a cgo parser (build speed, and its raw tree has no names resolved, so we would
-  redo the analysis); our own parser (principle 4). Costs: the tree is an undocumented text
-  format tied to the major version, so the checker refuses Postgres before 18 (17 does not mark
-  grouping sets, 15 has no marks); and each check also writes the tree to the server's log.
-  A statement that comes back without a tree stops the check with an error: passing every
-  column as nullable would hide that the session, through a pooler say, lost its settings.
-  Where it stops is spec 10.5: a reference is followed through a subquery in `from` and a
-  `group by`, and no further. Reopen when a Postgres release changes the tree (`TestSignatures`
-  fails) or when `"name!"` on CTE columns becomes a habit (following a CTE is about 15 lines).
 - **A name is one parameter, an expression one per occurrence.** `$active` twice is `$1` twice,
   so Postgres types it once and the cast in 10.6's idiom is optional; `${newId()}` twice is
-  two values, as a string template would evaluate it. `${...}` may not contain braces: the
-  parser reads them, but the SQL pass scans the literal itself until the checker hands it
-  parsed parameters. There is no way to write the text `$name`, and so no tagged dollar
+  two values, as a string template would evaluate it. Since DEV-827 the parser tells the pass
+  where each parameter lies, so `${...}` holds any expression. There is no way to write the text `$name`, and so no tagged dollar
   quoting.
 - **The emitted Go is a shape for the emitter to replace.** One function per literal over a
   `pgx.Tx`, returning `([]Row, error)` or the rows affected, named `Q<path>L<line>C<column>`
@@ -350,7 +398,7 @@ Each entry: what was decided, why, and what would reopen it.
   skipped.
 - **Sections 9 to 11 are named, not checked**: `Either`, `Raise`, `Tx`, `Db`, the forms of
   section 9, a sql literal and a marker each give `not-yet-checked`. DEV-826 and DEV-827
-  replace that.
+  replaced that.
 - **A file that does not parse stops `kogo check`**: its syntax error is reported, the
   other files are parsed, and none is checked. Checked without its declarations, the
   others show false errors, each naming something that is declared. Not taken: checking
@@ -441,9 +489,54 @@ Each entry: what was decided, why, and what would reopen it.
   location and a monotonic reading that break comparison by value.
 - **One naming rule gives every overload its Go name**, the prelude's and a program's; its
   spelling is under DEV-830 below.
-- **Section 13's `external object http` contradicts section 7**, which says outbound calls
-  arrive as parameters, and a global has no context to use. Left as it is, since no example
-  makes an outbound call; when they are designed, the binding becomes a handle.
+
+## Taken checking SQL and markers (DEV-827), not yet discussed
+
+- **The checker reads the SQL pass's own `Statement`** for a literal's signature, and the
+  facts carry it for the emitter (`Info.SQL`, with what each parameter binds and the
+  property each column fills). Not taken: a copy of the type in `check`, which would keep
+  pgx out of its build at the cost of a conversion. `check` still runs with no database: a
+  test answers with signatures of its own, written as the literal's text.
+- **A data class `R` may take any number of columns; a scalar `R` takes one** (spec 10.3).
+  As written, a one-column statement could only fill a scalar, so a one-property data class
+  was refused. A data class `R` written nullable is refused: a row is never null.
+- **A property takes the column named by its name in snake case**, `legalName` from
+  `legal_name`, compared exactly; a quoted mixed-case alias fills nothing. Of two columns
+  with one name, the second fills nothing and is reported.
+- **Inside a nullable nested data class, a column that may be null fills a property that
+  may not** (spec 10.3): on the outer join's absent side every column is null. Accepted
+  hole: a row where only some of them are null passes the check, and the emitted code must
+  panic on it.
+- **An enum maps by its set of constants**, in any order, whatever either side calls the
+  type. A list's elements may be `T` or `T?`, since Postgres does not say whether an array
+  holds a null.
+- **`db.tx` is two declarations in `check/core.kg`**, one with a plain block and one whose
+  block is a raise scope, and the checker keeps the second exactly where the enclosing fun
+  returns an `Either<E, ...>`, settling `E` from it (spec 10.7). So `val r = db.tx { ... }`
+  in such a fun is an `Either` too, and dropping it is an error. In a `Raise<E>` fun the
+  plain one applies, and its block is in the fun's raise scope as any lambda is.
+  `tx.atomically` is one plain declaration for the same reason. Not taken: choosing by the
+  type wanted, which `val r = db.tx { }` does not state.
+- **Markers count only the file's opt-in** (spec 11). Kotlin also lets a marked declaration
+  use another of the same marker, and its declaring file needs no opt-in; example 19 opts in
+  all the same. One rule, checked at each call, constructor and read of a val. A type
+  carries no marker, and `@RequiresOptIn` goes on nothing but a marker.
+- **A lambda whose value is a wanted `Unit` may end with `Unit`**: it is the lambda's
+  value, not a statement (spec 6). Example 18 ends `db.tx`'s block so.
+- **Where an error is reported**: Postgres's refusal at the place it names, a parameter's
+  wrong type at the parameter, and a column's fault at the literal, since Postgres does not
+  say where a column is written; the message names the column and the property.
+- **`kogo check` connects only when the program holds a sql literal**, to `$DATABASE_URL`
+  as `kogo-sql` does. A failure to ask the database stops the check with exit 2. The test
+  that goes through the SQL pass to the test database is `cmd/kogo`'s, over the examples;
+  the checker's own tests need none (`doc/design.md`).
+- **The five calls need their `Tx` written before the dot.** In a fun on `Tx`, a bare
+  `execute(sql"...")` is refused with a fix naming `this.execute`. No example or port calls
+  one on an implicit receiver, and taking it would have the checker and the emitter both
+  find that receiver. Reopen if a port writes helpers as funs on `Tx`.
+- **The examples changed to pass**: 12, 13 and 16 import `kogo.time.Instant` (spec 2), and
+  19 is `package example.markers`, since 12 also declares `Business`. The prelude gained
+  `Uuid`, `newId`, `List.size` and `check`, which they use.
 
 ## Taken building the emitter's first slice (DEV-830), not yet discussed
 
@@ -517,8 +610,11 @@ Each entry: what was decided, why, and what would reopen it.
   `this` is in `Narrowed`, with the type `this` is narrowed to; `Info.Core` is the
   checker's own file; and `check.Subst` gives a declaration's type as one use reads it.
 - **Refused as not yet emitted**, each with its position (`not-yet-emitted`):
-  - what can fail (spec 9): a fun, a lambda or a call in `Info.Fails`. The functions on an
-    `Either` value have Go already, since `prelude/` declares them.
+  - what can fail (spec 9): a fun, a lambda or a call in `Info.Fails`, and a call of any
+    fun of `check/core.kg`. The functions on an `Either` value have Go already, since
+    `prelude/` declares them.
+  - SQL and transactions (spec 10): a `Tx` or a `Db` wherever one is written, and each of
+    the five calls. Spec 7 puts one of the two in every fun that touches the database.
   - a `return` inside a lambda. It would leave the fun around it through a Go function
     value, which needs the panic that a failure uses. Whether Kogo wants it at all is
     open: Kotlin allows it only because its lambdas are inlined.
@@ -535,6 +631,8 @@ Each entry: what was decided, why, and what would reopen it.
     interface's fun with a default, an interface that implements another or has members
     and an `out` parameter, a reference to a fun with a default, a `?.` call of a property
     that holds a function, and a `for` over a `Map` or a `Set`.
+- **A marker is written nowhere** (spec 11): the checker has enforced it, and it does
+  nothing at run time, so a program with markers is emitted, not refused.
 - **Not handled**: two Kogo packages that import each other (Go refuses the cycle, with
   its own message); arithmetic on literals that overflows (`2147483647 + 1`), which Go
   refuses at compile time where Kotlin wraps; a literal outside its type's range;
@@ -543,9 +641,10 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Spec gaps found by the leakage ports, unresolved
 
-- A join returning two whole rows needs every column aliased by hand.
-- No mapping for composite types (`charge`).
-- `db.tx` cannot finish and roll back (the fees dry run).
-- No typed way to turn a named constraint violation into an expected failure.
+- A join returning two whole rows needs every column aliased by hand, and composite types
+  (`charge`) have no mapping. Agreed on 15 Nov 2026 and built in DEV-837: a composite type
+  fills a data class, and a whole row is selected as `b as business`.
+- Outbound calls are handles (above), but their timeouts and retries, workers, and an
+  application's own binding files have no design.
 - `Console`, `Decimal` and the text form of dates and instants have no stated members; the
   prelude's declarations (spec 13) are where they will be stated.

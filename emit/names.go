@@ -119,7 +119,7 @@ func (e *emitter) name(files []*syntax.File) {
 		var class func(d *syntax.ClassDecl)
 		class = func(d *syntax.ClassDecl) {
 			td := e.info.Classes[d]
-			if td == nil {
+			if td == nil || d.Kind == "annotation class" { // a marker is written nowhere
 				return
 			}
 			n := typeName(td)

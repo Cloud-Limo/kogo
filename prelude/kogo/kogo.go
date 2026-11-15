@@ -6,8 +6,12 @@
 package kogo
 
 import (
+	"crypto/rand"
+	"encoding/binary"
+	"fmt"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf16"
 
@@ -41,6 +45,8 @@ func Pair_widen[A, B, C, D any](p Pair[A, B], f func(A) C, g func(B) D) Pair[C, 
 }
 
 func ListOf[T any](elements ...T) List[T] { return elements }
+
+func List_Size[T any](this List[T]) int32 { return int32(len(this)) }
 
 func List_Filter[T any](this List[T], predicate func(T) bool) List[T] {
 	out := List[T]{}
@@ -186,4 +192,28 @@ func RequireNotNull[T any](value *T, lazyMessage func() string) T {
 		panic(lazyMessage())
 	}
 	return *value
+}
+
+func Check(value bool, lazyMessage func() string) rt.Unit {
+	if !value {
+		panic(lazyMessage())
+	}
+	return rt.Unit{}
+}
+
+// A Uuid is an id's sixteen bytes.
+type Uuid [16]byte
+
+func (u Uuid) String() string {
+	return fmt.Sprintf("%x-%x-%x-%x-%x", u[0:4], u[4:6], u[6:8], u[8:10], u[10:16])
+}
+
+// NewId gives an id that sorts by when it was made and is random
+// after that: a version 7 UUID.
+func NewId() Uuid {
+	var u Uuid
+	binary.BigEndian.PutUint64(u[:8], uint64(time.Now().UnixMilli())<<16)
+	rand.Read(u[6:])
+	u[6], u[8] = u[6]&0x0F|0x70, u[8]&0x3F|0x80
+	return u
 }

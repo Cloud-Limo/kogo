@@ -14,9 +14,10 @@ import (
 
 // A Type is a Kogo type of spec.md section 10.4.
 type Type struct {
-	Name string // Boolean, Uuid, ...; for an enum, its Postgres name in PascalCase
-	Enum bool
-	List bool
+	Name   string // Boolean, Uuid, ...; for an enum, its Postgres name in PascalCase
+	Enum   bool
+	Labels []string // an enum's, in Postgres's order
+	List   bool
 }
 
 func (t Type) String() string {
@@ -84,21 +85,22 @@ func Connect(ctx context.Context, connString string) (*Checker, error) {
 
 func (c *Checker) Close(ctx context.Context) { c.conn.Close(ctx) }
 
-// Check infers the signature of one literal. A fault in the literal
-// is an *Error; any other error is a failure to ask the database.
-func (c *Checker) Check(ctx context.Context, literal string) (*Statement, error) {
-	return c.check(ctx, literal, false)
+// Check infers the signature of one literal, whose parameters lie
+// where spans says, in order. A fault in the literal is an *Error; any
+// other error is a failure to ask the database.
+func (c *Checker) Check(ctx context.Context, literal string, spans []Span) (*Statement, error) {
+	return c.check(ctx, literal, spans, false)
 }
 
 // CheckDiscarding is Check for a call that throws the result's columns
 // away, as exists and execute do: they are not typed, so they need no
 // Kogo type, and the statement has none.
-func (c *Checker) CheckDiscarding(ctx context.Context, literal string) (*Statement, error) {
-	return c.check(ctx, literal, true)
+func (c *Checker) CheckDiscarding(ctx context.Context, literal string, spans []Span) (*Statement, error) {
+	return c.check(ctx, literal, spans, true)
 }
 
-func (c *Checker) check(ctx context.Context, literal string, discard bool) (*Statement, error) {
-	sql, params, edits, err := rewrite(literal)
+func (c *Checker) check(ctx context.Context, literal string, spans []Span, discard bool) (*Statement, error) {
+	sql, params, edits, err := rewrite(literal, spans)
 	if err != nil {
 		return nil, err
 	}
@@ -278,6 +280,8 @@ func (c *Checker) typeOf(ctx context.Context, oid uint32) (Type, error) {
 		t.List = true
 	case kind == "e":
 		t = Type{Name: pascal(name), Enum: true}
+		err = c.conn.QueryRow(ctx, `select array_agg(enumlabel::text order by enumsortorder) from pg_enum
+			where enumtypid = $1`, oid).Scan(&t.Labels)
 	case scalars[name] != "":
 		t = Type{Name: scalars[name]}
 	default:

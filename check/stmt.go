@@ -9,7 +9,8 @@ import "kogo/syntax"
 func (c *checker) block(b *syntax.Block, want Type, used bool, known facts) Type {
 	c.push(known)
 	defer c.pop()
-	used = used && !is(want, tUnit)
+	unit := used && is(want, tUnit) // its last statement may be any statement, or the value Unit
+	used = used && !unit
 	var last Type = tUnit
 	value, dead := false, false
 	for i, s := range b.Stmts {
@@ -21,7 +22,7 @@ func (c *checker) block(b *syntax.Block, want Type, used bool, known facts) Type
 			c.straight = e
 			last = c.value(e, want)
 		} else {
-			last = c.stmt(s)
+			last = c.stmt(s, unit && i == len(b.Stmts)-1)
 		}
 		dead = dead || is(last, tNothing)
 	}
@@ -37,8 +38,9 @@ func (c *checker) block(b *syntax.Block, want Type, used bool, known facts) Type
 }
 
 // stmt checks a statement whose value nothing uses. It gives Nothing
-// when the statement cannot finish.
-func (c *checker) stmt(s syntax.Stmt) Type {
+// when the statement cannot finish. A unit statement ends a block
+// whose value is a wanted Unit, and so may be a value of type Unit.
+func (c *checker) stmt(s syntax.Stmt, unit bool) Type {
 	switch s := s.(type) {
 	case *syntax.ValDecl:
 		var t Type = unknown
@@ -113,7 +115,7 @@ func (c *checker) stmt(s syntax.Stmt) Type {
 			if v := c.narrowable(b.X); v != nil {
 				c.assume(facts{v: nonNull(c.info.Types[b.X])})
 			}
-		case t != unknown && onlyValue(s):
+		case t != unknown && onlyValue(s) && !(unit && is(t, tUnit)):
 			c.errorf(first(s), "value-unused", "this statement is only a value, which nothing uses: assign it, return it or remove it")
 		case c.either(nonNull(t)) != nil:
 			c.errorf(first(s), "either-dropped", "this %s is dropped, and a failure with it: bind it, fold it, return it or assign it", t)

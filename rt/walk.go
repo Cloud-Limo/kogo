@@ -53,14 +53,14 @@ func equal(a, b reflect.Value) bool {
 		return a.Bool() == b.Bool()
 	case reflect.Int32, reflect.Int64:
 		return a.Int() == b.Int()
-	case reflect.Uint16:
+	case reflect.Uint16, reflect.Uint8: // a Char, and a byte of a Uuid
 		return a.Uint() == b.Uint()
 	case reflect.Float64:
 		x, y := a.Float(), b.Float()
 		return x == y && math.Signbit(x) == math.Signbit(y) || x != x && y != y
 	case reflect.String:
 		return a.Type() == b.Type() && a.String() == b.String()
-	case reflect.Slice:
+	case reflect.Slice, reflect.Array: // an array is a Uuid's bytes
 		if a.Len() != b.Len() {
 			return false
 		}

@@ -891,6 +891,11 @@ func (p *parser) call(fun Expr, pos Pos, typeArgs []Type) Expr {
 				if p.at("*") {
 					p.notKogo(p.tok.pos, "spread", "*spread", "pass a List")
 				}
+				if id, ok := fun.(*Ident); ok && p.tok.kind == tSQL {
+					if _, five := sqlCalls[id.Name]; five {
+						p.fail(p.tok.pos, "sql-placement", "call %s on the Tx: tx.%s(...), or this.%s(...) in a fun on Tx", id.Name, id.Name, id.Name)
+					}
+				}
 				if p.tok.kind == tSQL && isSQL && a.Name == "" && len(c.Args) == 0 {
 					s := p.sql()
 					s.Call, a.Value = sel.Name, s
@@ -930,6 +935,10 @@ func (p *parser) sql() *SQL {
 		sp := &SQLParam{Pos: part.pos, Name: part.name}
 		if part.expr {
 			sp.Expr = p.template(part)
+			sp.End = p.src.pos(part.end + 1)
+		} else {
+			sp.Expr = &Ident{Pos{part.pos.Offset + 1, part.pos.Line, part.pos.Column + 1}, part.name}
+			sp.End = Pos{part.pos.Offset + 1 + len(part.name), part.pos.Line, part.pos.Column + 1 + len(part.name)}
 		}
 		s.Params = append(s.Params, sp)
 	}

@@ -16,7 +16,7 @@ func (e *emitter) decl(d syntax.Decl) {
 	e.fn = &scope{names: map[any]string{}, used: map[string]bool{"this_": true}}
 	e.this, e.result, e.lambdas, e.loops = nil, nil, 0, nil
 	if e.info.Fails[d] != nil {
-		e.notYet(d, "a fun that can fail (spec.md 9)", "the next slice of the emitter writes Either and Raise")
+		e.notYet(d, "a fun that can fail (spec.md 9)", slices9and10)
 		return
 	}
 	switch d := d.(type) {

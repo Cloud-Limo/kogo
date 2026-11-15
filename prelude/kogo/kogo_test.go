@@ -2,8 +2,10 @@ package kogo
 
 import (
 	"math"
+	"regexp"
 	"slices"
 	"testing"
+	"time"
 	"unicode"
 
 	"kogo/rt"
@@ -79,9 +81,33 @@ func TestLists(t *testing.T) {
 	if xs[0] = 9; *wide[0] != 3 || *wide[2] != 5 || rt.ToString(Pair_widen(pairs[0], rt.Ptr[int64], rt.Ptr[string])) != "(3, a)" {
 		t.Error("a widened list is not a copy, or a widened pair is not the pair")
 	}
+	if List_Size(xs) != 3 {
+		t.Error("size is wrong")
+	}
 	if got := T_TakeIf("a", String_IsNotEmpty); got == nil || T_TakeIf("", String_IsNotEmpty) != nil || T_Let(2, func(n int) int { return n * 2 }) != 4 {
 		t.Error("takeIf or let is wrong")
 	}
+}
+
+// An id is written as a UUID is, sorts after one made earlier, and is
+// equal to itself and to no other.
+func TestIds(t *testing.T) {
+	a := NewId()
+	time.Sleep(2 * time.Millisecond)
+	b := NewId()
+	if s := rt.ToString(a); !regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).MatchString(s) || s >= rt.ToString(b) {
+		t.Errorf("%s then %s", a, b)
+	}
+	if !rt.Equal(a, a) || rt.Equal(a, b) {
+		t.Error("an id is equal to itself alone")
+	}
+	defer func() {
+		if recover() != "no" {
+			t.Error("a check that fails does not panic with its message")
+		}
+	}()
+	Check(true, func() string { return "yes" })
+	Check(false, func() string { return "no" })
 }
 
 // The functions on an Either value (spec.md section 9). Go cannot

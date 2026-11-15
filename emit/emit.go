@@ -39,11 +39,18 @@ func Emit(info *check.Info, prelude, program []*syntax.File, root string) (map[s
 func emitAll(info *check.Info, prelude, program []*syntax.File, root string) (*emitter, map[string][]byte, []*syntax.Error) {
 	e := &emitter{
 		info: info, root: root, names: map[any]string{}, bound: map[string]bool{},
-		nullable: map[*check.TypeParam]bool{}, scanned: map[*check.Func]bool{},
+		nullable: map[*check.TypeParam]bool{}, scanned: map[*check.Func]bool{}, later: map[any]bool{},
 	}
 	bindings := append([]*syntax.File{info.Core}, prelude...)
 	for _, f := range bindings {
 		e.bound[f.Package.Name] = true
+	}
+	for _, d := range info.Core.Decls {
+		if c, ok := d.(*syntax.ClassDecl); ok && c.Kind == "external class" {
+			e.later[info.Classes[c]] = true
+		} else if f, ok := d.(*syntax.FunDecl); ok {
+			e.later[info.Funcs[f]] = true
+		}
 	}
 	e.name(bindings)
 	e.name(program)
@@ -112,6 +119,7 @@ type emitter struct {
 	bound    map[string]bool           // the Kogo packages that Go implements: the prelude's
 	nullable map[*check.TypeParam]bool // the type parameters used as T?
 	scanned  map[*check.Func]bool      // the funs whose signatures are read for that
+	later    map[any]bool              // the core's Raise, Tx and Db and its funs: sections 9 and 10
 	insts    []inst
 
 	pkg     string            // the Kogo package being written
@@ -161,6 +169,9 @@ func (e *emitter) refuse(at syntax.Node, code, format string, args ...any) {
 func (e *emitter) notYet(at syntax.Node, what, fix string) {
 	e.refuse(at, "not-yet-emitted", "%s is not emitted yet: %s", what, fix)
 }
+
+// The fix for what belongs to the slices that follow this one.
+const slices9and10 = "the next slices of the emitter write failures, then SQL and transactions"
 
 // first gives where a node's text begins: an operator and a call are
 // positioned further in.

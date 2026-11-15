@@ -93,3 +93,16 @@ func (c *checker) fails(e *syntax.Call, call *Call) {
 		}
 	}
 }
+
+// txRaise reports whether f is the core's db.tx whose block is a
+// raise scope (spec.md 10.7).
+func (c *checker) txRaise(f *Func) bool {
+	return f.file == c.core && f.Name == "tx" && len(f.TypeParams) == 2
+}
+
+// otherTx reports whether f is the core's db.tx that does not apply
+// here: the one whose block is a raise scope is called where the
+// enclosing fun returns an Either, and the other everywhere else.
+func (c *checker) otherTx(f *Func) bool {
+	return f.file == c.core && f.Name == "tx" && c.txRaise(f) != (c.either(c.result) != nil)
+}

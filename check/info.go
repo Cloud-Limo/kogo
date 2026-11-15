@@ -1,7 +1,7 @@
-// Package check checks a Kogo program against spec.md sections 2 to 6
-// and 9: names, types, type arguments, overloads, narrowing, when and
-// expected failures. It
-// reads the parser's trees, the prelude's among them, and reports
+// Package check checks a Kogo program against spec.md sections 2 to
+// 11: names, types, type arguments, overloads, narrowing, when,
+// expected failures, SQL and markers. It reads the parser's trees, the
+// prelude's among them, and the SQL pass's signatures, and reports
 // errors or gives the facts the emitter needs.
 package check
 
@@ -14,10 +14,10 @@ type Info struct {
 	// is read there (a narrowed name has its narrowed type), and of
 	// every written type.
 	Types map[syntax.Node]Type
-	// Uses holds what each *syntax.Ident, *syntax.Select and
-	// *syntax.FuncRef refers to. A name that refers to a property or
-	// to a function with a receiver, and is not a Select, is read on
-	// this.
+	// Uses holds what each *syntax.Ident, *syntax.Select,
+	// *syntax.FuncRef and *syntax.ClassRef refers to. A name that
+	// refers to a property or to a function with a receiver, and is
+	// not a Select, is read on this.
 	Uses map[syntax.Node]Object
 	// Calls holds the function behind each *syntax.Call, behind each
 	// name that reads an extension val, and behind each operator that
@@ -53,6 +53,9 @@ type Info struct {
 	// A call that gives an Either value is not one: bind on its value
 	// is.
 	Fails map[syntax.Node]Type
+	// SQL holds each sql literal that one of the five calls of
+	// spec.md 10.2 takes, as matched with its row type and arguments.
+	SQL map[*syntax.SQL]*Query
 	// Core is the checker's own file, check/core.kg, as these tables
 	// know it: its declarations are package kogo's, with the prelude's.
 	Core *syntax.File
@@ -138,9 +141,11 @@ type TypeDecl struct {
 	copy, toString *Func // made when first called
 }
 
-// vis is where a declaration lives and who may name it.
+// vis is where a declaration lives, who may name it, and the markers
+// that a file must opt in to before it uses it (spec.md 11).
 type vis struct {
 	Pkg        string
 	file       *syntax.File
 	visibility string // "", "private" or "internal"
+	markers    []*TypeDecl
 }

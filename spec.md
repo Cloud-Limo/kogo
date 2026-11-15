@@ -149,10 +149,13 @@ There is one absent value, `null`, and it only inhabits `T?`.
   `||` and `!`, and the `is` and `null` branches of `when (x)`. In
   `a && b`, `b` is read knowing `a` holds; in `a || b`, knowing it does
   not.
-- A narrowing holds in the branch where the test's outcome is known, and
-  for the rest of the block when the other branch cannot finish: after
-  `if (x == null) return y`, and after the statement `x ?: return y`,
-  `x` is a `T`. Inside `x?.let { }` the lambda's parameter is a `T`.
+- A narrowing holds in the branch where the test's outcome is known.
+  Two statements narrow for the rest of the block: an `if` whose other
+  branch cannot finish, and `x ?: return y`. After
+  `if (x == null) return y`, or the statement `x ?: return y`, `x` is a
+  `T`. Nothing used as a value narrows past itself, though Kotlin's
+  does: after `val p = x ?: return y` it is `p` that is a `T`, and `x`
+  is still a `T?`. Inside `x?.let { }` the lambda's parameter is a `T`.
 - `require`, `check` and `ensure` do not narrow, though Kotlin's do:
   write `val y = requireNotNull(x) { "why" }`, or `ensureNotNull`.
 - `requireNotNull(x) { "message" }` and `checkNotNull(x) { "message" }`

@@ -103,6 +103,13 @@ Each entry: what was decided, why, and what would reopen it.
   stable. Not taken: narrowing a path (`booking.price`), and narrowing after `require`,
   `check` and `ensure`, both of which Kotlin does. No example or stage-1 port needs either.
   Reopen if ports keep binding a path to a `val` only to test it.
+- **Only a statement narrows for the rest of its block** (15 Nov 2026; spec 4): an `if`
+  whose other branch cannot finish, and `x ?: return y`. An `if`, `?:` or `when` used as a
+  value narrows nothing after it, though Kotlin's does: `val p = x ?: return y` gives `p`,
+  and the examples use `p`. Narrowing from a value would have to cover all three forms at
+  once (about 15 lines of checker, 40 of tests) and track what is known after any
+  expression, which the entry above avoids. Reopen if ports keep splitting
+  `val y = if (...) return ... else ...` into two statements.
 - **`Int` or `Long` mixed with `Double` is refused** (15 Nov 2026; spec 3). The two stage-1
   ports wrote one sum both ways, `amount * percent` and `amount.toDouble() * percent`; the
   second shows where cents become a floating-point number. `==` between `Int` and `Long` is

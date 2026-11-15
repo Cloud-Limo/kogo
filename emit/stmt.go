@@ -84,9 +84,12 @@ func (e *emitter) stmt(s syntax.Stmt) {
 	case *syntax.ValDecl:
 		vars := e.info.Vars[s]
 		if s.Destructure != nil {
-			t := e.temp()
-			e.w("%s := %s", t, e.expr(s.Value))
-			e.parts(vars, t, e.info.Types[s.Value])
+			// Written toward a variable, as any val's value is, so
+			// that a jump in it is a statement (spec 6).
+			t, vt := e.temp(), e.info.Types[s.Value]
+			e.w("var %s %s", t, e.typ(vt))
+			e.into(s.Value, dest{set, t, vt})
+			e.parts(vars, t, vt)
 		} else {
 			e.into(s.Value, dest{set, e.declare(vars[0]), vars[0].Type})
 		}

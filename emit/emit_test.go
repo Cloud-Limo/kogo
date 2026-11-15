@@ -489,6 +489,40 @@ fun other(): Int = helper()
 		"@file:OptIn(Unscoped::class)\npackage t\n\n@RequiresOptIn\nannotation class Unscoped\n\n@Unscoped\nfun unscoped(): Int = 9\nfun scoped(): Int = unscoped()\n")
 }
 
+// A jump may stand where a value goes straight into a val (spec 6),
+// and a destructuring val is one.
+func TestDestructuringJump(t *testing.T) {
+	expect(t, [][2]string{
+		{"t.Swap(nil)", "P(a=7, b=8)"},
+		{"t.Swap(&t.P{A: 1, B: 2})", "P(a=2, b=1)"},
+		{"t.Sums()", "3 7"},
+	}, `package t
+
+data class P(val a: Int, val b: Int)
+
+fun none(): P? = null
+
+fun swap(p: P?): P {
+    val (a, b) = p ?: return P(7, 8)
+    return P(b, a)
+}
+
+fun sums(): String {
+    val ps: List<P?> = listOf(P(1, 2), null, P(3, 4), P(5, 6))
+    var out = ""
+    for (q in ps) {
+        val (a, b) = q ?: continue
+        if (a > 3) {
+            val (c, d) = none() ?: break
+            out += "$c$d"
+        }
+        out += "${a + b} "
+    }
+    return out.trim()
+}
+`)
+}
+
 // A panic's trace names the Kogo file and line (principle 5): the
 // line of a statement, and the line of a call that is further down
 // than the statement begins.

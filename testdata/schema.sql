@@ -69,6 +69,16 @@ create table invoice (
     platform_fee_reference text
 );
 
+-- A composite type made with create type, whose fields Postgres
+-- cannot declare NOT NULL, and a table holding it.
+create type amount as (cents bigint, currency text);
+
+create table quote (
+    id uuid primary key,
+    total amount not null,
+    deposit amount
+);
+
 -- One column per row of the type table, all NOT NULL but `note`.
 create table every_type (
     flag boolean not null,

@@ -45,8 +45,17 @@ var goName = regexp.MustCompile(`^[A-Z][A-Za-z0-9]*$`)
 // Emit writes a Go file with one function per statement. An Exists
 // gives whether there is a row; otherwise a statement with columns
 // gives a slice of its row struct, and one without gives the count of
-// rows affected. Every parameter may be nil, which sends NULL.
+// rows affected. Every parameter may be nil, which sends NULL. A
+// column of a composite type has no Go type yet, and is refused.
 func Emit(pkg string, funcs []Func) ([]byte, error) {
+	for _, f := range funcs {
+		for _, c := range f.Stmt.Columns {
+			if c.Type.Fields != nil && !f.Exists {
+				return nil, fmt.Errorf("%s: column %q is a row of %s, which Emit cannot read yet: select its fields as columns",
+					f.Name, c.Name, c.Type.Name)
+			}
+		}
+	}
 	var body bytes.Buffer
 	types := "" // every Go type used, to know what to import
 	use := func(t Type, nullable bool) string {

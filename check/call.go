@@ -114,6 +114,9 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 	if call := c.info.Calls[e]; call != nil {
 		c.info.Uses[e.Fun] = call.Func
 		c.fails(e, call)
+		if id, ok := e.Fun.(*syntax.Ident); ok && call.Func.Receiver != nil && c.raised(call.Func.Receiver) == nil {
+			c.narrowedThis(id)
+		}
 	}
 	if safe {
 		t = nullable(t)

@@ -232,6 +232,10 @@ func subst(t Type, b binding) Type {
 	return t
 }
 
+// Subst gives t with each of params replaced by the type of args in
+// its place: a declaration's type as one use of it reads.
+func Subst(t Type, params []*TypeParam, args []Type) Type { return subst(t, bind(params, args)) }
+
 func substAll(ts []Type, b binding) []Type {
 	out := make([]Type, len(ts))
 	for i, t := range ts {

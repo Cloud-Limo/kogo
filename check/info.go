@@ -25,7 +25,9 @@ type Info struct {
 	// the same in a += b and in a when's in condition.
 	Calls map[syntax.Node]*Call
 	// Narrowed holds each use of a name that is narrowed there, and
-	// the type it is narrowed to; its Var holds the declared type.
+	// the type it is narrowed to; its Var holds the declared type. A
+	// name that reads a member of this, unwritten, is here with the
+	// type this is narrowed to.
 	Narrowed map[*syntax.Ident]Type
 	// Vars holds what a *syntax.ValDecl, *syntax.Param,
 	// *syntax.LambdaParam and *syntax.For declare: one Var, or one
@@ -53,6 +55,9 @@ type Info struct {
 	// SQL holds each sql literal that one of the five calls of
 	// spec.md 10.2 takes, as matched with its row type and arguments.
 	SQL map[*syntax.SQL]*Query
+	// Core is the checker's own file, check/core.kg, as these tables
+	// know it: its declarations are package kogo's, with the prelude's.
+	Core *syntax.File
 }
 
 // An Object is what a name refers to: a *Var, a *Func or a *TypeDecl.

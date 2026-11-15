@@ -52,7 +52,7 @@ Dev Postgres (migrated) ──►    │
 ```
 
 Only the type-check stage reads bindings and talks to Postgres. Sealed
-types become an interface plus a type switch; `T?` becomes a pointer; a
+types become an interface and `when` a switch; `T?` becomes a pointer; a
 failure is a panic that its own raise scope recovers; `context.Context`
 rides in the `Tx` and `Db` handles and never appears in source. "The
 emitter" below has the rest.
@@ -132,7 +132,7 @@ first slice. Emitted names must be ones a driver can call.
 | `Int`, `Long`, `Double`, `Boolean` | `int32`, `int64`, `float64`, `bool` |
 | `T?` | a pointer, nil for `null`, for every `T` |
 | data class | a struct, passed by value |
-| sealed interface, and `Either` | an interface; `when` is a type switch |
+| sealed interface, and `Either` | an interface; `when` is a switch, `is` a type test |
 | enum | a named string |
 | `List<T>` | a slice, never changed once built |
 | lambda | a function value |
@@ -172,8 +172,12 @@ expression in a function called on the spot. A wrapper cannot hold a
 refuses one buried in a larger expression. Evaluation stays left to
 right, which Go does not promise for every operand: tests must show it.
 
-**The prelude's Go** is a hand-written package in this repo with its own
-tests. One test emits a file that uses every declaration of `prelude/`
+**The prelude's Go** is hand-written in this repo with its own tests:
+`rt` holds what every program needs whatever its prelude (the walk
+behind `==` and `toString()`, `Unit`, `Char`, the helpers the emitter
+calls), and `prelude/kogo` and `prelude/kogo/time` hold the Go behind
+the declarations of Kogo's packages `kogo` and `kogo.time`. One test
+emits a file that uses every declaration of `prelude/`
 and compiles it. It depends on nothing but the Postgres driver: ids and
 times are small types of our own over the standard library, `Regex` is
 Go's, and `Decimal` holds what Postgres sent and has no arithmetic.

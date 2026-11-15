@@ -439,6 +439,34 @@ func TestStatements(t *testing.T) {
 	})
 }
 
+// Section 6: a jump stands where a value goes straight to a val, an
+// assignment, a return or a result, and nowhere inside a larger
+// expression, which the emitter wraps in a Go function.
+func TestJumps(t *testing.T) {
+	passes(t,
+		"fun f(s: String?, c: Boolean): String {\n    val t = s ?: return \"\"\n    var u = t\n    u = if (c) t else return \"x\"\n    return when (c) {\n        true -> s ?: return \"y\"\n        false -> u\n    }\n}",
+		"fun f(s: String?): String = s ?: return \"none\"",
+		"fun f(xs: List<Int?>, limit: Int?): Int {\n    var n = 0\n    for (x in xs) {\n        val y = x ?: continue\n        n = if (y > 0) n + y else break\n    }\n    return n\n}",
+		"fun f(xs: List<Int>): Int = xs.first().let {\n    fun half(n: Int): Int {\n        if (n < 2) return 0\n        return n / 2\n    }\n    half(it)\n}",
+		// A loop inside the larger expression holds its own break.
+		"fun g(n: Int): Int = n\nfun f(xs: List<Int>, c: Boolean): Int = g(if (c) {\n    var n = 0\n    for (x in xs) {\n        if (x > 2) break\n        n += x\n    }\n    n\n} else 0)",
+	)
+	fix := "bind the value to a val first"
+	refused(t, [][3]string{
+		{"fun g(n: Int): Int = n\nfun f(x: Int?): Int = g(x ?: ‸return 0)", "buried-jump", fix},
+		{"fun f(x: Int?): Int {\n    val y = 1 + (x ?: ‸return 0)\n    return y\n}", "buried-jump", "this return is buried in a larger expression"},
+		{"fun f(x: Int?, c: Boolean): Int {\n    if (c && (x ?: ‸return 0) > 1) return 1\n    return 2\n}", "buried-jump", fix},
+		{"fun g(n: Int): Int = n\nfun f(c: Boolean): Int = g(if (c) {\n    ‸return 1\n} else 2)", "buried-jump", fix},
+		{"fun g(n: Int): Int = n\nfun f(xs: List<Int?>): Int {\n    var n = 0\n    for (x in xs) n += g(x ?: ‸continue)\n    return n\n}", "buried-jump", "val v = x ?: continue"},
+		{"fun f(xs: List<Int?>): Int {\n    for (x in xs) {\n        val y = (x ?: ‸break) + 1\n    }\n    return 1\n}", "buried-jump", "this break is buried"},
+		// A lambda holds no return; a local fun inside one does.
+		{"fun f(xs: List<Int>): Int {\n    xs.forEach { if (it > 1) ‸return it }\n    return 0\n}", "kotlin-lambda-return", "end the lambda with its value, and return after the call that runs it"},
+		{"fun f(x: Int?): Int = x?.let { ‸return it } ?: 0", "kotlin-lambda-return", "a lambda holds no return"},
+		// n += v is n = n + v: the value is an operand.
+		{"fun f(xs: List<Int?>): Int {\n    var n = 0\n    for (x in xs) n += x ?: ‸break\n    return n\n}", "buried-jump", fix},
+	})
+}
+
 // Section 9: expected failures. Each row of both tables, then each
 // rule broken.
 func TestFailures(t *testing.T) {

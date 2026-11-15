@@ -302,7 +302,10 @@ interface `fun` before an extension of the same name.
 - Loops: `for (x in list)`, `for (i in 0 until n)`, `for ((k, v) in map)`,
   `while`. `break` and `continue` without labels.
 - `return` leaves the enclosing `fun`. Labelled returns (`return@name`) do
-  not exist; restructure with `if`/`else` or a local function.
+  not exist; restructure with `if`/`else` or a local function. A lambda
+  holds no `return`, though Kotlin allows one in a lambda it inlines:
+  the lambda's last expression is its value, and the `fun` returns
+  after the call that runs it.
 - Ranges: `a..b`, `a until b`, `x in a..b`, between two `Int`s or two
   `Long`s. A range is written only after `in`: in a test, a `for` and a
   `when` condition. It is not a value and has no type.
@@ -323,11 +326,12 @@ interface `fun` before an extension of the same name.
   `x ?: return y` are statements. So `- b` on a line of its own, which
   section 6.1 reads as a new statement, is refused.
 - `return`, `break` and `continue` stand in a value's place only where
-  that value goes straight into a `val`, an assignment or a `return`,
-  or is the result of the function or lambda: the right side of `?:`,
-  or a branch of an `if` or a `when` there, as `val p = x ?: return y`.
-  Buried in a larger expression, as `f(x ?: return y)`, one is an
-  error, though Kotlin allows it: bind the value to a `val` first.
+  that value goes straight into a `val`, an assignment with `=` or a
+  `return`, or is the result of the function: the right side
+  of `?:`, or a branch of an `if` or a `when` there, as
+  `val p = x ?: return y`. Buried in a larger expression, as
+  `f(x ?: return y)` or `n += x ?: break`, one is an error, though
+  Kotlin allows it: bind the value to a `val` first.
 
 ### 6.1 Lines, operators and literals
 
@@ -685,6 +689,9 @@ all listed here:
 
 - `Regex` takes RE2 patterns: no lookaround and no backreferences.
 - A `String` never holds half of a surrogate pair (section 3).
+- `lowercase()` maps one character at a time: `"İ".lowercase()` is `"i"`
+  where Kotlin's is `"i̇"`, two characters, and a final `Σ` becomes `σ`
+  where Kotlin's is `ς`.
 
 **Numbers.** `coerceAtLeast`, `coerceAtMost`, `coerceIn`, `abs`, `max`,
 `min`, `toInt`, `toLong`, `toDouble`, `toString`. A `Decimal` holds what
@@ -764,6 +771,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `lateinit`, top-level `var` | pass the value as a parameter |
 | `apply { }`, `run { }`, `with(x) { }` | name the value and call it |
 | `return@label` | `if`/`else` or a local function |
+| `return` inside a lambda, as `xs.forEach { if (it < 0) return false }` | end the lambda with its value; return after the call |
 | `suspend`, coroutines, `Flow`, threads | plain blocking code |
 | `Sequence`, `generateSequence`, `MutableList`, arrays | a `while` loop with a local `var`, or the list functions |
 | `java.time.*`, `java.util.UUID`, `BigDecimal` | `kogo.time.*`, `Uuid`, `Decimal` |

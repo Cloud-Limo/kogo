@@ -29,7 +29,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 		info: &Info{
 			Types: map[syntax.Node]Type{}, Uses: map[syntax.Node]Object{}, Calls: map[syntax.Node]*Call{},
 			Narrowed: map[*syntax.Ident]Type{}, Vars: map[syntax.Node][]*Var{}, Funcs: map[syntax.Node]*Func{},
-			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{}, SQL: map[*syntax.SQL]*Query{},
+			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{}, SQL: map[*syntax.SQL]*Query{}, Core: core,
 		},
 		pkgs: map[string]*pkg{}, members: map[string][]*Func{}, imports: map[*syntax.File]map[string]*pkg{},
 		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{},
@@ -84,6 +84,15 @@ type checker struct {
 	raise      Type             // the E of the raise scope around this place, or nil
 	lambdas    []*syntax.Lambda // the lambdas around this place
 	raiseDepth int              // how many of lambdas are outside the raise scope
+
+	// A jump stands only where a value goes straight to a val, an
+	// assignment, a return or a result (spec.md 6). straight is the
+	// expression about to be read that does; buried says that this
+	// place is inside one that does not, within its fun or lambda,
+	// and buriedLoop within its loop.
+	straight           syntax.Expr
+	buried, buriedLoop bool
+	inLambda           bool // inside a lambda of the fun at hand, which holds no return
 }
 
 // A pkg is the declarations of the files that share a package line.
@@ -489,6 +498,7 @@ func (c *checker) getter(f *Func, d *syntax.ValDecl) {
 		c.define(d, &Var{Kind: Param, Name: "this", Type: f.Receiver})
 		switch {
 		case d.Getter != nil && d.Value == nil:
+			c.straight = d.Getter
 			c.value(d.Getter, f.Result)
 		case !f.External:
 			c.errorf(d, "val-type", "an extension val has a getter and no value: val %s.%s: %s\n    get() = ...", f.Receiver, f.Name, f.Result)
@@ -543,10 +553,11 @@ func (c *checker) body(f *Func, d *syntax.FunDecl) {
 		}
 		c.define(p, f.Params[i])
 	}
-	defer func(r Type, l int, e Type, n int) {
-		c.result, c.loops, c.raise, c.raiseDepth = r, l, e, n
-	}(c.result, c.loops, c.raise, c.raiseDepth)
-	c.result, c.loops, c.raise, c.raiseDepth = f.Result, 0, raise, len(c.lambdas)
+	defer func(r Type, l int, e Type, n int, b, bl, il bool) {
+		c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda = r, l, e, n, b, bl, il
+	}(c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda)
+	c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda = f.Result, 0, raise, len(c.lambdas), false, false, false
+	c.straight = d.Expr
 	switch {
 	case d.Expr != nil && d.Result == nil:
 		if t := c.expr(d.Expr, nil); !fits(t, tUnit) {

@@ -237,12 +237,31 @@ Each entry: what was decided, why, and what would reopen it.
   counting whole characters, which is simpler and agrees with Postgres's `char_length`
   but changes what valid Kotlin means; storing UTF-16, which converts at every boundary.
   Accepted cost: `length` walks the string.
+- **A `Double` product is rounded before anything adds to it** (15 Nov 2026; spec 3). The
+  Go spec lets an implementation fuse `x*y + z` into one instruction that rounds once, across
+  statements too, and on arm64 Go does; Kotlin rounds each step, and the side-by-side run
+  compares `Double`s bit for bit. The emitter writes every `Double` multiplication as
+  `float64(x*y)`, the conversion the Go spec names as stopping fusion. Not taken: wrapping
+  only a product that feeds an addition, which has to follow values across statements.
+  Reopen if Go stops fusing, or a profile shows the lost instruction.
+- **`Double.toLong()` and `Double.toInt()` are Kotlin's, not Go's conversion** (15 Nov 2026;
+  spec 3). Go leaves an out-of-range conversion to the machine: `int64(1e30)` saturates on
+  arm64 and gives the minimum on amd64. The prelude spells Kotlin's rule out: truncate
+  toward zero, stop at the type's ends, `NaN` gives 0. Accepted cost: this arm64 VM already
+  saturates in hardware, so the tests that cover the ends cannot fail here; they guard amd64.
 - **A value-producing `if`, `when`, `?:` or `?.` is written toward where its value goes,
   and wrapped in a function elsewhere** (15 Nov 2026; spec 6). A `return`, `break` or
   `continue` buried in a larger expression is refused, though Kotlin allows it; the
   examples and both stage-1 ports hold two jumps in a value's place, both
   `val x = y ?: return z`. Not taken: flattening every expression into statements and
   temporaries, about 400 lines and the simplified tree under another name.
+- **A lambda holds no `return`** (15 Nov 2026; spec 6). Kotlin allows one only in a lambda
+  it inlines, where it leaves the enclosing fun. A Kogo lambda is a function value, so
+  leaving the fun through it would take the panic that a failure uses, at every such
+  `return`. The checker refuses it (`kotlin-lambda-return`) and says to end the lambda
+  with its value and return after the call; `break` and `continue` in a lambda were
+  refused already. No example or stage-1 port writes one. Reopen if ports keep rewriting
+  `xs.forEach { if (...) return x }` as loops and it reads badly.
 - **The prelude's Go is our own package with no new dependency** (15 Nov 2026). `Decimal`
   holds what Postgres sent and has no arithmetic: the ports use it once and convert it to a
   `Double`, and cusoon2 keeps money in cents. Reopen when a port needs decimal arithmetic,
@@ -519,7 +538,7 @@ Each entry: what was decided, why, and what would reopen it.
 - **Ids, instants and dates are our own small Go types.** Go's time value carries a
   location and a monotonic reading that break comparison by value.
 - **One naming rule gives every overload its Go name**, the prelude's and a program's; its
-  spelling is left to whoever builds the emitter, to record here.
+  spelling is under DEV-830 below.
 
 ## Taken checking SQL and markers (DEV-827), not yet discussed
 
@@ -569,6 +588,118 @@ Each entry: what was decided, why, and what would reopen it.
 - **The examples changed to pass**: 12, 13 and 16 import `kogo.time.Instant` (spec 2), and
   19 is `package example.markers`, since 12 also declares `Business`. The prelude gained
   `Uuid`, `newId`, `List.size` and `check`, which they use.
+
+## Taken building the emitter's first slice (DEV-830), not yet discussed
+
+- **The naming rule.** A top-level Go name is the Kogo name with its first letter in upper
+  case, so that a driver in another Go package can call it, and never ends with `_`. A type
+  is its name and a nested one joins with `_` (`Outcome_Ok`); an enum constant is
+  `InvoiceStatus_draft`. A top-level val and a fun with no receiver are `Name`. Anything
+  with a receiver is `Receiver_Name`, the receiver's type without its arguments: an
+  extension (`Booking_SupplierPay`), an extension val, a binding (`List_Filter`,
+  `String_Length`, `T_Let`) and an object's fun (`ZoneId_Of`). Where two declarations of
+  one package come out the same, each fun among them is spelled in full, its receiver with
+  its type arguments and then each parameter's type (`String_Substring_Int_Int`,
+  `ListT_SumOf_TToLong`, and `Regex_String` for the fun `Regex(pattern)` beside the type);
+  one with no parameters adds `_fun` and a val `_val`; a type keeps its name. Still the
+  same is an error, `go-name`. A `private` declaration adds `_f` and its file's number in
+  the package, since two files may each have one. cusoon2 has 5 overloaded funs, 5
+  overloaded extensions and 8 funs named as a type of their package among 161: the other
+  143 get the name a driver would guess. Not taken: always spelling the types, which is
+  one rule with no neighbours to look at and gives `JobWorth_Booking_ListBookingExtraCharge_Boolean`.
+  Accepted cost: adding an overload renames the fun it joins, which every Go caller sees
+  as a compile error. Reopen if generated callers (the RPC layer) want names that do not
+  depend on the neighbours.
+- **Inside a body a name is the Kogo name with `_` after it** (`price_`, `this_`): a local,
+  a parameter, a local fun and a type parameter, numbered where a declaration has two of
+  one name, so that Go's scopes never decide what a name means. Temporaries are `t1`,
+  imports `p1`. No local can then be a Go keyword (`type`, `func`) or hide a top-level name.
+- **A property is a Go field, and an interface's val a method `GetName()`**, since Go
+  refuses a field and a method of one name; a data class that implements the interface
+  gets the method. Kotlin has the same clash between `val label` and `fun getLabel()`;
+  a property `getLabel` beside it is refused (`go-name`), since the struct would then not
+  implement the interface.
+- **Layout.** `kogo emit <dir> <out>` writes one Go file for each Kogo package, `a.b`'s at
+  `<out>/a/b/kogo.go` in Go package `b`, and nothing else. The import path of `<out>` is
+  read from the `go.mod` above it, and the Go imports `kogo/rt` and `kogo/prelude/...`, so
+  a program's module requires this one. Not taken: copying the runtime into `<out>`,
+  which would free a program from this repo and is about 40 lines. Reopen when a program
+  is built outside this repo.
+- **`rt` apart from the prelude's Go** (principle 8). `rt` is what the core needs: `Unit`,
+  `Nothing`, `Char`, the walk behind `==` and `toString()`, and the emitter's helpers.
+  `prelude/kogo` and `prelude/kogo/time` are the Go of Kogo's packages `kogo` and
+  `kogo.time`, each binding named by the naming rule, so the emitter has no table of them.
+  A type with an `out` parameter has a `Name_widen` beside it (`List_widen`, `Pair_widen`),
+  which the emitter calls to use it as a wider type.
+- **`Unit` is a Go value, and every fun returns one.** `(T) -> Unit` and `(T) -> R` are
+  then one Go type, which `x.let { ... }` needs. `toString()` gives `kotlin.Unit`, as in
+  Kotlin.
+- **`when` is one Go `switch` over conditions for every subject**: `is` is a type test,
+  a constant an `==`, a range a call. `doc/design.md` had a type switch for a sealed
+  subject; that is a second path for the same result, and `null`, constants and `is` mix
+  in one `when`.
+- **A sealed interface is a Go interface with no methods.** A variant then needs no
+  marker, and an `Outcome<Nothing>` is an `Outcome<Int>` by Go's own conversion.
+- **A data class's struct carries its Kotlin names**: a blank first field tagged with the
+  class's name and each field tagged with its property's, which `toString()` reads. Not
+  taken: a generated method for each class.
+- **`==` inside a value compares a `Double` as Kotlin's `equals` does**: `NaN` is equal to
+  `NaN` and `0.0` is not equal to `-0.0`. Between two expressions that are each a `Double`
+  or a `Double?` it is IEEE's, as in Kotlin: Go's `==`, or `rt.EqualDouble` once either
+  may be null. A function is equal to nothing, itself included, where Kotlin compares
+  references: Go cannot.
+- **Arithmetic on two literals is kept from Go's constant folding**: the left one is read
+  through `rt.Val`, so that `2147483647 + 1` wraps and a `Double` gives `Infinity`, as at
+  run time. A minus on a whole literal is one literal (`int32(-2147483648)`); on anything
+  else that Go reads as a constant it is a run-time minus, since Go's constants have no
+  `-0.0`.
+- **A constructor's default is written at the call with the call's type arguments**: for
+  as long as it is written, each type parameter of the class names the Go type of its
+  argument. A type parameter with no Go name where it is written stops the emitter: it is
+  the emitter's mistake, never Go with a name missing.
+- **Evaluation order.** Go orders calls left to right and nothing else, so what must be
+  ordered is a call: a read of a local `var` (`rt.Val`), since a lambda called later in
+  the expression may assign it, and `/` and `%` (`rt.Div`, `rt.Rem`), which panic. A
+  call's operands written out of the order of their slots (named arguments, `x in c`, a
+  constructor's defaults) are read into temporaries first. Not ordered: nothing known.
+- **A parameter with a default is a pointer in Go**, nil when the call leaves it out, and
+  the fun gives it its default, which may read the parameters before it. A constructor's
+  default is written at the call, since it can read no parameter.
+- **`return`, `break` and `continue` in a value's place: `n += x ?: break` is refused**
+  (spec 6), since `n += v` is `n = n + v` and the value is an operand. A `break` inside a
+  loop that is itself inside the larger expression is allowed. `break` and `continue`
+  are written with their loop's label, because a `when` is a Go `switch`.
+- **The checker's facts gained three things**: a name that reads a member of a narrowed
+  `this` is in `Narrowed`, with the type `this` is narrowed to; `Info.Core` is the
+  checker's own file; and `check.Subst` gives a declaration's type as one use reads it.
+- **Refused as not yet emitted**, each with its position (`not-yet-emitted`):
+  - what can fail (spec 9): a fun, a lambda or a call in `Info.Fails`, and a call of any
+    fun of `check/core.kg`. The functions on an `Either` value have Go already, since
+    `prelude/` declares them.
+  - SQL and transactions (spec 10): a `Tx` or a `Db` wherever one is written, and each of
+    the five calls. Spec 7 puts one of the two in every fun that touches the database.
+  - a type argument that is nullable where the type parameter is used as `T?`
+    (`x.takeIf { }` on an `Int?`): two pointers in Go, and the outer one would not be null
+    when the value is.
+  - a type argument settled as `Nothing` (`none(null)`), so that no value's Go type holds
+    `Nothing` where its declaration holds a type parameter; that is what lets an
+    `Outcome<Nothing>` be used as an `Outcome<Int>` for free.
+  - a sealed value used as one whose type argument is another Go type (`Outcome<Ok<Int>>`
+    as `Outcome<Outcome<Int>>`): the value keeps the Go type it was made with, and an `is`
+    test would miss it. A list is copied instead; a sealed value would have to be rebuilt.
+  - a local fun or an interface's fun with type parameters (Go has neither), an
+    interface's fun with a default, an interface that implements another or has members
+    and an `out` parameter, a reference to a fun with a default, a `?.` call of a property
+    that holds a function, and a `for` over a `Map` or a `Set`.
+- **A marker is written nowhere** (spec 11): the checker has enforced it, and it does
+  nothing at run time, so a program with markers is emitted, not refused.
+- **Not handled**: two Kogo packages that import each other (Go refuses the cycle, with
+  its own message); a literal outside its type's range; two top-level vals that read each
+  other.
+- **`lowercase()` is Go's `strings.ToLower`**, stated in spec 12 as a corner where the
+  prelude differs (principle 3): matching `İ` and a final sigma means Java's case tables,
+  and no ported module depends on them. `uppercase()` is not in the prelude yet, so it
+  has no corner to state.
 
 ## Taken making `Either` the only spelling (DEV-833), not yet discussed
 

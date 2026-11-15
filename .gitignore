@@ -3,4 +3,6 @@
 *.test
 *.out
 /cmd/kogo-sql/emitted*/
+/cmd/kogo/emitted*/
+/emit/emitted*/
 /.claude/settings.local.json

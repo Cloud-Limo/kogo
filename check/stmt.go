@@ -19,6 +19,7 @@ func (c *checker) block(b *syntax.Block, want Type, used bool, known facts) Type
 			ok = false // with no else and nothing wanted it is a statement, as in Kotlin
 		}
 		if value = ok && used && i == len(b.Stmts)-1; value {
+			c.straight = e
 			last = c.value(e, want)
 		} else {
 			last = c.stmt(s, unit && i == len(b.Stmts)-1)
@@ -50,8 +51,10 @@ func (c *checker) stmt(s syntax.Stmt, unit bool) Type {
 			c.errorf(s, "val-type", "a local %s is given its value where it is declared", s.Name)
 		case s.Type != nil:
 			t = c.typ(s.Type)
+			c.straight = s.Value
 			c.value(s.Value, t)
 		default:
+			c.straight = s.Value
 			t = c.expr(s.Value, nil)
 		}
 		if s.Destructure != nil {
@@ -92,21 +95,18 @@ func (c *checker) stmt(s syntax.Stmt, unit bool) Type {
 		} else {
 			c.local(s, s.Name, elem, false)
 		}
-		c.loops++
-		c.block(s.Body, nil, false, nil)
-		c.loops--
+		c.loop(s.Body, nil)
 		c.pop()
 	case *syntax.While:
 		c.value(s.Cond, tBoolean)
 		holds, _ := c.test(s.Cond)
-		c.loops++
-		c.block(s.Body, nil, false, holds)
-		c.loops--
+		c.loop(s.Body, holds)
 	case *syntax.If:
 		return c.ifExpr(s, nil, false)
 	case *syntax.When:
 		return c.when(s, nil, false)
 	case syntax.Expr:
+		c.straight = s
 		t := c.expr(s, nil)
 		b, _ := s.(*syntax.Binary)
 		switch {
@@ -123,6 +123,16 @@ func (c *checker) stmt(s syntax.Stmt, unit bool) Type {
 		return t
 	}
 	return tUnit
+}
+
+// loop checks the body of a for or a while, where break and continue
+// may stand.
+func (c *checker) loop(body *syntax.Block, known facts) {
+	defer func(b bool) { c.buriedLoop = b }(c.buriedLoop)
+	c.buriedLoop = false
+	c.loops++
+	c.block(body, nil, false, known)
+	c.loops--
 }
 
 // onlyValue reports whether an expression does nothing but give a
@@ -147,6 +157,7 @@ func (c *checker) assign(s *syntax.Assign) {
 		c.errorf(id, "val-assigned", "%s is not a local var: declare it with var to give it another value", id.Name)
 	}
 	if s.Op == "=" {
+		c.straight = s.Value
 		c.value(s.Value, t)
 	} else if got := c.operate(s, s.Op[:1], id, t, s.Value, t); !fits(got, t) {
 		c.mismatch(id, got, t)

@@ -670,6 +670,13 @@ ignoreCase = true)`, `filter`, `filterNot`, `map` (over `Char`), and on
 the pattern syntax is RE2 (no lookaround, no backreferences). Case
 conversion never reads a locale.
 
+**Where the prelude differs from Kotlin.** A name that Kotlin has means
+what Kotlin's means in ordinary use. The corners where it does not are
+all listed here:
+
+- `Regex` takes RE2 patterns: no lookaround and no backreferences.
+- A `String` never holds half of a surrogate pair (section 3).
+
 **Numbers.** `coerceAtLeast`, `coerceAtMost`, `coerceIn`, `abs`, `max`,
 `min`, `toInt`, `toLong`, `toDouble`, `toString`. A `Decimal` holds what
 Postgres sent, exactly: it has `toDouble`, `toString`, `==` and

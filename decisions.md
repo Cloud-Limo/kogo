@@ -104,6 +104,35 @@ Each entry: what was decided, why, and what would reopen it.
   that a worker reads, so most request code writes rows. Not designed, on purpose:
   timeouts, retries, and whether workers are written in Kogo; they wait, with an
   application's own binding files, for the first port that calls out.
+- **Principle 3 is strict in the core and graded in the prelude** (15 Nov 2026;
+  `doc/design.md`). The core is finite and nearly covered, and every disagreement with Go
+  met there was settled by a prelude function, an emitter rule or a line of spec. The
+  prelude mirrors the JVM's library, some 110 functions each with corners (Java uppercases
+  `ß` to `SS`, Go leaves it), and matching all of them is the fight with Go not to have.
+  So a Kotlin name means Kotlin's behaviour in ordinary use; a corner may differ when
+  matching means reimplementing a JVM algorithm or table and no side-by-side run depends
+  on it, and is listed in spec 12; a function that would differ in ordinary use takes
+  another name, because an author who knows Kotlin trusts the name. Counting a string in
+  UTF-16 units stays: it was about 60 lines, so never required to differ. Signs this is
+  going wrong: unsafe code or cgo; a Go workaround for each new feature and not only at
+  the edges; the list in spec 12 outgrowing a page.
+- **The first module run side by side is cusoon2's invoice ledger and pay arithmetic; the
+  second, suppliers and businesses** (15 Nov 2026; `doc/design.md` "MVP steps"). The ledger
+  is pure, so it needs only the emitter's first slice; it is where a silent difference in
+  rounding costs money; one of cusoon2's 127 test files names any of its functions; and
+  stage 1 ported it, so redoing the port measures what the decisions since cost. Not
+  taken first: the pricing engine, pure but built on `object`s and a generic bounded by
+  `Enum`, which would test porting more than the emitter.
+- **"Same result" is exact, with no tolerance, over one shared file of cases**
+  (15 Nov 2026). A ledger one cent out is wrong, and a tolerance hides what the run is
+  for. Checking that a `Double` can match bit for bit already found two places where Go
+  differs: it may fuse a multiply and an add, and its conversion of an out-of-range
+  `Double` to a whole number depends on the processor. Not taken: a handful of cases by
+  eye; cents within one.
+- **The comparison lives in cusoon2, pinned to a commit of it** (15 Nov 2026). The Kotlin
+  half must, since it calls cusoon2's code, and the port is cusoon2's code in another
+  language; `poc-rs` is the precedent. Not taken: a third repo, which spreads one
+  experiment over three; the stage-1 directory, which is not a repository.
 - **The prelude's signatures are Kogo declarations, read by the checker like any other
   source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five

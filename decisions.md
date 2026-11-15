@@ -498,6 +498,11 @@ Each entry: what was decided, why, and what would reopen it.
   DEV-861). On a `Review:` or `Ruling:` that leaves nothing to change and that it agrees
   with, the lead runs the tests and merges at the reviewed sha, without a `Fixed:`. Not
   taken: a Fix session that changes nothing, which adds a step and no reader.
+- **The lead hands over through the issues** (16 Nov 2026, Greg and the lead). Each agreed
+  next step is on its issue before a lead session ends, as a launch comment, a `Ruling:` or
+  a `Lead:` comment, so a new lead needs only the board. Not taken: a handover note or
+  document, which is a second copy of the board. Reopen if an agreed step has no issue to
+  go on.
 - **The emitted Go names its source inline, by a relative path** (15 Nov 2026). Each line of
   Go begins with its own position, `/*line ../../src/a.kg:26*/`, padded so that a file's
   code starts at one column, then indented a tab for each block or closure it is in. Nobody
@@ -1385,11 +1390,6 @@ Each entry: what was decided, why, and what would reopen it.
 - **The lead does not commit.** Its decisions reach the repository through the issue or the
   PR they belong to, so every change has had a Code review; the merge it makes is of such a
   PR. Reopen if that makes small corrections slow.
-- **The lead hands over through the issues** (16 Nov 2026, Greg and the lead). Each agreed
-  next step is on its issue before a lead session ends, as a launch comment, a `Ruling:` or
-  a `Lead:` comment, so a new lead needs only the board. Not taken: a handover note or
-  document, which is a second copy of the board. Reopen if an agreed step has no issue to
-  go on.
 
 ## Taken writing line directives inline (DEV-857), not yet discussed
 

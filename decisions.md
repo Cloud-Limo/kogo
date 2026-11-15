@@ -252,7 +252,7 @@ Each entry: what was decided, why, and what would reopen it.
   `Long`**, as section 3 says, and that includes an argument that settles a type parameter
   and one side of `?:` or `if` with nothing wanted: `listOf(n, 0)`, `firstOr(longs, 0)` and
   `val x = cents ?: 0` are refused with "write 0L". Kotlin takes all three. Not taken:
-  letting a literal follow a `Long` beside it, about 5 lines, which is a second rule for
+  letting a literal follow a `Long` beside it, about 15 lines, which is a second rule for
   what a literal is. Reopen if ports trip on it often.
 - **`==` needs one side to fit the other, `?` aside** (spec 3). This is the rule that makes
   `Int == Long` an error and lets `x == null` through.

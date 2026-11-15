@@ -218,6 +218,8 @@ func TestTypes(t *testing.T) {
 		"data class P(val a: Int, val b: String = \"\")\nfun f(p: P): P = p.copy(b = p.toString())\nfun g(p: P): Int {\n    val (a, b) = p\n    return a + b.length\n}\nfun h(): Boolean = P(1) == P(b = \"x\", a = 2)",
 		"enum class E { a, b }\nfun f(e: E): String = e.name + E.a.name\nfun g(): List<E> = E.entries",
 		"interface I<K> {\n    val label: String\n    fun card(key: K): Int\n}\ndata class D(override val label: String, val n: Int) : I<Int> {\n    override fun card(key: Int): Int = key + n + label.length\n}\ninterface J {\n    fun size(): Int\n}\ndata object O : J {\n    override fun size(): Int = 0\n}\nfun f(i: I<Int>, d: D, j: J): Int = i.card(1) + d.card(2) + i.label.length + j.size() + O.size()",
+		// An out type parameter is given back: in a val, a result, a list, a lambda's parameter.
+		"sealed interface B<out T> {\n    val all: List<T>\n    fun each(f: (T) -> Unit): B<T>\n}",
 		"sealed interface S<out T>\ndata class A<T>(val v: T) : S<T>\ndata object B : S<Nothing>\nfun f(c: Boolean): S<Int> = if (c) A(1) else B\nfun g(c: Boolean): Int {\n    val s = if (c) A(1) else B\n    return when (s) {\n        is A -> s.v\n        B -> 0\n    }\n}",
 		"fun f(g: (Int, String) -> Long, h: (() -> Unit)?): Long = g(1, \"\")",
 		// A value fits a wider type: T? for T, and through an out parameter.
@@ -248,6 +250,10 @@ func TestTypes(t *testing.T) {
 		{"enum class E { a }\nfun f(): E = ‸E", "not-a-value", "E is a type, not a value"},
 		{"enum class E { a }\nfun f(): E = ‸E()", "not-callable", "only a data class is made by calling its name"},
 		{"interface I { val label: String }\n‸data class D(val n: Int) : I", "override", "D implements I: give its constructor override val label: String"},
+		{"interface I { val label: String }\n‸data object O : I", "override", "a data object has no constructor to give val label: make O a data class, or label a fun in I"},
+		{"sealed interface B<out T> {\n    fun put(‸value: T): B<T>\n}", "variance", "T is out in B, so a B gives a T back and takes none (spec.md 3.2): remove out, or make put an extension of B<T>"},
+		{"sealed interface B<out T> {\n    ‸fun each(): (T) -> Unit\n}", "variance", "make each an extension of B<T>"},
+		{"sealed interface B<out T> {\n    ‸val keys: Map<T, Int>\n}", "variance", "T is out in B"},
 		{"interface I { fun card(key: Int): Int }\n‸data class D(val n: Int) : I", "override", "D implements I: give it override fun card(key: Int): Int"},
 		{"interface I<K> { fun card(key: K): Int }\ndata class D(val n: Int) : I<Int> {\n    override ‸fun card(key: String): Int = 1\n}", "override", "this does not match I<Int>: write override fun card(key: Int): Int"},
 		{"interface I\ndata class D(val n: Int) : I {\n    override ‸fun card(): Int = 1\n}", "override", "no interface of D declares fun card(): Int"},
@@ -346,6 +352,11 @@ func TestCalls(t *testing.T) {
 		// Both errors of 5.2.
 		{"fun g(a: Int): Int = a\nfun g(a: String): Int = 0\nfun f(): Int = ‸g(1L)", "no-overload", "no g fits this call with (Long): the candidates are fun g(a: Int): Int; fun g(a: String): Int"},
 		{"fun g(a: Int): Int = a\nfun g(a: Int?): Int = 0\nfun f(): Int = ‸g(1)", "ambiguous-call", "2 declarations of g fit this call and nothing ranks them: rename one of fun g(a: Int): Int; fun g(a: Int?): Int"},
+		// Two declarations no call could choose between are refused where declared.
+		{"fun g(a: Int): Int = a\n‸fun g(b: Int): Long = 0", "duplicate", "fun g(a: Int): Int is already declared in package t with this receiver and these parameter types: rename one"},
+		{"fun <T> h(xs: List<T>): Int = 1\n‸fun <U> h(ys: List<U>): Int = 2", "duplicate", "fun <T> h(xs: List<T>): Int is already declared"},
+		{"val Int.half: Int\n    get() = this / 2\n---\npackage t\n‸val Int.half: Long\n    get() = 0", "duplicate", "val Int.half: Int is already declared"},
+		{"package kogo.x\nexternal fun Int.twice(): Int\n---\npackage kogo.y\nexternal ‸fun Int.twice(): Long", "duplicate", "fun Int.twice(): Int is already declared in package kogo.x"},
 		{"fun f(xs: List<String>): Int = xs.‸sumOf { \"\" }", "no-overload", "no sumOf fits this call with (a lambda giving String)"},
 		{"fun g(a: Int): Int = a\nfun f(): Int = ‸g(1, 2)", "arguments", "g takes 1 arguments, and 2 are written: it is fun g(a: Int): Int"},
 		{"fun g(a: Int): Int = a\nfun f(): Int = ‸g(b = 1)", "arguments", "g has no parameter named b"},

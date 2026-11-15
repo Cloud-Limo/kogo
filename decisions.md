@@ -439,9 +439,6 @@ Each entry: what was decided, why, and what would reopen it.
   which any file could claim with its package line. An `external` in a program's file is
   refused where it is declared; with it go the nullable receiver, `out` and `vararg` that
   only a binding may write. Reopen if a program needs Go bindings of its own.
-- **Not refused yet**: a `val` in an interface that a data object implements (it has no
-  constructor to override it in), an `out` type parameter used as a parameter's type, and
-  two functions with one signature, which are an error only when called.
 
 ## Taken checking expected failures (DEV-826), not yet discussed
 
@@ -566,6 +563,20 @@ Each entry: what was decided, why, and what would reopen it.
 - **The examples changed to pass**: 12, 13 and 16 import `kogo.time.Instant` (spec 2), and
   19 is `package example.markers`, since 12 also declares `Business`. The prelude gained
   `Uuid`, `newId`, `List.size` and `check`, which they use.
+
+## Taken refusing three programs (DEV-834), not yet discussed
+
+- **`out` is checked by Kotlin's whole rule**, not only a parameter's type (spec 3.2): a
+  result or a `val` of type `(T) -> Unit` or `Map<T, Int>` lets the same `null` in, and
+  the walk over positions costs the same. The fix the error gives is an extension fun.
+- **Two declarations of one name clash on their kind, receiver and parameter types**,
+  type parameters compared by position (spec 5.2). Parameter names do not separate them,
+  though a call could choose by name: Kotlin refuses the pair, and the emitter would have
+  to tell them apart in Go. Two `private` ones in different files do not clash, as a test
+  of section 2 already had; a fun and an extension `val` of one name do not either. Reopen
+  if the emitter cannot give private overloads in two files their own Go names.
+- **A data object that cannot implement a `val` keeps the code `override`**, at the
+  declaration as the other `override` errors are; only the fix changes.
 
 ## Spec gaps found by the leakage ports, unresolved
 

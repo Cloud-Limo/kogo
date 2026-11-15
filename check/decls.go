@@ -4,6 +4,7 @@ import (
 	"cmp"
 	_ "embed"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -52,6 +53,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 	for i := 0; i < len(c.sigs); i++ {
 		c.sigs[i]()
 	}
+	c.overloads()
 	for i := 0; i < len(c.bodies); i++ {
 		c.bodies[i]()
 	}
@@ -341,6 +343,45 @@ func external(d syntax.Decl) bool {
 	return false
 }
 
+// overloads reports a fun or an extension val with the receiver and
+// parameter types of one declared before it beside it (spec.md 5.2):
+// no call could choose between them. Private ones in two files are
+// not beside each other.
+func (c *checker) overloads() {
+	groups := slices.Collect(maps.Values(c.members))
+	for _, p := range c.pkgs {
+		groups = slices.AppendSeq(groups, maps.Values(p.funcs))
+	}
+	for _, fs := range groups {
+		for i, f := range fs {
+			j := slices.IndexFunc(fs[:i], func(g *Func) bool {
+				return (f.file == g.file || f.visibility != "private" && g.visibility != "private") && shape(f) == shape(g)
+			})
+			if j >= 0 {
+				c.file = f.file
+				c.errorf(f.Decl, "duplicate", "%s is already declared in package %s with this receiver and these parameter types: rename one", describe(fs[j], nil), fs[j].Pkg)
+			}
+		}
+	}
+}
+
+// shape gives what tells two functions of one name apart: their kind,
+// receiver and parameter types, their type parameters by position.
+func shape(f *Func) string {
+	b := binding{}
+	for i, p := range f.TypeParams {
+		b[p] = &TypeParam{Name: fmt.Sprint("#", i)}
+	}
+	s := fmt.Sprint(f.Kind, " ")
+	if f.Receiver != nil {
+		s += subst(f.Receiver, b).String()
+	}
+	for _, p := range f.Params {
+		s += ", " + subst(p.Type, b).String()
+	}
+	return s
+}
+
 func (c *checker) addFunc(f *Func, receiver bool) {
 	c.info.Funcs[f.Decl] = f
 	if f.External && receiver {
@@ -476,6 +517,11 @@ func (c *checker) class(td *TypeDecl) {
 			td.Entries = append(td.Entries, &Var{Kind: Entry, Name: e.Name, Type: self(td), Owner: td, Decl: e})
 		}
 	}
+	variance := func(at syntax.Node, t Type, out bool, name string) {
+		if p := misplaced(t, out); p != nil {
+			c.errorf(at, "variance", "%s is out in %s, so a %s gives a %s back and takes none (spec.md 3.2): remove out, or make %s an extension of %s", p, td.Name, td.Name, p, name, self(td))
+		}
+	}
 	for _, m := range d.Body {
 		switch m := m.(type) {
 		case *syntax.ValDecl:
@@ -484,6 +530,7 @@ func (c *checker) class(td *TypeDecl) {
 				continue
 			}
 			v := &Var{Kind: Property, Name: m.Name, Type: c.declared(m), Owner: td, Decl: m}
+			variance(m, v.Type, true, m.Name)
 			td.Props = append(td.Props, v)
 			c.info.Vars[m] = []*Var{v}
 		case *syntax.FunDecl:
@@ -494,6 +541,10 @@ func (c *checker) class(td *TypeDecl) {
 			}
 			c.info.Funcs[m] = f
 			c.signature(f, m, td)
+			for i, p := range f.Params {
+				variance(m.Params[i], p.Type, false, m.Name)
+			}
+			variance(m, f.Result, true, m.Name)
 			td.Methods = append(td.Methods, f)
 			c.later(&c.bodies, func() { c.body(f, m) })
 		}
@@ -522,7 +573,11 @@ func (c *checker) conform(td *TypeDecl) {
 				return v.Name == p.Name && v.Decl.(*syntax.Param).Override && fits(v.Type, want)
 			})
 			if i < 0 {
-				c.errorf(td.Decl, "override", "%s implements %s: give its constructor override val %s: %s", td.Name, s, p.Name, want)
+				fix := fmt.Sprintf("give its constructor override val %s: %s", p.Name, want)
+				if td.Kind == "data object" {
+					fix = fmt.Sprintf("a data object has no constructor to give val %s: make %s a data class, or %s a fun in %s", p.Name, td.Name, p.Name, s.Decl.Name)
+				}
+				c.errorf(td.Decl, "override", "%s implements %s: %s", td.Name, s, fix)
 				continue
 			}
 			used[td.Props[i]] = true
@@ -550,6 +605,38 @@ func (c *checker) conform(td *TypeDecl) {
 			c.errorf(f.Decl, "override", "no interface of %s declares %s: a data class holds only its interfaces' funs", td.Name, describe(f, nil))
 		}
 	}
+}
+
+// misplaced gives an out type parameter that t has where a value is
+// taken rather than given back, or nil. out says which t is in: true
+// for a result or a val, false for a parameter.
+func misplaced(t Type, out bool) *TypeParam {
+	switch t := t.(type) {
+	case *TypeParam:
+		if t.Out && !out {
+			return t
+		}
+	case *Nullable:
+		return misplaced(t.Elem, out)
+	case *Named:
+		for i, a := range t.Args {
+			p := misplaced(a, out)
+			if p == nil && !t.Decl.Params[i].Out {
+				p = misplaced(a, !out)
+			}
+			if p != nil {
+				return p
+			}
+		}
+	case *FuncType:
+		for _, p := range t.Params {
+			if tp := misplaced(p, !out); tp != nil {
+				return tp
+			}
+		}
+		return misplaced(t.Result, out)
+	}
+	return nil
 }
 
 // describe prints a function as it is declared, without its receiver

@@ -113,6 +113,14 @@ type parameter of a sealed interface
 is the only variance annotation in the language, a binding's external
 class aside (section 13).
 
+An `out` type parameter is only given back, as in Kotlin: it may be the
+type of a `val` or of what a `fun` returns, never of a `fun`'s parameter,
+where a `Box<Int>` used as a `Box<Int?>` could be given `null`. Inside a
+type, positions turn as in Kotlin: `fun each(f: (T) -> Unit)` gives a
+`T` back, and `Map<T, Int>`, whose key is not `out`, both takes and gives
+one, so it is refused anywhere. Write a fun that takes one as an
+extension: `fun <T> Box<T>.put(value: T): Box<T>`.
+
 ### 3.3 Enums
 
 ```kotlin
@@ -132,7 +140,9 @@ interface Regime<K> {
 ```
 
 An interface declares abstract `val`s and `fun`s. No default bodies. Only
-data classes and `data object`s implement interfaces. There are no other
+data classes and `data object`s implement interfaces. A `data object` has no
+constructor to implement a `val` in, so it implements only interfaces
+that declare `fun`s alone. There are no other
 classes, no inheritance, no `object`, no `companion object`, no anonymous
 `object :` expressions. Use a lambda where Kotlin would use an anonymous
 object.
@@ -256,6 +266,13 @@ lists the candidates; several left is an error that names them and says
 to rename one. Nothing is ranked as more specific, so `f(x: Int)`
 beside `f(x: Int?)` cannot be called with an `Int`, though Kotlin picks
 the first.
+
+Two `fun`s, or two extension `val`s, of one name in one package whose
+receiver and parameter types are the same are an error at the second,
+since no call could choose between them. Parameter names, results and
+the names of type parameters do not tell them apart; two `private` ones
+in different files do not meet. Bindings with a receiver are one group
+across packages, as they are in scope everywhere.
 
 One exception: when the candidates left differ only in what one lambda
 parameter returns, as the prelude's `sumOf` does for `Int`, `Long` and

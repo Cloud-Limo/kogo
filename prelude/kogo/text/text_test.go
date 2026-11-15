@@ -23,7 +23,9 @@ func TestPlain(t *testing.T) {
 		{1e22, "1" + strings.Repeat("0", 22)},
 		{-2.75, "-2.75"},
 		{math.Copysign(0, -1), "0"},
+		// Java writes these two as 49 and 99, ending one place later.
 		{math.SmallestNonzeroFloat64, "0." + strings.Repeat("0", 323) + "5"},
+		{2 * math.SmallestNonzeroFloat64, "0." + strings.Repeat("0", 322) + "1"},
 	} {
 		if got := Plain(c.value); got != c.want {
 			t.Errorf("Plain(%v) = %s, want %s", c.value, got, c.want)

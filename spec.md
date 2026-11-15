@@ -743,8 +743,11 @@ zone: every conversion names its zone.
 **Text** (`kogo.text`). `plain(value: Double): String` writes a number
 as its shortest digits, with no exponent and no trailing `.0`: `5.0` is
 `5`, `12.5` is `12.5`, `1.0E7` is `10000000`. Negative zero is `0`. `NaN`
-and an infinity have no digits and are a bug: `plain` panics. The
-smallest `Double` ends in `5`, where Java's `BigDecimal` writes `49`.
+and an infinity have no digits and are a bug: `plain` panics. Every
+other `Double` reads as Java's `BigDecimal` writes it but eight below
+`1.0E-322`, 1, 2, 10, 12, 14, 16, 18 and 20 times the smallest: where
+the shortest digits are one, Java writes the closest two, so the
+smallest `Double` ends in `5` here and `49` in Java.
 
 **Ids.** `Uuid`, `Uuid.parse(text): Uuid?`, `newId(): Uuid` (time-ordered
 random).
@@ -816,12 +819,12 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `suspend`, coroutines, `Flow`, threads | plain blocking code |
 | `Sequence`, `generateSequence`, `MutableList`, arrays | a `while` loop with a local `var`, or the list functions |
 | `java.time.*`, `java.util.UUID`, `BigDecimal` | `kogo.time.*`, `Uuid`, `Decimal` |
+| `BigDecimal.valueOf(x).stripTrailingZeros().toPlainString()` | `plain(x)`, from `kogo.text`, not `Decimal` |
 | `OffsetDateTime`, `LocalDateTime` | `Instant`, or `ZonedDateTime` with a named zone |
 | jOOQ (`ctx.select...`, records, `.store()`, `into(X::class.java)`) | `sql"""` and a data class |
 | `X::class`, reflection | nothing; the only `::class` is inside `@file:OptIn(...)` |
 | annotations other than markers | nothing |
 | `String.format`, `Locale` | string templates, `padStart` |
-| `BigDecimal.valueOf(x).stripTrailingZeros().toPlainString()` | `plain(x)`, from `kogo.text` |
 | `by lazy`, delegation | compute it once and pass it |
 | `vararg`, `*spread` | a `List` |
 | `inline`, `reified`, `operator`, `infix` | a plain function |

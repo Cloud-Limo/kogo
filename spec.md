@@ -11,9 +11,9 @@ Source files end in `.kg`.
 ## 1. The one rule
 
 Where a construct is valid in both Kotlin and Kogo it means the same thing.
-Kogo adds exactly two things that Kotlin lacks, and both look unlike Kotlin:
-the `sql"""..."""` literal (section 10) and the `external` binding
-declarations (section 13).
+Kogo adds exactly three things that Kotlin lacks, and each looks unlike
+Kotlin: the `sql"""..."""` literal (section 10), the `external` binding
+declarations (section 13) and the `api` list (section 15).
 
 ## 2. Files, packages, visibility
 
@@ -29,13 +29,14 @@ import kogo.time.Instant
   wherever they lie. An import names one declaration of another package;
   a name of the file's own package needs none.
 - A file holds any number of top-level declarations: functions, `val`
-  constants, types, typealiases, marker annotations.
+  constants, types, typealiases, marker annotations, `api` lists
+  (section 15).
 - `private` means this file. `internal` means this package. No modifier
   means public. There is no `protected`.
 - Comments: `//`, `/* */` and `/** */`. KDoc is kept as a comment.
 - The declarations of package `kogo` (section 12, and the functions of
-  sections 8 and 9) are in scope in every file. `kogo.time` and
-  `kogo.text` are imported by name.
+  sections 8 and 9) are in scope in every file. The prelude's other
+  packages, as `kogo.time`, are imported by name.
 
 ## 3. Types
 
@@ -394,7 +395,7 @@ error("unreachable")
 do integer division by zero, an index out of range and `single()` on a
 list that does not hold exactly one element. Code cannot catch a panic.
 The server catches it at the request boundary, rolls the transaction back,
-logs it and answers 500.
+logs it and answers 500 (section 15).
 
 There is no `try`, `catch`, `finally`, `throw`, `runCatching` or
 `Either.catch`, and no exception types.
@@ -796,6 +797,12 @@ smallest `Double` ends in `5` here and `49` in Java.
 **Ids.** `Uuid`, `Uuid.parse(text): Uuid?`, `newId(): Uuid` (time-ordered
 random).
 
+**Requests** (`kogo.rpc`). A `Request` is what the server read of one
+HTTP request, passed to an operation (section 15):
+`request.header(name): String?`, `request.cookie(name): String?` and
+`request.clientAddress: String`. A header's name is matched whatever
+its case. Kogo code does not build or change one.
+
 ## 13. Bindings
 
 A binding declares what Go code provides. It compiles to nothing. The
@@ -874,3 +881,166 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `inline`, `reified`, `operator`, `infix` | a plain function |
 | `println`, `readln` | a `Console` parameter, from `kogo.io` |
 | value classes | `typealias`, in v0 |
+
+## 15. Operations
+
+An operation is a function that a browser calls: JSON in, JSON out. A
+program names its operations in an `api` list, and from the list the
+compiler writes the server's table and the browser's TypeScript types.
+
+```kotlin
+api ops { me, updateJob, completeLogin }
+
+fun updateJob(tx: Tx, env: OpsEnv, request: Request, input: UpdateJobInput): Either<String, DriverJob> = either {
+    val driver = requireDriver(tx, request).bind()
+    val job = requireJob(tx, driver, input.number).bind()
+    ensure(job.state != JobState.Complete) { "This job can no longer be changed." }
+    tx.execute(sql"update job set driver_notes = ${input.notes} where id = ${job.id}")
+    DriverJob(job.number, job.state, input.notes)
+}
+```
+
+### 15.1 The list
+
+- `api name { f, g, h }` is a top-level declaration, the third thing
+  Kogo adds to Kotlin. It names top-level funs that are in scope where
+  it is written, its own package's or imported ones. The list may end
+  with a comma.
+- A fun's name is its operation's name on the wire, so a list holds no
+  name twice. A fun may stand in more than one list.
+- An operation is an ordinary fun: any code may call it, and nothing
+  but the list marks it.
+
+### 15.2 An operation's shape
+
+An operation takes four parameters, in this order, and returns
+`Either<String, A>`:
+
+| Parameter | What it is |
+| --- | --- |
+| a `Tx` or a `Db` | the database; which of the two decides who runs the transaction (15.3) |
+| the environment | one type of the application's, the same for every fun of a list: a data class of what lives as long as the server, the clock and the handles of outbound calls (sections 7 and 13) |
+| a `Request` | `kogo.rpc.Request` (section 12): the caller's cookies, headers and address |
+| the input | a wire type (15.4), or `Unit` for none |
+
+- The parameters' names are the author's. An operation has no type
+  parameters and no default values.
+- `A` is a wire type, or `Unit` for an operation with nothing to say.
+- A `Left` is a refusal: words for the person using the page. An
+  operation turns any other failure into words, with `mapLeft`, before
+  it returns.
+- Nothing runs before an operation. It finds out who is asking in its
+  own first lines, from the `Request` it was given.
+
+### 15.3 The transaction
+
+- An operation that takes a `Tx` runs in one transaction, which the
+  server opens at SERIALIZABLE. An answer commits it. A refusal rolls
+  it back, so a refused request has changed nothing. A panic rolls it
+  back (section 8). On a serialization failure or a deadlock the server
+  rolls back and calls the operation again from the start, so it must
+  have no effect outside the transaction, as the block of
+  `db.tx(serializable = true)` must not (10.7).
+- An operation that takes a `Db` runs in no transaction and opens its
+  own with `db.tx` (10.7). Write one where something must stay after a
+  refusal, as the count of a failed login does, or must happen once, as
+  redeeming a code with another service must.
+
+```kotlin
+fun completeLogin(db: Db, env: OpsEnv, request: Request, input: CompleteLoginInput): Either<String, DriverAccount> = either {
+    val attempts = db.tx { tx -> countAttempt(tx, request.clientAddress) }.bind()
+    ensure(attempts <= 5) { "Too many attempts. Try again later." }
+    val user = redeemCode(env.idp, input.oneTimeCode).bind()
+    db.tx(serializable = true) { tx ->
+        val driver = claimDriver(tx, user) ?: raise("There is no driver account for that address.")
+        DriverAccount(driver.name)
+    }.bind()
+}
+```
+
+### 15.4 The wire
+
+Inputs and answers are JSON.
+
+| Kogo | JSON | TypeScript |
+| --- | --- | --- |
+| `Boolean` | `true` or `false` | `boolean` |
+| `Int`, `Long`, `Double` | a number | `number` |
+| `String` | a string | `string` |
+| `Uuid` | a string, as `toString()` writes it | `string` |
+| an enum | its constant's name | `"Offered" \| "Confirmed"` |
+| a data class | an object with a key for each property, under its name | an object type |
+| a sealed interface | its variant's object, with a key `type` that holds the variant's name | a union of object types |
+| `List<T>` | an array | `T[]` |
+| `T?` | `null`, or `T` | `T \| null` |
+| `Unit` | `{}` | `Record<string, never>` |
+
+- Any other type in an input or an answer is a compile error: a `Map`,
+  a `Set`, a `Pair`, a `Decimal`, a type of `kogo.time`, a function, an
+  external class. Send text that the server has formatted.
+- A sealed interface on the wire has no type parameters, and no variant
+  of it has a property named `type`. A nested variant goes by its own
+  name, `ForBusiness` for `AcceptInvite.ForBusiness`, and a
+  `data object` is `{"type": "Name"}`.
+- Two wire types of one name in one list are a compile error, and so
+  is one named `Outcome`, the answer's own type in TypeScript.
+- Nothing is optional: a property that may be `null` is still a key.
+- Reading is strict. A key that is missing, a key the type does not
+  have, a value of another type, a number that is not whole or does
+  not fit where an `Int` or a `Long` is wanted, a string that is not a
+  `Uuid` or not one of an enum's names: each is a 400, and the
+  operation does not run. Where the input is `Unit` the body is not
+  read.
+- A `Long` crosses only from -9007199254740991 to 9007199254740991,
+  the whole numbers JavaScript holds exactly. Reading one outside them
+  is a 400; an answer that holds one is a bug, and panics. Send a
+  larger number as a `String`.
+- A `Double` that is `NaN` or an infinity has no JSON: an answer that
+  holds one panics.
+
+The answer is one of two objects:
+
+```json
+{"type": "ok", "value": {"number": 41, "state": "Confirmed", "notes": null}}
+{"type": "refused", "message": "This job can no longer be changed."}
+```
+
+### 15.5 The boundary
+
+Each operation is served by `POST` at its name, under a path the
+application chooses.
+
+| What happened | Status | Body |
+| --- | --- | --- |
+| the operation answered | 200 | the `ok` object |
+| the operation refused | 200 | the `refused` object |
+| the input does not read (15.4) | 400 | the operation and the key, never the value |
+| no operation of that name | 404 | |
+| a method other than `POST` | 405 | |
+| a panic (section 8) | 500 | the request's id |
+| the reruns of a `Tx` operation did not end in time | 503 | the request's id |
+
+### 15.6 TypeScript
+
+`kogo ts <dir> <out>` writes `<out>/<name>.ts` for each list: every
+wire type its operations reach, the answer's type, and an interface
+that names each operation's input and value.
+
+```ts
+export type Outcome<T> = {type: "ok"; value: T} | {type: "refused"; message: string}
+
+export type JobState = "Offered" | "Confirmed" | "Complete"
+export type DriverJob = {
+  number: number
+  state: JobState
+  notes: string | null
+}
+
+export interface Ops {
+  me: {input: Record<string, never>; value: DriverAccount | null}
+  updateJob: {input: UpdateJobInput; value: DriverJob}
+}
+```
+
+The code that calls `fetch` is the application's own, typed by this
+file.

@@ -57,7 +57,7 @@ Only the type-check stage reads bindings and talks to Postgres. Sealed
 types become an interface and `when` a switch; `T?` becomes a pointer; a
 failure is a panic that its own raise scope recovers; `context.Context`
 rides in the `Tx` and `Db` handles and never appears in source. "The
-emitter" below has the rest.
+emitter" below has the rest, and "The server" what serves operations.
 
 ## The SQL pass
 
@@ -210,6 +210,64 @@ the connection's driver has been told of the type. `db.tx` begins,
 commits and rolls back around its block, and `tx.atomically` is a
 savepoint; whatever Postgres refuses is a panic, which rolls back on
 its way out as a failure does.
+
+## The server
+
+Serving operations (`spec.md` section 15) adds no stage to the
+pipeline: the checker reads each `api` list, the emitter writes a table
+for it, a Go library serves the table, and the application's own Go
+starts it.
+
+**The checker** holds the list's rules: each fun's four parameters and
+its `Either<String, A>`, one environment type for a list, and every
+input and answer a wire type. It hands the emitter each list with its
+operations, and whether each takes a `Tx` or a `Db`.
+
+**The table.** For each list the emitter writes one Go value in the
+list's package: each operation's name on the wire, its kind, and its
+fun. Nothing outside calls an operation by its Go name, so the naming
+rule's neighbours never reach the wire.
+
+**The library** is hand-written Go in this repo, the Go of package
+`kogo.rpc`, beside its `Request`. Given a table, a `Db` and the
+environment it is an `http.Handler` that does what section 15 says: it
+finds the operation, reads the input strictly, runs a `Tx` operation in
+a SERIALIZABLE transaction with reruns, commits or rolls back, writes
+the answer, and turns a panic into a 500. JSON is read and written by
+one walk over the emitted types, as `==` is, by the names the structs
+already carry: no code is emitted for each type. Reruns are those of
+`db.tx(serializable = true)`, here with a limit, since a person is
+waiting: 90 seconds unless `main` says otherwise, and past it the
+answer is 503, so that a 500 always means a bug.
+
+**The application's `main`** is Go that it writes once, about fifteen
+lines: read the configuration, open the pool, build the environment's
+handles, mount the handler at a path, listen. Configuration, ports,
+paths and other routes, a webhook say, stay out of the language. There
+is no `fun main` and no `kogo serve`. A Go test calls a table without
+HTTP.
+
+**Logging.** One id for each HTTP request, given before any rerun and
+written on every line about it: an id for each attempt makes a rerun
+look like a second request. For every request: the operation, the
+outcome (ok, refused, or the status), the time taken, and each rerun
+with its cause, since a serialization failure and a deadlock call for
+different investigations. For a panic: its message and a trace that
+names the Kogo file and line. Never an input, an answer or a refusal's
+words: they carry login codes and personal data. The lines go to a
+logger that `main` passes.
+
+**TypeScript.** `kogo ts` writes one file for each list from the
+checker's facts: the wire types, the answer's type and the table of
+operations. Nothing is found by reflection. The file is checked in, and
+an application's own checks run `kogo ts` and fail when `git diff`
+shows a change, so Kogo needs no flag for a stale file. The client
+that calls `fetch` is the application's: it depends on its cookies and
+its UI framework.
+
+**Not designed, on purpose:** how an operation sets a cookie (logins);
+Origin and CSRF checks, which will be options of the handler; workers;
+timeouts and retries of outbound calls.
 
 ## MVP steps
 

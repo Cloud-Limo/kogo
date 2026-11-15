@@ -76,6 +76,32 @@ parameters and columns through domains, citext, enums and arrays, and
 rejects a misspelt column, a mistyped comparison and an unknown enum
 label, each with a position.
 
+## The checker
+
+The checker reads the parser's trees, the prelude's declarations
+(`spec.md` section 13) and the SQL pass's signatures. It reports errors,
+or hands the emitter facts beside the syntax tree: tables keyed by tree
+node, as Go's own type checker gives.
+
+- The type of every expression, and what every name refers to.
+- For each call, the function chosen, its settled type arguments, and
+  whether it can fail and with what error type.
+- Where a name is narrowed, and to what.
+- For each `sql` literal, its signature and the column that fills each
+  property.
+
+Every function, lambda and call is marked as able to fail with an error
+type `E`, or not, whichever spelling the author used, so the emitter
+knows one notion of a fallible function. The checker asks for a
+literal's signature through one function: the SQL pass answers in real
+use and a test answers with signatures of its own, so the checker's
+tests need no database.
+
+There is no second, simplified tree, because its right shape depends on
+the Go to be emitted. The emitter therefore handles every surface form.
+A simplifying step can be added between the two later, reading the same
+facts.
+
 ## MVP steps
 
 1. The SQL pass, as a Go library and a command.

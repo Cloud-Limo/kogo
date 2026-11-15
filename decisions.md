@@ -36,6 +36,51 @@ Each entry: what was decided, why, and what would reopen it.
   the checker handle a `this` that may be null, and no example or stage-1 port writes one; a
   parameter does the job. The parser refuses it at the `?.` (`nullable-receiver`). Reopen
   when a port needs one to read naturally.
+- **The prelude's signatures are Kogo declarations, read by the checker like any other
+  source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
+  Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
+  lines. Not taken: tables inside the checker, which make every prelude function a compiler
+  change and put the prelude in the core (principle 8). Built into the checker all the same,
+  because the core sections define them: the operators (`+` on lists, `list[i]`, `in`,
+  ranges, `to`), the forms of section 9, the five SQL calls and `db.tx`, and what data
+  classes and enums provide. A binding may have a nullable receiver (`isNullOrBlank`,
+  `orEmpty`), which application code may not. Reopen if a prelude function's type cannot be
+  written in Kogo and is too useful to leave out.
+- **Type arguments are settled in one fixed order, with no solver** (15 Nov 2026; spec 5.1):
+  the receiver, the arguments that are not lambdas, the type the result must have, then
+  what each lambda returns. Kotlin weighs every clue at once, in thousands of lines and
+  with errors that are hard to act on; this is a few hundred, and each refusal names its
+  fix. Walked by hand over the 20 or so generic calls of the examples: all pass, and two
+  are already written as it demands. Accepted cost: some valid Kotlin is refused
+  (`val r = either { ... }` with no stated type). The prelude's `List`, `Set`, `Map`, `Pair`
+  and `Either` are `out`, as Kotlin's are. Reopen if a port needs written type arguments
+  often enough to read badly.
+- **An overload is chosen by fit, never by rank** (15 Nov 2026; spec 5.2). Kotlin ranks the
+  candidates that fit and picks the most specific; the ranking is the complicated part and
+  it interacts with inference. Here exactly one candidate may fit, and two that fit are an
+  error that says to rename one. The exception is the one Kotlin itself has for `sumOf`:
+  candidates that differ only in what a lambda returns are chosen by reading the lambda.
+  The same answer serves ordering: the prelude declares `sortedBy` once per key type, since
+  Kogo cannot say "any ordered type". Reopen if those lists become a burden; the other way
+  is an "ordered" bound that only bindings may use.
+- **Only a name narrows** (15 Nov 2026; spec 4): a local `val` or a parameter, by `!= null`,
+  `== null` and `is`, through `&&`, `||` and `!`, and for the rest of a block when the other
+  branch cannot finish. A name that narrows never changes, so nothing learned is ever
+  forgotten; Kotlin's version is large because it follows `var`s and which properties are
+  stable. Not taken: narrowing a path (`booking.price`), and narrowing after `require`,
+  `check` and `ensure`, both of which Kotlin does. No example or stage-1 port needs either.
+  Reopen if ports keep binding a path to a `val` only to test it.
+- **`Int` or `Long` mixed with `Double` is refused** (15 Nov 2026; spec 3). The two stage-1
+  ports wrote one sum both ways, `amount * percent` and `amount.toDouble() * percent`; the
+  second shows where cents become a floating-point number. `==` between `Int` and `Long` is
+  an error and a whole-number literal is a `Long` where one is expected, both as in Kotlin.
+- **The checker hands the emitter facts beside the syntax tree** (15 Nov 2026;
+  `doc/design.md`), as Go's type checker does, and marks what can fail in one way whichever
+  spelling was used. Not taken: a second, simplified tree for the emitter, about 1,000
+  lines whose right shape depends on Go output that is not designed. Accepted cost: the
+  emitter handles every surface form, perhaps 15 to 20 extra cases, tested only through the
+  Go they produce. Reopen when the emitter's cases tangle; a simplifying step can then be
+  added between the two without changing the checker.
 
 ## Taken in the v0 spec, not yet discussed
 
@@ -148,6 +193,25 @@ Each entry: what was decided, why, and what would reopen it.
   class's properties are `val`s, its body holds only `override fun`s, an interface's members
   have no body, an enum has no constructor or body, and a type parameter has no bound.
 
+## Taken writing the checker's rules (DEV-824), not yet discussed
+
+- **A type that Go implements is `external class Name<T>`, with no body.** Its members are
+  `external fun` and `external val` with the class as the receiver, the one form that can
+  also say `List<Long>.sum()` and `String?.isNullOrBlank()`; members in a body would be a
+  second way to write most of them. An `external object` of the same name gives
+  `Uuid.parse(text)`. `class` is refused everywhere else, so the word marks the type as not
+  Kogo's to construct.
+- **The prelude's declarations live in `prelude/`, and package `kogo` is in scope in every
+  file**, as `kotlin.*` is in Kotlin. The examples already call `listOf` with no import and
+  import `kogo.time` names one by one.
+- **A statement that is only a value is an error** (spec 6), where Kotlin warns. Section
+  6.1 reads `val y = a` and `- b` on two lines as two statements, as Kotlin does, and so
+  with `return` and `x`, and `f` and `{ x }`; this makes each of them an error instead of a
+  silent misreading.
+- **The branches of an `if` or a `when` used as a value need a common type** by the same
+  small rule as type arguments (spec 5.1), since there is no `Any` for them to widen to.
+- **Type arguments are written all or none**, as in Kotlin.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - A `select` of a function returning `void` (`pg_advisory_xact_lock`, cusoon2's `bind_tenant`)
@@ -156,8 +220,7 @@ Each entry: what was decided, why, and what would reopen it.
 
 - A join returning two whole rows needs every column aliased by hand.
 - No mapping for composite types (`charge`).
-- `Long * Double` and smart casts through `&&` and `||` are unspecified. (DEV-819 settled
-  unary minus and destructuring in lambda parameters.)
 - `db.tx` cannot finish and roll back (the fees dry run).
 - No typed way to turn a named constraint violation into an expected failure.
-- `Console`, `Decimal` and the text form of dates and instants have no stated members.
+- `Console`, `Decimal` and the text form of dates and instants have no stated members; the
+  prelude's declarations (spec 13) are where they will be stated.

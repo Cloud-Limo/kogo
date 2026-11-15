@@ -31,6 +31,9 @@ import kogo.time.Instant
 - `private` means this file. `internal` means this package (directory).
   No modifier means public. There is no `protected`.
 - Comments: `//`, `/* */` and `/** */`. KDoc is kept as a comment.
+- The declarations of package `kogo` (section 12, and the functions of
+  sections 8 and 9) are in scope in every file. `kogo.time` is imported
+  by name.
 
 ## 3. Types
 
@@ -54,7 +57,14 @@ Numeric literals: `1` is `Int`, `1L` is `Long`, `1.0` is `Double`,
 `10_000` allowed; there are no hex, binary or exponent forms. There are no implicit numeric conversions; write
 `.toLong()`, `.toInt()`, `.toDouble()`. `Int / Int` and `Long / Long`
 truncate toward zero. `Long * Int` and the other mixed `Int`/`Long`
-operators give `Long`, as in Kotlin.
+operators give `Long`, as in Kotlin, and `< <= > >=` compare an `Int`
+with a `Long`; `==` between them is an error, as in Kotlin. A
+whole-number literal is a `Long` where a `Long` is expected (a declared
+type, a parameter, a return): `val total: Cents = 0`. Everywhere else it
+is an `Int`, so `cents == 0L`. `Int` or `Long` mixed with `Double` is an
+error in arithmetic and in comparison, though Kotlin allows it: write
+`.toDouble()`, so that the place where a whole number becomes a
+floating-point one is visible.
 
 Equality `==` is structural for every type. There is no `===`.
 
@@ -86,7 +96,8 @@ sealed interface Outcome<out T> {
 
 The variants are data classes or `data object`s nested in the body or
 declared in the same file. `out` on a type parameter of a sealed interface
-is the only variance annotation in the language.
+is the only variance annotation in the language, a binding's external
+class aside (section 13).
 
 ### 3.3 Enums
 
@@ -121,8 +132,22 @@ object.
 There is one absent value, `null`, and it only inhabits `T?`.
 
 - `x?.f()`, `x ?: y`, `x ?: return y`, `x ?: raise(e)`.
-- Smart casts: after `if (x != null)`, after `x ?: return`, and inside
-  `x?.let { }`, a `val` of type `T?` is a `T`. A `var` is never smart cast.
+- A test narrows a name (a smart cast): where `x != null` is known to
+  hold, `x` of type `T?` is a `T`, and where `x is V` is, `x` of a sealed
+  interface type is its variant `V`. Only a name narrows: a local `val`
+  or a parameter, a lambda's included. A `var` never narrows, and nor
+  does a path such as `booking.price`, though Kotlin narrows some: bind
+  it to a `val` first.
+- The tests are `x != null`, `x == null` and `x is T`, joined by `&&`,
+  `||` and `!`, and the `is` and `null` branches of `when (x)`. In
+  `a && b`, `b` is read knowing `a` holds; in `a || b`, knowing it does
+  not.
+- A narrowing holds in the branch where the test's outcome is known, and
+  for the rest of the block when the other branch cannot finish: after
+  `if (x == null) return y`, and after the statement `x ?: return y`,
+  `x` is a `T`. Inside `x?.let { }` the lambda's parameter is a `T`.
+- `require`, `check` and `ensure` do not narrow, though Kotlin's do:
+  write `val y = requireNotNull(x) { "why" }`, or `ensureNotNull`.
 - `requireNotNull(x) { "message" }` and `checkNotNull(x) { "message" }`
   give a `T` or panic (section 8).
 - `!!` does not exist.
@@ -150,7 +175,8 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
 - Default arguments and named arguments as in Kotlin. No `vararg`.
 - Generic functions take plain type parameters: no bounds, no `where`, no
   `reified`, no `inline`.
-- Overloading by parameter types is allowed.
+- Functions, and extension `val`s, may share a name; section 5.2 says
+  how a call chooses among them.
 - No `operator`, `infix`, `tailrec` or `suspend`.
 - Lambdas: `{ a, b -> ... }` and `it`. A parameter may state its type,
   `{ e: StoreError -> ... }`, and a pair or a data class may be
@@ -159,6 +185,60 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
   `::name` to top-level functions are allowed.
 - Lambdas with receivers (`T.() -> R`) do not exist, with one exception:
   `Raise<E>` (section 9).
+
+### 5.1 Type arguments
+
+A call to a generic function may write its type arguments, all of them:
+`emptyList<Int>()`. Where it writes none, each type parameter is settled
+by the first of these that mentions it:
+
+1. the receiver: `xs` in `xs.map { ... }`;
+2. the arguments that are not lambdas; when several mention it, their
+   common type;
+3. the type the result must have: a declared type, a parameter's type,
+   the function's return type;
+4. what a lambda argument returns, lambdas taken left to right.
+
+Every argument and the result are then checked against what was
+settled. Nothing is settled twice and there is no search. A lambda's
+parameter types must be settled before its body is read; where they are
+not, state them: `{ e: StoreError -> ... }`. A type parameter that
+nothing settles is an error: write the type arguments.
+
+The common type of two types is that type when they are the same, `T?`
+for `T` and `null`, and the sealed interface for two of its variants;
+`Nothing` joins with anything. No other two types have one, since there
+is no `Any`. The branches of an `if` or a `when` used as a value, and
+the two sides of `?:`, need a common type in the same way, unless the
+type the result must have is known, when each is checked against that.
+
+A value fits where its own type or a wider one is wanted: `T` fits `T?`,
+a variant fits its sealed interface, a data class fits an interface it
+implements, `Nothing` fits anything, and for an `out` type parameter
+`Outcome<A>` fits `Outcome<B>` when `A` fits `B`.
+
+Kotlin infers more. These are errors in Kogo, each with its fix:
+
+| Kotlin accepts | In Kogo |
+| --- | --- |
+| `val r = either { ... }`, nothing stating its type | `either<String, Int> { ... }` |
+| `listOf(1, "a")`, a `List<Any>` | no such list; there is no `Any` |
+| a lambda parameter typed by a later argument | `{ e: StoreError -> ... }` |
+
+### 5.2 Overloads
+
+A call keeps the candidates of its name whose receiver and arguments
+that are not lambdas fit: their count, their names and their types. A
+lambda fits any parameter of a function type and takes no part in the
+choice. Exactly one candidate must be left. None left is an error that
+lists the candidates; several left is an error that names them and says
+to rename one. Nothing is ranked as more specific, so `f(x: Int)`
+beside `f(x: Int?)` cannot be called with an `Int`, though Kotlin picks
+the first.
+
+One exception: when the candidates left differ only in what one lambda
+parameter returns, as the prelude's `sumOf` does for `Int`, `Long` and
+`Double`, the lambda is read once and what it returns chooses.
 
 ## 6. Statements and expressions
 
@@ -182,6 +262,11 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
 - Scope functions: `let`, `also` and `takeIf` only. `apply`, `run`, `with`
   and `takeUnless` do not exist.
 - `to` builds a `Pair`: `a to b`.
+- A statement that is only a value is an error, where Kotlin warns: a
+  name, a literal, a member read, a lambda, or an operator's result that
+  nothing uses. A call, an assignment, `return` and the like, and
+  `x ?: return y` are statements. So `- b` on a line of its own, which
+  section 6.1 reads as a new statement, is refused.
 
 ### 6.1 Lines, operators and literals
 
@@ -458,7 +543,9 @@ error. Markers do nothing at run time. No other annotation exists.
 ## 12. Prelude
 
 The prelude is a library, not part of the core. Names match Kotlin's
-standard library and `java.time` where the meaning is the same.
+standard library and `java.time` where the meaning is the same. Its
+signatures are bindings (section 13) kept in `prelude/`: the lists below
+say what exists, and the declarations say what each takes and gives.
 
 **Collections** (immutable; "changing" one returns a new one).
 `listOf`, `emptyList`, `setOf`, `mapOf`, `size`, `isEmpty`, `isNotEmpty`,
@@ -500,19 +587,38 @@ random).
 
 ## 13. Bindings
 
-A binding declares the types of a Go package. It compiles to nothing.
+A binding declares what Go code provides. It compiles to nothing. The
+prelude is written as bindings, so its signatures are Kogo source: the
+checker reads them like any other file, and so can an author.
 
 ```kotlin
 @go("httpx")
 external object http {
     fun get(url: String): Either<HttpError, Response>
 }
+
+external class List<out T>
+external val <T> List<T>.size: Int
+external fun <T, R> List<T>.map(transform: (T) -> R): List<R>
+external fun <T> List<T>.firstOrNull(): T?
+external fun <T> List<T>?.orEmpty(): List<T>
+external fun List<Long>.sum(): Long
 ```
 
-Bindings are written once per Go package by whoever maintains the prelude.
-Application code never contains `external` and never names a Go symbol.
-(`@go` is the binding's own syntax, not an annotation in the sense of
-section 11.)
+- `external object` holds functions called on its name: `http.get(url)`.
+- `external class Name<T>` names a type that Go implements. It has no
+  body, and Kogo code cannot construct or implement it. An external
+  object may share its name, which gives `Uuid.parse(text)`.
+- `external fun` and `external val` declare a function and a property
+  with no body. Every member of an external class is declared this way,
+  with the class as the receiver.
+- Two things are allowed in a binding and nowhere else: a nullable
+  receiver, and `out` on an external class's type parameter.
+- `@go("package")` names the Go package of the declaration it precedes.
+
+Bindings are written by whoever maintains the prelude. Application code
+never contains `external` and never names a Go symbol. (`@go` is the
+binding's own syntax, not an annotation in the sense of section 11.)
 
 ## 14. Not in Kogo
 

@@ -141,7 +141,9 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
 ```
 
 - Top-level functions, extension functions and extension `val`s with a
-  getter. Local functions are allowed inside a function body.
+  getter. Local functions are allowed inside a function body. An
+  extension's receiver is not nullable: `fun String?.f()` does not exist;
+  take the value as a parameter.
 - Every top-level function states its parameter types and its return type.
   The return type may be omitted only for `Unit`. Inference works inside a
   function body only.

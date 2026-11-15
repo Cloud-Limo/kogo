@@ -316,6 +316,9 @@ func (p *parser) decl(abstract bool) Decl {
 // receiverAndName reads Name, or Receiver.name for an extension.
 func (p *parser) receiverAndName() (Type, string) {
 	t := p.typ()
+	if p.at("?.") {
+		p.fail(p.tok.pos, "nullable-receiver", "an extension's receiver is not nullable: take the value as a parameter")
+	}
 	if p.got(".") {
 		_, name := p.ident()
 		return t, name

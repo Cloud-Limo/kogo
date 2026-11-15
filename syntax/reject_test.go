@@ -104,6 +104,8 @@ func TestFaults(t *testing.T) {
 		{"import a.b‸.*", "syntax", "no wildcard"},
 		{"‸protected fun f() {}", "kotlin-visibility", "private (this file) and internal"},
 		{"fun f() = when (‸val x = g()) { else -> x }", "syntax", "declare the val before"},
+		{"fun String‸?.f(): String = this", "nullable-receiver", "take the value as a parameter"},
+		{"val List<Int>‸?.n: Int\n    get() = 1", "nullable-receiver", "take the value as a parameter"},
 	} {
 		e, line, column := fault(t, c.src)
 		if e.Line != line || e.Column != column || e.Code != c.code || !strings.Contains(e.Message, c.message) {

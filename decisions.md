@@ -32,6 +32,10 @@ Each entry: what was decided, why, and what would reopen it.
   spec; Go saves a second per edit at most, and Kogo adds a parse, a check and a prepare of
   its own. Kogo's case rests on what it leaves out, not on build speed. Reopen if a measured
   loop (CI, cold start, the full suite) shows Kogo winning by more than seconds.
+- **An extension's receiver is not nullable** (15 Nov 2026). Allowing `fun String?.f()` makes
+  the checker handle a `this` that may be null, and no example or stage-1 port writes one; a
+  parameter does the job. The parser refuses it at the `?.` (`nullable-receiver`). Reopen
+  when a port needs one to read naturally.
 
 ## Taken in the v0 spec, not yet discussed
 

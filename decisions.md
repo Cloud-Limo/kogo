@@ -52,9 +52,9 @@ Each entry: what was decided, why, and what would reopen it.
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
   lines. Not taken: tables inside the checker, which make every prelude function a compiler
   change and put the prelude in the core (principle 8). Built into the checker all the same,
-  because the core sections define them: the operators (`+` on lists, `list[i]`, `in`,
-  ranges, `to`), the forms of section 9, the five SQL calls and `db.tx`, and what data
-  classes and enums provide. A binding may have a nullable receiver (`isNullOrBlank`,
+  because the core sections define them: the operators on numbers, `==`, ranges, the forms
+  of section 9, the five SQL calls and `db.tx`, and what data classes and enums provide.
+  The other operators are bindings (the entry below). A binding may have a nullable receiver (`isNullOrBlank`,
   `orEmpty`), which application code may not. Reopen if a prelude function's type cannot be
   written in Kogo and is too useful to leave out.
 - **Type arguments are settled in one fixed order, with no solver** (15 Nov 2026; spec 5.1):
@@ -74,6 +74,17 @@ Each entry: what was decided, why, and what would reopen it.
   The same answer serves ordering: the prelude declares `sortedBy` once per key type, since
   Kogo cannot say "any ordered type". Reopen if those lists become a burden; the other way
   is an "ordered" bound that only bindings may use.
+- **An operator on anything but a number is a binding** (15 Nov 2026; spec 6): `a + b` is
+  the prelude's `plus`, `a < b` its `compareTo`, `x in c` its `contains`, `c[i]` its `get`,
+  `a to b` its `to`. Only an `external fun` counts, so application code still defines no
+  operator. `Decimal + Decimal` and `Instant < Instant` then take a line of prelude and no
+  checker change, and the emitter sees an ordinary call; about 25 lines of checker against
+  about 60 that grow with each type. Accepted costs: `xs.plus(x)` is a second spelling of
+  `xs + x`, as in Kotlin; whoever writes bindings decides which types have an operator;
+  `"a" + "b"` needs `String.plus` in the prelude. The two stage-1 ports use only string
+  `+`, `list[i]` and `to`, so the gain is expected, not yet shown. Reopen if an operator's
+  meaning comes to depend on more than its receiver's and its argument's types, or if the
+  emitted call costs at run time.
 - **Only a name narrows** (15 Nov 2026; spec 4): a local `val` or a parameter, by `!= null`,
   `== null` and `is`, through `&&`, `||` and `!`, and for the rest of a block when the other
   branch cannot finish. A name that narrows never changes, so nothing learned is ever
@@ -225,15 +236,6 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken building the checker (DEV-825), not yet discussed
 
-- **An operator on anything but a number is a binding** (spec 6): `a + b` is the prelude's
-  `plus`, `a < b` its `compareTo`, `x in c` its `contains`, `c[i]` its `get`, `a to b` its
-  `to`, and only an `external fun` counts, so application code still defines no operator.
-  This narrows the list in "The prelude's signatures are Kogo declarations" above, which had
-  the operators built into the checker: numbers, `==`, `&& || !`, `?:`, ranges, `for` and
-  destructuring still are. `Decimal + Decimal` and `Instant < Instant` then take a line of
-  prelude and no checker change, and the emitter sees an ordinary call. About 25 lines
-  against about 60. Reopen if an operator's meaning comes to depend on more than its
-  receiver's and its argument's types.
 - **A binding may take `vararg`** (spec 13), the third thing only a binding may write:
   `listOf(10, 1, 3)` cannot be declared without it, and 5.1's "common type of several
   arguments" assumes it. Application code still takes a `List`.

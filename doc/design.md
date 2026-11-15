@@ -148,13 +148,15 @@ address.
 
 **Failures.** `raise` and `bind` are ordinary calls that panic; the
 `either { }` block recovers and gives the failure as a value, as Arrow
-does with an exception. Each scope has a handle, a `Raise<E>` function
-takes it as a hidden first parameter, and a failure carries the handle
-it was raised on, so a scope recovers only its own. A panic of any other
-kind is a bug (section 8 of the spec) and passes through untouched. So a
-failure works anywhere inside its scope, lambdas included, and the
-prelude needs no failure-aware copies. The prelude's Go must hold no
-lock and leave nothing half done while it calls a lambda.
+does with an exception. Each scope has a handle, a local that the
+lambdas inside it capture; no function takes a hidden scope parameter,
+since a function that can fail returns an `Either`. A failure carries
+the handle it was raised on, so a scope recovers only its own. A panic
+of any other kind is a bug (section 8 of the spec) and passes through
+untouched. So a failure works anywhere inside its scope, lambdas
+included, and the prelude needs no failure-aware copies. The prelude's
+Go must hold no lock and leave nothing half done while it calls a
+lambda.
 
 **Strings** are Go strings counted as Kotlin counts: UTF-16 units. An
 operation that would leave half a surrogate pair leaves U+FFFD.

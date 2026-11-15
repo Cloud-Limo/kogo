@@ -31,11 +31,10 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			if rt = c.this(); rt != nil {
 				cands = c.methods(rt, name)
 			}
-			// this's interface fun comes before an extension, but
-			// not before a fun called on the raise scope.
+			// this's interface fun comes before an extension.
 			member := cands != nil
 			for _, f := range c.funcs(name) {
-				if f.Kind == Fun && !c.otherTx(f) && (!member || f.Receiver == nil || c.raise != nil && c.raised(f.Receiver) != nil) {
+				if f.Kind == Fun && !c.otherTx(f) && (!member || f.Receiver == nil) {
 					cands = append(cands, f)
 				}
 			}
@@ -135,7 +134,7 @@ func (c *checker) noFunc(at syntax.Node, name string, rt Type, member bool) Type
 	}
 	d, _ := c.findType(name)
 	switch {
-	case member && notKogo[name] == "":
+	case member && notKogo[name][0] == "":
 		return c.errorf(at, "unknown-name", "a %s has no function %s", rt, name)
 	case member || d == nil:
 		return c.missing(at, name)
@@ -445,12 +444,6 @@ func wholeLiteral(e syntax.Expr) bool {
 // a lambda fits any parameter of a function type.
 func (c *checker) accepts(k candidate, typed map[syntax.Expr]Type) bool {
 	if tp, _ := settle(k, typed); tp != nil {
-		return false
-	}
-	// The raise scope is the receiver of a fun called on it, and fits
-	// when the fun's E does (spec.md 9). A lone candidate keeps its
-	// raise-type error, which says how to convert the failure.
-	if r := c.raised(k.f.Receiver); r != nil && c.raise != nil && !fits(subst(r, k.b), c.raise) {
 		return false
 	}
 	for i, p := range k.f.Params {

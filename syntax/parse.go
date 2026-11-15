@@ -306,6 +306,8 @@ func (p *parser) decl(abstract bool) Decl {
 		p.notKogo(p.tok.pos, "object", "an object", "use top-level vals and functions")
 	case p.at("sealed") && p.peek(1).text == "class":
 		p.notKogo(p.tok.pos, "class", "a sealed class", "use a sealed interface")
+	case p.at("context") && p.peek(1).text == "(":
+		p.notKogo(p.tok.pos, "context", "a context parameter", "take the value as a parameter, or for Raise<E> return an Either and bind it")
 	}
 	kinds := []string{"data class", "data object", "sealed interface", "interface", "enum class", "annotation class"}
 	for _, k := range kinds {

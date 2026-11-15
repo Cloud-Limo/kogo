@@ -424,25 +424,17 @@ func TestStatements(t *testing.T) {
 // rule broken.
 func TestFailures(t *testing.T) {
 	passes(t,
-		// The forms of a raise scope, either's block and a Raise<E> fun.
+		// The forms of a raise scope, either's block.
 		"fun f(n: Int): Either<String, Int> = either {\n    if (n < 0) raise(\"negative\")\n    n\n}",
 		"fun f(n: Int): Either<String, Int> = either {\n    ensure(n > 0) { \"not positive\" }\n    n\n}",
 		"fun f(n: Int?): Either<String, Int> = either { ensureNotNull(n) { \"none\" } + 1 }",
 		"fun g(): Either<String, Int> = either { 1 }\nfun f(): Either<String, Int> = either { g().bind() + 1 }",
-		"fun Raise<String>.g(): Int = raise(\"no\")\nfun Raise<String>.f(): Int = g() + 1\nfun h(): Either<String, Int> = either { g() }",
-		"fun Raise<Int>.g(): String = raise(1)\nfun f(): Either<String, String> = either { withError({ n: Int -> \"$n\" }) { g() } }",
-		// A fun that raises a variant runs where its sealed interface is raised.
-		"sealed interface S {\n    data object A : S\n}\nfun Raise<S.A>.g(): Int = raise(S.A)\nfun Raise<S>.f(): Int = g()",
+		// An Either of a variant is bound where its sealed interface is raised.
+		"sealed interface S {\n    data object A : S\n}\nfun g(): Either<S.A, Int> = either { raise(S.A) }\nfun f(): Either<S, Int> = either { g().bind() }",
 		// The type arguments are written, or settled by the type wanted.
 		"fun f(): Int? = either<String, Int> { 1 }.getOrNull()",
 		// A lambda inside a raise scope is in it.
 		"fun g(n: Int): Either<String, Int> = either { n }\nfun f(xs: List<Int>): Either<String, List<Int>> = either { xs.map { g(it).bind() } }",
-		// The raise scope is the receiver of a fun called on it: it
-		// chooses between overloads, and this's member does not hide
-		// it, though it does outside a raise scope.
-		"fun Raise<String>.g(): Int = 1\nfun Raise<Int>.g(): Int = 2\nfun f(): Either<String, Int> = either { g() }",
-		"interface V {\n    fun ensure(n: Int): Boolean\n}\nfun V.f(n: Int): Either<String, Int> = either {\n    ensure(n > 0) { \"negative\" }\n    n\n}",
-		"interface V {\n    fun raise(r: String): Int\n}\nfun V.f(): Int = raise(\"no\")",
 		// Working with an Either value.
 		"fun f(c: Boolean): Either<String, Int> = if (c) 1.right() else \"no\".left()",
 		"fun f(x: Either<String, Int>): String = x.fold({ e -> e }, { n -> \"$n\" })",
@@ -457,15 +449,13 @@ func TestFailures(t *testing.T) {
 		{"fun f(): Either<String, Int> = either { raise(‸1) }", "type-mismatch", "this is a Int where a String is wanted"},
 		{"fun f(): Either<String, Int> = either {\n    ensure(true) { ‸1 }\n    1\n}", "type-mismatch", "this is a Int where a String is wanted"},
 		{"fun g(): Either<Int, Int> = either { 1 }\nfun f(): Either<String, Int> = either { g().‸bind() }", "raise-type", "bind can fail with a Int, and this raise scope fails with a String: convert the failure, .mapLeft { e -> ... }.bind()"},
-		{"fun Raise<Int>.g(): Int = 1\nfun Raise<String>.f(): Int = ‸g()", "raise-type", "g can fail with a Int, and this raise scope fails with a String: convert the failure, withError({ e: Int -> ... }) { g(...) }"},
 		// The forms outside a raise scope.
-		{"fun g(): Either<String, Int> = either { 1 }\nfun f(): Int = g().‸bind()", "raise-scope", "bind can fail with a String, and this is not a raise scope: wrap it in either<String, ...> { }, or call it from a fun Raise<String>.name(...)"},
-		{"fun Raise<String>.g(): Int = 1\nfun f(): Int = ‸g()", "raise-scope", "g can fail with a String, and this is not a raise scope: wrap it in either<String, ...> { }"},
+		{"fun g(): Either<String, Int> = either { 1 }\nfun f(): Int = g().‸bind()", "raise-scope", "bind can fail with a String, and this is not a raise scope: wrap it in either<String, ...> { }"},
 		{"fun f(): Int = ‸raise(\"no\")", "raise-scope", "raise can fail with a String"},
 		// A lambda that fails into the raise scope around it is not
 		// kept as a value, which could run outside the scope.
 		{"fun f(): Either<String, () -> Int> = either { ‸{ raise(\"no\") } }", "raise-escape", "this lambda fails into the raise scope around it, and is kept as a value, which could run outside the scope: pass it straight to the call that runs it, or make it return an Either<String, A>"},
-		{"fun Raise<String>.g(): Int = 1\nfun Raise<String>.f(): () -> Int = ‸{ g() }", "raise-escape", "pass it straight to the call"},
+		{"fun g(): Either<String, Int> = either { 1 }\nfun f(): Either<String, () -> Int> = either { ‸{ g().bind() } }", "raise-escape", "pass it straight to the call"},
 		{"fun f(): Either<String, Int> = either {\n    val g: () -> Int = ‸{ raise(\"no\") }\n    g()\n}", "raise-escape", "pass it straight to the call"},
 		// A local fun is not in the raise scope around it.
 		{"fun f(): Either<String, Int> = either {\n    fun g(): Int = ‸raise(\"no\")\n    g()\n}", "raise-scope", "this is not a raise scope"},
@@ -474,10 +464,12 @@ func TestFailures(t *testing.T) {
 		{"fun g(n: Int): Either<String, Int> = either { n }\nfun f(xs: List<Int>) {\n    xs.forEach { ‸g(it) }\n}", "either-dropped", "is dropped"},
 		// Nothing settles what either's block raises: spec.md 5.1's first row.
 		{"fun f(): Int {\n    val r = ‸either { 1 }\n    return 1\n}", "type-arguments", "nothing settles either's type parameter E before its block is read: write its type arguments, either<...> { ... }"},
-		// Raise<E> is a fun's receiver and nothing else, and Either is
-		// built with left and right.
-		{"fun Raise<String>.f() {\n    val r = ‸this\n}", "unknown-name", "a fun Raise<E>.name() has none"},
-		{"fun f(r: ‸Raise<String>) {}", "raise-receiver", "Raise<String> is written only as the receiver of a fun: fun Raise<String>.name(...): A"},
+		// A program writes no Raise<E>, and a fun with that receiver
+		// says no more of what its body raises. Either is built with
+		// left and right.
+		{"fun ‸Raise<String>.f(): Int = raise(\"no\")", "raise-receiver", "Raise<String> is not written in a program (spec.md 9): return an Either<String, A> from either<String, A> { ... }, and bind it where it is called"},
+		{"fun f(r: ‸Raise<String>) {}", "raise-receiver", "return an Either<String, A>"},
+		{"fun g(): Either<Int, Int> = either { 1 }\nfun f(): Either<String, Int> = either { ‸withError({ n: Int -> \"$n\" }) { g().bind() } }", "with-error", "withError is not Kogo: convert the failure of a block with either<E2, A> { ... }.mapLeft { e -> ... }.bind()"},
 		{"fun f(g: ‸Raise<String>.() -> Int) {}", "function-receiver", "a function type has no receiver (spec.md 5): take the value as a parameter, or for Raise<E> return an Either<E, A>"},
 		{"fun f(g: ‸Int.() -> Int) {}", "function-receiver", "take the value as a parameter"},
 		{"fun f(): Either<String, Int> = Either.‸Left(\"no\")", "either-constructor", "an Either is built with e.left() or a.right()"},
@@ -611,12 +603,10 @@ fun f(tx: Tx, id: Uuid, n: Int): List<Row> = tx.query<Row>(sql"$id: Uuid, ${n + 
 	}
 }
 
-// Section 9: the two spellings of a fallible function are one notion
-// underneath. The same program in each has the same facts of what can
-// fail, line by line, leaving out either's block, which only the
-// first spelling writes.
+// Section 9: what can fail, line by line, leaving out either's block,
+// which is a raise scope.
 func TestFailsFacts(t *testing.T) {
-	spellings := []string{`fun parsePercent(text: String): Either<String, Int> = either {
+	src := `fun parsePercent(text: String): Either<String, Int> = either {
     val n = text.toIntOrNull() ?: raise("Enter a number.")
     ensure(n in 0..100) { "Enter a percentage from 0 to 100." }
     n
@@ -624,15 +614,7 @@ func TestFailsFacts(t *testing.T) {
 fun twice(text: String): Either<String, Int> = either {
     val n = parsePercent(text).bind()
     listOf(1, 2).map { parsePercent(text).bind() }.size + n
-}`, `fun Raise<String>.parsePercent(text: String): Int {
-    val n = text.toIntOrNull() ?: raise("Enter a number.")
-    ensure(n in 0..100) { "Enter a percentage from 0 to 100." }
-    return n
-}
-fun Raise<String>.twice(text: String): Int {
-    val n = parsePercent(text)
-    return listOf(1, 2).map { parsePercent(text) }.size + n
-}`}
+}`
 	want := `2 call String
 3 call String
 7 call String
@@ -640,33 +622,31 @@ fun Raise<String>.twice(text: String): Int {
 8 lambda String
 fun parsePercent String
 fun twice String`
-	for _, src := range spellings {
-		info, errs := run(t, src)
-		if errs != nil {
-			t.Fatalf("%s\n%v", src, errs)
-		}
-		var got []string
-		for n, e := range info.Fails {
-			switch n := n.(type) {
-			case *syntax.FunDecl:
-				if info.Funcs[n].Pkg == "t" {
-					got = append(got, fmt.Sprintf("fun %s %s", n.Name, e))
-				}
-			case *syntax.Call:
-				got = append(got, fmt.Sprintf("%d call %s", n.At().Line-1, e))
-			case *syntax.Lambda:
-				if info.Types[n].(*FuncType).Receiver == nil {
-					got = append(got, fmt.Sprintf("%d lambda %s", n.At().Line-1, e))
-				}
+	info, errs := run(t, src)
+	if errs != nil {
+		t.Fatalf("%s\n%v", src, errs)
+	}
+	var got []string
+	for n, e := range info.Fails {
+		switch n := n.(type) {
+		case *syntax.FunDecl:
+			if info.Funcs[n].Pkg == "t" {
+				got = append(got, fmt.Sprintf("fun %s %s", n.Name, e))
+			}
+		case *syntax.Call:
+			got = append(got, fmt.Sprintf("%d call %s", n.At().Line-1, e))
+		case *syntax.Lambda:
+			if info.Types[n].(*FuncType).Receiver == nil {
+				got = append(got, fmt.Sprintf("%d lambda %s", n.At().Line-1, e))
 			}
 		}
-		if slices.Sort(got); strings.Join(got, "\n") != want {
-			t.Errorf("%s\n got %s\nwant %s", src, strings.Join(got, "\n"), want)
-		}
+	}
+	if slices.Sort(got); strings.Join(got, "\n") != want {
+		t.Errorf("%s\n got %s\nwant %s", src, strings.Join(got, "\n"), want)
 	}
 	// A lambda that returns an Either does not fail: its value is the
 	// Either, which its type says.
-	info, _ := run(t, "fun f(x: Either<String, Int>): Either<String, Int> = x.flatMap { it.right() }")
+	info, _ = run(t, "fun f(x: Either<String, Int>): Either<String, Int> = x.flatMap { it.right() }")
 	for n, e := range info.Fails {
 		if _, ok := n.(*syntax.Lambda); ok {
 			t.Errorf("the lambda of flatMap: got %v, want it not to fail", e)
@@ -693,7 +673,7 @@ func TestFacts(t *testing.T) {
 	}
 	var files []*syntax.File
 	names := []string{"00_cents", "00_booking", "01_pay", "02_discount", "03_abn", "04_sealed_when", "05_enum_when", "06_nullable",
-		"07_either", "08_raise_receiver", "09_error_layers", "20_interface_loop_time"}
+		"07_either", "09_error_layers", "20_interface_loop_time"}
 	for _, name := range names {
 		src, err := os.ReadFile("../examples/" + name + ".kg")
 		if err != nil {
@@ -709,7 +689,7 @@ func TestFacts(t *testing.T) {
 	if errs != nil {
 		t.Fatalf("examples 01 to 09 and 20: %v", errs)
 	}
-	for _, name := range []string{"01_pay", "04_sealed_when", "06_nullable", "07_either", "08_raise_receiver"} {
+	for _, name := range []string{"01_pay", "04_sealed_when", "06_nullable", "07_either"} {
 		i := slices.IndexFunc(files, func(f *syntax.File) bool { return f.Name == name+".kg" })
 		got, golden := dump(info, files[i]), "testdata/"+name+".facts"
 		if *update {

@@ -200,10 +200,9 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
   destructured, `{ (d, w) -> d * w }`. A lambda is a value of a function
   type. Trailing-lambda call syntax as in Kotlin. Function references
   `::name` to top-level functions are allowed.
-- Lambdas with receivers (`T.() -> R`) do not exist, with one exception:
-  the block of `either { }` and of `withError`, whose receiver is a
-  `Raise<E>` (section 9). A function type with a receiver is not
-  written: take the value as a parameter, or return an `Either`.
+- Lambdas with receivers (`T.() -> R`) do not exist. A function type
+  with a receiver is not written: take the value as a parameter, or
+  return an `Either`.
 
 ### 5.1 Type arguments
 
@@ -378,27 +377,18 @@ There is no `try`, `catch`, `finally`, `throw`, `runCatching` or
 
 ## 9. Expected failures
 
-An expected failure is a value. There are two spellings of a fallible
-function and they are the same thing underneath.
+An expected failure is a value. A function that can fail returns an
+`Either`:
 
 ```kotlin
-// Spelling 1: return an Either.
 fun parsePercent(text: String): Either<String, Int> = either {
     val n = text.toIntOrNull() ?: raise("Enter a number.")
     ensure(n in 0..100) { "Enter a percentage from 0 to 100." }
     n
 }
-
-// Spelling 2: a Raise receiver. The return type is the success type.
-fun Raise<String>.requirePercent(text: String): Int {
-    val n = text.toIntOrNull() ?: raise("Enter a number.")
-    ensure(n in 0..100) { "Enter a percentage from 0 to 100." }
-    return n
-}
 ```
 
-Inside an `either<E, A> { }` block or a `Raise<E>` function (a *raise
-scope* for `E`):
+Inside an `either<E, A> { }` block (a *raise scope* for `E`):
 
 | Form | Meaning |
 | --- | --- |
@@ -406,32 +396,28 @@ scope* for `E`):
 | `ensure(cond) { e }` | fail with `e` unless `cond` |
 | `ensureNotNull(x) { e }` | `x` as non-null, or fail with `e` |
 | `x.bind()` | `x: Either<E, A>` gives its `A`, or fails with its `E` |
-| calling a `Raise<E>` function | runs it; its failure is this scope's failure |
-| `withError({ e2 -> e }) { ... }` | runs a block that is a raise scope for `E2`, converting its failure |
 
-Outside a raise scope a `Raise<E>` function cannot be called; wrap the
-call in `either { }`.
+Outside a raise scope these forms are errors: wrap the code in
+`either { }`.
 
+- Every place a body can fail is marked in it: one of these forms, or
+  a call with `.bind()`, so it reads without opening its callees. A
+  forgotten `bind` leaves an `Either` that is dropped or of the wrong
+  type, an error either way.
 - Each form fails with a type that fits the scope's `E`: `raise(e)`
-  needs an `e` that is an `E`, `bind` an `Either<E2, A>` whose `E2`
-  fits `E`, and a `Raise<E2>` function may be called where `E2` fits
-  `E`, so one that raises a variant runs where its sealed interface is
-  raised. Convert any other failure with `mapLeft` or `withError`.
+  needs an `e` that is an `E`, and `bind` an `Either<E2, A>` whose `E2`
+  fits `E`. Convert any other failure with `mapLeft`, of one call,
+  `load(id).mapLeft { e -> ... }.bind()`, or of several,
+  `either<E2, A> { ... }.mapLeft { e -> ... }.bind()`.
 - A lambda inside a raise scope is in it, as in Kotlin:
   `either { ids.map { load(it).bind() } }`. A local `fun` is not.
   A lambda that fails into the scope is passed straight to the call
   that runs it: kept as a value, in a `val` or as a result, it could
   run outside the scope, and is refused.
-- A `Raise<E>` function is called on the raise scope as on a receiver.
-  Overloads that differ only in their `E` are chosen by the scope's,
-  and a member of `this` with the same name does not hide one, as it
-  hides an extension (section 5.2).
-- `Raise<E>` is written only as the receiver of a function, and that
-  function has no `this`. `either`'s `E` is settled as section 5.1
-  says, before its block is read: by the type wanted, or written,
-  `either<String, Int> { ... }`.
-- The forms' signatures are the checker's own, in `check/core.kg`, beside
-  `Either` itself.
+- `either`'s `E` is settled as section 5.1 says, before its block is
+  read: by the type wanted, or written, `either<String, Int> { ... }`.
+- A program does not write `Raise<E>`. The forms' signatures are the
+  checker's own, in `check/core.kg`, beside `Either` itself.
 
 Working with an `Either` value:
 
@@ -455,8 +441,9 @@ this table are the prelude's, in `prelude/either.kg`.
 The error type `E` is any type. cusoon2 uses `String` (words for the
 user) at the RPC boundary and sealed interfaces elsewhere.
 
-Nothing else from Arrow exists: no `Option`, `NonEmptyList`,
-`zipOrAccumulate`, `recover`, `nullable { }`, `Ior` or `Validated`.
+Nothing else from Arrow exists: no `Raise<E>` receivers (section 14),
+`withError`, `Option`, `NonEmptyList`, `zipOrAccumulate`, `recover`,
+`nullable { }`, `Ior` or `Validated`.
 
 ## 10. SQL
 
@@ -744,6 +731,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | --- | --- |
 | `x!!` | `requireNotNull(x) { "why" }`, or handle the null |
 | `try`/`catch`/`throw`, `runCatching` | return `Either`, or panic with `check`/`error` |
+| `fun Raise<E>.f()`, `context(Raise<E>)` | return an `Either` and `bind` it |
 | `class Foo { ... }`, `open`, `abstract`, inheritance | data class, sealed interface, top-level functions |
 | `object`, `companion object` | top-level `val`s and functions |
 | `object : Iface { ... }` | a data class implementing it, or a lambda |

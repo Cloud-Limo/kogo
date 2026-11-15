@@ -1,18 +1,13 @@
 package check
 
-import (
-	"fmt"
+import "kogo/syntax"
 
-	"kogo/syntax"
-)
-
-// Expected failures (spec.md section 9). A raise scope for E is the
-// body of a fun whose receiver is Raise<E>, or a block of type
-// Raise<E>.() -> A, either's and withError's. A lambda inside one is
-// in it, as in Kotlin; a local fun is not. A fun whose receiver is
-// Raise<E> is called on the raise scope around the call, which takes
-// the place of this; the core's raise, ensure, ensureNotNull and
-// withError are such funs, and bind is one on its Either.
+// Expected failures (spec.md section 9). A raise scope for E is a
+// block of type Raise<E>.() -> A, either's or db.tx's. A lambda inside
+// one is in it, as in Kotlin; a local fun is not. Only the core writes
+// Raise<E>: its raise, ensure and ensureNotNull are funs whose
+// receiver is Raise<E>, called on the raise scope around the call,
+// which takes the place of this, and bind is one on its Either.
 
 // raised gives E when t is Raise<E>, and nil otherwise.
 func (c *checker) raised(t Type) Type {
@@ -30,25 +25,10 @@ func (c *checker) either(t Type) Type {
 	return nil
 }
 
-// receiver reads a fun's receiver, or in the core a function type's:
-// the one place where Raise<E> is written.
-func (c *checker) receiver(t syntax.Type) Type {
-	if n, ok := t.(*syntax.NamedType); ok && !n.Nullable && len(n.Args) == 1 {
-		if d, _ := c.findType(n.Name); d != nil && d == c.prelude("Raise") {
-			r := &Named{d, []Type{c.typ(n.Args[0])}}
-			c.info.Types[t] = r
-			return r
-		}
-	}
-	return c.typ(t)
-}
-
-// failing records the error type of a fun that can fail: one whose
-// receiver is Raise<E>, or that returns Either<E, A>.
+// failing records the error type of a fun that can fail: one that
+// returns Either<E, A>.
 func (c *checker) failing(at syntax.Node, f *Func) {
-	if e := c.raised(f.Receiver); e != nil {
-		c.info.Fails[at] = e
-	} else if e := c.either(f.Result); e != nil {
+	if e := c.either(f.Result); e != nil {
 		c.info.Fails[at] = e
 	}
 }
@@ -70,11 +50,9 @@ func (c *checker) raiseBlock(l *syntax.Lambda, receiver Type, params []Type, wan
 func (c *checker) fails(e *syntax.Call, call *Call) {
 	f := call.Func
 	var err Type
-	fix := ".mapLeft { e -> ... }.bind()"
 	switch {
 	case call.Receiver == nil && c.raised(f.Receiver) != nil:
 		err = subst(c.raised(f.Receiver), bind(f.TypeParams, call.TypeArgs))
-		fix = fmt.Sprintf("withError({ e: %s -> ... }) { %s(...) }", err, f.Name)
 	case f.Name == "bind" && f.file == c.core:
 		err = call.TypeArgs[0]
 	default:
@@ -83,9 +61,9 @@ func (c *checker) fails(e *syntax.Call, call *Call) {
 	switch {
 	case err == unknown, c.raise == unknown: // something failed already: say no more
 	case c.raise == nil:
-		c.errorf(e.Fun, "raise-scope", "%s can fail with a %s, and this is not a raise scope: wrap it in either<%s, ...> { }, or call it from a fun Raise<%s>.name(...)", f.Name, err, err, err)
+		c.errorf(e.Fun, "raise-scope", "%s can fail with a %s, and this is not a raise scope: wrap it in either<%s, ...> { }", f.Name, err, err)
 	case !fits(err, c.raise):
-		c.errorf(e.Fun, "raise-type", "%s can fail with a %s, and this raise scope fails with a %s: convert the failure, %s", f.Name, err, c.raise, fix)
+		c.errorf(e.Fun, "raise-type", "%s can fail with a %s, and this raise scope fails with a %s: convert the failure, .mapLeft { e -> ... }.bind()", f.Name, err, c.raise)
 	default:
 		c.info.Fails[e] = err
 		for _, l := range c.lambdas[c.raiseDepth:] {

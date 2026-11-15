@@ -65,8 +65,8 @@ func write(b *strings.Builder, v reflect.Value) {
 // line a declaration.
 func TestExamples(t *testing.T) {
 	files, _ := filepath.Glob("../examples/*.kg")
-	if len(files) != 23 {
-		t.Fatalf("%d examples, want 23", len(files))
+	if len(files) != 22 {
+		t.Fatalf("%d examples, want 22", len(files))
 	}
 	var got strings.Builder
 	for _, file := range files {

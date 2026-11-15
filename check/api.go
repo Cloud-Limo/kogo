@@ -3,6 +3,7 @@ package check
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -31,14 +32,21 @@ type Op struct {
 
 // apis checks the api lists of the program.
 func (c *checker) apis(program []*syntax.File) {
-	lists := map[string]string{} // where each list's name is first declared
+	type first struct{ name, at string }
+	lists := map[string]first{} // by name in lower case, the list first declared and where
 	for _, f := range program {
 		c.enter(f, c.pkgOf(f.Package.Name))
 		for _, d := range f.APIs {
-			if at, ok := lists[d.Name]; ok {
-				c.errorf(d, "duplicate", "api %s is already declared at %s: kogo ts writes each list to the file of its name, %s.ts, so rename one (spec.md 15.1)", d.Name, at, d.Name)
+			key := strings.ToLower(d.Name)
+			if e, ok := lists[key]; !ok {
+				lists[key] = first{d.Name, fmt.Sprintf("%s:%d", f.Name, d.Line)}
+			} else if e.name == d.Name {
+				c.errorf(d, "duplicate", "api %s is already declared at %s: kogo ts writes each list to the file of its name, %s.ts, so rename one (spec.md 15.1)", d.Name, e.at, d.Name)
 			} else {
-				lists[d.Name] = fmt.Sprintf("%s:%d", f.Name, d.Line)
+				c.errorf(d, "duplicate", "api %s is declared at %s as api %s: kogo ts writes each list to the file of its name, and %s.ts and %s.ts are one file where case is ignored, as on macOS, so rename one (spec.md 15.1)", d.Name, e.at, e.name, d.Name, e.name)
+			}
+			if Interface(d.Name) == "Outcome" {
+				c.errorf(d, "wire-name", "api %s's interface in TypeScript would be Outcome, the answer's own type: rename the list (spec.md 15.1)", d.Name)
 			}
 			if len(d.Funs) == 0 {
 				c.errorf(d, "operation", "api %s names no fun: name its operations, as api %s { f, g } (spec.md 15.1)", d.Name, d.Name)
@@ -195,6 +203,9 @@ func (c *checker) add(id *syntax.Ident, what string, w *reach, d *TypeDecl) {
 	}
 	if d.Simple() == "Outcome" {
 		c.errorf(id, "wire-name", "%s's %s reaches %s, and Outcome is the answer's own type in TypeScript: rename it (spec.md 15.4)", id.Name, what, d.Name)
+	}
+	if r, _ := utf8.DecodeRuneInString(d.Simple()); unicode.IsLower(r) {
+		c.errorf(id, "wire-name", "%s's %s reaches %s, and a wire type's name begins with an upper-case letter, so that TypeScript does not keep it for its own, as it keeps string: rename it (spec.md 15.4)", id.Name, what, d.Name)
 	}
 	if s := Interface(w.list); d.Simple() == s {
 		c.errorf(id, "wire-name", "%s's %s reaches %s, and %s is api %s's interface in TypeScript: rename it (spec.md 15.4)", id.Name, what, d.Name, s, w.list)

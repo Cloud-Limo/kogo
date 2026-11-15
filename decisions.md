@@ -1279,6 +1279,20 @@ Each entry: what was decided, why, and what would reopen it.
 - **The interface is the list's name with its first letter in upper case** (spec 15.6),
   `Ops` for `ops`, as 15.6's example had it. The function lives in `check`, which refuses a
   wire type of that name, and `ts` calls it, so the two cannot drift.
+- **A wire type's name begins with an upper-case letter** (spec 15.4). TypeScript refuses
+  `type string = ...`, and `string`, `never` and the rest of its own type names and
+  reserved words all begin in lower case, so one rule covers them, and Kotlin names classes
+  in upper case anyway. Not taken: a list of TypeScript's reserved names, which is long and
+  refuses a lower-case name only when it clashes. Reopen if a program needs a lower-case
+  wire type.
+- **List names that differ only in case are refused, and so are `outcome` and `Outcome`**
+  (spec 15.1): `ops.ts` and `Ops.ts` are one file on macOS, and either of the second pair
+  would name its interface as the answer's type.
+- **`kogo ts` removes nothing from `<out>`**, as `kogo emit` does not: a renamed list leaves
+  its old file. An application that wants `<out>` to hold only what Kogo wrote empties it
+  before running `kogo ts`. Not taken: removing `.ts` files that start with the generated
+  line, which lets a tool delete files it was not asked to. Reopen if a stale file misleads
+  a frontend in practice.
 - **An enum with no constants is written `never`**: Kotlin and Kogo accept one, and an empty
   union is not TypeScript. No value of it can cross, so the type says so. Not taken:
   refusing it on the wire, a rule for a case no program writes.

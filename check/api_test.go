@@ -50,6 +50,8 @@ func TestOperations(t *testing.T) {
 		{rpc() + "‸api ops { }", "operation", "api ops names no fun"},
 		{rpc() + "api ops { me }\n‸api ops { me }", "duplicate", "api ops is already declared at f2.kg:5: kogo ts writes each list to the file of its name, ops.ts"},
 		{rpc() + "api ops { me }\n---\npackage b\nimport t.me\n‸api ops { me }", "duplicate", "api ops is already declared at f2.kg:5"},
+		{rpc() + "api ops { me }\n‸api Ops { me }", "duplicate", "api Ops is declared at f2.kg:5 as api ops: kogo ts writes each list to the file of its name, and Ops.ts and ops.ts are one file where case is ignored"},
+		{rpc() + "‸api outcome { me }", "wire-name", "api outcome's interface in TypeScript would be Outcome, the answer's own type: rename the list"},
 		{rpc("import kogo.time.Instant\n") + "api ops { ‸f }\ndata class In(val n: Int, val at: Instant)\n" + op("In", "Unit") + time,
 			"wire", "f's input holds In.at: Instant, which does not cross the wire: send text the server has formatted"},
 		{rpc() + "api ops { ‸f }\n" + op("Unit", "List<Map<String, Int>>"), "wire", "f's answer holds a Map<String, Int>, which does not cross"},
@@ -67,6 +69,7 @@ func TestOperations(t *testing.T) {
 			"wire-name", "f's answer reaches b.Item, and api ops reaches t.Item: two wire types of one name in a list are one type in TypeScript"},
 		{rpc() + "api ops { ‸f }\ndata class Outcome(val n: Int)\n" + op("Unit", "Outcome"), "wire-name", "Outcome is the answer's own type in TypeScript"},
 		{rpc() + "api ops { ‸f }\ndata class In(val ops: Ops)\nenum class Ops { One }\n" + op("In", "Unit"), "wire-name", "f's input reaches Ops, and Ops is api ops's interface in TypeScript: rename it"},
+		{rpc() + "api ops { ‸f }\ndata class string(val n: Int)\n" + op("string", "Unit"), "wire-name", "f's input reaches string, and a wire type's name begins with an upper-case letter"},
 	})
 }
 

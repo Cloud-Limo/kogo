@@ -944,7 +944,10 @@ fun updateJob(tx: Tx, env: OpsEnv, request: Request, input: UpdateJobInput): Eit
   name twice, and the name is one fun's: not two funs of that name in
   scope. A fun may stand in more than one list.
 - A list names at least one fun. Its name is its TypeScript file's
-  (15.6), so no two lists of a program have one name.
+  (15.6), so no two lists of a program have one name, or names that
+  differ only in case, which are one file where case is ignored. No
+  list is named `outcome` or `Outcome`, whose interface would take the
+  answer's type's name.
 - An operation is an ordinary fun: any code may call it, and nothing
   but the list marks it.
 
@@ -1021,6 +1024,8 @@ Inputs and answers are JSON.
 - Two wire types of one name in one list are a compile error, and so
   is one named `Outcome`, the answer's own type in TypeScript, or one
   named as its list's interface (15.6), `Ops` in `api ops`.
+- A wire type's name begins with an upper-case letter, so it is none
+  of the names TypeScript keeps for its own, as `string` and `never`.
 - Nothing is optional: a property that may be `null` is still a key.
 - Reading is strict. A key that is missing, a key the type does not
   have, a value of another type, a number that is not whole or does

@@ -15,9 +15,9 @@ type Info struct {
 	// every written type.
 	Types map[syntax.Node]Type
 	// Uses holds what each *syntax.Ident, *syntax.Select,
-	// *syntax.FuncRef and *syntax.ClassRef refers to. A name that refers to a property or
-	// to a function with a receiver, and is not a Select, is read on
-	// this.
+	// *syntax.FuncRef and *syntax.ClassRef refers to. A name that
+	// refers to a property or to a function with a receiver, and is
+	// not a Select, is read on this.
 	Uses map[syntax.Node]Object
 	// Calls holds the function behind each *syntax.Call, behind each
 	// name that reads an extension val, and behind each operator that

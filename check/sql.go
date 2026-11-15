@@ -1,6 +1,7 @@
 package check
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -16,6 +17,22 @@ import (
 // test, one of the test's own. A *sqlpass.Error is a fault in the
 // literal; any other error, a failure to ask.
 type Signatures func(*syntax.SQL) (*sqlpass.Statement, error)
+
+// Signer gives the SQL pass's signatures, from the database db
+// connects to: a literal's parameters lie where the parser found them,
+// and the columns of exists and execute are not typed.
+func Signer(ctx context.Context, db *sqlpass.Checker) Signatures {
+	return func(lit *syntax.SQL) (*sqlpass.Statement, error) {
+		var spans []sqlpass.Span
+		for _, p := range lit.Params {
+			spans = append(spans, sqlpass.Span{Start: p.Offset - lit.TextPos.Offset, End: p.End.Offset - lit.TextPos.Offset})
+		}
+		if !lit.Typed() {
+			return db.CheckDiscarding(ctx, lit.Text, spans)
+		}
+		return db.Check(ctx, lit.Text, spans)
+	}
+}
 
 // A Query is a sql literal as the checker matched it with the Kogo
 // around it (spec.md section 10).

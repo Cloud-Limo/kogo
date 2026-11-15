@@ -83,16 +83,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return 2
 		}
 		defer db.Close(ctx)
+		ask := check.Signer(ctx, db)
 		sigs = func(lit *syntax.SQL) (*sqlpass.Statement, error) {
-			var spans []sqlpass.Span
-			for _, p := range lit.Params {
-				spans = append(spans, sqlpass.Span{Start: p.Offset - lit.TextPos.Offset, End: p.End.Offset - lit.TextPos.Offset})
-			}
-			ask := db.Check
-			if !lit.Typed() {
-				ask = db.CheckDiscarding
-			}
-			st, err := ask(ctx, lit.Text, spans)
+			st, err := ask(lit)
 			var fault *sqlpass.Error
 			if err != nil && !errors.As(err, &fault) && lost == nil {
 				lost = err

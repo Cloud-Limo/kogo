@@ -21,6 +21,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"kogo/check"
 	"kogo/sqlpass"
 	"kogo/syntax"
 )
@@ -86,6 +87,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return fatal("sql-connect", fmt.Errorf("no development database, set DATABASE_URL or the PG* variables: %w", err))
 	}
 	defer checker.Close(ctx)
+	ask := check.Signer(ctx, checker)
 
 	out, faults := encoder(stdout), encoder(stdout)
 	if emit {
@@ -111,11 +113,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		for _, lit := range tree.SQL {
 			line, column := lit.Line, lit.Column
-			check := checker.Check
-			if !lit.Typed() {
-				check = checker.CheckDiscarding
-			}
-			st, err := check(ctx, lit.Text, spans(lit))
+			st, err := ask(lit)
 			var fault *sqlpass.Error
 			switch {
 			case errors.As(err, &fault):
@@ -158,15 +156,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 		stdout.Write(src)
 	}
 	return 0
-}
-
-// spans gives where the parser found each parameter of a literal.
-func spans(lit *syntax.SQL) []sqlpass.Span {
-	var out []sqlpass.Span
-	for _, p := range lit.Params {
-		out = append(out, sqlpass.Span{Start: p.Offset - lit.TextPos.Offset, End: p.End.Offset - lit.TextPos.Offset})
-	}
-	return out
 }
 
 // position gives the line and column, both from 1, of a byte offset.

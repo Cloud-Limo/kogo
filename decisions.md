@@ -486,6 +486,18 @@ Each entry: what was decided, why, and what would reopen it.
   `renew` used for nothing else, which the lead pulls when it starts. Not taken:
   `~/Dev/cusoon2`, where other sessions switch branches and the tasks vanish on any branch
   older than cusoon2 PR 1486. Reopen if the tasks move out of cusoon2.
+- **The lead merges** (16 Nov 2026). The step after a Review is Fix, which pushes and ends
+  with a `Fixed:` comment, the issue still In Review; the lead reads the fix commits, runs
+  the tests and merges. A Review covers the original diff, and the lead answers for what
+  merges, so the one step that cannot be undone is the lead's; a fixing session that meets
+  a choice it should not make has somewhere to stop, and an async fix run ends In Review
+  like every other run. Not taken: the fixing session merges, as first written (DEV-858),
+  which merges commits nobody else has read. Reopen if waiting for a lead session holds
+  merges up.
+- **The lead merges a PR with nothing left to change** (16 Nov 2026, lead's ruling on
+  DEV-861). On a `Review:` or `Ruling:` that leaves nothing to change and that it agrees
+  with, the lead runs the tests and merges at the reviewed sha, without a `Fixed:`. Not
+  taken: a Fix session that changes nothing, which adds a step and no reader.
 
 ## Taken in the v0 spec, not yet discussed
 
@@ -1339,17 +1351,17 @@ Each entry: what was decided, why, and what would reopen it.
 - **Handoff and Review comments go on the PR as well as the issue.** A run has no Linear
   access and is shown none of the issue's earlier comments; the PR is the one place both a
   run and a Zed session can read. Reopen if runs are given the issue's comments.
-- **A Question without a Ruling stops the merge, not the fixes.** "Fix and merge" makes the
-  fixes and pushes, then stops. Not taken: refusing to start, which loses the fixes for one
-  open point; merging and filing the Question, which merges what the review doubted.
-- **The lead removes worktrees and deletes merged branches, not the session that merges.**
-  That session is standing in the worktree, and an async merge has no session here at all;
-  a run's last push would recreate a remote branch it had deleted. `git push origin
-  --delete`, not `gh pr merge --delete-branch`, which tries to check out `main` in the
-  worktree and fails because `~/Dev/kogo` holds it.
+- **A Question without a Ruling stops the merge, not the fixes.** Fix makes the fixes,
+  pushes, and lists the Question under Open in its `Fixed:` comment; the lead does not merge
+  while anything is Open. Not taken: refusing to start, which loses the fixes for one open
+  point; merging and filing the Question, which merges what the review doubted.
+- **The lead removes worktrees and deletes merged branches.** It merges, so it removes them
+  then, and at Starting any left behind. `git push origin --delete`, not `gh pr merge
+  --delete-branch`, which tries to check out `main` in the worktree and fails because
+  `~/Dev/kogo` holds it.
 - **The lead does not commit.** Its decisions reach the repository through the issue or the
-  PR they belong to, so every change has had a Code review. Reopen if that makes small
-  corrections slow.
+  PR they belong to, so every change has had a Code review; the merge it makes is of such a
+  PR. Reopen if that makes small corrections slow.
 
 ## Spec gaps found by the leakage ports, unresolved
 

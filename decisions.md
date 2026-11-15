@@ -1435,11 +1435,14 @@ Each entry: what was decided, why, and what would reopen it.
   directory in a module root, which is the user's business.
 - **An `<out>` that is a link is followed before the walk**, as the write follows it, and
   the stale file is named under `<out>` as given.
-- **A `<dir>` that is a link is followed before the walk** in `kogo check`, `emit` and
-  `ts` (DEV-864), and each source is named under `<dir>` as given (the lead's, as for
-  `<out>`). Links below `<dir>` stay unfollowed. Emit's line directives then run through
-  the link and reach the file. A `<dir>` whose link cannot be resolved is walked as given,
-  so the walk's `read` error names it as the user wrote it.
+- **`<dir>` is walked with a separator appended** in `kogo check`, `emit` and `ts`
+  (DEV-864, the lead's ruling), so a `<dir>` that is a link is followed and every name the
+  walk makes, a source's or an unreadable's, lies under `<dir>` as given. Links below
+  `<dir>` stay unfollowed. A dangling link, a missing path and a file are each `read`,
+  exit 2: `kogo check <dir>` is all the README, the spec and the usage line promise, and
+  one rule for the argument is worth more than a second way in that nothing uses. Not
+  taken: resolving the link with `EvalSymlinks` and joining each name back onto `<dir>`,
+  which kept a file argument working. Reopen if a file argument is wanted.
 
 ## Spec gaps found by the leakage ports, unresolved
 

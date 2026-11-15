@@ -385,6 +385,14 @@ func TestLinkedDir(t *testing.T) {
 	if want := `{"file":"` + filepath.Join(link, "a.kg") + `","line":3,"column":16,"code":"unknown-name"`; code != 1 || !strings.HasPrefix(stdout.String(), want) {
 		t.Errorf("exit %d, want 1\n got %s%s\nwant %s...", code, &stdout, &stderr, want)
 	}
+	// A link that names nothing is a <dir> that cannot be read.
+	dangling := filepath.Join(t.TempDir(), "dangling")
+	os.Symlink(filepath.Join(dir, "nowhere"), dangling)
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"check", dangling}, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), `"code":"read"`) {
+		t.Errorf("dangling: exit %d, want 2 and read\n got %s%s", code, &stdout, &stderr)
+	}
 }
 
 // A program with no sql literal is checked without a database; one

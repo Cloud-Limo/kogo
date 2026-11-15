@@ -231,6 +231,61 @@ func TestBindingsOnlyInPrelude(t *testing.T) {
 	}
 }
 
+// Section 2: packages do not import each other, directly or through
+// others. One error for each group, at its shortest cycle.
+func TestImportCycles(t *testing.T) {
+	passes(t,
+		"package a\nimport b.g\nfun f(): Int = g()\n---\npackage b\nfun g(): Int = 1",
+		"package a\nimport a.g\nfun f(): Int = g()\n---\npackage a\nfun g(): Int = 1",
+	)
+	tie := "package a\nimport ‸c.h\nimport b.g\nfun f(): Int = 1\n---\npackage b\nimport a.f\nfun g(): Int = 1\n---\npackage c\nimport a.f\nfun h(): Int = 1"
+	refused(t, [][3]string{
+		{"package a\nimport ‸b.g\nimport b.h\nfun f(): Int = g() + h()\n---\npackage b\nimport a.f\nfun g(): Int = 1\nfun h(): Int = 2\nfun k(): Int = f()",
+			"import-cycle", "packages import each other: f1.kg:2 in a imports b.g, b.h; f2.kg:2 in b imports a.f; move what one package takes from another into a package both may import"},
+		{"package a\nimport ‸b.g\nfun f(): Int = 1\n---\npackage b\nimport c.h\nfun g(): Int = 1\n---\npackage c\nimport a.f\nfun h(): Int = 1",
+			"import-cycle", ": f1.kg:2 in a imports b.g; f2.kg:2 in b imports c.h; f3.kg:2 in c imports a.f;"},
+		// a takes from c and b, both of which take from a: of the two
+		// cycles, the one whose imports come first is told.
+		{tie, "import-cycle", ": f1.kg:2 in a imports c.h; f3.kg:2 in c imports a.f;"},
+		// A ring of three that holds a cycle of two: the two is told.
+		{"package a\nimport b.g\nfun f(): Int = 1\n---\npackage b\nimport ‸c.h\nfun g(): Int = 1\n---\npackage c\nimport a.f\nimport b.g\nfun h(): Int = 1",
+			"import-cycle", ": f2.kg:2 in b imports c.h; f3.kg:3 in c imports b.g;"},
+	})
+	_, errs := run(t, "package a\nimport b.g\nfun f(): Int = 1\n---\npackage b\nimport a.f\nfun g(): Int = 1\n---\npackage c\nimport d.k\nfun h(): Int = 1\n---\npackage d\nimport c.h\nfun k(): Int = 1")
+	if len(errs) != 2 || !strings.HasPrefix(errs[0].Error(), "f1.kg:2:8: import-cycle") || !strings.HasPrefix(errs[1].Error(), "f3.kg:2:8: import-cycle") {
+		t.Errorf("two separate cycles: got %v, want an error at each", errs)
+	}
+}
+
+// Imports rank in the order the files were given, not by name, and a
+// program's file in a package of the prelude's is on a cycle like any.
+func TestImportCyclesAgainstPrelude(t *testing.T) {
+	pre, err := prelude.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(files ...string) []*syntax.Error {
+		var program []*syntax.File
+		for i := 0; i < len(files); i += 2 {
+			f, err := syntax.Parse(files[i], []byte(files[i+1]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			program = append(program, f)
+		}
+		_, errs := Check(pre, program, nil)
+		return errs
+	}
+	errs := check("z.kg", "package b\nimport a.f\nfun g(): Int = 1", "a.kg", "package a\nimport b.g\nfun f(): Int = 1")
+	if len(errs) != 1 || !strings.HasPrefix(errs[0].Error(), "z.kg:2:8: import-cycle") {
+		t.Errorf("given z.kg first: got %v, want the error in z.kg", errs)
+	}
+	errs = check("a.kg", "package a\nimport kogo.time.Instant\nfun f(): Int = 1", "t.kg", "package kogo.time\nimport a.f\nfun g(): Int = 1")
+	if !slices.ContainsFunc(errs, func(e *syntax.Error) bool { return e.Code == "import-cycle" }) {
+		t.Errorf("a cycle through kogo.time: got %v, want an import-cycle", errs)
+	}
+}
+
 // Section 3: the types, the number rules and what each declaration
 // may hold.
 func TestTypes(t *testing.T) {

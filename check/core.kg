@@ -1,0 +1,20 @@
+// The core's own declarations: Either and the forms of a raise scope
+// (spec.md section 9). The checker reads them before the prelude and
+// knows each by name: a fun whose receiver is Raise<E> is called on
+// the raise scope around the call, bind needs one that takes its E,
+// and a block of type Raise<E>.() -> A is a raise scope for E.
+package kogo
+
+sealed interface Either<out E, out A> {
+    data class Left<E> internal constructor(val value: E) : Either<E, Nothing>
+    data class Right<A> internal constructor(val value: A) : Either<Nothing, A>
+}
+
+external class Raise<E>
+
+external fun <E, A> either(block: Raise<E>.() -> A): Either<E, A>
+external fun <E> Raise<E>.raise(r: E): Nothing
+external fun <E> Raise<E>.ensure(condition: Boolean, raise: () -> E)
+external fun <E, A> Raise<E>.ensureNotNull(value: A?, raise: () -> E): A
+external fun <E, A> Either<E, A>.bind(): A
+external fun <E, F, A> Raise<E>.withError(transform: (F) -> E, block: Raise<F>.() -> A): A

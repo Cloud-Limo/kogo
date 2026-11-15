@@ -2,6 +2,7 @@ package check
 
 import (
 	"cmp"
+	_ "embed"
 	"fmt"
 	"slices"
 	"strings"
@@ -9,18 +10,27 @@ import (
 	"kogo/syntax"
 )
 
+//go:embed core.kg
+var coreSource []byte
+
 // Check checks the files of a program against the prelude's, which
 // alone may declare bindings (spec.md 13). It gives what it learned
 // and the errors it found, file by file, the prelude's first.
 func Check(prelude, program []*syntax.File) (*Info, []*syntax.Error) {
+	core, err := syntax.Parse("check/core.kg", coreSource)
+	if err != nil {
+		panic(err) // every test of the checker parses it
+	}
+	prelude = append([]*syntax.File{core}, prelude...)
 	files := append(slices.Clip(prelude), program...)
 	c := &checker{
 		info: &Info{
 			Types: map[syntax.Node]Type{}, Uses: map[syntax.Node]Object{}, Calls: map[syntax.Node]*Call{},
 			Narrowed: map[*syntax.Ident]Type{}, Vars: map[syntax.Node][]*Var{}, Funcs: map[syntax.Node]*Func{},
-			Classes: map[*syntax.ClassDecl]*TypeDecl{},
+			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{},
 		},
 		pkgs: map[string]*pkg{}, members: map[string][]*Func{}, imports: map[*syntax.File]map[string]*pkg{},
+		core: core,
 	}
 	order := map[string]int{}
 	for i, f := range files {
@@ -60,13 +70,17 @@ type checker struct {
 	imports map[*syntax.File]map[string]*pkg
 	sigs    []func() // reads each declaration's signature, once every name is declared
 	bodies  []func() // checks each body, once every signature is read
+	core    *syntax.File
 
 	// Where the checker is.
-	file   *syntax.File
-	pkg    *pkg
-	scope  *scope
-	result Type // what the enclosing fun returns
-	loops  int  // the loops around this place, inside its fun or lambda
+	file       *syntax.File
+	pkg        *pkg
+	scope      *scope
+	result     Type             // what the enclosing fun returns
+	loops      int              // the loops around this place, inside its fun or lambda
+	raise      Type             // the E of the raise scope around this place, or nil
+	lambdas    []*syntax.Lambda // the lambdas around this place
+	raiseDepth int              // how many of lambdas are outside the raise scope
 }
 
 // A pkg is the declarations of the files that share a package line.
@@ -135,12 +149,9 @@ func (c *checker) notYet(at syntax.Node, what string, section int) Type {
 	return c.errorf(at, "not-yet-checked", "%s belongs to spec.md section %d, which is not checked yet", what, section)
 }
 
-// The names of sections 9 and 10 that a program can write without
-// their declarations existing yet.
-var later = map[string]int{
-	"Either": 9, "Raise": 9, "either": 9, "raise": 9, "ensure": 9, "ensureNotNull": 9, "bind": 9,
-	"withError": 9, "left": 9, "right": 9, "Tx": 10, "Db": 10,
-}
+// The names of section 10 that a program can write without their
+// declarations existing yet.
+var later = map[string]int{"Tx": 10, "Db": 10}
 
 // Kotlin's scope functions that section 6 leaves out.
 var notKogo = map[string]string{
@@ -368,6 +379,7 @@ func (c *checker) getter(f *Func, d *syntax.ValDecl) {
 	c.open(f.TypeParams)
 	defer c.pop()
 	f.Receiver, f.Result = c.typ(d.Receiver), c.declared(d)
+	c.failing(d, f)
 	c.later(&c.bodies, func() {
 		c.open(f.TypeParams)
 		defer c.pop()
@@ -395,7 +407,7 @@ func (c *checker) signature(f *Func, d *syntax.FunDecl, owner *TypeDecl) {
 	c.open(f.TypeParams)
 	defer c.pop()
 	if d.Receiver != nil {
-		f.Receiver = c.typ(d.Receiver)
+		f.Receiver = c.receiver(d.Receiver)
 	}
 	for _, p := range d.Params {
 		v := &Var{Kind: Param, Name: p.Name, Type: c.typ(p.Type), Decl: p}
@@ -405,13 +417,16 @@ func (c *checker) signature(f *Func, d *syntax.FunDecl, owner *TypeDecl) {
 	if f.Result = tUnit; d.Result != nil {
 		f.Result = c.typ(d.Result)
 	}
+	c.failing(d, f)
 }
 
-// body checks a fun's default values and its body.
+// body checks a fun's default values and its body. A fun whose
+// receiver is Raise<E> has no this: its body is a raise scope for E.
 func (c *checker) body(f *Func, d *syntax.FunDecl) {
 	c.open(f.TypeParams)
 	defer c.pop()
-	if f.Receiver != nil {
+	raise := c.raised(f.Receiver)
+	if f.Receiver != nil && raise == nil {
 		c.define(d, &Var{Kind: Param, Name: "this", Type: f.Receiver})
 	}
 	for i, p := range d.Params {
@@ -420,8 +435,10 @@ func (c *checker) body(f *Func, d *syntax.FunDecl) {
 		}
 		c.define(p, f.Params[i])
 	}
-	defer func(r Type, l int) { c.result, c.loops = r, l }(c.result, c.loops)
-	c.result, c.loops = f.Result, 0
+	defer func(r Type, l int, e Type, n int) {
+		c.result, c.loops, c.raise, c.raiseDepth = r, l, e, n
+	}(c.result, c.loops, c.raise, c.raiseDepth)
+	c.result, c.loops, c.raise, c.raiseDepth = f.Result, 0, raise, len(c.lambdas)
 	switch {
 	case d.Expr != nil && d.Result == nil:
 		if t := c.expr(d.Expr, nil); !fits(t, tUnit) {
@@ -583,10 +600,13 @@ func (c *checker) typ(t syntax.Type) Type {
 func (c *checker) typ1(t syntax.Type) Type {
 	switch t := t.(type) {
 	case *syntax.FuncType:
-		if t.Receiver != nil {
-			return c.notYet(t, "a function type with a receiver", 9)
+		if t.Receiver != nil && c.file != c.core {
+			return c.errorf(t, "function-receiver", "a function type has no receiver (spec.md 5): take the value as a parameter, or for Raise<E> return an Either<E, A>")
 		}
 		f := &FuncType{Result: c.typ(t.Result)}
+		if t.Receiver != nil {
+			f.Receiver = c.receiver(t.Receiver)
+		}
 		for _, p := range t.Params {
 			f.Params = append(f.Params, c.typ(p))
 		}
@@ -606,7 +626,10 @@ func (c *checker) typ1(t syntax.Type) Type {
 		if len(args) != len(params) {
 			return c.errorf(t, "type-arguments", "%s takes %d type arguments, and %d are written here", t.Name, len(params), len(args))
 		}
-		if r = subst(r, bind(params, args)); t.Nullable {
+		if r = subst(r, bind(params, args)); c.raised(r) != nil {
+			return c.errorf(t, "raise-receiver", "%s is written only as the receiver of a fun: fun %s.name(...): A", r, r)
+		}
+		if t.Nullable {
 			r = nullable(r)
 		}
 		return r

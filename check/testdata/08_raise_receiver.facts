@@ -1,0 +1,64 @@
+  5:1   FunDecl declares fun Raise<String>.requirePercent(value: Int?): Int; fails with String
+  5:11  NamedType : String
+  5:34  Param declares parameter value: Int?
+  5:41  NamedType : Int?
+  5:48  NamedType : Int
+  5:5   NamedType : Raise<String>
+  6:13  Ident is fun <E, A> Raise<E>.ensureNotNull(value: A?, raise: () -> E): A
+  6:26  Call : Int; calls fun <E, A> Raise<E>.ensureNotNull(value: A?, raise: () -> E): A with <String, Int>, on the raise scope, arguments per parameter [1 1]; fails with String
+  6:27  Ident : Int?; is parameter value
+  6:34  Lambda : () -> String
+  6:36  StringLit : String
+  6:37  Literal : String
+  6:5   ValDecl declares local n: Int
+  7:11  Call : Unit; calls fun <E> Raise<E>.ensure(condition: Boolean, raise: () -> E): Unit with <String>, on the raise scope, arguments per parameter [1 1]; fails with String
+  7:12  Ident : Int; is local n
+  7:14  Binary : Boolean
+  7:17  Literal : Int
+  7:20  Literal : Int
+  7:25  Lambda : () -> String
+  7:27  StringLit : String
+  7:28  Literal : String
+  7:5   Ident is fun <E> Raise<E>.ensure(condition: Boolean, raise: () -> E): Unit
+  8:12  Ident : Int; is local n
+  8:5   Jump : Nothing
+ 11:1   FunDecl declares fun Raise<String>.shareFor(outside: Boolean, percent: Int?): Int?; fails with String
+ 11:11  NamedType : String
+ 11:28  Param declares parameter outside: Boolean
+ 11:37  NamedType : Boolean
+ 11:46  Param declares parameter percent: Int?
+ 11:5   NamedType : Raise<String>
+ 11:55  NamedType : Int?
+ 11:62  NamedType : Int?
+ 12:18  Ident is fun Raise<String>.requirePercent(value: Int?): Int
+ 12:32  Call : Int; calls fun Raise<String>.requirePercent(value: Int?): Int, on the raise scope, arguments per parameter [1]; fails with String
+ 12:33  Ident : Int?; is parameter percent
+ 12:47  Literal : Nothing?
+ 12:5   If : Int?
+ 12:9   Ident : Boolean; is parameter outside
+ 15:1   FunDecl declares fun shareOrMessage(outside: Boolean, percent: Int?): String
+ 15:20  Param declares parameter outside: Boolean
+ 15:29  NamedType : Boolean
+ 15:38  Param declares parameter percent: Int?
+ 15:47  NamedType : Int?
+ 15:54  NamedType : String
+ 16:11  Call : Either<String, Int?>; calls fun <E, A> either(block: Raise<E>.() -> A): Either<E, A> with <String, Int?>, no receiver, arguments per parameter [1]
+ 16:12  NamedType : String
+ 16:20  NamedType : Int?
+ 16:26  Lambda : Raise<String>.() -> Int?; fails with String
+ 16:28  Ident is fun Raise<String>.shareFor(outside: Boolean, percent: Int?): Int?
+ 16:36  Call : Int?; calls fun Raise<String>.shareFor(outside: Boolean, percent: Int?): Int?, on the raise scope, arguments per parameter [1 1]; fails with String
+ 16:37  Ident : Boolean; is parameter outside
+ 16:46  Ident : Int?; is parameter percent
+ 16:5   Ident is fun <E, A> either(block: Raise<E>.() -> A): Either<E, A>
+ 17:10  Select is fun <E, A, R> Either<E, A>.fold(ifLeft: (E) -> R, ifRight: (A) -> R): R
+ 17:14  Call : String; calls fun <E, A, R> Either<E, A>.fold(ifLeft: (E) -> R, ifRight: (A) -> R): R with <String, Int?, String>, on its receiver, arguments per parameter [1 1]
+ 17:15  Lambda : (String) -> String; declares local it: String
+ 17:17  Ident : String; is local it
+ 17:23  Lambda : (Int?) -> String
+ 17:25  LambdaParam declares local share: Int?
+ 17:34  StringLit : String
+ 17:35  Literal : String
+ 17:44  Ident : Int?; is local share
+ 17:50  Binary : Int
+ 17:53  Literal : Int

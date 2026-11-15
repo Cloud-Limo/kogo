@@ -265,7 +265,7 @@ func (c *checker) ident(e *syntax.Ident) Type {
 		return c.errorf(e, "not-a-value", "%s is a local fun: call it, or pass a lambda that does", e.Name)
 	}
 	if e.Name == "this" {
-		return c.errorf(e, "unknown-name", "there is no this here: an extension and a data class's fun have one")
+		return c.errorf(e, "unknown-name", "there is no this here: an extension and a data class's fun have one, and a fun Raise<E>.name() has none")
 	}
 	if this := c.this(); this != nil {
 		if t, ok := c.member(e, nil, this, e.Name); ok {
@@ -374,7 +374,7 @@ func (c *checker) findObject(name string) *TypeDecl {
 }
 
 // prelude gives a type of package kogo that the core knows by name:
-// List, Set, Map and Pair.
+// List, Set, Map and Pair, and the core's own Either and Raise.
 func (c *checker) prelude(name string) *TypeDecl {
 	if kogo := c.pkgs["kogo"]; kogo != nil {
 		return kogo.types[name]
@@ -834,7 +834,8 @@ func (c *checker) cond(cond *syntax.Cond, st Type, subject *Var, covered map[str
 // is the type its result must have, when that is known.
 func (c *checker) lambda(l *syntax.Lambda, params []Type, want Type) *FuncType {
 	c.push(nil)
-	defer c.pop()
+	c.lambdas = append(c.lambdas, l)
+	defer func() { c.pop(); c.lambdas = c.lambdas[:len(c.lambdas)-1] }()
 	ft := &FuncType{Params: slices.Clone(params)}
 	unsettled := func(at syntax.Node, name string) Type {
 		return c.errorf(at, "lambda-parameters", "nothing settles the type of %s before this lambda is read: state it, as { %s: Type -> ... }", name, name)
@@ -882,6 +883,9 @@ func (c *checker) lambda(l *syntax.Lambda, params []Type, want Type) *FuncType {
 	c.loops = 0
 	if ft.Result = c.block(l.Body, want, true, nil); want != nil {
 		ft.Result = want
+	}
+	if e := c.either(ft.Result); e != nil && c.info.Fails[l] == nil {
+		c.info.Fails[l] = e
 	}
 	c.info.Types[l] = ft
 	return ft

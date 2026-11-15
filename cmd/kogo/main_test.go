@@ -26,11 +26,11 @@ func kogo(t *testing.T, files map[string]string) (code int, stdout string) {
 	return code, strings.ReplaceAll(out.String(), dir+string(filepath.Separator), "")
 }
 
-// kogo check passes examples 01 to 06 and 20, with the two files that
+// kogo check passes examples 01 to 09 and 20, with the two files that
 // hold what 01 refers to, as one program against the real prelude.
 func TestExamples(t *testing.T) {
 	files := map[string]string{}
-	for _, pattern := range []string{"0[0-6]_*.kg", "20_*.kg"} {
+	for _, pattern := range []string{"0[0-9]_*.kg", "20_*.kg"} {
 		names, _ := filepath.Glob("../../examples/" + pattern)
 		for _, name := range names {
 			src, err := os.ReadFile(name)
@@ -40,8 +40,8 @@ func TestExamples(t *testing.T) {
 			files[filepath.Base(name)] = string(src)
 		}
 	}
-	if len(files) != 9 {
-		t.Fatalf("%d examples, want 9", len(files))
+	if len(files) != 12 {
+		t.Fatalf("%d examples, want 12", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)

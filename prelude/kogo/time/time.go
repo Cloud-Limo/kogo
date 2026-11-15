@@ -85,9 +85,18 @@ func (z ZonedDateTime) String() string {
 func Clock_Now(this Clock) Instant                           { return this.now() }
 func Instant_AtZone(this Instant, zone ZoneId) ZonedDateTime { return ZonedDateTime{this, zone} }
 
-// LocalDate_PlusDays counts across months and years, as java.time does.
+// The days since 1970-01-01 of java.time's first and last LocalDate,
+// in years -999999999 and 999999999.
+const minEpochDay, maxEpochDay = -365243219162, 365241780471
+
+// LocalDate_PlusDays counts across months and years, as java.time does,
+// and panics past java.time's range rather than give a wrong date.
 func LocalDate_PlusDays(this LocalDate, daysToAdd int64) LocalDate {
-	y, m, d := gotime.Date(int(this.Year), gotime.Month(this.Month), int(this.Day)+int(daysToAdd), 0, 0, 0, 0, gotime.UTC).Date()
+	day := gotime.Date(int(this.Year), gotime.Month(this.Month), int(this.Day), 0, 0, 0, 0, gotime.UTC).Unix() / 86400
+	if daysToAdd > maxEpochDay-day || daysToAdd < minEpochDay-day {
+		panic(fmt.Sprintf("%v plus %d days is outside the range of a LocalDate", this, daysToAdd))
+	}
+	y, m, d := gotime.Unix((day+daysToAdd)*86400, 0).UTC().Date()
 	return LocalDate{int32(y), int32(m), int32(d)}
 }
 

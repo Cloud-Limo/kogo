@@ -71,7 +71,9 @@ func emit(t *testing.T, root string, sources ...string) (*emitter, map[string][]
 // lies in the module that holds rt and the prelude's Go, and runs
 // them as a program. In main.go ROOT stands for the directory's
 // import path. It gives what the program prints, with its panic's
-// trace when it ends in one.
+// trace when it ends in one, or why it does not build. The build is
+// apart from the run, so that what go says about the build, such as
+// the modules it downloads, is never read as the program's output.
 func build(t *testing.T, files func(root string) map[string][]byte) string {
 	t.Helper()
 	dir, err := os.MkdirTemp(".", "emitted")
@@ -89,7 +91,11 @@ func build(t *testing.T, files func(root string) map[string][]byte) string {
 			t.Fatal(err)
 		}
 	}
-	out, _ := exec.Command("go", "run", "./"+dir).CombinedOutput()
+	prog := filepath.Join(dir, "prog")
+	if out, err := exec.Command("go", "build", "-o", prog, "./"+dir).CombinedOutput(); err != nil {
+		return string(out)
+	}
+	out, _ := exec.Command(prog).CombinedOutput()
 	return string(out)
 }
 

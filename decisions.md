@@ -1480,6 +1480,16 @@ Each entry: what was decided, why, and what would reopen it.
   passes, its implementers unknown, and is left to the runtime. Not taken: leaving every
   interface to the runtime, though the checker can see the function.
 
+## Taken building the tests' emitted Go apart from its run (DEV-865), not yet discussed
+
+- **A test that runs emitted Go builds it with `go build`, then runs the binary**, and
+  reads only the binary's output (stdout and stderr, so a panic's trace stays). With `go
+  run` the go command's own stderr, `go: downloading …` on a cold module cache, was read as
+  the program's: neither test binary of `cmd/kogo` or `emit` needs `puddle` or `x/sync`,
+  which the prelude's `pgxpool` does. Not taken: `go mod download` in `mise run testdb`,
+  which leaves the tests wrong wherever the cache is cold for another reason; or a filter
+  on `go:` lines, which hides what a program prints.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, workers, and an

@@ -494,6 +494,10 @@ Each entry: what was decided, why, and what would reopen it.
   as `kogo-sql` does. A failure to ask the database stops the check with exit 2. The test
   that goes through the SQL pass to the test database is `cmd/kogo`'s, over the examples;
   the checker's own tests need none (`doc/design.md`).
+- **The five calls need their `Tx` written before the dot.** In a fun on `Tx`, a bare
+  `execute(sql"...")` is refused with a fix naming `this.execute`. No example or port calls
+  one on an implicit receiver, and taking it would have the checker and the emitter both
+  find that receiver. Reopen if a port writes helpers as funs on `Tx`.
 - **The examples changed to pass**: 12, 13 and 16 import `kogo.time.Instant` (spec 2), and
   19 is `package example.markers`, since 12 also declares `Business`. The prelude gained
   `Uuid`, `newId`, `List.size` and `check`, which they use.

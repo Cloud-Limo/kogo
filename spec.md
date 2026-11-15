@@ -499,10 +499,11 @@ fun suppliersOf(tx: Tx, operatorId: ID): List<SupplierRow> =
 | `tx.exists(sql"...")` | `Boolean` | true when at least one row |
 | `tx.execute(sql"...")` | `Int`, rows affected | |
 
-`insert`/`update`/`delete ... returning` go through the query calls. `exists` and `execute`
-discard the result's columns, so those columns are not typed and need no type of section
-10.4: `tx.execute(sql"select pg_advisory_xact_lock($key)")` passes though `void` has none,
-and a `returning` under `execute` is ignored.
+Each is called on a `Tx` written before the dot: in a fun on `Tx`,
+`this.execute(sql"...")`. `insert`/`update`/`delete ... returning` go through the query
+calls. `exists` and `execute` discard the result's columns, so those columns are not typed
+and need no type of section 10.4: `tx.execute(sql"select pg_advisory_xact_lock($key)")`
+passes though `void` has none, and a `returning` under `execute` is ignored.
 
 ### 10.3 Result types
 

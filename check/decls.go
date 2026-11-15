@@ -410,7 +410,7 @@ func (c *checker) signature(f *Func, d *syntax.FunDecl, owner *TypeDecl) {
 }
 
 // body checks a fun's default values and its body. Where its receiver
-// failed, Raise<E> perhaps, what it raises says no more.
+// is a Raise<E>, refused, what it raises says no more.
 func (c *checker) body(f *Func, d *syntax.FunDecl) {
 	c.open(f.TypeParams)
 	defer c.pop()
@@ -418,8 +418,10 @@ func (c *checker) body(f *Func, d *syntax.FunDecl) {
 	if f.Receiver != nil {
 		c.define(d, &Var{Kind: Param, Name: "this", Type: f.Receiver})
 	}
-	if f.Receiver == unknown {
-		raise = unknown
+	if n, ok := d.Receiver.(*syntax.NamedType); ok && f.Receiver == unknown {
+		if t, _ := c.findType(n.Name); t != nil && t == c.prelude("Raise") {
+			raise = unknown
+		}
 	}
 	for i, p := range d.Params {
 		if p.Default != nil {

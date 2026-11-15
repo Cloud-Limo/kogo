@@ -490,6 +490,11 @@ func TestFailures(t *testing.T) {
 		{"fun f(g: () -> Int): Either<String, Int> = either(‸g)", "type-mismatch", "this is a () -> Int where a Raise<String>.() -> Int is wanted"},
 		{"fun f(): Either<String, Int> = ‸either(1) { raise(\"no\") }", "arguments", "either is given block twice"},
 	})
+	// Only a refused Raise<E> receiver keeps quiet about the body: an
+	// unknown type there still lets raise-scope be said.
+	if _, errs := run(t, "fun Foo.f(): Int = raise(\"no\")"); len(errs) != 2 || errs[0].Code != "unknown-name" || errs[1].Code != "raise-scope" {
+		t.Errorf("an unknown receiver: got %v, want unknown-name then raise-scope", errs)
+	}
 }
 
 // Section 10: the five calls, their result types and their parameters,

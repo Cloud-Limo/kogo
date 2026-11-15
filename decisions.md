@@ -787,8 +787,10 @@ Each entry: what was decided, why, and what would reopen it.
   `fun <T> later(b: () -> T) = b` does, and a failure raised after its scope has returned
   would be a panic no scope recovers: a 500 where section 9 promises a value. Kotlin
   allows it, and Arrow throws when it happens. Not taken: following each function-typed
-  parameter through its fun's body to see that it is only called, more checker for a case
-  no example has. Reopens when a program needs its own fun to run a failing block.
+  parameter through its fun's body to see that it is only called, which makes a call's
+  legality depend on a body elsewhere (principle 2). Reopens when a program needs its own
+  fun to run a failing block, and then by Kotlin's marker on the signature, `inline fun`,
+  which forbids keeping the parameter, at the cost of a keyword Kogo does not have.
 - **The prelude's Go is safe to unwind through**, a rule stated at the top of
   `prelude/kogo/kogo.go`: a function that calls a lambda holds no lock and leaves nothing
   half done while it runs. Every one there already keeps what it builds to itself until it

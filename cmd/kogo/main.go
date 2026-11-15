@@ -88,6 +88,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 		// false errors: each name it declares would be unknown.
 		return 1
 	}
+	if len(files) == 0 { // a mistyped <dir> would pass
+		fatal.Encode(syntax.Error{Code: "no-source", Message: fmt.Sprintf("no .kg file lies under %s: give the directory that holds the program", args[1])})
+		return 2
+	}
 	var sigs check.Signatures
 	var lost error // a failure to ask the database, which stops the check
 	if slices.ContainsFunc(files, func(f *syntax.File) bool { return f.SQL != nil }) {

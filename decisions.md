@@ -1443,6 +1443,10 @@ Each entry: what was decided, why, and what would reopen it.
   one rule for the argument is worth more than a second way in that nothing uses. Not
   taken: resolving the link with `EvalSymlinks` and joining each name back onto `<dir>`,
   which kept a file argument working. Reopen if a file argument is wanted.
+- **A `<dir>` with no `.kg` file under it is `no-source`, exit 2**, for `check`, `emit`
+  and `ts` (DEV-864, the lead's ruling): a mistyped path to an empty directory would
+  otherwise pass the only gate in silence. The message names `<dir>` and says to give the
+  directory that holds the program. Not taken: an empty program has no errors, exit 0.
 
 ## Spec gaps found by the leakage ports, unresolved
 

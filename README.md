@@ -26,7 +26,9 @@ bin/kogo ts <dir> <out>
 
 `kogo check` checks the `.kg` files under a directory as one program and
 prints one JSON error a line (file, line, column, code, message). It
-exits 0 when there are none. A program with a `sql"""` literal is checked
+exits 0 when there are none. A `<dir>` with no `.kg` file under it is
+refused with `no-source`, exit 2, as is a `<dir>` that is not a directory;
+a link to one is followed. A program with a `sql"""` literal is checked
 against the database `DATABASE_URL` names, as below. `kogo emit` checks
 them and then writes one Go package for each Kogo package, `a.b`'s at
 `<out>/a/b/kogo.go`; `<out>` lies in a Go module that requires this one.

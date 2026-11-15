@@ -158,6 +158,12 @@ func TestDeclarations(t *testing.T) {
 	if got := show(f); err != nil || got != `(File t.kg [(Annotation OptIn [(ClassRef A) (ClassRef b.B)])] (Ident x.y) [(Ident a.b.C) (Ident d.e)])` {
 		t.Errorf("file head: %s %v", got, err)
 	}
+
+	// An api list may end with a comma, and api is a name elsewhere.
+	f = parse(t, "api ops { me, updateJob, }\napi other {\n    me\n}\nfun api(api: Int): Int = api")
+	if got := show(f.APIs); got != `[(API ops [(Ident me) (Ident updateJob)]) (API other [(Ident me)])]` || len(f.Decls) != 1 {
+		t.Errorf("api lists: %s, %d declarations", got, len(f.Decls))
+	}
 }
 
 func TestExpressions(t *testing.T) {

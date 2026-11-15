@@ -150,7 +150,7 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 		}
 		e.w("var %s_entries = []%s{%s}", name, name, strings.Join(all, ", "))
 	case "data class", "data object":
-		simple := td.Name[strings.LastIndexByte(td.Name, '.')+1:]
+		simple := td.Simple()
 		if d.Kind == "data object" {
 			simple += ",object"
 		}

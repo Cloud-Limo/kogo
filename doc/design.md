@@ -105,6 +105,8 @@ node, as Go's own type checker gives.
 - Where a name is narrowed, and to what.
 - For each `sql` literal, its signature and the column that fills each
   property.
+- For each `api` list, its operations in order, and the wire types they
+  reach.
 
 Every function, lambda and call is marked as able to fail with an error
 type `E`, or not, whichever spelling the author used, so the emitter
@@ -234,16 +236,18 @@ fun. Nothing outside calls an operation by its Go name, so the naming
 rule's neighbours never reach the wire.
 
 **The library** is hand-written Go in this repo, the Go of package
-`kogo.rpc`, beside its `Request`. Given a table, a `Db` and the
-environment it is an `http.Handler` that does what section 15 says: it
-finds the operation, reads the input strictly, runs a `Tx` operation in
-a SERIALIZABLE transaction with reruns, commits or rolls back, writes
+`kogo.rpc`, beside its `Request`. Given a table, a connection pool and
+the environment it is an `http.Handler` that does what section 15 says:
+it finds the operation, reads the input strictly, runs a `Tx` operation
+in a SERIALIZABLE transaction with reruns, commits or rolls back, writes
 the answer, and turns a panic into a 500. JSON is read and written by
 one walk over the emitted types, as `==` is, by the names the structs
-already carry: no code is emitted for each type. Reruns are those of
-`db.tx(serializable = true)`, here with a limit, since a person is
-waiting: 90 seconds unless `main` says otherwise, and past it the
-answer is 503, so that a 500 always means a bug.
+already carry: no reader or writer is emitted for each type. Go's
+reflection lists neither an enum's constants nor a sealed interface's
+variants, so the table carries each that its inputs reach. Reruns are
+those of `db.tx(serializable = true)`, here with a limit, since a
+person is waiting: 90 seconds unless `main` says otherwise, and past it
+the answer is 503, so that a 500 always means a bug.
 
 **The application's `main`** is Go that it writes once, about fifteen
 lines: read the configuration, open the pool, build the environment's

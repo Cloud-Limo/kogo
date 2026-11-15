@@ -1,0 +1,9 @@
+// What the server read of one HTTP request, handed to an operation
+// (spec.md 15.2). Kogo code reads one and never builds one.
+package kogo.rpc
+
+external class Request
+
+external fun Request.header(name: String): String?
+external fun Request.cookie(name: String): String?
+external val Request.clientAddress: String

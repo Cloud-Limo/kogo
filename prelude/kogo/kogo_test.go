@@ -97,7 +97,7 @@ func TestLists(t *testing.T) {
 	}
 }
 
-func TestListsForLedgers(t *testing.T) {
+func TestMoreLists(t *testing.T) {
 	five, xs := int64(5), make(List[int64], 1, 4)
 	if got := ListOfNotNull(nil, &five, nil); !slices.Equal(got, []int64{5}) {
 		t.Errorf("listOfNotNull gives %v", got)
@@ -108,6 +108,9 @@ func TestListsForLedgers(t *testing.T) {
 	a, b := List_Plus(xs, ListOf[int64](1)), List_Plus(xs, ListOf[int64](2))
 	if !slices.Equal(a, []int64{0, 1}) || !slices.Equal(b, []int64{0, 2}) {
 		t.Errorf("one plus wrote over another: %v %v", a, b)
+	}
+	if List_Plus(List[int64]{}, nil) == nil {
+		t.Error("an empty plus an empty is nil, which pgx and JSON write as null")
 	}
 	if List_Get(a, 1) != 1 || Int_ToLong(-3) != -3 {
 		t.Error("get or toLong is wrong")

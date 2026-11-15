@@ -9,10 +9,11 @@ import (
 	"kogo/syntax"
 )
 
-// Check checks the files of a program, the prelude's among them. It
-// gives what it learned and the errors it found, file by file in
-// source order.
-func Check(files []*syntax.File) (*Info, []*syntax.Error) {
+// Check checks the files of a program against the prelude's, which
+// alone may declare bindings (spec.md 13). It gives what it learned
+// and the errors it found, file by file, the prelude's first.
+func Check(prelude, program []*syntax.File) (*Info, []*syntax.Error) {
+	files := append(slices.Clip(prelude), program...)
 	c := &checker{
 		info: &Info{
 			Types: map[syntax.Node]Type{}, Uses: map[syntax.Node]Object{}, Calls: map[syntax.Node]*Call{},
@@ -29,6 +30,9 @@ func Check(files []*syntax.File) (*Info, []*syntax.Error) {
 			c.notYet(a, "@file:OptIn", 11)
 		}
 		for _, d := range f.Decls {
+			if i >= len(prelude) && external(d) {
+				c.errorf(d, "external", "only the prelude declares bindings (spec.md 13): give this a body in Kogo")
+			}
 			c.declare(d, "")
 		}
 	}
@@ -327,6 +331,19 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 			})
 		}
 	}
+}
+
+// external reports whether a declaration is a binding.
+func external(d syntax.Decl) bool {
+	switch d := d.(type) {
+	case *syntax.ClassDecl:
+		return strings.HasPrefix(d.Kind, "external ")
+	case *syntax.FunDecl:
+		return d.Mods.External
+	case *syntax.ValDecl:
+		return d.Mods.External
+	}
+	return false
 }
 
 func (c *checker) addFunc(f *Func, receiver bool) {

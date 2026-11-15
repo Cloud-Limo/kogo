@@ -302,11 +302,15 @@ Each entry: what was decided, why, and what would reopen it.
   others show false errors, each naming something that is declared. Not taken: checking
   them anyway (one typo, many wrong errors) or a parser that recovers past an error (its
   size, to save one rerun). Reopen if ports show syntax errors fixed one rerun at a time.
-- **Not refused yet: `external` in application code** (spec 13). Nothing tells a binding's
-  file from an application's until `kogo check` is told where bindings live. Nor: a `val`
-  in an interface that a data object implements (it has no constructor to override it in),
-  an `out` type parameter used as a parameter's type, and two functions with one signature,
-  which are an error only when called.
+- **`check.Check` takes the prelude's files apart from the program's, and only the
+  prelude's may declare a binding** (spec 13). `kogo check` loads the prelude itself, so
+  it knows which is which. Not taken: allowing `external` in package `kogo` and under it,
+  which any file could claim with its package line. An `external` in a program's file is
+  refused where it is declared; with it go the nullable receiver, `out` and `vararg` that
+  only a binding may write. Reopen if a program needs Go bindings of its own.
+- **Not refused yet**: a `val` in an interface that a data object implements (it has no
+  constructor to override it in), an `out` type parameter used as a parameter's type, and
+  two functions with one signature, which are an error only when called.
 
 ## Spec gaps found by the leakage ports, unresolved
 

@@ -39,6 +39,7 @@ external fun String.plus(other: String): String
 external fun String.compareTo(other: String): Int
 external fun String?.isNullOrBlank(): Boolean
 external fun Int.toLong(): Long
+external fun Int.toDouble(): Double
 external fun <T, R> T.let(block: (T) -> R): R
 external fun <T> requireNotNull(value: T?, lazyMessage: () -> String): T
 external fun require(value: Boolean, lazyMessage: () -> String)
@@ -63,18 +64,23 @@ func split(src string) []string {
 }
 
 // run checks src with the tests' prelude, which is f0.kg; the files
-// of src are f1.kg and on.
+// of src are f1.kg and on. A file of src in package kogo, or one under
+// it, joins the prelude, to hold bindings of the test's own.
 func run(t *testing.T, src string) (*Info, []*syntax.Error) {
 	t.Helper()
-	var files []*syntax.File
+	var pre, program []*syntax.File
 	for i, text := range append([]string{bindings}, split(src)...) {
 		f, err := syntax.Parse(fmt.Sprintf("f%d.kg", i), []byte(text))
 		if err != nil {
 			t.Fatalf("%s\n%v", text, err)
 		}
-		files = append(files, f)
+		if name := f.Package.Name; name == "kogo" || strings.HasPrefix(name, "kogo.") {
+			pre = append(pre, f)
+		} else {
+			program = append(program, f)
+		}
 	}
-	return Check(files)
+	return Check(pre, program)
 }
 
 // refused checks that each program is refused once, where ‸ stands,
@@ -123,7 +129,9 @@ func TestNames(t *testing.T) {
 		{"package a\nimport ‸b.g\n---\npackage c\nfun g(): Int = 1", "unknown-import", "no package b"},
 		{"package a\nimport ‸c.h\n---\npackage c\nfun g(): Int = 1", "unknown-import", "package c declares nothing named h"},
 		{"package a\nimport ‸kogo.time.seconds\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int", "member-import", "seconds is a member, in scope wherever a value of its receiver's type is: remove this import"},
-		// Section 13: an external object holds funs.
+		// Section 13: only the prelude declares bindings, and an
+		// external object holds funs.
+		{"external ‸fun String.shout(): String", "external", "only the prelude declares bindings (spec.md 13): give this a body in Kogo"},
 		{"package kogo\nexternal object Zone {\n    ‸val utc: Long\n}", "external-object", "an external object holds funs only (spec.md 13): declare fun utc(): ... instead"},
 		{"package a\nimport ‸c.g\n---\npackage c\nprivate fun g(): Int = 1", "not-visible", "g is private to f2.kg: remove private"},
 		{"package a\nimport ‸c.g\n---\npackage c\ninternal fun g(): Int = 1", "not-visible", "g is internal to package c: remove internal"},
@@ -145,12 +153,23 @@ func TestNames(t *testing.T) {
 	})
 }
 
+// A program's file is not the prelude's for claiming its package.
+func TestBindingsOnlyInPrelude(t *testing.T) {
+	f, err := syntax.Parse("p.kg", []byte("package kogo\nexternal class Box\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, errs := Check(nil, []*syntax.File{f}); len(errs) != 1 || errs[0].Code != "external" {
+		t.Errorf("got %v, want one external error", errs)
+	}
+}
+
 // Section 3: the types, the number rules and what each declaration
 // may hold.
 func TestTypes(t *testing.T) {
 	passes(t,
 		"typealias Cents = Long\nval zero: Cents = 0\nfun f(a: Cents, n: Int): Cents = a * n / 100 - -1\nfun g(a: Cents): Boolean = a == 0L && a < 1 && 1 <= a\nfun h(a: Cents?): Cents = a ?: 0\nfun k(): Cents { return 0 }",
-		"fun f(a: Double, n: Int): Double = a * n.toDouble() + 1.5\nexternal fun Int.toDouble(): Double",
+		"fun f(a: Double, n: Int): Double = a * n.toDouble() + 1.5",
 		"fun f(c: Char, s: String, b: Boolean, u: Unit): String = \"$c $s $b ${f(c, s, !b, Unit)}\" + \"\"\"raw\"\"\"",
 		"typealias Pairs<T> = List<Pair<T, T>>\nfun f(ps: Pairs<Int>): Pair<Int, Int> = ps.first()",
 		"data class P(val a: Int, val b: String = \"\")\nfun f(p: P): P = p.copy(b = p.toString())\nfun g(p: P): Int {\n    val (a, b) = p\n    return a + b.length\n}\nfun h(): Boolean = P(1) == P(b = \"x\", a = 2)",
@@ -361,10 +380,11 @@ var update = flag.Bool("update", false, "rewrite testdata/*.facts from the check
 // The facts of whole examples, as the emitter will read them: one
 // line for each node that has any, in source order.
 func TestFacts(t *testing.T) {
-	files, err := prelude.Files()
+	pre, err := prelude.Files()
 	if err != nil {
 		t.Fatal(err)
 	}
+	var files []*syntax.File
 	names := []string{"00_cents", "00_booking", "01_pay", "02_discount", "03_abn", "04_sealed_when", "05_enum_when", "06_nullable", "20_interface_loop_time"}
 	for _, name := range names {
 		src, err := os.ReadFile("../examples/" + name + ".kg")
@@ -377,7 +397,7 @@ func TestFacts(t *testing.T) {
 		}
 		files = append(files, f)
 	}
-	info, errs := Check(files)
+	info, errs := Check(pre, files)
 	if errs != nil {
 		t.Fatalf("examples 01 to 06 and 20: %v", errs)
 	}

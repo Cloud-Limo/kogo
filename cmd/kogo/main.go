@@ -33,11 +33,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fatal.Encode(syntax.Error{Code: "usage", Message: "usage: kogo check <dir>"})
 		return 2
 	}
-	files, err := prelude.Files()
+	pre, err := prelude.Files()
 	if err != nil {
 		fatal.Encode(syntax.Error{Code: "prelude", Message: err.Error()})
 		return 2
 	}
+	var files []*syntax.File
 	failed := false
 	err = filepath.WalkDir(args[1], func(file string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(file, ".kg") {
@@ -65,7 +66,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		// false errors: each name it declares would be unknown.
 		return 1
 	}
-	_, faults := check.Check(files)
+	_, faults := check.Check(pre, files)
 	for _, f := range faults {
 		out.Encode(f)
 	}

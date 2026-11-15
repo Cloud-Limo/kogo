@@ -316,6 +316,14 @@ Each entry: what was decided, why, and what would reopen it.
   cost: a data class that holds a function cannot be compared, be a `Map`'s key or go in
   a `Set`, which Kotlin allows. Reopen if ports that turn anonymous objects into lambdas
   need to compare them.
+- **Behind a type parameter, `==` panics once it reaches a function** (16 Nov 2026; spec
+  3). The runtime's walk stops at the first part that differs, so `eq(Rule("a", f),
+  Rule("b", f))` answers `false` and `eq(Rule("a", f), Rule("a", f))` panics; the spec
+  says so. No answer differs from Kotlin's: `false` comes only where Kotlin's is `false`
+  too, and `true` is never reached past a function. Not taken: panicking whenever either
+  value holds a function anywhere, about 15 code lines and a full walk of both values on
+  every unequal comparison, to make a rare failure earlier. Reopen if a port passes its
+  tests and then panics on data whose other parts are equal.
 - **The prelude's signatures are Kogo declarations, read by the checker like any other
   source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
@@ -880,10 +888,6 @@ Each entry: what was decided, why, and what would reopen it.
   `NaN` and `0.0` is not equal to `-0.0`. Between two expressions that are each a `Double`
   or a `Double?` it is IEEE's, as in Kotlin: Go's `==`, or `rt.EqualDouble` once either
   may be null. A value that holds a function is not compared: see "Agreed with Greg".
-- **`x == null` is allowed where `x` holds a function** (DEV-845): it tests for null,
-  compares no function, and is how a `T?` is narrowed. The message names the data class
-  and property that hold the function itself. Not taken: refusing it with every
-  other `==`, which leaves `((Int) -> Boolean)?` untestable.
 - **Arithmetic on two literals is kept from Go's constant folding**: the left one is read
   through `rt.Val`, so that `2147483647 + 1` wraps and a `Double` gives `Infinity`, as at
   run time. A minus on a whole literal is one literal (`int32(-2147483648)`); on anything
@@ -1421,6 +1425,21 @@ Each entry: what was decided, why, and what would reopen it.
   opens the next, and a `case` and its conditions are written at the `switch`'s level. A
   line with no position (none is written today inside a declaration) gets its tabs and no
   directive.
+
+## Taken refusing `==` on a function (DEV-845), not yet discussed
+
+- **`x == null` is allowed where `x` holds a function**, and so is a `when`'s `null ->`
+  branch: it tests for null, compares no function, and is how a `T?` is narrowed. Not
+  taken: refusing it with every other `==`, which leaves `((Int) -> Boolean)?` with no
+  null test.
+- **The message names the declaration and property that hold the function**, as `Rule's
+  property test`, even where it is reached through `List<…>` or a variant. Not taken:
+  printing the whole path, longer for the cases where the type is already in view.
+- **An interface's `val`s are read like a data class's properties** (ruled on the review
+  of DEV-845), so an interface that declares a function `val` is refused: every value of it
+  holds one, since its implementers declare the `val`. An interface with no function `val`
+  passes, its implementers unknown, and is left to the runtime. Not taken: leaving every
+  interface to the runtime, though the checker can see the function.
 
 ## Spec gaps found by the leakage ports, unresolved
 

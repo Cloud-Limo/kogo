@@ -659,11 +659,13 @@ fun boxed(): String = "${D(0.0 / 0.0) == D(0.0 / 0.0)} ${D(0.0) == D(-0.0)}"
 }
 
 // A function behind a type parameter, which check cannot see, is not
-// compared (spec.md 3): == panics, where Kotlin compares by reference.
+// compared (spec.md 3): == panics once it reaches the function, and
+// answers false where an earlier part differs.
 func TestFunctionEquality(t *testing.T) {
 	expect(t, [][2]string{
 		{"t.Same()", "panics: a function cannot be compared"},
 		{"t.Holds()", "panics: a function cannot be compared"},
+		{"t.Differ()", "false"},
 		{"t.Plain()", "true"},
 	}, `package t
 
@@ -679,6 +681,11 @@ fun same(): Boolean {
 fun holds(): Boolean {
     val r = Rule("pos", { n -> n > 0 })
     return setOf(r).contains(r)
+}
+
+fun differ(): Boolean {
+    val test = { n: Int -> n > 0 }
+    return eq(Rule("a", test), Rule("b", test))
 }
 
 fun plain(): Boolean = eq(listOf("a"), listOf("a"))

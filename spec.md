@@ -85,10 +85,13 @@ A value that holds a function is not compared, though Kotlin compares
 functions by reference. `==` and `!=` are an error where either side's
 type holds one: a function type, a data class with a property whose type
 holds one, a sealed interface with such a variant, and a `T?` or a type
-argument of any of these, as `List<Rule>`. Comparing with `null` is
-allowed. Where the type does not show the function, behind a type
-parameter or an interface, comparing panics, `contains`, `distinct` and
-a `Set`'s or `Map`'s keys included.
+argument of any of these, as `List<Rule>`, and an interface that
+declares a function `val`; so is a `when` branch that compares its
+subject with such a value. Comparing with `null` is allowed. Where the
+type does not show the function, behind a type parameter or an
+interface, the comparison panics once it reaches the function, and
+answers `false` where a part before it differs, `contains`, `distinct`
+and a `Set`'s or `Map`'s keys included.
 
 A `String` counts as Kotlin's does: `length`, `substring`, `padStart`
 and reading it as `Char`s count UTF-16 units, so `"😀".length` is 2. It

@@ -20,12 +20,14 @@ is open.
 
 ## Starting
 
-1. `git -C ~/Dev/kogo pull --ff-only`.
+1. `git -C ~/Dev/kogo pull --ff-only` and
+   `git -C ~/Dev/cusoon2-tasks pull --ff-only`.
 2. `LINEAR_PROJECT=Kogo lin list board`: every open issue with its
    state and the first line of its newest comment.
 3. Remove each worktree whose PR has merged (`gh pr list --state
    merged --head <branch>`): check `git status` there is clean, then
-   `git worktree remove` and `git branch -d`.
+   `git worktree remove`, `git branch -d` and
+   `git push origin --delete <branch>`.
 4. Tell Greg, in this order and briefly: what waits for him, what is
    ready to merge, what needs a review, what is running, what could
    start. End with the one move you suggest.

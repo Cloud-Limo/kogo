@@ -40,8 +40,10 @@ run in Zed or as an async run, in any mix. So whatever a later step
 needs is on the issue, the PR or the pushed branch, never only in a
 session or a worktree.
 
-`lin X` below is short for `mise -C ~/Dev/cusoon2 run linear-X`;
-`$LINEAR_API_KEY` is already in the shell.
+`lin X` below is short for `mise -C ~/Dev/cusoon2-tasks run linear-X`,
+a cusoon2 checkout kept on `renew` for these tasks alone: other
+sessions switch branches in `~/Dev/cusoon2`, and the tasks go missing
+with them. `$LINEAR_API_KEY` is already in the shell.
 
 - **Lead.** "Lead" starts the session Greg talks to: read
   `doc/lead.md` and follow it. No other session needs that file.
@@ -51,7 +53,7 @@ session or a worktree.
   you find worth doing; nobody screens issues first.
 - **Pickup.** "Pickup DEV-NNN" is `lin pickup DEV-NNN kogo-dev-NNN`:
   read its output and start. Use your own worktree, on the branch name
-  that output gives:
+  that output gives: `git -C ~/Dev/kogo fetch origin`, then
   `git worktree add -b <branch> ~/Dev/kogo-dev-NNN origin/main`.
   `~/Dev/kogo` stays on `main` for Greg and the lead: never edit,
   commit or switch branch there, and never work in another issue's
@@ -69,8 +71,9 @@ session or a worktree.
   and stop.
 - **Code review.** "Code review DEV-NNN": `lin show DEV-NNN` and take
   the PR and branch from the newest Handoff. Work in
-  `~/Dev/kogo-dev-NNN`: create it from `origin/<branch>` when it is
-  missing, otherwise `git pull --ff-only` there. Read the whole diff
+  `~/Dev/kogo-dev-NNN`: when it is missing, `git -C ~/Dev/kogo fetch
+  origin` and create it from `origin/<branch>`; otherwise
+  `git pull --ff-only` there. Read the whole diff
   against the issue, `spec.md` and the rules above, and run the tests.
   Change no code. Write one comment: the first line
   `Review: <PR url> at <sha> · N fix, N won't fix, N question`, then
@@ -81,13 +84,13 @@ session or a worktree.
   with `lin comment`, print it, and stop.
 - **Fix and merge.** "Fix and merge", with the key when the session
   is new: in the same worktree, fast-forwarded, make every Fix of the
-  newest Review as further commits, and treat a `Ruling:` comment
-  after it as the answer to its Question. Rewrite the PR description
-  if the work moved. Push. If a Question has no Ruling, stop here and
-  say so. Otherwise `gh pr merge --merge`, then
-  `git push origin --delete <branch>`, and post `Merged: <sha>` with
-  what was fixed on the issue and the PR. The merge moves the issue to
-  Done. Leave the worktree: the lead removes it.
+  newest Review as further commits. A `Ruling:` comment after it
+  answers its Questions and overrides the Review where they differ,
+  a Fix included. Rewrite the PR description if the work moved. Push.
+  If a Question has no Ruling, stop here and say so. Otherwise
+  `gh pr merge --merge` and post `Merged: <sha>` with what was fixed
+  on the issue and the PR. The merge moves the issue to Done. Leave
+  the worktree and the remote branch: the lead removes both.
 - **Async runs.** A run has no Linear access and its clone is its
   worktree. Where a step posts on the issue, write that comment as the
   run's `answer.md`, which the wrapper posts, and post it on the PR

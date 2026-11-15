@@ -153,6 +153,17 @@ Each entry: what was decided, why, and what would reopen it.
   Java's everywhere. `Uuid`, `newId` and `Decimal` are Kogo's own with no import; none is
   a member of a Kotlin type, and they stay. Reopen if imports of `kogo.` functions come to
   crowd a file, or a function keeps reading worse than the member would.
+- **A prelude declaration always lands with its Go and a test** (15 Nov 2026; spec 12 and
+  13). `TestPrelude` compiles a use of every declaration against the Go behind it, and
+  stays that strict: a declaration the checker accepts is one the emitter can write. Not
+  taken: declarations ahead of their Go, on a list the emitter refuses, which lets a port
+  check against names that cannot run; a second state for a prelude function, which every
+  reader of the prelude would then have to tell apart.
+- **An operator on numbers is not also a named function** (15 Nov 2026; spec 3 and 12).
+  `+` on numbers is built into the checker, so `pay?.plus(x)` on a `Long?` has no binding;
+  a port writes `pay?.let { it + x }`. Not taken: `Long.plus(Long)` for the one call in
+  cusoon2's pay arithmetic, which opens every operator on every pair of number types to
+  the same request. Reopen if ported code keeps reaching for the named form.
 - **The prelude's signatures are Kogo declarations, read by the checker like any other
   source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
@@ -847,6 +858,27 @@ Each entry: what was decided, why, and what would reopen it.
 - **Not done: reading a composite at run time.** DEV-832 is not done, so the issue leaves
   it out; `sqlpass.Emit` refuses a composite column, as `kogo-sql emit` then does with
   `sql-emit`, rather than write Go that does not build.
+
+## Taken adding what the invoice ledger calls (DEV-841), not yet discussed
+
+- **A `Set` walks its keys to find one.** The one ordered implementation is a slice of
+  keys compared with `rt.Equal`, so a lookup costs the set's size and `setOf` its square.
+  A hash would need a second walk that agrees with `==` everywhere. Reopen when a set or
+  a map is big enough for the walk to show.
+- **`rt`'s `==` compares a Go type that embeds `rt.Unordered` by its `Keys()` regardless
+  of order**, each key once. `rt` knows no prelude type by name, and `Unordered`'s
+  unexported method means no data class can be taken for a set by a member's name; `Map`
+  can give its entries the same way. Not taken: an exported `Elements() []any`, which a
+  member could match and which copied every key on every comparison.
+- **One declaration where Kotlin has two or more.** `listOfNotNull(vararg elements: T?)`
+  covers Kotlin's single-element overload; `List<T>.plus(elements: List<T>)` stands for
+  Kotlin's `Collection<T>.plus(Iterable<T>)`, since Kogo has no `Iterable`, and the
+  one-element `plus` waits for a call; `coerceAtLeast` and `coerceAtMost` are on `Long`
+  only. `Set<out T>.contains(element: T)` takes a `T`, as Kotlin's does by
+  `@UnsafeVariance`.
+- **Three more than the issue listed, because the ledger calls them**: `list[i]`
+  (`List.get`), `Int.toLong()` and `LocalDate.plusDays`, each in section 12.
+- **A `for` over a `Set` is still refused by the emitter**, as before; no call needs it.
 
 ## Spec gaps found by the leakage ports, unresolved
 

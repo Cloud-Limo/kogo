@@ -97,6 +97,68 @@ func TestLists(t *testing.T) {
 	}
 }
 
+func TestMoreLists(t *testing.T) {
+	five, xs := int64(5), make(List[int64], 1, 4)
+	if got := ListOfNotNull(nil, &five, nil); !slices.Equal(got, []int64{5}) {
+		t.Errorf("listOfNotNull gives %v", got)
+	}
+	if got := List_Map(ListOf[int64](1, 2), func(x int64) string { return rt.ToString(x * 2) }); !slices.Equal(got, []string{"2", "4"}) {
+		t.Errorf("map gives %v", got)
+	}
+	a, b := List_Plus(xs, ListOf[int64](1)), List_Plus(xs, ListOf[int64](2))
+	if !slices.Equal(a, []int64{0, 1}) || !slices.Equal(b, []int64{0, 2}) {
+		t.Errorf("one plus wrote over another: %v %v", a, b)
+	}
+	if List_Plus(List[int64]{}, nil) == nil {
+		t.Error("an empty plus an empty is nil, which pgx and JSON write as null")
+	}
+	if List_Get(a, 1) != 1 || Int_ToLong(-3) != -3 {
+		t.Error("get or toLong is wrong")
+	}
+	if Long_CoerceAtLeast(-1, 0) != 0 || Long_CoerceAtLeast(3, 0) != 3 || Long_CoerceAtMost(9, 4) != 4 || Long_CoerceAtMost(2, 4) != 2 {
+		t.Error("coerceAtLeast or coerceAtMost is wrong")
+	}
+	defer func() {
+		if recover() != "no" {
+			t.Error("a require that fails does not panic with its message")
+		}
+	}()
+	Require(true, func() string { return "yes" })
+	Require(false, func() string { return "no" })
+}
+
+// A set holds each key once, in the order first given, finds a key as
+// == does, and is equal to a set of the same keys in any order.
+func TestSets(t *testing.T) {
+	b1, b2 := "B", "B"
+	s := SetOf(Pair[string, *string]{"A", &b1}, Pair[string, *string]{"C", nil}, Pair[string, *string]{"A", &b2})
+	if got := rt.ToString(s); got != "[(A, B), (C, null)]" {
+		t.Errorf("a set's text is %s", got)
+	}
+	if !Set_Contains(s, Pair[string, *string]{"A", rt.Ptr("B")}) || Set_Contains(s, Pair[string, *string]{"A", nil}) {
+		t.Error("contains does not compare as == does")
+	}
+	ints := SetOf[int32](1, 2, 3)
+	for _, c := range []struct {
+		a, b any
+		want bool
+	}{
+		{ints, SetOf[int32](3, 1, 2), true},
+		{ints, SetOf[int32](1, 2), false},
+		{ints, SetOf[int32](1, 2, 4), false},
+		{ints, ListOf[int32](1, 2, 3), false},
+		{SetOf[int32](), SetOf[int32](), true},
+		{Set_widen(ints, rt.Ptr[int32]), ints, true},
+	} {
+		if got := rt.Equal(c.a, c.b); got != c.want {
+			t.Errorf("%s == %s is %v", rt.ToString(c.a), rt.ToString(c.b), got)
+		}
+	}
+	if got := rt.ToString(SetOf[int32]()); got != "[]" {
+		t.Errorf("an empty set's text is %s", got)
+	}
+}
+
 // An id is written as a UUID is, sorts after one made earlier, and is
 // equal to itself and to no other.
 func TestIds(t *testing.T) {

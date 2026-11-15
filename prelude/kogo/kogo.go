@@ -14,7 +14,9 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -51,6 +53,17 @@ func Pair_widen[A, B, C, D any](p Pair[A, B], f func(A) C, g func(B) D) Pair[C, 
 
 func ListOf[T any](elements ...T) List[T] { return elements }
 
+// ListOfNotNull gives the elements that are not null.
+func ListOfNotNull[T any](elements ...*T) List[T] {
+	out := List[T]{}
+	for _, x := range elements {
+		if x != nil {
+			out = append(out, *x)
+		}
+	}
+	return out
+}
+
 func List_Size[T any](this List[T]) int32 { return int32(len(this)) }
 
 func List_Filter[T any](this List[T], predicate func(T) bool) List[T] {
@@ -61,6 +74,13 @@ func List_Filter[T any](this List[T], predicate func(T) bool) List[T] {
 		}
 	}
 	return out
+}
+
+// List_Get is list[i]; an index outside the list is a bug.
+func List_Get[T any](this List[T], index int32) T { return this[index] }
+
+func List_Map[T, R any](this List[T], transform func(T) R) List[R] {
+	return List_widen(this, transform)
 }
 
 func List_MapIndexed[T, R any](this List[T], transform func(int32, T) R) List[R] {
@@ -98,6 +118,52 @@ func ListT_SumOf_TToLong[T any](this List[T], selector func(T) int64) int64 {
 	}
 	return sum
 }
+
+// List_Plus is a new list, never nil: neither operand's array is
+// written.
+func List_Plus[T any](this, elements List[T]) List[T] {
+	return append(append(make(List[T], 0, len(this)+len(elements)), this...), elements...)
+}
+
+// ordered holds each key once, in the order first given, comparing
+// keys as == does (decisions.md). Set is built on it, and Map is to be
+// built on it, with a value beside each key. A lookup walks the keys.
+type ordered[K any] struct{ keys []K }
+
+func (o ordered[K]) index(k K) int {
+	return slices.IndexFunc(o.keys, func(x K) bool { return rt.Equal(x, k) })
+}
+
+func (o *ordered[K]) add(k K) {
+	if o.index(k) < 0 {
+		o.keys = append(o.keys, k)
+	}
+}
+
+// Set embeds rt.Unordered so that == compares its keys regardless of
+// order.
+type Set[T any] struct {
+	rt.Unordered
+	ordered[T]
+}
+
+func (s Set[T]) String() string      { return rt.ToString(s.keys) }
+func (s Set[T]) Keys() reflect.Value { return reflect.ValueOf(s.keys) }
+
+// Set_widen keeps every key: values that differ as Ts differ as Bs.
+func Set_widen[A, B any](s Set[A], f func(A) B) Set[B] {
+	return Set[B]{ordered: ordered[B]{List_widen(s.keys, f)}}
+}
+
+func SetOf[T any](elements ...T) Set[T] {
+	var s Set[T]
+	for _, x := range elements {
+		s.add(x)
+	}
+	return s
+}
+
+func Set_Contains[T any](this Set[T], element T) bool { return this.index(element) >= 0 }
 
 // A String is a Go string counted as Kotlin counts it, in UTF-16
 // units (spec.md section 3). An operation that would leave half of a
@@ -167,7 +233,11 @@ func Regex_String(pattern string) Regex {
 
 func Regex_Matches(this Regex, input string) bool { return this.whole.MatchString(input) }
 
+func Int_ToLong(this int32) int64      { return int64(this) }
 func Long_ToDouble(this int64) float64 { return float64(this) }
+
+func Long_CoerceAtLeast(this, minimumValue int64) int64 { return max(this, minimumValue) }
+func Long_CoerceAtMost(this, maximumValue int64) int64  { return min(this, maximumValue) }
 
 // Double_ToLong rounds toward zero, gives 0 for NaN and stops at the
 // ends of Long, as Kotlin does; Go leaves those to the machine.
@@ -211,6 +281,8 @@ func RequireNotNull[T any](value *T, lazyMessage func() string) T {
 	}
 	return *value
 }
+
+func Require(value bool, lazyMessage func() string) rt.Unit { return Check(value, lazyMessage) }
 
 func Check(value bool, lazyMessage func() string) rt.Unit {
 	if !value {

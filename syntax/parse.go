@@ -316,7 +316,13 @@ func (p *parser) decl(abstract bool) Decl {
 // receiverAndName reads Name, or Receiver.name for an extension.
 func (p *parser) receiverAndName() (Type, string) {
 	t := p.typ()
+	if p.at("?.") {
+		p.fail(p.tok.pos, "nullable-receiver", "an extension's receiver is not nullable: take the value as a parameter")
+	}
 	if p.got(".") {
+		if nullable(t) {
+			p.fail(t.At(), "nullable-receiver", "an extension's receiver is not nullable: take the value as a parameter")
+		}
 		_, name := p.ident()
 		return t, name
 	}
@@ -329,6 +335,17 @@ func (p *parser) receiverAndName() (Type, string) {
 		return nil, n.Name
 	}
 	return &NamedType{Pos: n.Pos, Name: n.Name[:i]}, n.Name[i+1:]
+}
+
+// nullable reports whether t is written with a trailing ?.
+func nullable(t Type) bool {
+	switch t := t.(type) {
+	case *NamedType:
+		return t.Nullable
+	case *FuncType:
+		return t.Nullable
+	}
+	return false
 }
 
 func (p *parser) funDecl(m Modifiers, abstract bool) *FunDecl {

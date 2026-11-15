@@ -36,6 +36,7 @@ however small, is an issue or goes into one that is open.
 | --- | --- | --- |
 | Todo | none | choose Zed or async, below |
 | Todo | launch comment | Greg adds the `agent` label |
+| Todo | `Lead:` | as the comment says |
 | In Progress | `Taken` | wait |
 | In Review | `Handoff:` | a Code review |
 | In Review | `Review:` | read it, then Fix |
@@ -71,6 +72,10 @@ Suggest one and say why in a line; Greg agrees or picks the other.
   conversation, or when it needs this VM (a read of `cusoon_b`, the
   stage-1 ports). Give Greg the phrase: "Pickup DEV-NNN", "Code review
   DEV-NNN" or "Fix DEV-NNN".
+- **Zed** too when the work lands in another repository, cusoon2 for
+  one: a run clones the repository of the issue's Linear project, so
+  it would clone Kogo. Such an issue carries a `Lead:` comment saying
+  so.
 
 A step's place does not bind the next: a PR coded in Zed can be
 reviewed by a run, and the reverse.
@@ -123,3 +128,11 @@ when what is Open is a choice of his kind.
 
 After a merge, look at what the issue was for. File the next issue if
 the work exposed one.
+
+## Ending
+
+Nothing is left only in the session: a new lead, started with "Lead",
+reads the board and nothing else. Before you stop, put each agreed
+next step on its issue: a launch comment for a run, a `Ruling:` for a
+review, and otherwise a comment whose first line begins `Lead:` and
+says what was agreed and when. There is no handover document.

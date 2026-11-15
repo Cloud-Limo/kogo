@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -228,6 +229,69 @@ func TestBindingsOnlyInPrelude(t *testing.T) {
 	}
 	if _, errs := Check(nil, []*syntax.File{f}, nil); len(errs) != 1 || errs[0].Code != "external" {
 		t.Errorf("got %v, want one external error", errs)
+	}
+}
+
+// Section 2: packages do not import each other, directly or through
+// others. One error for each group, at its shortest cycle.
+func TestImportCycles(t *testing.T) {
+	passes(t,
+		"package a\nimport b.g\nfun f(): Int = g()\n---\npackage b\nfun g(): Int = 1",
+		"package a\nimport a.g\nfun f(): Int = g()\n---\npackage a\nfun g(): Int = 1",
+	)
+	tie := "package a\nimport ‸c.h\nimport b.g\nfun f(): Int = 1\n---\npackage b\nimport a.f\nfun g(): Int = 1\n---\npackage c\nimport a.f\nfun h(): Int = 1"
+	refused(t, [][3]string{
+		{"package a\nimport ‸b.g\nimport b.h\nfun f(): Int = g() + h()\n---\npackage b\nimport a.f\nfun g(): Int = 1\nfun h(): Int = 2\nfun k(): Int = f()",
+			"import-cycle", "packages import each other: f1.kg:2 in a imports b.g, b.h; f2.kg:2 in b imports a.f; move what one package takes from another into a package both may import"},
+		{"package a\nimport ‸b.g\nfun f(): Int = 1\n---\npackage b\nimport c.h\nfun g(): Int = 1\n---\npackage c\nimport a.f\nfun h(): Int = 1",
+			"import-cycle", ": f1.kg:2 in a imports b.g; f2.kg:2 in b imports c.h; f3.kg:2 in c imports a.f;"},
+		// a takes from c and b, both of which take from a: of the two
+		// cycles, the one whose imports come first is told.
+		{tie, "import-cycle", ": f1.kg:2 in a imports c.h; f3.kg:2 in c imports a.f;"},
+		// A ring of three that holds a cycle of two: the two is told.
+		{"package a\nimport b.g\nfun f(): Int = 1\n---\npackage b\nimport ‸c.h\nfun g(): Int = 1\n---\npackage c\nimport a.f\nimport b.g\nfun h(): Int = 1",
+			"import-cycle", ": f2.kg:2 in b imports c.h; f3.kg:3 in c imports b.g;"},
+	})
+	tie = strings.Replace(tie, "‸", "", 1)
+	_, first := run(t, tie)
+	for range 20 {
+		if _, errs := run(t, tie); !reflect.DeepEqual(errs, first) {
+			t.Fatalf("got %v, then %v", first, errs)
+		}
+	}
+	_, errs := run(t, "package a\nimport b.g\nfun f(): Int = 1\n---\npackage b\nimport a.f\nfun g(): Int = 1\n---\npackage c\nimport d.k\nfun h(): Int = 1\n---\npackage d\nimport c.h\nfun k(): Int = 1")
+	if len(errs) != 2 || !strings.HasPrefix(errs[0].Error(), "f1.kg:2:8: import-cycle") || !strings.HasPrefix(errs[1].Error(), "f3.kg:2:8: import-cycle") {
+		t.Errorf("two separate cycles: got %v, want an error at each", errs)
+	}
+}
+
+// The examples, checked with the prelude, hold no cycle.
+func TestExamplesHaveNoImportCycle(t *testing.T) {
+	pre, err := prelude.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	names, _ := filepath.Glob("../examples/*.kg")
+	var files []*syntax.File
+	for _, name := range names {
+		src, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f, err := syntax.Parse(name, src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, f)
+	}
+	if len(files) < 22 {
+		t.Fatalf("read %d examples, want 22", len(files))
+	}
+	_, errs := Check(pre, files, nil)
+	for _, e := range errs {
+		if e.Code == "import-cycle" {
+			t.Error(e)
+		}
 	}
 }
 

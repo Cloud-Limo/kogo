@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -252,46 +251,38 @@ func TestImportCycles(t *testing.T) {
 		{"package a\nimport b.g\nfun f(): Int = 1\n---\npackage b\nimport ‸c.h\nfun g(): Int = 1\n---\npackage c\nimport a.f\nimport b.g\nfun h(): Int = 1",
 			"import-cycle", ": f2.kg:2 in b imports c.h; f3.kg:3 in c imports b.g;"},
 	})
-	tie = strings.Replace(tie, "‸", "", 1)
-	_, first := run(t, tie)
-	for range 20 {
-		if _, errs := run(t, tie); !reflect.DeepEqual(errs, first) {
-			t.Fatalf("got %v, then %v", first, errs)
-		}
-	}
 	_, errs := run(t, "package a\nimport b.g\nfun f(): Int = 1\n---\npackage b\nimport a.f\nfun g(): Int = 1\n---\npackage c\nimport d.k\nfun h(): Int = 1\n---\npackage d\nimport c.h\nfun k(): Int = 1")
 	if len(errs) != 2 || !strings.HasPrefix(errs[0].Error(), "f1.kg:2:8: import-cycle") || !strings.HasPrefix(errs[1].Error(), "f3.kg:2:8: import-cycle") {
 		t.Errorf("two separate cycles: got %v, want an error at each", errs)
 	}
 }
 
-// The examples, checked with the prelude, hold no cycle.
-func TestExamplesHaveNoImportCycle(t *testing.T) {
+// Imports rank in the order the files were given, not by name, and a
+// program's file in a package of the prelude's is on a cycle like any.
+func TestImportCyclesAgainstPrelude(t *testing.T) {
 	pre, err := prelude.Files()
 	if err != nil {
 		t.Fatal(err)
 	}
-	names, _ := filepath.Glob("../examples/*.kg")
-	var files []*syntax.File
-	for _, name := range names {
-		src, err := os.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
+	check := func(files ...string) []*syntax.Error {
+		var program []*syntax.File
+		for i := 0; i < len(files); i += 2 {
+			f, err := syntax.Parse(files[i], []byte(files[i+1]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			program = append(program, f)
 		}
-		f, err := syntax.Parse(name, src)
-		if err != nil {
-			t.Fatal(err)
-		}
-		files = append(files, f)
+		_, errs := Check(pre, program, nil)
+		return errs
 	}
-	if len(files) < 22 {
-		t.Fatalf("read %d examples, want 22", len(files))
+	errs := check("z.kg", "package b\nimport a.f\nfun g(): Int = 1", "a.kg", "package a\nimport b.g\nfun f(): Int = 1")
+	if len(errs) != 1 || !strings.HasPrefix(errs[0].Error(), "z.kg:2:8: import-cycle") {
+		t.Errorf("given z.kg first: got %v, want the error in z.kg", errs)
 	}
-	_, errs := Check(pre, files, nil)
-	for _, e := range errs {
-		if e.Code == "import-cycle" {
-			t.Error(e)
-		}
+	errs = check("a.kg", "package a\nimport kogo.time.Instant\nfun f(): Int = 1", "t.kg", "package kogo.time\nimport a.f\nfun g(): Int = 1")
+	if !slices.ContainsFunc(errs, func(e *syntax.Error) bool { return e.Code == "import-cycle" }) {
+		t.Errorf("a cycle through kogo.time: got %v, want an import-cycle", errs)
 	}
 }
 

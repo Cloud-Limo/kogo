@@ -1114,9 +1114,11 @@ Each entry: what was decided, why, and what would reopen it.
   import from the next package, and every name it takes from there, so the message shows
   what would have to move. A package with two files that import the next one is on the
   cycle once, through the file that comes first.
-- **"Comes first" compares cycles from their earliest import**: of the shortest cycles in
-  a group, the one whose earliest import, by file path and line, comes first; on a tie
-  there, its next import, and so on. The error stands at that earliest import.
+- **Of a group's shortest cycles, the one through the earliest import is told**: earliest
+  by the order the files were given, then line, as the checker orders its other errors,
+  so a path spelled another way changes nothing. From there the cycle takes, at each
+  package, the earliest import that keeps it shortest, and the error stands at the first.
+  Comparing whole cycles import by import was written first and is not simpler to tell.
 
 ## Spec gaps found by the leakage ports, unresolved
 

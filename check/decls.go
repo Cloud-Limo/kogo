@@ -38,7 +38,6 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 	for i, f := range files {
 		order[f.Name] = i
 		c.enter(f, c.pkgOf(f.Package.Name))
-		c.pkg.prelude = c.pkg.prelude || i < len(prelude)
 		for _, d := range f.Decls {
 			if i >= len(prelude) && external(d) {
 				c.errorf(d, "external", "only the prelude declares bindings (spec.md 13): give this a body in Kogo")
@@ -105,7 +104,6 @@ type pkg struct {
 	aliases map[string]*alias
 	funcs   map[string][]*Func // funs and extension vals
 	vals    map[string]*Var
-	prelude bool // a package of the prelude's
 }
 
 type alias struct {
@@ -118,7 +116,7 @@ type alias struct {
 
 func (c *checker) pkgOf(name string) *pkg {
 	if c.pkgs[name] == nil {
-		c.pkgs[name] = &pkg{name, map[string]*TypeDecl{}, map[string]*TypeDecl{}, map[string]*alias{}, map[string][]*Func{}, map[string]*Var{}, false}
+		c.pkgs[name] = &pkg{name, map[string]*TypeDecl{}, map[string]*TypeDecl{}, map[string]*alias{}, map[string][]*Func{}, map[string]*Var{}}
 	}
 	return c.pkgs[name]
 }

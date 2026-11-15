@@ -1114,6 +1114,57 @@ Each entry: what was decided, why, and what would reopen it.
 - **An enum column that does not fit an enum class names the labels and constants that
   differ**, where it printed the class it wanted, which had the same name.
 
+## Taken serving a table of operations (DEV-850), not yet discussed
+
+- **A table is a Go value built by two generic constructors**, `rpc.Tx(name, f)` and
+  `rpc.Db(name, f)`, so Go checks each fun's four parameters and its `Either`; the input
+  and answer types come with `f`. Besides the operations it holds each enum's entries,
+  the `Name_entries` slice the emitter already writes, and each sealed interface's
+  `rpc.Variants[I](V1{}, V2{})`. Not taken: a reader and writer emitted for each type,
+  which the design refused; names in a string table, which Go would not check.
+- **An `Int` or a `Long` is read only as digits** (spec 15.4): `1.0` and `1e3` are refused
+  as not whole, though each is a whole number. `JSON.stringify` writes every whole number a
+  `Long` can carry as digits, so only a client of another language meets this. Reading
+  digits exactly is then `strconv.ParseInt`; a parser of decimal fractions and exponents
+  would be the rest of the walk again. Reopen if a client sends `1.0` for a whole number.
+- **A `Uuid` is read in the form `toString()` writes, 8-4-4-4-12 hex digits, in either
+  case**, as Java's `UUID.fromString` takes upper case. Java also takes groups of other
+  lengths; this does not.
+- **A key given twice is not refused**: the last one counts, as `encoding/json` reads it
+  and as `JSON.parse` does. A body holding a second value after the first is a 400.
+- **The 400's body is text: the operation, the key's path and what is wrong**, as
+  `updateJob: input.stops[1].state is not one of Offered, Confirmed`. A path, not a bare
+  key, since one name may stand at many places. An enum's constants and a sealed
+  interface's variants are listed; the value never is. The 500's and 503's body is
+  `request <id>`, the id the log holds; the 404's and 405's are empty, with `Allow: POST`
+  on a 405.
+- **The answer is written inside the transaction**, so an answer with no JSON, a `NaN`
+  or a `Long` past the limit, rolls back as any other panic does.
+- **The reruns' limit is checked before each rerun, from when the request arrived**: an
+  attempt under way is never cut, and there is no pause between reruns, as `db.tx` has
+  none. The rerun code is `db.tx(serializable = true)`'s, now `kogo.SerializableTx`,
+  which asks the caller before each rerun.
+- **The handler is `rpc.NewHandler(table, pool, env, logger)`, with a `Limit` field**,
+  and serves `POST /<name>`; `main` mounts it under its path with `http.StripPrefix`.
+  It makes each request's `Db` from the pool and the request's context, so a client that
+  goes away cancels its statements, which panic: a 500 in the log.
+- **The log is `log/slog`**: per request a line `served` with `request` (a new `Uuid`),
+  `operation`, `outcome` (`ok`, `refused` or the status) and `duration`, since slog's
+  `time` is the line's own; a line `rerun` with
+  its `cause`, `serialization failure` or `deadlock`; a line `panic` with `message` and
+  `trace`. A 400's problem is not logged; its body tells the caller. A panic anywhere
+  in the request, its reading too, is a 500 with that line.
+- **`NewHandler` panics if the table lacks an enum's entries or a sealed interface's
+  variants that some input reaches**, by one walk over each input type, so a table the
+  emitter got wrong fails when the server starts, not on the first request to use it.
+- **`clientAddress` is the host of the connection's address.** Behind a proxy, `main`
+  sets the request's `RemoteAddr` from the proxy's header before the handler sees it,
+  since only `main` knows which proxy to trust. A header's first value is its value;
+  `header("Host")` is the request's host, which Go keeps out of its headers.
+- **Not handled**: a limit on the body's size, which `main` sets with Go's
+  `http.MaxBytesHandler` (a body past it reads as not JSON, a 400); the request's
+  `Content-Type`, which belongs with the CSRF checks.
+
 ## Taken refusing import cycles (DEV-844), not yet discussed
 
 - **A cycle is told as one line for each file on it**: the file, the line of its first

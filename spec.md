@@ -73,6 +73,12 @@ its two sides must fit where the other's type is wanted (section 5.1),
 `?` aside, so `x == null` passes and `Int == Long` and `String == Int`
 are errors.
 
+A `String` counts as Kotlin's does: `length`, `substring`, `padStart`
+and reading it as `Char`s count UTF-16 units, so `"😀".length` is 2. It
+never holds half of a surrogate pair, though Kotlin's can: an operation
+that would leave one, as `"😀".substring(0, 1)`, leaves U+FFFD in its
+place, which also counts as one unit.
+
 ### 3.1 Data classes
 
 ```kotlin
@@ -294,6 +300,12 @@ interface `fun` before an extension of the same name.
   nothing uses. A call, an assignment, `return` and the like, and
   `x ?: return y` are statements. So `- b` on a line of its own, which
   section 6.1 reads as a new statement, is refused.
+- `return`, `break` and `continue` stand in a value's place only where
+  that value goes straight into a `val`, an assignment or a `return`,
+  or is the result of the function or lambda: the right side of `?:`,
+  or a branch of an `if` or a `when` there, as `val p = x ?: return y`.
+  Buried in a larger expression, as `f(x ?: return y)`, one is an
+  error, though Kotlin allows it: bind the value to a `val` first.
 
 ### 6.1 Lines, operators and literals
 
@@ -587,7 +599,8 @@ say what exists, and the declarations say what each takes and gives.
 `take`, `drop`, `zip`, `plus` (`+`), `groupBy`, `associateBy`,
 `associate`, `toSet`, `toList`, `orEmpty`, `joinToString`, `forEach`,
 `keys`, `values`, `listOfNotNull`. A `Map` and a `Set` iterate in
-insertion order.
+insertion order and compare keys as `==` does, by value, so any type may
+be a key.
 
 There are no mutable collections, sequences or arrays. Build a list with
 `map`/`filter`/`+`, or accumulate into a local `var` of an immutable list.
@@ -603,7 +616,9 @@ the pattern syntax is RE2 (no lookaround, no backreferences). Case
 conversion never reads a locale.
 
 **Numbers.** `coerceAtLeast`, `coerceAtMost`, `coerceIn`, `abs`, `max`,
-`min`, `toInt`, `toLong`, `toDouble`, `toString`.
+`min`, `toInt`, `toLong`, `toDouble`, `toString`. A `Decimal` holds what
+Postgres sent, exactly: it has `toDouble`, `toString`, `==` and
+`< <= > >=`, and no arithmetic in v0.
 
 **Time** (`kogo.time`). `Instant`, `LocalDate` (`plusDays`, `year`,
 `monthValue`, `dayOfMonth`, `atStartOfDay(zone): Instant`), `LocalTime`,

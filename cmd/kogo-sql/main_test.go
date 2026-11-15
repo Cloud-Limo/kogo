@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,7 +12,7 @@ import (
 
 // kogoSQL runs the command against the test database and gives its
 // output, one line an element, and its exit code.
-func kogoSQL(t *testing.T, args ...string) (stdout []byte, lines []string, code int) {
+func kogoSQL(t *testing.T, args ...string) (lines []string, code int) {
 	url := os.Getenv("KOGO_TEST_DATABASE_URL")
 	if url == "" {
 		url = "postgres://kogo:kogo@127.0.0.1/kogo_test"
@@ -24,7 +23,7 @@ func kogoSQL(t *testing.T, args ...string) (stdout []byte, lines []string, code 
 	if code == 2 {
 		t.Fatalf("kogo-sql could not run (create the test database with `mise run testdb`): %s", errs.String())
 	}
-	return out.Bytes(), strings.Split(strings.TrimSpace(out.String()+errs.String()), "\n"), code
+	return strings.Split(strings.TrimSpace(out.String()+errs.String()), "\n"), code
 }
 
 func TestCheckExamples(t *testing.T) {
@@ -49,7 +48,7 @@ func TestCheckExamples(t *testing.T) {
 		"19_markers.kg:15:27 (id: Uuid) -> id: Uuid, legal_name: String",
 		"21_sql_void.kg:6:16 (key: Long) -> ",
 	}
-	_, lines, code := kogoSQL(t, "check", "../../examples")
+	lines, code := kogoSQL(t, "check", "../../examples")
 	if code != 0 || len(lines) != len(want) {
 		t.Fatalf("exit %d with %d lines, want 0 with %d:\n%s", code, len(lines), len(want), strings.Join(lines, "\n"))
 	}
@@ -84,7 +83,7 @@ func TestWrongStatements(t *testing.T) {
 		`20:73 sql-rejected operator does not exist: uuid = citext`,
 		`24:65 sql-rejected operator does not exist: text < integer`,
 	}
-	_, lines, code := kogoSQL(t, "check", "testdata")
+	lines, code := kogoSQL(t, "check", "testdata")
 	unclosed := `{"file":"testdata/unclosed.kg","line":4,"column":40,"code":"sql-unterminated","message":"this sql literal has no closing quote"}`
 	if lines[0] != unclosed {
 		t.Errorf("\n got %s\nwant %s", lines[0], unclosed)
@@ -105,56 +104,5 @@ func TestWrongStatements(t *testing.T) {
 		if d.File != "testdata/wrong.kg" || !strings.HasPrefix(got, want[i]) {
 			t.Errorf("\n got %s %s\nwant testdata/wrong.kg %s", d.File, got, want[i])
 		}
-	}
-}
-
-// The Go emitted for examples/ is built with testdata/driver.go and run.
-func TestEmittedGoRuns(t *testing.T) {
-	src, lines, code := kogoSQL(t, "emit", "../../examples", "main")
-	if code != 0 {
-		t.Fatalf("exit %d:\n%s", code, strings.Join(lines, "\n"))
-	}
-	// Inside the module, so the program finds pgx as this module pins it.
-	dir, err := os.MkdirTemp(".", "emitted")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-	driver, err := os.ReadFile("testdata/driver.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for name, content := range map[string][]byte{"main.go": driver, "queries.go": src} {
-		if err := os.WriteFile(filepath.Join(dir, name), content, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	out, err := exec.Command("go", "run", "./"+dir).CombinedOutput()
-	want := `supplier: Bolt Couriers 40
-abn of bolt is null: true
-administered: Acme Pty Ltd storefront: acme-store
-administered: Bolt Couriers storefront: none
-invite: outside share is null: true
-invite again: outside 25
-drivers, any: 1 inactive: 0
-fees accounted: 2
-paid invoices: 1
-ann administers acme: true nobody does: false
-locked: 1
-`
-	if err != nil || string(out) != want {
-		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)
-	}
-}
-
-func TestFuncNamesAreDistinct(t *testing.T) {
-	used := map[string]bool{}
-	seen := map[string]bool{}
-	for _, file := range []string{"a-b", "a_b", "sub/x", "sub_x"} {
-		name := funcName(file, 3, 10, used)
-		if seen[name] {
-			t.Errorf("%s is named %s, as another file's literal is", file, name)
-		}
-		seen[name] = true
 	}
 }

@@ -1,8 +1,9 @@
 // Package kogo is the Go behind the declarations of Kogo's package
 // kogo: prelude/kogo.kg and prelude/either.kg, and what check/core.kg
-// declares for section 9. Each Go name follows the emitter's naming
-// rule (decisions.md), and a test of the emitter compiles a use of
-// every one of prelude/ against its declaration.
+// declares for sections 9 and 10 (either.go, db.go). Each Go name
+// follows the emitter's naming rule (decisions.md), and a test of the
+// emitter compiles a use of every one of prelude/ against its
+// declaration.
 //
 // A failure is a panic (either.go), so it may unwind through any
 // function here that calls a lambda. Such a function holds no lock

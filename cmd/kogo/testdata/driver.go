@@ -1,17 +1,41 @@
-// The driver of TestEmittedGoRuns: it calls the Go emitted for
-// examples 01 to 07, 09 and 20 and prints what each gives. ROOT stands
-// for the import path of the directory the Go is written to.
+// The driver of TestEmittedGoRuns: it calls the Go emitted for the
+// examples and prints what each gives. ROOT stands for the import
+// path of the directory the Go is written to.
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"ROOT/cusoon/invoice"
 	"ROOT/cusoon/model"
 	"ROOT/example"
+	"ROOT/example/markers"
+	"kogo/internal/testdb"
+	"kogo/prelude/kogo"
 	ktime "kogo/prelude/kogo/time"
 	"kogo/rt"
 )
+
+// The rows that examples 10 to 19 and 21 read.
+const seed = `
+insert into business (id, slug, legal_name, created_at, abn) values
+    ('00000000-0000-0000-0000-000000000001', 'acme', 'Acme Pty Ltd', '2026-01-02 03:04:05+00', '51824753556'),
+    ('00000000-0000-0000-0000-000000000002', 'bolt', 'Bolt Couriers', '2026-01-02 03:04:05+00', null);
+insert into person (id, name, email) values ('00000000-0000-0000-0000-000000000003', 'Ann', 'ann@example.com');
+insert into admin_grant (person_id, business_id) select p.id, b.id from person p, business b;
+insert into tenant (id, business_id, slug) values
+    ('00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'acme-store');
+insert into tenant_driver (tenant_id, driver_id) select t.id, p.id from tenant t, person p;
+insert into supply_agreement (operator_id, supplier_id, driver_share_percent) values
+    ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', 40);
+insert into invoice (id, number, total_cents, status) values
+    ('00000000-0000-0000-0000-000000000005', 'INV-1', 1000, 'paid'),
+    ('00000000-0000-0000-0000-000000000006', 'INV-2', null, 'sent');
+`
+
+// in runs f in a transaction of db, as db.tx { } does.
+func in[T any](db kogo.Db, f func(kogo.Tx) T) T { return kogo.Db_Tx_Boolean_TxToA(db, nil, f) }
 
 // show prints a result as Kogo's toString() writes it.
 func show(what string, value any) { fmt.Println(what+":", rt.ToString(value)) }
@@ -95,4 +119,66 @@ func main() {
 	clock := ktime.FixedClock(ktime.Instant{Seconds: 1794753000}) // 2026-11-15T14:30:00Z
 	show("today in Sydney", example.TodayIn(clock, "Australia/Sydney"))
 	show("today in New York", example.TodayIn(clock, "America/New_York"))
+
+	// 10 to 19 and 21: SQL, against a schema of its own in the test
+	// database, through a Db made as a server would make one.
+	ctx := context.Background()
+	pool, drop := testdb.Open(ctx, "../../testdata/schema.sql")
+	defer drop()
+	if _, err := pool.Exec(ctx, seed); err != nil {
+		panic(err)
+	}
+	db := kogo.NewDb(ctx, pool)
+	acme, bolt, ann, nobody := kogo.Uuid{15: 1}, kogo.Uuid{15: 2}, kogo.Uuid{15: 3}, kogo.Uuid{15: 9}
+	paid, sent := kogo.Uuid{15: 5}, kogo.Uuid{15: 6}
+	in(db, func(tx kogo.Tx) rt.Unit {
+		show("suppliers", example.SuppliersOf(tx, acme))
+		show("abn of acme", example.AbnOf(tx, acme))
+		show("abn of bolt", example.AbnOf(tx, bolt))
+		show("abn of nobody", example.AbnOf(tx, nobody))
+		show("legal name", example.LegalName(tx, bolt))
+		show("ann administers acme", example.Administers(tx, ann, acme))
+		show("nobody administers acme", example.Administers(tx, nobody, acme))
+		show("business", example.BusinessBySlug(tx, "ACME"))
+		show("business of no slug", example.BusinessBySlug(tx, "none"))
+		show("administered", example.Administered_Tx_Uuid(tx, ann))
+		show("drivers", example.LinkedDrivers(tx, nil))
+		show("inactive drivers", example.LinkedDrivers(tx, rt.Ptr(false)))
+		show("invoice", example.Invoice_Tx_Uuid_Boolean(tx, paid, false))
+		show("invoice for update", example.Invoice_Tx_Uuid_Boolean(tx, sent, true))
+		show("no invoice", example.Invoice_Tx_Uuid_Boolean(tx, nobody, true))
+		show("paid invoices", example.PaidCount(tx))
+		show("business by id", markers.Business_Tx_Uuid(tx, acme))
+		show("held", markers.LegalNameOf(*markers.Hold(tx, acme)))
+		show("hold of nobody", markers.Hold(tx, nobody))
+		show("locked", example.LockInvoice(tx, 822))
+		return rt.Unit{}
+	})
+	panics("legal name of nobody", func() { in(db, func(tx kogo.Tx) string { return example.LegalName(tx, nobody) }) })
+
+	// 16: the check that fails is a panic, which rolls its update back.
+	account := func(ids ...kogo.Uuid) rt.Unit {
+		return in(db, func(tx kogo.Tx) rt.Unit {
+			return example.AccountFees(tx, ids, "REF-1", ktime.Instant{Seconds: 1794753000})
+		})
+	}
+	panics("fees of a missing invoice", func() { account(paid, sent, nobody) })
+	show("fees, the first rolled back", account(paid, sent))
+
+	// 13 and 18: an upsert, and a transaction that fails as a value.
+	invite := func(share *int32) example.Invite {
+		return in(db, func(tx kogo.Tx) example.Invite {
+			return example.UpsertInvite(tx, acme, example.InviteKind_outside, ann, ann, share)
+		})
+	}
+	first := invite(nil)
+	show("invite's kind", first.Kind)
+	show("invite's share", first.DriverSharePercent)
+	show("accept with no share", example.Accept(db, first.Id, bolt))
+	second := invite(rt.Ptr[int32](25))
+	show("invite again", second.DriverSharePercent)
+	show("the same invite", second.Id == first.Id)
+	show("accept", example.Accept(db, first.Id, bolt))
+	show("accept again", example.Accept(db, first.Id, bolt))
+	show("suppliers after", in(db, func(tx kogo.Tx) []example.SupplierRow { return example.SuppliersOf(tx, acme) }))
 }

@@ -5,8 +5,13 @@
 package time
 
 import (
+	"errors"
 	"fmt"
+	"math"
+	"strconv"
 	gotime "time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // A Clock gives the time. A program is handed one: SystemClock in
@@ -48,6 +53,111 @@ func fraction(nanos int32) string {
 type LocalDate struct{ Year, Month, Day int32 }
 
 func (d LocalDate) String() string { return fmt.Sprintf("%04d-%02d-%02d", d.Year, d.Month, d.Day) }
+
+// A LocalTime is a time of day: the nanoseconds since midnight.
+type LocalTime struct{ NanoOfDay int64 }
+
+// String is java.time's text: seconds are left out when they are zero.
+func (t LocalTime) String() string {
+	s, nanos := t.NanoOfDay/1e9, int32(t.NanoOfDay%1e9)
+	text := fmt.Sprintf("%02d:%02d", s/3600, s/60%60)
+	if s%60 != 0 || nanos != 0 {
+		text += fmt.Sprintf(":%02d", s%60) + fraction(nanos)
+	}
+	return text
+}
+
+// A Duration is a length of time: seconds, and the nanoseconds past
+// that second, from 0 up, as java.time holds one.
+type Duration struct {
+	Seconds int64
+	Nanos   int32
+}
+
+// String is java.time's text, PT8H6M12.345S: each part has the sign
+// of the whole, and a part that is zero is left out.
+func (d Duration) String() string {
+	secs, nanos := d.Seconds, int64(d.Nanos)
+	if secs < 0 && nanos > 0 {
+		secs, nanos = secs+1, nanos-1e9
+	}
+	text := "PT"
+	if h := secs / 3600; h != 0 {
+		text += fmt.Sprintf("%dH", h)
+	}
+	if m := secs % 3600 / 60; m != 0 {
+		text += fmt.Sprintf("%dM", m)
+	}
+	if s := float64(secs%60) + float64(nanos)/1e9; s != 0 || text == "PT" {
+		text += strconv.FormatFloat(s, 'f', -1, 64) + "S"
+	}
+	return text
+}
+
+// To and from Postgres (spec.md 10.4), which keeps microseconds: an
+// Instant is a timestamptz, a LocalDate a date, a LocalTime a time
+// and a Duration an interval. Postgres's infinity is none of them,
+// and an interval with months has no length: each is an error, as a
+// null is, which the caller panics with, and so is a time of 24:00,
+// which Postgres holds and a LocalTime does not. An interval's day is
+// 24 hours, and a Duration is sent as microseconds alone: one too long
+// for an int64 of them is an error too.
+
+func (i *Instant) ScanTimestamptz(v pgtype.Timestamptz) error {
+	if !v.Valid || v.InfinityModifier != pgtype.Finite {
+		return errors.New("null or infinity is not an Instant")
+	}
+	*i = Instant{v.Time.Unix(), int32(v.Time.Nanosecond())}
+	return nil
+}
+
+func (i Instant) TimestamptzValue() (pgtype.Timestamptz, error) {
+	return pgtype.Timestamptz{Time: i.utc(), Valid: true}, nil
+}
+
+func (d *LocalDate) ScanDate(v pgtype.Date) error {
+	if !v.Valid || v.InfinityModifier != pgtype.Finite {
+		return errors.New("null or infinity is not a LocalDate")
+	}
+	y, m, day := v.Time.Date()
+	*d = LocalDate{int32(y), int32(m), int32(day)}
+	return nil
+}
+
+func (d LocalDate) DateValue() (pgtype.Date, error) {
+	return pgtype.Date{Time: gotime.Date(int(d.Year), gotime.Month(d.Month), int(d.Day), 0, 0, 0, 0, gotime.UTC), Valid: true}, nil
+}
+
+func (t *LocalTime) ScanTime(v pgtype.Time) error {
+	if !v.Valid || v.Microseconds >= 86400e6 {
+		return errors.New("null or 24:00 is not a LocalTime")
+	}
+	*t = LocalTime{v.Microseconds * 1000}
+	return nil
+}
+
+func (t LocalTime) TimeValue() (pgtype.Time, error) {
+	return pgtype.Time{Microseconds: t.NanoOfDay / 1000, Valid: true}, nil
+}
+
+func (d *Duration) ScanInterval(v pgtype.Interval) error {
+	if !v.Valid || v.Months != 0 {
+		return errors.New("null, or an interval with months, is not a Duration")
+	}
+	secs, micros := v.Microseconds/1e6, v.Microseconds%1e6
+	if micros < 0 {
+		secs, micros = secs-1, micros+1e6
+	}
+	*d = Duration{int64(v.Days)*86400 + secs, int32(micros * 1000)}
+	return nil
+}
+
+func (d Duration) IntervalValue() (pgtype.Interval, error) {
+	if d.Seconds > (math.MaxInt64-int64(d.Nanos)/1000)/1_000_000 || d.Seconds < math.MinInt64/1_000_000 {
+		return pgtype.Interval{}, fmt.Errorf("%s is too long for an interval", d)
+	}
+	return pgtype.Interval{Microseconds: d.Seconds*1e6 + int64(d.Nanos)/1000, Valid: true}, nil
+}
 
 // A ZoneId is a named zone of the tz database.
 type ZoneId struct {

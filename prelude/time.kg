@@ -4,6 +4,8 @@ package kogo.time
 external class Clock
 external class Instant
 external class LocalDate
+external class LocalTime
+external class Duration
 external class ZoneId
 external class ZonedDateTime
 

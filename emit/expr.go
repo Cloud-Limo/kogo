@@ -426,14 +426,10 @@ func (e *emitter) callExpr(x *syntax.Call, recv *operand, rt check.Type) (string
 // stands for one. recv, when set, stands for the receiver, of type
 // rt: that of a ?. once it is known not to be null.
 func (e *emitter) call(at syntax.Node, c *check.Call, recv *operand, rt check.Type) (string, check.Type) {
-	if c == nil { // one of the five calls of spec.md 10.2, which the checker settles apart
-		e.notYet(at, "a call that takes a sql literal (spec.md 10)", slice10)
-		return "nil", e.info.Types[at]
+	if c == nil { // one of the five calls of spec.md 10.2, which the checker settles apart, on a Tx that is not null
+		return e.sql(at.(*syntax.Call)), e.info.Types[at]
 	}
 	f := c.Func
-	if e.later[f] {
-		e.notYet(at, "a call of "+f.Name+" (spec.md 10)", slice10)
-	}
 	// bind, raise, ensure and ensureNotNull are given the handle of
 	// the raise scope they are in, and fail with its E (prelude/kogo).
 	form, bind := e.info.Fails[at] != nil, ""

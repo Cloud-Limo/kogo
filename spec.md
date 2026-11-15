@@ -540,7 +540,8 @@ column.
   fills `data class Supplier(val driverSharePercent: Int, val business: BusinessName)`.
   A nullable nested data class is `null` when all of its columns are null
   (the absent side of an outer join), so a column that may be null fills
-  a property of it that may not.
+  a property of it that may not. A null there in a row where another of
+  its columns is not null panics (section 8).
 - A property that is a data class may instead be filled by the one column
   of its name, of a composite type (10.4). A table's name or alias on its
   own is its whole row, so whole rows are read from a join as
@@ -589,6 +590,18 @@ A parameter's Kogo type must map to the type Postgres infers for it. When
 Postgres cannot infer one, cast it: `$active::boolean`. A parameter or a
 result column of a type that is not in the table is a compile error: cast
 it in the statement.
+
+A value goes to Postgres and comes back as it is, with these edges.
+Postgres keeps microseconds, so an `Instant`, a `LocalTime` and a
+`Duration` are sent cut to the microsecond. A `Duration` is sent as a
+count of microseconds, and an `interval` read as one counts a day as 24
+hours. What Postgres holds and the Kogo type does not is a panic when
+it is read (section 8): `infinity` in a `timestamptz` or a `date`,
+`24:00` in a `time`, and an `interval` with months, which has no fixed
+length. A `Duration` too long for an `interval`'s microseconds is a
+panic when it is sent. A `Decimal` holds `NaN` and `Infinity` as well
+as numbers, and a zero keeps its scale: `0.00`. An empty `List` is sent as an
+empty array, never as `NULL`.
 
 ### 10.5 Nullability
 

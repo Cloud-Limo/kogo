@@ -31,8 +31,9 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			if rt = c.this(); rt != nil {
 				cands = c.methods(rt, name)
 			}
+			member := cands != nil // this's interface fun comes before an extension
 			for _, f := range c.funcs(name) {
-				if f.Kind == Fun {
+				if f.Kind == Fun && !(member && f.Receiver != nil) {
 					cands = append(cands, f)
 				}
 			}
@@ -72,11 +73,21 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 	default:
 		return c.callValue(e, c.expr(e.Fun, nil))
 	}
-	if len(cands) == 0 && c.holds(rt, recv != nil, name) {
-		return c.callValue(e, c.expr(e.Fun, nil)) // a val of a function type
-	} else if len(cands) == 0 {
+	switch {
+	case len(cands) > 0:
+	case !c.holds(rt, recv != nil, name):
 		c.loose(e.Args, nil)
 		return c.noFunc(e.Fun, name, rt, recv != nil)
+	case recv == nil:
+		return c.callValue(e, c.expr(e.Fun, nil)) // a val of a function type
+	default:
+		// A property of a function type: its receiver is read already.
+		t, _ := c.member(e.Fun, recv, rt, name)
+		if c.info.Types[e.Fun] = t; safe {
+			c.info.Types[e.Fun] = nullable(t)
+			return nullable(c.callValue(e, t))
+		}
+		return c.callValue(e, t)
 	}
 	t := c.resolve(e, e.Fun, name, cands, recv, rt, e.TypeArgs, e.Args, want)
 	if call := c.info.Calls[e]; call != nil {

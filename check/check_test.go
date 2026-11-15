@@ -260,6 +260,9 @@ func TestCalls(t *testing.T) {
 		"fun f(): String = Text.of(1)",
 		"val Int.half: Int\n    get() = this / 2\nval Long.half: Long\n    get() = this / 2\nfun f(a: Int, b: Long): Long = a.half + b.half",
 		"data class D(val step: (Int) -> Int)\nval twice: (Int) -> Int = { it * 2 }\nfun D.f(): Int = step(1) + twice(2) + this.step(3)",
+		"data class D(val step: (Int) -> Int)\nfun f(d: D?): Int? = d?.step(1)",
+		// this's interface fun comes before an extension of its name.
+		"interface I {\n    fun cost(n: Long): Long\n}\ndata class D(val k: Long) : I {\n    override fun cost(n: Long): Long = n * k\n}\nfun D.cost(n: Long): Long = n\nfun D.total(): Long = cost(1L) + this.cost(2L)",
 		"fun <T> List<T>.second(): T = this[1]\nfun <T> pick(xs: List<T>, n: Int): T = if (n == 1) xs.second() else pick(xs, n - 1)",
 	)
 	refused(t, [][3]string{
@@ -290,6 +293,7 @@ func TestCalls(t *testing.T) {
 		{"fun f(s: String?): Int = s.‸compareTo(\"\")", "nullable", "this String? may be null: write ?.compareTo, or test it for null first"},
 		{"fun f(n: Int): Int = ‸n(1)", "not-callable", "this is a Int, which is not a function"},
 		{"fun f(g: (Int) -> Int): Int = ‸g(1, 2)", "arguments", "is called with its 1 arguments in order"},
+		{"data class D(val step: () -> Long)\nfun d(n: Long): D = D { n }\nfun f(): Long = d(‸\"s\").step()", "type-mismatch", "this is a String where a Long is wanted"},
 		{"fun f(xs: List<Int>): List<Int> = xs.map ‸{ a, b -> a }", "lambda-parameters", "this lambda names 2 parameters where 1 are passed to it"},
 		{"fun f(xs: List<Int>): List<Int> = xs.map { x: ‸String -> 1 }", "type-mismatch", "this parameter is passed a Int, which is not a String"},
 		{"fun f(xs: List<Int>): List<Int> = xs.map { ‸\"a\" }", "type-mismatch", "this is a String where a Int is wanted"},

@@ -31,9 +31,11 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			if rt = c.this(); rt != nil {
 				cands = c.methods(rt, name)
 			}
-			member := cands != nil // this's interface fun comes before an extension
+			// this's interface fun comes before an extension, but
+			// not before a fun called on the raise scope.
+			member := cands != nil
 			for _, f := range c.funcs(name) {
-				if f.Kind == Fun && !(member && f.Receiver != nil) {
+				if f.Kind == Fun && (!member || f.Receiver == nil || c.raise != nil && c.raised(f.Receiver) != nil) {
 					cands = append(cands, f)
 				}
 			}
@@ -46,6 +48,13 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 		if q := c.qualifier(fun.X); q != "" {
 			if d, _ := c.findType(q + "." + name); d != nil && d.Ctor != nil && c.visible(d.Ctor.vis) {
 				cands = []*Func{d.Ctor}
+			} else if d != nil && d.Ctor != nil {
+				c.loose(e.Args, nil)
+				if outer, _ := c.findType(q); outer == c.prelude("Either") {
+					return c.errorf(fun, "either-constructor", "an Either is built with e.left() or a.right(), not with its constructor")
+				}
+				c.see(fun, q+"."+name+"'s constructor", d.Ctor.vis)
+				return unknown
 			} else if o := c.findObject(q); o != nil {
 				cands = slices.DeleteFunc(slices.Clone(o.Methods), func(f *Func) bool { return f.Name != name })
 			}
@@ -92,6 +101,7 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 	t := c.resolve(e, e.Fun, name, cands, recv, rt, e.TypeArgs, e.Args, want)
 	if call := c.info.Calls[e]; call != nil {
 		c.info.Uses[e.Fun] = call.Func
+		c.fails(e, call)
 	}
 	if safe {
 		t = nullable(t)
@@ -202,7 +212,10 @@ func (c *checker) loose(args []*syntax.Arg, done map[syntax.Expr]Type) {
 			for i := range params {
 				params[i] = unknown
 			}
+			outer := c.raise // it may be a raise scope's block: say no more
+			c.raise = unknown
 			c.lambda(l, params, nil)
+			c.raise = outer
 		} else if t := c.expr(a.Value, nil); done != nil {
 			done[a.Value] = t
 		}
@@ -317,6 +330,12 @@ func (c *checker) receives(f *Func, rt Type, written bool) (binding, bool) {
 		return b, !written
 	case f.Receiver == unknown: // its declaration failed: say no more
 		return b, true
+	case !written && c.raised(f.Receiver) != nil:
+		// Called on the raise scope around the call; fails checks it.
+		if c.raise != nil {
+			unify(c.raised(f.Receiver), c.raise, b, func(p *TypeParam, t Type) { b[p] = t })
+		}
+		return b, true
 	case rt == nil:
 		return b, false
 	}
@@ -419,6 +438,12 @@ func (c *checker) accepts(k candidate, typed map[syntax.Expr]Type) bool {
 	if tp, _ := settle(k, typed); tp != nil {
 		return false
 	}
+	// The raise scope is the receiver of a fun called on it, and fits
+	// when the fun's E does (spec.md 9). A lone candidate keeps its
+	// raise-type error, which says how to convert the failure.
+	if r := c.raised(k.f.Receiver); r != nil && c.raise != nil && !fits(subst(r, k.b), c.raise) {
+		return false
+	}
 	for i, p := range k.f.Params {
 		want := subst(p.Type, k.b)
 		for _, a := range k.placed[i] {
@@ -457,7 +482,7 @@ func (c *checker) byLambda(left []candidate, typed map[syntax.Expr]Type) []candi
 			return left
 		}
 		ft := subst(lambdaParam(k.f.Params[i], l), k.b).(*FuncType)
-		if open(&FuncType{ft.Params, tUnit}, k.b) || fts != nil && list("", ft.Params, "") != list("", fts[0].Params, "") {
+		if open(&FuncType{Params: ft.Params, Result: tUnit}, k.b) || fts != nil && list("", ft.Params, "") != list("", fts[0].Params, "") {
 			return left
 		}
 		fts = append(fts, ft)
@@ -538,7 +563,15 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 				if !open(ft.Result, b) {
 					w = subst(ft.Result, b)
 				}
-				got = c.lambda(a.(*syntax.Lambda), params, w)
+				if r := c.raised(ft.Receiver); r == nil {
+					got = c.lambda(a.(*syntax.Lambda), params, w)
+				} else {
+					if open(r, b) { // it says what may be raised in the block
+						c.errorf(where, "type-arguments", "nothing settles %s's type parameter %s before its block is read: write its type arguments, %s<...> { ... }", f.Name, r, f.Name)
+						unify(r, unknown, b, now)
+					}
+					got = c.raiseBlock(a.(*syntax.Lambda), subst(ft.Receiver, b), params, w)
+				}
 				typed[a] = got
 			}
 			for j := range min(len(ft.Params), len(got.Params)) {

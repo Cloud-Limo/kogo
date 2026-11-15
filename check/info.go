@@ -1,5 +1,6 @@
-// Package check checks a Kogo program against spec.md sections 2 to 6:
-// names, types, type arguments, overloads, narrowing and when. It
+// Package check checks a Kogo program against spec.md sections 2 to 6
+// and 9: names, types, type arguments, overloads, narrowing, when and
+// expected failures. It
 // reads the parser's trees, the prelude's among them, and reports
 // errors or gives the facts the emitter needs.
 package check
@@ -36,6 +37,20 @@ type Info struct {
 	Funcs map[syntax.Node]*Func
 	// Classes holds the type of each *syntax.ClassDecl.
 	Classes map[*syntax.ClassDecl]*TypeDecl
+	// Fails holds the error type E of each function, lambda and call
+	// that can fail (spec.md section 9). A *syntax.FunDecl whose
+	// function has the receiver Raise<E> or returns Either<E, A>,
+	// whichever spelling is used, and a *syntax.ValDecl, an extension
+	// val, that returns Either<E, A>. A *syntax.Lambda that is a raise
+	// scope for E, the block of either or withError, or that holds a
+	// call failing into the raise scope around it, which fails with
+	// E: running it can fail. A lambda that returns an Either is not
+	// one; its type says so. A *syntax.Call that makes the raise scope
+	// it is in fail: bind, and a call of a fun whose receiver is
+	// Raise<E>, raise, ensure, ensureNotNull and withError among them.
+	// A call that gives an Either value is not one: bind on its value
+	// is.
+	Fails map[syntax.Node]Type
 }
 
 // An Object is what a name refers to: a *Var, a *Func or a *TypeDecl.
@@ -49,7 +64,7 @@ func (*TypeDecl) object() {}
 type Call struct {
 	Func     *Func           // nil when a value of a function type is called
 	TypeArgs []Type          // one for each of Func.TypeParams
-	Receiver syntax.Expr     // nil when Func has none, or when it is this, unwritten
+	Receiver syntax.Expr     // nil when Func has none, or when it is this or the raise scope, unwritten
 	Args     [][]syntax.Expr // for each parameter, what fills it: nothing where its default does, several for a vararg
 }
 

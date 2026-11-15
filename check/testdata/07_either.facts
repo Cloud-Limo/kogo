@@ -1,0 +1,88 @@
+  4:1   ClassDecl declares type SignupError
+  5:25  Param declares property SignupError.BadEmail.email: String
+  5:36  NamedType : String
+  5:46  NamedType : SignupError
+  5:5   ClassDecl declares type SignupError.BadEmail
+  6:28  NamedType : SignupError
+  6:5   ClassDecl declares type SignupError.TooYoung
+  9:1   FunDecl declares fun checkedEmail(text: String): Either<SignupError, String>; fails with SignupError
+  9:18  Param declares parameter text: String
+  9:24  NamedType : String
+  9:33  NamedType : Either<SignupError, String>
+  9:40  NamedType : SignupError
+  9:53  NamedType : String
+  9:63  Ident is fun <E, A> either(block: Raise<E>.() -> A): Either<E, A>
+  9:70  Call : Either<SignupError, String>; calls fun <E, A> either(block: Raise<E>.() -> A): Either<E, A> with <SignupError, String>, no receiver, arguments per parameter [1]
+  9:70  Lambda : Raise<SignupError>.() -> String; fails with SignupError
+ 10:17  Ident : String; is parameter text
+ 10:22  Select is fun String.trim(): String
+ 10:26  Call : String; calls fun String.trim(): String, on its receiver, arguments per parameter []
+ 10:29  Select is fun String.lowercase(): String
+ 10:38  Call : String; calls fun String.lowercase(): String, on its receiver, arguments per parameter []
+ 10:5   ValDecl declares local email: String
+ 11:11  Call : Unit; calls fun <E> Raise<E>.ensure(condition: Boolean, raise: () -> E): Unit with <SignupError>, on the raise scope, arguments per parameter [1 1]; fails with SignupError
+ 11:12  Ident : String; is local email
+ 11:18  Select is fun String.contains(other: String): Boolean
+ 11:26  Call : Boolean; calls fun String.contains(other: String): Boolean, on its receiver, arguments per parameter [1]
+ 11:27  StringLit : String
+ 11:28  Literal : String
+ 11:33  Lambda : () -> SignupError
+ 11:35  Ident is type SignupError
+ 11:47  Select is constructor fun SignupError.BadEmail(email: String): SignupError.BadEmail
+ 11:5   Ident is fun <E> Raise<E>.ensure(condition: Boolean, raise: () -> E): Unit
+ 11:55  Call : SignupError.BadEmail; calls constructor fun SignupError.BadEmail(email: String): SignupError.BadEmail, no receiver, arguments per parameter [1]
+ 11:56  Ident : String; is parameter text
+ 12:5   Ident : String; is local email
+ 15:1   FunDecl declares fun signup(email: String, age: Int): Either<SignupError, String>; fails with SignupError
+ 15:12  Param declares parameter email: String
+ 15:19  NamedType : String
+ 15:27  Param declares parameter age: Int
+ 15:32  NamedType : Int
+ 15:38  NamedType : Either<SignupError, String>
+ 15:45  NamedType : SignupError
+ 15:58  NamedType : String
+ 15:68  Ident is fun <E, A> either(block: Raise<E>.() -> A): Either<E, A>
+ 15:75  Call : Either<SignupError, String>; calls fun <E, A> either(block: Raise<E>.() -> A): Either<E, A> with <SignupError, String>, no receiver, arguments per parameter [1]
+ 15:75  Lambda : Raise<SignupError>.() -> String; fails with SignupError
+ 16:19  Ident is fun checkedEmail(text: String): Either<SignupError, String>
+ 16:31  Call : Either<SignupError, String>; calls fun checkedEmail(text: String): Either<SignupError, String>, no receiver, arguments per parameter [1]
+ 16:32  Ident : String; is parameter email
+ 16:39  Select is fun <E, A> Either<E, A>.bind(): A
+ 16:43  Call : String; calls fun <E, A> Either<E, A>.bind(): A with <SignupError, String>, on its receiver, arguments per parameter []; fails with SignupError
+ 16:5   ValDecl declares local checked: String
+ 17:13  Binary : Boolean
+ 17:15  Literal : Int
+ 17:19  Ident is fun <E> Raise<E>.raise(r: E): Nothing
+ 17:24  Call : Nothing; calls fun <E> Raise<E>.raise(r: E): Nothing with <SignupError>, on the raise scope, arguments per parameter [1]; fails with SignupError
+ 17:25  Ident is type SignupError
+ 17:37  Select : SignupError.TooYoung; is type SignupError.TooYoung
+ 17:9   Ident : Int; is parameter age
+ 18:5   Ident : String; is local checked
+ 21:1   FunDecl declares fun message(result: Either<SignupError, String>): String
+ 21:13  Param declares parameter result: Either<SignupError, String>
+ 21:21  NamedType : Either<SignupError, String>
+ 21:28  NamedType : SignupError
+ 21:41  NamedType : String
+ 21:51  NamedType : String
+ 22:12  Select is fun <E, A, R> Either<E, A>.fold(ifLeft: (E) -> R, ifRight: (A) -> R): R
+ 22:16  Call : String; calls fun <E, A, R> Either<E, A>.fold(ifLeft: (E) -> R, ifRight: (A) -> R): R with <SignupError, String, String>, on its receiver, arguments per parameter [1 1]
+ 22:5   Ident : Either<SignupError, String>; is parameter result
+ 23:11  LambdaParam declares local e: SignupError
+ 23:9   Lambda : (SignupError) -> String
+ 24:13  When : String
+ 24:19  Ident : SignupError; is local e
+ 25:20  NamedType : SignupError.BadEmail
+ 25:44  StringLit : String
+ 25:47  Ident : SignupError.BadEmail; is local e; narrowed from SignupError
+ 25:49  Select : String; is property SignupError.BadEmail.email
+ 25:55  Literal : String
+ 26:17  Ident is type SignupError
+ 26:29  Select : SignupError.TooYoung; is type SignupError.TooYoung
+ 26:41  StringLit : String
+ 26:42  Literal : String
+ 29:11  LambdaParam declares local email: String
+ 29:20  StringLit : String
+ 29:21  Literal : String
+ 29:31  Ident : String; is local email
+ 29:36  Literal : String
+ 29:9   Lambda : (String) -> String

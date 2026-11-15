@@ -18,6 +18,8 @@ external fun <T> List<T>.sumOf(selector: (T) -> Long): Long
 external val String.length: Int
 external fun String.plus(other: String): String
 external fun String.trim(): String
+external fun String.lowercase(): String
+external fun String.contains(other: String): Boolean
 external fun String.isNotEmpty(): Boolean
 external fun String.substring(startIndex: Int): String
 external fun String.substring(startIndex: Int, endIndex: Int): String

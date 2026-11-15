@@ -558,6 +558,13 @@ func (c *checker) binary(e *syntax.Binary, want Type) Type {
 				fix = ": write the literal with L, or .toLong()"
 			}
 			c.errorf(e, "type-mismatch", "%s compares a %s with a %s, which are never equal%s", e.Op, xt, yt, fix)
+		} else if !null(e.X) && !null(e.Y) {
+			for _, t := range []Type{xt, yt} {
+				if found, where := holdsFunc(t, map[*TypeDecl]bool{}); found {
+					c.errorf(e, "function-equality", "%s compares a %s, and %s holds a function, which is never compared: compare the other properties", e.Op, t, where)
+					break
+				}
+			}
 		}
 		return tBoolean
 	case "..", "until":
@@ -979,4 +986,49 @@ func (c *checker) lambda(l *syntax.Lambda, params []Type, want Type) *FuncType {
 	}
 	c.info.Types[l] = ft
 	return ft
+}
+
+// holdsFunc is whether a value of t holds a function (spec.md 3), and
+// where: a property, or t itself. A declaration's properties are read
+// unsubstituted, each once, and its type arguments apart, so a type
+// that refers to itself ends.
+func holdsFunc(t Type, seen map[*TypeDecl]bool) (bool, string) {
+	switch t := t.(type) {
+	case *FuncType:
+		return true, "it"
+	case *Nullable:
+		return holdsFunc(t.Elem, seen)
+	case *Named:
+		for _, a := range t.Args {
+			if found, where := holdsFunc(a, seen); found {
+				return true, where
+			}
+		}
+		return holdsFuncDecl(t.Decl, seen)
+	}
+	return false, ""
+}
+
+func holdsFuncDecl(d *TypeDecl, seen map[*TypeDecl]bool) (bool, string) {
+	if seen[d] {
+		return false, ""
+	}
+	seen[d] = true
+	if d.Kind == "sealed interface" {
+		for _, v := range d.Variants {
+			if found, where := holdsFuncDecl(v, seen); found {
+				return true, where
+			}
+		}
+	} else if d.Kind != "interface" {
+		for _, p := range d.Props {
+			if found, where := holdsFunc(p.Type, seen); found {
+				if where == "it" {
+					where = d.Name + "'s property " + p.Name
+				}
+				return true, where
+			}
+		}
+	}
+	return false, ""
 }

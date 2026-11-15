@@ -306,6 +306,16 @@ Each entry: what was decided, why, and what would reopen it.
   of those programs through. A rough count found none of the first three forms in
   cusoon2. Reopen if a port needs a generic fun in an interface, or files whose vals use
   each other.
+- **A value that holds a function is not compared** (15 Nov 2026; spec 3). Kotlin
+  compares functions by reference and Go cannot compare them; the emitter's first slice
+  answered `false`, so `rule == rule` was `true` in Kotlin and `false` in Kogo with no
+  error, in the core where the two must agree. The checker refuses `==` where it can see a
+  function in the type, and the runtime panics where it cannot. Not taken: leaving
+  `false` and stating it in the spec, a silent difference in `==`; comparing Go's code
+  pointers, which calls two closures of one lambda equal whatever they captured. Accepted
+  cost: a data class that holds a function cannot be compared, be a `Map`'s key or go in
+  a `Set`, which Kotlin allows. Reopen if ports that turn anonymous objects into lambdas
+  need to compare them.
 - **The prelude's signatures are Kogo declarations, read by the checker like any other
   source** (15 Nov 2026; spec 13). The author sees real signatures instead of guessing from
   Kotlin, the checker has one way to check a call, and its tests can use a prelude of five
@@ -869,8 +879,11 @@ Each entry: what was decided, why, and what would reopen it.
 - **`==` inside a value compares a `Double` as Kotlin's `equals` does**: `NaN` is equal to
   `NaN` and `0.0` is not equal to `-0.0`. Between two expressions that are each a `Double`
   or a `Double?` it is IEEE's, as in Kotlin: Go's `==`, or `rt.EqualDouble` once either
-  may be null. A function is equal to nothing, itself included, where Kotlin compares
-  references: Go cannot.
+  may be null. A value that holds a function is not compared: see "Agreed with Greg".
+- **`x == null` is allowed where `x` holds a function** (DEV-845): it tests for null,
+  compares no function, and is how a `T?` is narrowed. The message names the data class
+  and property that hold the function itself. Not taken: refusing it with every
+  other `==`, which leaves `((Int) -> Boolean)?` untestable.
 - **Arithmetic on two literals is kept from Go's constant folding**: the left one is read
   through `rt.Val`, so that `2147483647 + 1` wraps and a `Double` gives `Infinity`, as at
   run time. A minus on a whole literal is one literal (`int32(-2147483648)`); on anything

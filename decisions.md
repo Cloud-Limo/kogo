@@ -688,6 +688,12 @@ Each entry: what was decided, why, and what would reopen it.
   keep reaching for a method in the body; reopen the restating if a port meets a base with
   many fields and many implementers, or a wall needs an interface, which would then have to
   carry a marker that binds its implementers.
+- **The two boxes end each reply that reports or changes the state of work** (16 Nov 2026,
+  Greg; DEV-897; `doc/lead.md`, "Talking to Greg"). They exist so that Greg never starts a
+  move too soon, so they are restated whole, each row standing on its own, and a reply that
+  only carries on a discussion leaves them out whole. Not taken: boxes in every reply, a
+  discussion's included, which pushes the open question off his screen. Reopen if Greg
+  starts a move too soon.
 
 ## Taken in the v0 spec, not yet discussed
 

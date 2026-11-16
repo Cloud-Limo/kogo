@@ -186,11 +186,12 @@ changes only `.md` files, run two more checks:
   compares every built-in with Kotlin's, takes about ten seconds and
   ends `N cases of M names, 0 differ`.
 - `KOGO=~/Dev/kogo-dev-NNN ~/Dev/cusoon2-tasks/kogo/run.sh`, from any
-  directory (Starting step 1 pulls that checkout). It compares the ports with their Kotlin, needs
-  cusoon2's Gradle build, `jq` and, for its cases on the database,
-  `sudo -n -u postgres`, and takes a few minutes. Read its last three
-  lines, `N cases`, `T tables holding rows, R rows` and `0 differ`:
-  `0 differ` alone reads the same when no case ran.
+  directory (Starting step 1 pulls that checkout). It compares the
+  ports with their Kotlin, needs cusoon2's Gradle build, `jq` and, for
+  its cases on the database, `sudo -n -u postgres`, and takes a few
+  minutes. Read its last three lines, `N cases`, `T tables holding
+  rows, R rows` and `0 differ`: `0 differ` alone reads the same when no
+  case ran.
 
 If either stops before its last line, differs, or the comparison
 counts no cases, run it once on `main` (in `~/Dev/kogo`, or with

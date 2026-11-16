@@ -11,10 +11,10 @@ structure wherever Kogo has the construct, so the two read side by side.
 (`spec.md` section 14, or a name section 12 does not list), the port
 says why in a one-line comment, as `// generateSequence becomes a while:
 spec 14`; adding a name to the spec is not the port's to do ("Add what
-the spec lists" says whose it is). The handoff lists each and names the case of the side-by-side
-run that reaches it. A service the Kotlin had by injection (its database
-context, a clock) becomes a parameter (`tx`, `db`, `clock`; spec section
-7) with no mark.
+the spec lists" says whose it is). The handoff lists each and names the
+case of the side-by-side run that reaches it. A service the Kotlin had
+by injection (its database context, a clock) becomes a parameter (`tx`,
+`db`, `clock`; spec section 7) with no mark.
 
 **Cover SQL rather than mark it.** Every statement departs, since jOOQ's
 builder becomes a literal, so its rule is coverage instead: the

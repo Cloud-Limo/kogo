@@ -43,6 +43,18 @@ constraints) is worth typing.
 8. **Core apart from prelude.** Nothing specific to one application
    lives in the core.
 
+## Two aims
+
+Kogo serves two aims, kept apart and equally important.
+
+- **The language.** Kogo need not have all of Kotlin or match it
+  everywhere. Where the two overlap they mean the same (principle 3),
+  and Kogo should be easy to write and unsurprising to someone who knows
+  Kotlin.
+- **A port.** A module moved from Kotlin to Kogo behaves exactly as its
+  Kotlin did. That is shown by running both, never by reading: the
+  side-by-side run of "MVP steps". `doc/porting.md` has the rules.
+
 ## Pipeline
 
 ```

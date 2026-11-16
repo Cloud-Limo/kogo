@@ -568,6 +568,20 @@ Each entry: what was decided, why, and what would reopen it.
   DEV-875). About fifty listed names are not declared; building all is some 600 lines no
   program needs yet. Not taken: building them all now; cutting the spec to what exists,
   which hides what is coming. Reopen if ports keep meeting the same names.
+- **Two aims, kept apart** (16 Nov 2026, Greg; `doc/design.md`). The language need not match
+  Kotlin everywhere, only mean the same where the two overlap; a port must behave exactly as
+  its Kotlin did, shown by running both. Equally important. Not taken: one aim, "matches",
+  which either bends the language toward one application or lets a port drift while the
+  language is argued about. Reopen if a port's exactness cannot be had without changing what
+  the language means.
+- **A port transliterates; SQL is covered, not marked** (16 Nov 2026, Greg;
+  `doc/porting.md`). A port keeps the Kotlin's names, order and structure, and marks each
+  departure outside SQL with a comment, a line in the handoff and a case that reaches it.
+  Every SQL statement departs, so instead each is run by the side-by-side script, both ways
+  where it can go two. Not taken: idiomatic Kogo resting on the comparison alone, which a
+  reader cannot check against the Kotlin; a marker on every statement, which says nothing.
+  Reopen if a tool counts statements run, or a port's comparison misses a departure a mark
+  would have shown.
 
 ## Taken in the v0 spec, not yet discussed
 

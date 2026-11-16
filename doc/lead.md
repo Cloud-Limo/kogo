@@ -57,6 +57,13 @@ else you decide, and record where it will be read: a `Ruling:` comment
 for a review's Question, the issue's Scope for work not started. The
 agent doing the work copies it into `decisions.md`.
 
+A port's handoff may ask for a name the spec does not list
+(`doc/porting.md`, "Add what the spec lists"). One Kotlin has, from its
+standard library or `java.time`, wanted with Kotlin's meaning, you
+approve, recorded as above, and tell Greg in your report; an operator
+on a prelude type counts, as `compareTo` behind `<`. One that would be
+Kogo's own, or differ from Kotlin's in ordinary use, goes to Greg.
+
 Bring Greg one choice at a time, never a list of choices:
 
 - two or three sentences of context that stand on their own;
@@ -178,14 +185,13 @@ changes only `.md` files, run two more checks:
 - `mise run kotlin`, in the worktree after `mise install` there. It
   compares every built-in with Kotlin's, takes about ten seconds and
   ends `N cases of M names, 0 differ`.
-- `KOGO=~/Dev/kogo-dev-NNN kogo/run.sh`, started from
-  `~/Dev/cusoon2-tasks` (the checkout Starting step 1 pulls): from
-  anywhere else it stops in `useDatabase`, without cusoon2's
-  environment. It compares the ports with their Kotlin, needs
-  cusoon2's Gradle build, `jq` and, for its cases on the database,
-  `sudo -n -u postgres`, and takes a few minutes. Read its last three
-  lines, `N cases`, `T tables holding rows, R rows` and `0 differ`:
-  `0 differ` alone reads the same when no case ran.
+- `KOGO=~/Dev/kogo-dev-NNN ~/Dev/cusoon2-tasks/kogo/run.sh`, from any
+  directory (Starting step 1 pulls that checkout). It compares the
+  ports with their Kotlin, needs cusoon2's Gradle build, `jq` and, for
+  its cases on the database, `sudo -n -u postgres`, and takes a few
+  minutes. Read its last three lines, `N cases`, `T tables holding
+  rows, R rows` and `0 differ`: `0 differ` alone reads the same when no
+  case ran.
 
 If either stops before its last line, differs, or the comparison
 counts no cases, run it once on `main` (in `~/Dev/kogo`, or with

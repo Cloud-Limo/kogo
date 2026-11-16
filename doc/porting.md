@@ -10,11 +10,11 @@ structure wherever Kogo has the construct, so the two read side by side.
 **Mark each departure outside SQL.** Where Kogo lacks the construct
 (`spec.md` section 14, or a name section 12 does not list), the port
 says why in a one-line comment, as `// generateSequence becomes a while:
-spec 14`; adding the name to the spec is a language change, not the
-port's. The handoff lists each and names the case of the side-by-side
-run that reaches it. A service the Kotlin had by injection (its database
-context, a clock) becomes a parameter (`tx`, `db`, `clock`; spec section
-7) with no mark.
+spec 14`; adding a name to the spec is not the port's to do ("Add what
+the spec lists" says whose it is). The handoff lists each and names the
+case of the side-by-side run that reaches it. A service the Kotlin had
+by injection (its database context, a clock) becomes a parameter (`tx`,
+`db`, `clock`; spec section 7) with no mark.
 
 **Cover SQL rather than mark it.** Every statement departs, since jOOQ's
 builder becomes a literal, so its rule is coverage instead: the
@@ -47,7 +47,15 @@ without such a run, nor with a difference owed.
 
 **Add what the spec lists.** A name the port needs that the spec lists
 and the prelude lacks is added to the prelude (DEV-875), not written
-around.
+around. A name the spec does not list is one of two kinds. One Kotlin
+has (its standard library, or `java.time` for a type of `kogo.time`),
+wanted with Kotlin's meaning, the port reports in its handoff and the
+lead approves; it is then added to section 12's list and the prelude
+together, with a case in `kotlin/builtins` where that check takes one.
+One that would be Kogo's own, or would differ from Kotlin's in ordinary
+use, is Greg's. Until either is built the port writes round it as a
+marked departure. An operator on a prelude type is such a name: `a < b`
+is `compareTo` and `a + b` is `plus` (spec section 6).
 
 **The handoff reports:** the cusoon2 commit the port matches; each
 departure with its case; "N of M statements run" and each not reached;

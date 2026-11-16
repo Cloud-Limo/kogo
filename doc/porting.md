@@ -1,7 +1,8 @@
 # Porting a Kotlin module
 
-A port behaves exactly as its Kotlin did (`doc/design.md`, "Ports"), and
-these rules say how that is reached and shown.
+A port aims to behave exactly as its Kotlin did (`doc/design.md`,
+"Ports"); these rules say how that is reached and shown, and what
+happens to a difference.
 
 **Transliterate by default.** Keep the Kotlin's names, order and
 structure wherever Kogo has the construct, so the two read side by side.

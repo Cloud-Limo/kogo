@@ -227,6 +227,7 @@ func (c *checker) wire(id *syntax.Ident, what string, whole Type, w *reach) {
 		}
 		c.errorf(id, "wire", "%s's %s %s, %s (spec.md 15.4)", id.Name, what, where, why)
 	}
+	been := map[*TypeDecl]bool{} // this walk's, for the input's marks
 	var walk func(t Type, path string)
 	walk = func(t Type, path string) {
 		if t == unknown {
@@ -249,9 +250,14 @@ func (c *checker) wire(id *syntax.Ident, what string, whole Type, w *reach) {
 			bad(t, path, "which does not cross the wire: send text the server has formatted")
 		case len(d.Params) > 0:
 			bad(t, path, "and a type on the wire has no type parameters: declare one type for each use")
-		case w.seen[d]:
+		case what == "input" && d.Kind == "data class" && len(d.Ctor.markers) > 0:
+			bad(t, path, fmt.Sprintf("whose constructor is marked @%s, and no request makes one: take the id or the slug in the input and make the value with the function that checks it", d.Ctor.markers[0].Name))
+		case been[d], w.seen[d] && what != "input":
 		default:
-			c.add(id, what, w, d)
+			been[d] = true
+			if !w.seen[d] {
+				c.add(id, what, w, d)
+			}
 			if path == "" {
 				path = d.Name
 			}

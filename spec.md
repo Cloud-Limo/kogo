@@ -747,8 +747,10 @@ data class HeldBusiness @UnscopedRead constructor(val business: Business, val st
 
 A file may use a marked function, property or constructor only if it
 begins with `@file:OptIn(UnscopedRead::class)`. Anything else is a
-compile error. A `copy` of a data class and a row read into one (10.3)
-use its constructor. Only the file's opt-in counts: marking the function
+compile error. A value of a data class is made four ways, each held to
+a marked constructor: a call of it; a `copy` and a row read into one
+(10.3), which use it; and an operation's input, which is refused even
+where the file opts in (15.4). Only the file's opt-in counts: marking the function
 that makes the use does not stand in for it, as it does in Kotlin, and
 the file that declares a marked function opts in to use it too. A type
 carries no marker; mark its constructor. Markers do nothing at run time.
@@ -1061,6 +1063,9 @@ Inputs and answers are JSON.
   a data class, with an enum that says which case it is.
 - `Unit` stands only as the whole input or the whole answer.
 - A data class on the wire has no type parameters.
+- An input that is or holds a data class whose constructor is marked
+  (11) is a compile error: take the id in the input and make the value
+  with the function that checks it. An answer may hold one.
 - Two wire types of one name in one list are a compile error, and so
   is one named `Outcome`, the answer's own type in TypeScript, or one
   named as its list's interface (15.6), `Ops` in `api ops`.

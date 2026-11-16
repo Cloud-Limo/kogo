@@ -13,6 +13,8 @@ is building it because he wants to; do not argue whether it is practical.
 - `decisions.md` records each choice with its reason and what reopens it.
   Add to it whenever you choose something the spec or the issue did not.
 - `doc/design.md` is the design: principles, pipeline, the SQL pass.
+- `doc/porting.md` is how a port of a Kotlin module stays close to it
+  and is checked against it: read it before porting.
 - `prototype/` holds stage 1's throwaway scripts; replace, don't extend.
 
 ## Rules

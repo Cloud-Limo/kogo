@@ -60,10 +60,11 @@ agent doing the work copies it into `decisions.md`.
 Bring Greg one choice at a time, never a list of choices:
 
 - two or three sentences of context that stand on their own;
-- a short example, in Kogo or SQL, of each option;
+- the options lettered, a, b, c, each with a short example in Kogo or
+  SQL;
 - your recommendation, with its size (code / tests) and the process it
   needs (an open PR, or a new issue);
-- a closing question he can answer in a word.
+- a closing question he answers with a letter.
 
 Record his answer, dated, the same way as your own.
 
@@ -78,12 +79,19 @@ When you list Greg's next moves, give two lists and never mix them.
 each with what it waits on and who will say when it is ready. A move
 changes list only when you tell him so.
 
+Number each row of You can do now. Greg answers with the numbers of
+the moves he did, `1` or `1 3`, and with a question's letter, `b`;
+both can come in one reply, `1 b`. A Zed session back from its step
+he says as `884 back`. The numbers are those of your latest list:
+restate the lists in each reply, so a move carried over may get a new
+number. Anything else he types is plain words.
+
 You can do now:
 
-| Move | How |
-| --- | --- |
-| Launch DEV-901's review | add `agent` to DEV-901 |
-| Fix DEV-902 in its Zed session | say "Fix DEV-902" there |
+| # | Move | How |
+| --- | --- | --- |
+| 1 | Launch DEV-901's review | add `agent` to DEV-901 |
+| 2 | Fix DEV-902 in its Zed session | say "Fix DEV-902" there |
 
 Not yet:
 
@@ -124,7 +132,7 @@ follows "The launch comment" in cusoon2's
 
 After Greg adds the label, wait for the run in the background and act
 when it hands off; a Zed session's handoff does not show, so Greg says
-when one is back.
+when one is back, as `884 back`.
 
 | Step | Directive | The brief adds |
 | --- | --- | --- |
@@ -144,12 +152,19 @@ when one is back.
 
 ## Reading what comes back
 
+Read a Handoff, Review or Fixed on the PR, where it is whole. A
+`Ruling:` or a `Merged:` you post goes in full on the PR and its first
+line alone on the issue (`head -1 ruling.md | lin comment DEV-NNN`),
+as every step's comment does. For an issue whose PR is in another
+repository, the PR is that one. A Fix run's brief still quotes each
+Ruling in full.
+
 - Check a claim against the code before passing it on.
 - A Review of Fix and Won't fix only, which you agree with: suggest
   Fix. Disagree with an item and you post a `Ruling:` that says so.
-- A Question that is yours: post `Ruling: <n>: <the answer>` on the
-  issue and the PR. One that is Greg's: bring it to him as above, then
-  post his answer as the Ruling.
+- A Question that is yours: post `Ruling: <n>: <the answer>`. One
+  that is Greg's: bring it to him as above, then post his answer as
+  the Ruling.
 
 ## Merging
 
@@ -181,11 +196,11 @@ If they match and pass, nothing is Open and both checks end
 `0 differ` with a case count above zero, or were skipped,
 `gh pr merge --merge`, which moves the issue to Done, post
 `Merged: <sha>`, the built-ins check's last line and the comparison's
-`N cases` with `0 differ` (or "checks skipped") on the PR and the
-issue, remove the worktree and both branches as in Starting step 3,
-and pull `main`. Otherwise post a `Ruling:`, with any differing
-cases, and ask for another Fix. Go to Greg only when what is Open is
-a choice of his kind.
+`N cases` with `0 differ` (or "checks skipped") in full on the PR and
+its first line on the issue, remove the worktree and both branches
+as in Starting step 3, and pull `main`. Otherwise post a `Ruling:`,
+with any differing cases, and ask for another Fix. Go to Greg only
+when what is Open is a choice of his kind.
 
 After a merge, look at what the issue was for. File the next issue if
 the work exposed one.

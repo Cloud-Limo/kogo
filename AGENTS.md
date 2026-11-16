@@ -36,8 +36,10 @@ is building it because he wants to; do not argue whether it is practical.
 ## Workflow
 
 Linear holds the state of every piece of work and GitHub holds its
-code. An issue goes Todo, In Progress, In Review, Done, and the first
-line of its newest comment says what happens next. Each step below can
+code. The PR holds each step's comment in full, and the issue the
+first line of each, which is all the board shows. An issue goes Todo,
+In Progress, In Review, Done, and the first line of its newest comment
+says what happens next. Each step below can
 run in Zed or as an async run, in any mix. So whatever a later step
 needs is on the issue, the PR or the pushed branch, never only in a
 session or a worktree.
@@ -68,13 +70,13 @@ with them. `$LINEAR_API_KEY` is already in the shell.
   PR into `main` with `gh pr create`. Write one comment: the first
   line `Handoff: <PR url> · <branch> · <worktree>`, then Landed /
   Verified / Decided / Next step / Gotcha. Post it on the PR with `gh
-  pr comment` and on the issue with
-  `lin comment DEV-NNN --state "In Review" < handoff.md`, print it,
-  and stop.
+  pr comment` and its first line alone on the issue with
+  `head -1 handoff.md | lin comment DEV-NNN --state "In Review"`,
+  print it, and stop.
 - **Code review.** "Code review DEV-NNN": `lin show DEV-NNN` and take
-  the PR and branch from the newest Handoff. Work in
-  `~/Dev/kogo-dev-NNN`: when it is missing, `git -C ~/Dev/kogo fetch
-  origin` and create it from `origin/<branch>`; otherwise
+  the PR and branch from the newest Handoff; its text is on the PR.
+  Work in `~/Dev/kogo-dev-NNN`: when it is missing, `git -C ~/Dev/kogo
+  fetch origin` and create it from `origin/<branch>`; otherwise
   `git pull --ff-only` there. Read the whole diff
   against the issue, `spec.md` and the rules above, and run the tests.
   Change no code. Write one comment: the first line
@@ -82,24 +84,32 @@ with them. `$LINEAR_API_KEY` is already in the shell.
   a numbered list. Each item is a **Fix** (what is wrong, the change,
   its size as code / tests), a **Won't fix** (the finding and why it
   stays) or a **Question** (a choice that is Greg's or the lead's: the
-  options and which you lean to). Post it on the PR and on the issue
-  with `lin comment`, print it, and stop.
+  options and which you lean to). Post it on the PR, and its first
+  line alone on the issue with `head -1 review.md | lin comment
+  DEV-NNN`, print it, and stop.
 - **Fix.** "Fix DEV-NNN": in the same worktree, fast-forwarded or
   made as in Code review when missing, make every Fix of the newest
-  Review as further commits. A `Ruling:` comment after it answers its
-  Questions and overrides the Review where they differ, a Fix
-  included. Rewrite the PR description if the work moved. Push.
+  Review, read on the PR, as further commits. A `Ruling:` comment
+  after it, on the PR too, answers its Questions and overrides the
+  Review where they differ, a Fix included. Rewrite the PR description
+  if the work moved. Push.
   Write one comment: the first line
   `Fixed: <PR url> at <sha>`, then what was done for each numbered
   item, and under **Open** any Question without a Ruling and any
-  choice the fixes raised. Post it on the PR and on the issue with
-  `lin comment DEV-NNN` (no `--state`: it stays In Review), print it,
-  and stop. Do not merge: the lead reads the fixes and merges.
+  choice the fixes raised. Post it on the PR, and its first line
+  alone on the issue with `head -1 fixed.md | lin comment DEV-NNN`
+  (no `--state`: it stays In Review), print it, and stop. Do not
+  merge: the lead reads the fixes and merges.
 - **Async runs.** A run has no Linear access and its clone is its
-  worktree. Where a step posts on the issue, write that comment as the
-  run's `answer.md`, which the wrapper posts, and post it on the PR
-  yourself. A review or fix run leaves its tree clean: whatever is
-  left is pushed to the PR's branch. No run merges.
+  worktree. Post the step's comment on the PR yourself and write the
+  same, in full, as the run's `answer.md`, which the wrapper posts on
+  the issue whole: the one place a full comment lands on the issue,
+  and what an interrupted run leaves behind. A review or fix run
+  leaves its tree clean: whatever is left is pushed to the PR's
+  branch. No run merges.
+- A comment with no PR to hold it stays on the issue in full: a
+  launch comment, a `Lead:` comment, an answer of Greg's given before
+  a PR exists.
 - Greg does not review Kogo's PRs on GitHub. Review is the Code
   review step, and the lead answers for the quality of what merges
   and is the only one that merges.

@@ -37,8 +37,12 @@ mistake in the port, a fault in Kogo, or a corner where Kogo differs,
 and each is fixed, the last by matching the prelude (principle 3) or by
 a function of Kogo's own used as a marked departure; or Greg accepts it,
 recorded as "Ports" has it, and the comparison names the accepted cases
-one by one. A port passes at zero differences beyond those, and a module
-does not replace its Kotlin without such a run.
+one by one; or it is owed: the port leaves out something the Kotlin
+does, because Kogo cannot yet do it. Record what is left out, the issue
+that will close it and the cases it covers, which the comparison names
+and forgives until that issue closes. A port passes at zero differences
+beyond those accepted and owed, and a module does not replace its Kotlin
+without such a run, nor with a difference owed.
 
 **Add what the spec lists.** A name the port needs that the spec lists
 and the prelude lacks is added to the prelude (DEV-875), not written
@@ -46,4 +50,5 @@ around.
 
 **The handoff reports:** the cusoon2 commit the port matches; each
 departure with its case; "N of M statements run" and each not reached;
-the run's cases, differences and any accepted ones.
+the run's cases, differences, any accepted ones and each one owed with
+its issue.

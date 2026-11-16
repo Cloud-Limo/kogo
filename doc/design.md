@@ -53,7 +53,12 @@ same inputs and compared exactly before it replaces it. A difference
 the run finds is fixed, or it is accepted: Greg decides, and it is
 recorded with what differs, why matching it costs too much, and the
 cases it covers, so that the comparison forgives those cases and
-nothing else. `doc/porting.md` has the rules.
+nothing else. A difference may also be owed: the port leaves out
+something the Kotlin does, because Kogo cannot yet do it. It is
+recorded with what is left out, the issue that will close it, and the
+cases it covers, and the comparison forgives those cases until then. A
+piece with a difference owed does not replace its Kotlin.
+`doc/porting.md` has the rules.
 
 ## Pipeline
 
@@ -312,9 +317,10 @@ emitted Go. Every result is compared exactly: whole numbers digit for
 digit, a `Double` bit for bit, text character for character, `null`,
 lists in order, data classes field by field; a case that throws in
 Kotlin must panic in Kogo with the same message. There is no tolerance,
-and passing is zero differences. Each difference is a mistake in the
-port, a fault in the emitter or the prelude, or a difference Greg
-accepts, recorded (Ports). The first module is cusoon2's invoice
+and passing is zero differences beyond those accepted and owed, since
+the MVP stops at the comparison and replaces nothing. Each difference
+is a mistake in the port, a fault in the emitter or the prelude, one
+Greg accepts or one owed, both recorded (Ports). The first module is cusoon2's invoice
 ledger and pay arithmetic, which needs only the emitter's first slice;
 the second, once SQL runs, is suppliers and businesses, where the same
 result also means the same rows changed from identical copies of a

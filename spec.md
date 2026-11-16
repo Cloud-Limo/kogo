@@ -434,6 +434,9 @@ error("unreachable")
 `require`, `check`, `requireNotNull`, `checkNotNull` and `error` panic, as
 do integer division by zero, an index out of range and `single()` on a
 list that does not hold exactly one element. Code cannot catch a panic.
+An `Int` or `Long` `/` or `%` by zero panics with Kotlin's message,
+`/ by zero`; a `Double` divided by zero is an infinity or NaN. `list[i]`
+outside the list panics with `Index 5 out of bounds for length 3`.
 The server catches it at the request boundary, rolls the transaction back,
 logs it and answers 500 (section 15).
 

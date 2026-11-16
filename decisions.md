@@ -1494,6 +1494,19 @@ Each entry: what was decided, why, and what would reopen it.
   non-zero still fails the comparison. Not taken: dropping it because nothing exits quietly
   today; a test made to stop failing wrongly should not let one pass wrongly.
 
+## Taken giving section 8's panics Kotlin's messages (DEV-870), not yet discussed
+
+- **`rt.Div` stays one generic function**, and tells a whole number from a Double by
+  `T(1)/2 == 0` inside its `b == 0` branch, so the hot path is one comparison and the
+  emitter is unchanged. Not taken: a separate `DivInt` for whole numbers, which moves the
+  choice into the emitter for no gain.
+- **`list[i]` outside the list is fixed here too** (`Index 5 out of bounds for length 3`,
+  the JVM's message for `listOf(...)[5]`), one unsigned comparison in `List_Get`. Not taken:
+  filing it apart, for a change of three lines.
+- **`single()` is not added**: section 8 and the stdlib list name it, but the prelude has
+  no `single` at all, so there is no message to correct; adding it is a feature, left to be
+  filed. Not taken: adding it here.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, workers, and an

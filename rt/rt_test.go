@@ -128,3 +128,29 @@ func TestRanges(t *testing.T) {
 		t.Error("In holds both ends, and InUntil not its last")
 	}
 }
+
+// A whole number divided by zero panics with Kotlin's message (spec.md
+// section 8); a Double divided by zero is an infinity or NaN.
+func TestByZero(t *testing.T) {
+	for name, f := range map[string]func(){
+		"Int /":  func() { Div[int32](7, 0) },
+		"Int %":  func() { Rem[int32](7, 0) },
+		"Long /": func() { Div[int64](7, 0) },
+		"Long %": func() { Rem[int64](7, 0) },
+	} {
+		func() {
+			defer func() {
+				if p := recover(); p != "/ by zero" {
+					t.Errorf("%s 0 panics with %v, want / by zero", name, p)
+				}
+			}()
+			f()
+		}()
+	}
+	if got := Div(1.0, 0); !math.IsInf(got, 1) {
+		t.Errorf("1.0 / 0.0 is %v, want Infinity", got)
+	}
+	if got := Div(0.0, 0); !math.IsNaN(got) {
+		t.Errorf("0.0 / 0.0 is %v, want NaN", got)
+	}
+}

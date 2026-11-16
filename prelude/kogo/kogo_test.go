@@ -100,6 +100,24 @@ func TestLists(t *testing.T) {
 	}
 }
 
+// An index outside a list panics with Kotlin's message (spec.md
+// section 8).
+func TestIndexOutOfBounds(t *testing.T) {
+	for i, want := range map[int32]string{
+		5:  "Index 5 out of bounds for length 3",
+		-1: "Index -1 out of bounds for length 3",
+	} {
+		func() {
+			defer func() {
+				if p := recover(); p != want {
+					t.Errorf("list[%d] panics with %v, want %s", i, p, want)
+				}
+			}()
+			List_Get(ListOf[int32](1, 2, 3), i)
+		}()
+	}
+}
+
 func TestMoreLists(t *testing.T) {
 	five, xs := int64(5), make(List[int64], 1, 4)
 	if got := ListOfNotNull(nil, &five, nil); !slices.Equal(got, []int64{5}) {

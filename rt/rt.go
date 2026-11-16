@@ -43,12 +43,31 @@ func Widen[A, B any](p *A, f func(A) B) *B {
 func Val[T any](x T) T { return x }
 
 // Div is a / b. It is a call so that a division by zero panics in
-// source order, and so that Go never folds it at compile time.
-func Div[T int32 | int64 | float64](a, b T) T { return a / b }
+// source order, and so that Go never folds it at compile time. A whole
+// number divided by zero panics with Kotlin's message; a Double gives
+// an infinity or NaN, as Kotlin's does. The test one/2 == 0 tells the
+// two apart on the cold path only.
+func Div[T int32 | int64 | float64](a, b T) T {
+	if b == 0 {
+		if one := T(1); one/2 == 0 {
+			panic(byZero)
+		}
+	}
+	return a / b
+}
 
 // Rem is a % b on whole numbers, and Mod on Doubles.
-func Rem[T int32 | int64](a, b T) T { return a % b }
-func Mod(a, b float64) float64      { return math.Mod(a, b) }
+func Rem[T int32 | int64](a, b T) T {
+	if b == 0 {
+		panic(byZero)
+	}
+	return a % b
+}
+
+// byZero is Kotlin's message for a whole number divided by zero.
+const byZero = "/ by zero"
+
+func Mod(a, b float64) float64 { return math.Mod(a, b) }
 
 // In reports x in lo..hi, and InUntil x in lo until hi.
 func In(x, lo, hi int64) bool      { return lo <= x && x <= hi }

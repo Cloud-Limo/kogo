@@ -623,12 +623,15 @@ Each entry: what was decided, why, and what would reopen it.
   DEV-884; `doc/design.md`, "Ports"). Three outcomes. Fixed: the port or Kogo was wrong.
   Accepted: a corner where matching costs too much; Greg decides, it stays for good and
   does not block replacing the Kotlin. Owed: the port leaves out something the Kotlin does
-  because Kogo cannot yet do it; recorded with what is left out, the issue that will close
-  it and the cases it covers, forgiven until that issue closes, and it blocks replacing.
+  because Kogo cannot yet do it; Greg decides, as with accepted, since nothing the
+  comparison forgives is forgiven unless he said so; recorded with what is left out, the
+  issue that will close it and the cases it covers, forgiven until that issue closes, and
+  it blocks replacing.
   The MVP is done at zero differences beyond those accepted and owed, since it stops at the
   comparison. The case was DEV-879: `sendInvite` queues an email and Kogo has no mail. Not
   taken: recording such a gap as accepted, which reads as kept for good; holding the MVP
-  until Kogo can send mail. Reopen if owed differences are left open after their piece is
+  until Kogo can send mail; the lead agreeing an owed difference, which lets a gap be
+  forgiven before Greg has seen it; the porting session deciding alone. Reopen if owed differences are left open after their piece is
   otherwise ready to replace its Kotlin.
 
 ## Taken in the v0 spec, not yet discussed

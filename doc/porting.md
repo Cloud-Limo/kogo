@@ -37,10 +37,11 @@ mistake in the port, a fault in Kogo, or a corner where Kogo differs,
 and each is fixed, the last by matching the prelude (principle 3) or by
 a function of Kogo's own used as a marked departure; or Greg accepts it,
 recorded as "Ports" has it, and the comparison names the accepted cases
-one by one; or it is owed: the port leaves out something the Kotlin
-does, because Kogo cannot yet do it. Record what is left out, the issue
-that will close it and the cases it covers, which the comparison names
-and forgives until that issue closes. A port passes at zero differences
+one by one; or Greg decides it is owed: the port leaves out something
+the Kotlin does, because Kogo cannot yet do it. The handoff names the
+gap and leaves it to him. Record what is left out, the issue that will
+close it and the cases it covers, which the comparison names and
+forgives until that issue closes. A port passes at zero differences
 beyond those accepted and owed, and a module does not replace its Kotlin
 without such a run, nor with a difference owed.
 

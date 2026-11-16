@@ -54,10 +54,11 @@ the run finds is fixed, or it is accepted: Greg decides, and it is
 recorded with what differs, why matching it costs too much, and the
 cases it covers, so that the comparison forgives those cases and
 nothing else. A difference may also be owed: the port leaves out
-something the Kotlin does, because Kogo cannot yet do it. It is
-recorded with what is left out, the issue that will close it, and the
-cases it covers, and the comparison forgives those cases until then. A
-piece with a difference owed does not replace its Kotlin.
+something the Kotlin does, because Kogo cannot yet do it. Greg
+decides, and it is recorded with what is left out, the issue that will
+close it, and the cases it covers, and the comparison forgives those
+cases until then. A piece with a difference owed does not replace its
+Kotlin.
 `doc/porting.md` has the rules.
 
 ## Pipeline
@@ -320,13 +321,14 @@ Kotlin must panic in Kogo with the same message. There is no tolerance,
 and passing is zero differences beyond those accepted and owed, since
 the MVP stops at the comparison and replaces nothing. Each difference
 is a mistake in the port, a fault in the emitter or the prelude, one
-Greg accepts or one owed, both recorded (Ports). The first module is cusoon2's invoice
-ledger and pay arithmetic, which needs only the emitter's first slice;
-the second, once SQL runs, is suppliers and businesses, where the same
-result also means the same rows changed from identical copies of a
-database, with the clock and new ids supplied alike. The port, the
-drivers and the cases live in cusoon2, since nothing specific to it
-enters this repo, and the port names the cusoon2 commit it matches.
+Greg accepts or one owed, both recorded (Ports). The first module is
+cusoon2's invoice ledger and pay arithmetic, which needs only the
+emitter's first slice; the second, once SQL runs, is suppliers and
+businesses, where the same result also means the same rows changed from
+identical copies of a database, with the clock and new ids supplied
+alike. The port, the drivers and the cases live in cusoon2, since
+nothing specific to it enters this repo, and the port names the cusoon2
+commit it matches.
 
 ## Keeping the general language open
 

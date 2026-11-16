@@ -32,9 +32,10 @@ tell Greg.
    merged --head <branch>`): check `git status` there is clean, then
    `git worktree remove`, `git branch -d` and
    `git push origin --delete <branch>`.
-4. Tell Greg, briefly and as "Talking to Greg" says: his moves in
-   the two lists, You can do now and Not yet, then what is running.
-   End with the one move you suggest.
+4. Tell Greg, briefly and as "Talking to Greg" says. Open with the
+   one move you suggest, in bold; then his moves in the two lists,
+   You can do now and Not yet; then what is running and what you
+   will merge.
 
 | State | Newest comment | Next |
 | --- | --- | --- |
@@ -96,10 +97,11 @@ Not yet:
 Suggest one and say why in a line; Greg agrees or picks another.
 
 - **The Zed session already open on the issue**, when the step before
-  ran there minutes ago: its context is warm and a run is slower to
-  start. Give Greg the phrase for that session.
-- **Async** is the default when no Zed session is open on the issue:
-  the issue stands alone and a launch comment can say the rest.
+  ran there minutes ago, but not a Code review of what that session
+  wrote: its context is warm and a run is slower to start. Give Greg
+  the phrase for that session.
+- **Async** is the default otherwise: the issue stands alone and a
+  launch comment can say the rest.
 - **Zed** when Greg wants to watch or steer, when the work is a
   conversation, or when it needs this VM (a read of `cusoon_b`, the
   stage-1 ports). Give Greg the phrase: "Pickup DEV-NNN", "Code review

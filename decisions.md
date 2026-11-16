@@ -608,14 +608,17 @@ Each entry: what was decided, why, and what would reopen it.
   "Talking to Greg"). You can do now, each with its exact phrase or label, and Not yet, each
   with what it waits on and who will say when it is ready; a move changes list only when the
   lead says so, and every reply opens with what waits on Greg, in bold. Not taken: one list
-  mixing the two, in which a move not ready sat among ready ones and could be started too
-  soon (DEV-880, DEV-881). Reopen if Greg finds the split hides what matters most.
+  mixing the two, in which a move not ready sits among ready ones and can be started too
+  soon. Reopen if Greg finds the split hides what matters most.
 - **The lead does not run other sessions' steps** (16 Nov 2026, Greg; `doc/lead.md`, "What
   you own"). A Pickup, a Code review or a Fix runs in Zed or as an async run, chosen by the
   lead and started by Greg; the Zed session already open on an issue is the first choice for
-  its next step while its context is warm. Not taken: the lead's own subagents, whose output
-  fills the lead's session and whose review is not the reviewing model's to make. Reopen if
-  the lead gains a way to start a run itself.
+  its next step while its context is warm, except a Code review of what that session wrote:
+  a session cannot review its own code, though it can fix it, and the session that reviewed
+  can fix too. Not taken: the lead's own subagents, whose output fills the lead's session
+  and whose review would be the lead's, not the reviewing model's. The mistakes behind it
+  were made in DEV-880 and DEV-881 on 16 Nov 2026. Reopen if Greg asks the lead to make a
+  step itself.
 
 ## Taken in the v0 spec, not yet discussed
 

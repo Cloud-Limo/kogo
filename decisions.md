@@ -1541,6 +1541,22 @@ Each entry: what was decided, why, and what would reopen it.
 - **`substring(start)` is `substring(start, length)`**, so both give the same message, as
   Kotlin's do (`Range [4, 3)` for `"abc".substring(4)`).
 
+## The check against Kotlin (DEV-877)
+
+- **One entry point, `call`, in the shared source, and a case is a branch of a `when`** on
+  its name, so each driver is one call and both run the same code. Not taken: plain
+  functions of differing signatures, which need a table of calls in each driver.
+- **Every case takes the same ten inputs and gives a `String`**, written by a template, so
+  `toString` is compared too. Not taken: typed results and an encoding in each driver.
+- **Inputs are tab-separated numbers** (a text as code points, a `Double` as its bits), not
+  JSON: kotlinc has no JSON reader, and a driver must stay small.
+- **A kept difference is a substring of either result**, listed in `kotlin/cases/main.go`
+  with where the spec states it. It can hide a real fault whose result holds the same text.
+  Not taken: leaving the inputs out, which is anticipating; a rule for each case.
+- **A bug's message stays Kogo's where Kotlin's cannot be matched or says less** (an empty
+  list's index, a `replace` with a bad group): spec.md section 12 says so. Reopen if a
+  program reads a message.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, workers, and an

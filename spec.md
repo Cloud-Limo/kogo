@@ -813,6 +813,11 @@ all listed here:
   `"-a--c-"`. The text is read as Kotlin reads it: `$1` and `${name}`
   are groups, and a backslash takes the next character as it is.
 - `trim(char)` takes one `Char`, where Kotlin's takes any number.
+- A bug's message is not always Kotlin's. Kotlin words an index outside
+  a list by the list's class, so `emptyList<Int>()[0]` is `Empty list
+  doesn't contain element at index 0.` there and `Index 0 out of bounds
+  for length 0` here, as for every list; and a `replace` whose text
+  names no group says so in Kogo's words.
 - A `Decimal` writes the digits Postgres sent, where Java's `BigDecimal`
   writes an exponent for a small number: `0.0000001` is `1E-7` in
   Kotlin.

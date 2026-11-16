@@ -1,0 +1,26 @@
+// The prelude's string, Char and Regex functions (see lists.kg).
+package builtins
+
+fun strings(f: String, s: String, t: String, n: Int, m: Int): String? = when (f) {
+    "length" -> "${s.length} ${s.isNotEmpty()}"
+    "stringPlus" -> "${s + t} ${(s + t).length} ${s.plus(t) == t.plus(s)}"
+    "trim" -> "<${s.trim()}>"
+    "trimChar" -> "${t.map { s.trim(it) }}"
+    "isBlank" -> "${s.isBlank()} ${s.isNotBlank()}"
+    "ifEmpty" -> s.ifEmpty { t }
+    "startsWith" -> "${s.startsWith(t)} ${(t + s).startsWith(t)}"
+    "contains" -> "${s.contains(t)} ${(s + t + s).contains(t)}"
+    "lowercase" -> s.lowercase()
+    "filterNot" -> s.filterNot { it.isWhitespace() }
+    "filterNotIn" -> s.filterNot { t.map { c -> c }.toSet().contains(it) }
+    "substringFrom" -> s.substring(n)
+    "substring" -> s.substring(n, m)
+    "stringMap" -> "${s.map { it }} ${s.map { it.isWhitespace() }}"
+    "digitToInt" -> "${s.map { it.digitToInt() }}"
+    "matches" -> "${Regex("[a-z ]*").matches(s)} ${Regex("a|.b").matches(s)}"
+    "replace" -> s.replace(Regex("(b+)|c"), t)
+    "trimSubstring" -> "<${s.trim().substring(n).trim('a')}>"
+    "substringPlus" -> s.substring(0, n) + t + s.substring(n)
+    "lowercaseContains" -> "${s.lowercase().contains(t.lowercase())} ${(s + t).lowercase()}"
+    else -> null
+}

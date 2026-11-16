@@ -105,6 +105,7 @@ func TestLists(t *testing.T) {
 func TestIndexOutOfBounds(t *testing.T) {
 	for i, want := range map[int32]string{
 		5:  "Index 5 out of bounds for length 3",
+		3:  "Index 3 out of bounds for length 3",
 		-1: "Index -1 out of bounds for length 3",
 	} {
 		func() {

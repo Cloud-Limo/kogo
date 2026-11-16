@@ -42,6 +42,9 @@ func Widen[A, B any](p *A, f func(A) B) *B {
 // variable read beside a call that changes it, so the read is a call.
 func Val[T any](x T) T { return x }
 
+// byZero is Kotlin's message for a whole number divided by zero.
+const byZero = "/ by zero"
+
 // Div is a / b. It is a call so that a division by zero panics in
 // source order, and so that Go never folds it at compile time. A whole
 // number divided by zero panics with Kotlin's message; a Double gives
@@ -63,10 +66,6 @@ func Rem[T int32 | int64](a, b T) T {
 	}
 	return a % b
 }
-
-// byZero is Kotlin's message for a whole number divided by zero.
-const byZero = "/ by zero"
-
 func Mod(a, b float64) float64 { return math.Mod(a, b) }
 
 // In reports x in lo..hi, and InUntil x in lo until hi.

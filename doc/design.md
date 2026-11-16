@@ -43,17 +43,17 @@ constraints) is worth typing.
 8. **Core apart from prelude.** Nothing specific to one application
    lives in the core.
 
-## Two aims
+## Ports
 
-Kogo serves two aims, kept apart and equally important.
-
-- **The language.** Kogo need not have all of Kotlin or match it
-  everywhere. Where the two overlap they mean the same (principle 3),
-  and Kogo should be easy to write and unsurprising to someone who knows
-  Kotlin.
-- **A port.** A module moved from Kotlin to Kogo behaves exactly as its
-  Kotlin did. That is shown by running both, never by reading: the
-  side-by-side run of "MVP steps". `doc/porting.md` has the rules.
+Code moved from Kotlin to Kogo aims to behave exactly as it did;
+cusoon2 is the first application to move. Principle 3 does not give
+this: a port is not the same text, since its SQL and whatever Kogo
+leaves out are rewritten. So each piece is run beside its Kotlin on the
+same inputs and compared exactly before it replaces it. A difference
+the run finds is fixed, or it is accepted: Greg decides, and it is
+recorded with what differs, why matching it costs too much, and the
+cases it covers, so that the comparison forgives those cases and
+nothing else. `doc/porting.md` has the rules.
 
 ## Pipeline
 
@@ -313,14 +313,14 @@ digit, a `Double` bit for bit, text character for character, `null`,
 lists in order, data classes field by field; a case that throws in
 Kotlin must panic in Kogo with the same message. There is no tolerance,
 and passing is zero differences. Each difference is a mistake in the
-port, a fault in the emitter or the prelude, or a language difference
-to state. The first module is cusoon2's invoice ledger and pay
-arithmetic, which needs only the emitter's first slice; the second,
-once SQL runs, is suppliers and businesses, where the same result also
-means the same rows changed from identical copies of a database, with
-the clock and new ids supplied alike. The port, the drivers and the
-cases live in cusoon2, since nothing specific to it enters this repo,
-and the port names the cusoon2 commit it matches.
+port, a fault in the emitter or the prelude, or a difference Greg
+accepts, recorded (Ports). The first module is cusoon2's invoice
+ledger and pay arithmetic, which needs only the emitter's first slice;
+the second, once SQL runs, is suppliers and businesses, where the same
+result also means the same rows changed from identical copies of a
+database, with the clock and new ids supplied alike. The port, the
+drivers and the cases live in cusoon2, since nothing specific to it
+enters this repo, and the port names the cusoon2 commit it matches.
 
 ## Keeping the general language open
 

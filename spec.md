@@ -813,11 +813,11 @@ all listed here:
   `"-a--c-"`. The text is read as Kotlin reads it: `$1` and `${name}`
   are groups, and a backslash takes the next character as it is.
 - `trim(char)` takes one `Char`, where Kotlin's takes any number.
-- A bug's message is not always Kotlin's. Kotlin words an index outside
-  a list by the list's class, so `emptyList<Int>()[0]` is `Empty list
-  doesn't contain element at index 0.` there and `Index 0 out of bounds
-  for length 0` here, as for every list; and a `replace` whose text
-  names no group says so in Kogo's words.
+- A bug's message is Kotlin's but for these two. Kotlin words an index
+  outside a list by the list's class, so `emptyList<Int>()[0]` is
+  `Empty list doesn't contain element at index 0.` there and `Index 0
+  out of bounds for length 0` here, as for every list; and a `replace`
+  whose text names no group says so in Kogo's words.
 - A `Decimal` writes the digits Postgres sent, where Java's `BigDecimal`
   writes an exponent for a small number: `0.0000001` is `1E-7` in
   Kotlin.
@@ -856,7 +856,8 @@ and an infinity have no digits and are a bug: `plain` panics. Every
 other `Double` reads as Java's `BigDecimal` writes it but eight below
 `1.0E-322`, 1, 2, 10, 12, 14, 16, 18 and 20 times the smallest: where
 the shortest digits are one, Java writes the closest two, so the
-smallest `Double` ends in `5` here and `49` in Java.
+smallest `Double` ends in `5` here and `49` in Java. The difference is
+`plain`'s alone: a template and `toString` write these as Java does.
 
 **Ids.** `Uuid`, `Uuid.parse(text): Uuid?`, `newId(): Uuid` (time-ordered
 random).

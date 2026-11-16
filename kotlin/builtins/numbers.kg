@@ -18,4 +18,5 @@ fun call(
     f: String, xs: List<Long>, ys: List<Long>, s: String, t: String,
     n: Int, m: Int, x: Long, y: Long, d: Double,
 ): String =
-    lists(f, xs, ys, n, m) ?: strings(f, s, t, n, m) ?: numbers(f, x, y, d, n) ?: "no case $f"
+    lists(f, xs, ys, n, m) ?: strings(f, s, t, n, m) ?: numbers(f, x, y, d, n)
+        ?: probes(f, xs, ys, s, t, n, m, x, y, d) ?: "no case $f"

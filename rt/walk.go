@@ -195,8 +195,8 @@ func double(f float64) string {
 		return s
 	}
 	mantissa, exp, _ := strings.Cut(strconv.FormatFloat(f, 'e', -1, 64), "e")
-	if !strings.Contains(mantissa, ".") {
-		mantissa += ".0"
+	if !strings.Contains(mantissa, ".") { // Java writes the closest two digits
+		mantissa, exp, _ = strings.Cut(strconv.FormatFloat(f, 'e', 1, 64), "e")
 	}
 	n, _ := strconv.Atoi(exp)
 	return mantissa + "E" + strconv.Itoa(n)

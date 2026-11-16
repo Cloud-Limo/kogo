@@ -18,7 +18,7 @@ fun strings(f: String, s: String, t: String, n: Int, m: Int): String? = when (f)
     "stringMap" -> "${s.map { it }} ${s.map { it.isWhitespace() }}"
     "digitToInt" -> "${s.map { it.digitToInt() }}"
     "matches" -> "${Regex("[a-z ]*").matches(s)} ${Regex("a|.b").matches(s)}"
-    "replace" -> s.replace(Regex("(b+)|c"), t)
+    "replace" -> s.replace(Regex("(b+)|(?<c>c)"), t)
     "trimSubstring" -> "<${s.trim().substring(n).trim('a')}>"
     "substringPlus" -> s.substring(0, n) + t + s.substring(n)
     "lowercaseContains" -> "${s.lowercase().contains(t.lowercase())} ${(s + t).lowercase()}"

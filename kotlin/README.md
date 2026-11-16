@@ -13,7 +13,8 @@ and is not part of `go test ./...`.
   and print its result or its panic's message; `cases diff` prints each
   case that differs and exits 1 if any does.
 - A difference is fixed in the prelude, or listed in `cases/main.go`'s
-  `kept` with where `spec.md` states it.
+  `kept` with where `spec.md` states it: the cases it applies to and a
+  rewrite of both results, which must then agree.
 
 To cover a function, add a branch: the generator reads the names from
 the source. Everything written is under `kotlin/_work`.

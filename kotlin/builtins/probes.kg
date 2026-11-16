@@ -1,0 +1,30 @@
+// The generic functions over other element types, and the prelude's
+// functions that are neither list, string nor number (see lists.kg).
+package builtins
+
+fun probes(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int, m: Int, x: Long, y: Long, d: Double): String? = when (f) {
+    "setDouble" -> "${setOf(d, 0.0, -0.0, d)} ${setOf(d).contains(d)} ${listOf(d, 0.0).toSet() == listOf(0.0, d).toSet()} ${setOf(0.0).contains(d)}"
+    "setString" -> "${setOf(s, t, s)} ${s.map { it }.toSet()} ${setOf(s, t) == setOf(t, s)} ${setOf(s).contains(t)}"
+    "setList" -> "${setOf(xs, ys, xs.take(n))} ${setOf(xs to ys, xs to ys)} ${setOf(xs).contains(ys)}"
+    "setEq" -> "${(xs + ys).toSet() == (ys + xs).toSet()} ${xs.toSet() == xs.take(n).toSet()}"
+    "listString" -> "${listOf(s, t).first()} ${listOf(s, t).map { it.length }} ${listOf(s, t).filter { it.isNotEmpty() }} ${s.map { it }.take(n)} ${s.map { it }.drop(n) + t.map { it }}"
+    "listDouble" -> "${listOf(d, 1.5).sumOf { it.toLong() }} ${xs.map { it.toDouble() / 2.0 }} ${listOf(d, d).zip(xs)}"
+    "listList" -> "${listOf(xs, ys).map { it.size }} ${listOf(xs, ys).filter { it.isNotEmpty() }.first()} ${listOf(xs, ys) + listOf(ys)}"
+    "let" -> "${x.let { it + y }} ${s.let { it + t }} ${xs.let { it.size }}"
+    "takeIf" -> "${x.takeIf { it > y }} ${s.takeIf { it.isNotBlank() }} ${listOfNotNull(s.takeIf { it.length > n }, t.takeIf { it.length > m })}"
+    "require" -> requires(n, m)
+    "check" -> checks(n, m)
+    "requireNotNull" -> "${requireNotNull(xs.firstOrNull()) { "none in $xs" }}"
+    "checkNotNull" -> "${checkNotNull(xs.singleOrNull()) { "not one in $xs" }}"
+    else -> null
+}
+
+fun requires(n: Int, m: Int): String {
+    require(n > m) { "n $n m $m" }
+    return "ok"
+}
+
+fun checks(n: Int, m: Int): String {
+    check(n > m) { "n $n m $m" }
+    return "ok"
+}

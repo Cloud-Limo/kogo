@@ -1550,12 +1550,22 @@ Each entry: what was decided, why, and what would reopen it.
   `toString` is compared too. Not taken: typed results and an encoding in each driver.
 - **Inputs are tab-separated numbers** (a text as code points, a `Double` as its bits), not
   JSON: kotlinc has no JSON reader, and a driver must stay small.
-- **A kept difference is a substring of either result**, listed in `kotlin/cases/main.go`
-  with where the spec states it. It can hide a real fault whose result holds the same text.
-  Not taken: leaving the inputs out, which is anticipating; a rule for each case.
-- **A bug's message stays Kogo's where Kotlin's cannot be matched or says less** (an empty
-  list's index, a `replace` with a bad group): spec.md section 12 says so. Reopen if a
-  program reads a message.
+- **A kept difference names its cases and a rewrite**, listed in `kotlin/cases/main.go`
+  with where the spec states it: both results are rewritten and must then be equal, so a
+  fault hides only if it changes nothing but the rewritten text in those cases. Not taken:
+  a substring of either result, which hid four planted faults; leaving the inputs out,
+  which is anticipating. Where a kept `lowercase` difference flips a `contains`, the
+  `lowercaseContains` case's boolean is not compared when its text holds `σ`.
+- **A bug's message is Kotlin's but for a closed list in spec.md section 12**: an index
+  into a list Kotlin built as its empty list, which Kotlin words by the list's class, and
+  a `replace` with a bad group, which keeps Kogo's words. The check holds every other
+  message to Kotlin's. Not taken: always Kotlin's, which cannot hold for the first; no
+  promise, which lets any message drift. Reopen if a program reads a message.
+- **A template writes the smallest `Double`s as Java does** (`4.9E-324`): where the
+  shortest digits are one, `rt` writes the closest two. `"$d"` is valid in both languages,
+  so principle 3 holds it to Kotlin's; `plain` is Kogo's own and keeps its difference.
+- **`trim(char)` trims by UTF-16 units**, as Kotlin's does and section 3 says, so a half
+  of a pair trims and leaves U+FFFD.
 
 ## Spec gaps found by the leakage ports, unresolved
 

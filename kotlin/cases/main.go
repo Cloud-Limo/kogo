@@ -8,6 +8,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"maps"
 	"math"
 	"math/rand/v2"
 	"os"
@@ -22,25 +23,28 @@ import (
 // apart (whitespace, case, digits, a replacement's $ and \).
 var (
 	lists = [][]int64{{}, {1}, {-1}, {0, 0}, {1, 2, 3}, {math.MaxInt64}, {math.MinInt64, math.MaxInt64, -1}, {3, 1, 3, 2, 1}}
-	texts = []string{"", "a", " ", "😀", "\t a b\n", "a😀b", "abcabc", "$1", `\`, "٣4", "ABC é", "  x\u001f", "İΣ", "aaa", "$", "bb c"}
+	texts = []string{"", "a", " ", "😀", "\t a b\n", "a😀b", "abcabc", "$1", `\`, "٣4", "ABC é", "  x\u001f", "İΣ", "aaa", "$", "bb c", "\u001f", "\u0085"}
 	ints  = []int64{0, 1, -1, 2, 3, math.MaxInt32, math.MinInt32, 7}
 	longs = []int64{0, 1, -1, math.MaxInt64, math.MinInt64, math.MaxInt32 + 1, 1 << 53, 10}
 	reals = []float64{0, math.Copysign(0, -1), 1.5, -1.5, math.NaN(), math.Inf(1), math.Inf(-1), math.MaxFloat64,
-		math.SmallestNonzeroFloat64, 1 << 31, -(1 << 31) - 0.5, 1 << 63, 1e7, 0.001, 0.0001, 123456789.125, 1e21, 0.1}
-	letters = []rune("abcABC 019\t$\\é😀٣ ")
+		1 << 31, -(1 << 31) - 0.5, 1 << 63, 1e7, 0.001, 0.0001, 123456789.125, 1e21, 0.1,
+		1 * tiny, 2 * tiny, 10 * tiny, 12 * tiny, 14 * tiny, 16 * tiny, 18 * tiny, 20 * tiny,
+		-1 * tiny, -2 * tiny, -10 * tiny, -12 * tiny, -14 * tiny, -16 * tiny, -18 * tiny, -20 * tiny}
+	tiny    = math.SmallestNonzeroFloat64 // the eight below 1.0E-322 whose shortest digits are one
+	letters = []rune("abcABC 019\t$\\éÉ😀٣ {}")
 )
 
-// kept are the differences Kogo means to keep, or that wait on a
-// ruling: a case that differs where either result holds in is counted
-// under why and does not fail the check.
-var kept = []struct{ in, why string }{
-	{"\uFFFD", "spec.md section 3: a String never holds half of a surrogate pair"},
-	{"i\u0307", "spec.md section 12: lowercase maps one character at a time"},
-	{"ς", "spec.md section 12: lowercase maps one character at a time"},
-	{"Empty list doesn't contain element", "spec.md section 12: a bug's message is not always Kotlin's"},
-	{"Illegal group reference", "spec.md section 12: a bug's message is not always Kotlin's"},
-	{"No group ", "spec.md section 12: a bug's message is not always Kotlin's"},
-	{"4.9E-324", "not ruled: the smallest Double writes as 5.0E-324, Kotlin's as 4.9E-324"},
+// kept are the differences Kogo means to keep: in a case whose name
+// matches names, both results are rewritten, from to to, and a case
+// that then agrees is counted under why and does not fail the check.
+var kept = []struct{ names, from, to, why string }{
+	{"substringPlus", `[\x{10000}-\x{10FFFF}]`, "\uFFFD\uFFFD", "spec.md section 3: a String never holds half of a surrogate pair"},
+	{"lowercase|lowercaseContains", "i\u0307", "i", "spec.md section 12: lowercase maps one character at a time"},
+	{"lowercase|lowercaseContains", "ς", "σ", "spec.md section 12: lowercase maps one character at a time"},
+	{"lowercaseContains", `^(?:true|false) (.*σ.*)$`, "_ $1", "spec.md section 12: lowercase maps one character at a time"},
+	{"get", `Empty list doesn't contain element at index (-?\d+)\.`, "Index $1 out of bounds for length 0", "spec.md section 12: an index into Kotlin's empty list"},
+	{"replace", `[Ii]llegal group reference.*`, "illegal group reference", "spec.md section 12: replace with a bad group"},
+	{"replace", "No group ", "no group ", "spec.md section 12: replace with a bad group"},
 }
 
 func main() {
@@ -115,7 +119,14 @@ func gen(dir string) {
 		if e := pick(1, len(reals), 0); e >= 0 {
 			d = reals[e]
 		}
-		in := fmt.Sprint(join(list(1)), "\t", join(list(3)), "\t", join(text(1)), "\t", join(text(5)), "\t",
+		xs, ys, s, t := list(1), list(3), text(1), text(5)
+		if i >= 40 && r.IntN(4) == 0 { // so that one is inside, or a reordering of, the other
+			ys = slices.Clone(xs)
+			r.Shuffle(len(ys), func(a, b int) { ys[a], ys[b] = ys[b], ys[a] })
+			a := r.IntN(len(s) + 1)
+			t = s[a : a+r.IntN(len(s)-a+1)]
+		}
+		in := fmt.Sprint(join(xs), "\t", join(ys), "\t", join(s), "\t", join(t), "\t",
 			num(1, ints, small), "\t", num(3, ints, small), "\t", num(1, longs, r.Int64), "\t", num(5, longs, small), "\t",
 			int64(math.Float64bits(d)))
 		for _, name := range names {
@@ -143,8 +154,14 @@ func diff(cases, kogo, kotlin string) {
 		if a[i] == b[i] {
 			continue
 		}
-		if i := slices.IndexFunc(kept, func(k struct{ in, why string }) bool { return strings.Contains(a[i]+b[i], k.in) }); i >= 0 {
-			differ["kept, "+kept[i].why]++
+		x, y, why := a[i], b[i], ""
+		for _, k := range kept {
+			if re := regexp.MustCompile(k.from); regexp.MustCompile("^("+k.names+")$").MatchString(name) && re.MatchString(x+y) {
+				x, y, why = re.ReplaceAllString(x, k.to), re.ReplaceAllString(y, k.to), k.why
+			}
+		}
+		if x == y {
+			differ["kept, "+why]++
 			continue
 		}
 		total++
@@ -152,7 +169,8 @@ func diff(cases, kogo, kotlin string) {
 			fmt.Printf("%s\n  kogo   %s\n  kotlin %s\n", c[i], a[i], b[i])
 		}
 	}
-	for name, n := range differ {
+	for _, name := range slices.Sorted(maps.Keys(differ)) {
+		n := differ[name]
 		fmt.Printf("%s: %d differ\n", name, n)
 	}
 	fmt.Printf("%d cases of %d names, %d differ\n", len(c), len(names), total)

@@ -83,7 +83,8 @@ func List_Filter[T any](this List[T], predicate func(T) bool) List[T] {
 }
 
 // List_Get is list[i]; an index outside the list is a bug, and panics
-// with Kotlin's message.
+// with Kotlin's message, but for a list Kotlin built as its empty list,
+// which Kotlin words by the list's class (spec.md section 12).
 func List_Get[T any](this List[T], index int32) T {
 	if uint32(index) >= uint32(len(this)) {
 		panic("Index " + strconv.Itoa(int(index)) + " out of bounds for length " + strconv.Itoa(len(this)))
@@ -269,8 +270,19 @@ func isWhitespace(r rune) bool {
 
 func String_Trim_fun(this string) string { return strings.TrimFunc(this, isWhitespace) }
 
+// String_Trim_Char trims by UTF-16 units, as Kotlin does: a half of
+// a pair trims it, and the other half is left as U+FFFD (spec.md
+// section 3).
 func String_Trim_Char(this string, char rt.Char) string {
-	return strings.TrimFunc(this, func(r rune) bool { return rune(char) == r })
+	u := units(this)
+	i, j := 0, len(u)
+	for i < j && rt.Char(u[i]) == char {
+		i++
+	}
+	for j > i && rt.Char(u[j-1]) == char {
+		j--
+	}
+	return string(utf16.Decode(u[i:j]))
 }
 
 func String_IsBlank(this string) bool    { return strings.TrimFunc(this, isWhitespace) == "" }

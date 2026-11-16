@@ -252,6 +252,7 @@ func TestPortCalls(t *testing.T) {
 		{String_Replace("Heron Draft", re(`\bdraft$`), ""), "Heron Draft"},
 		{String_Replace("heron draft", re(`\bdraft$`), "") + "|" + String_Replace("herondraft", re(`\bdraft$`), ""), "heron |herondraft"},
 		{String_Trim_Char("--a-b--", '-'), "a-b"},
+		{String_Trim_Char("😀", 0xD83D) + String_Trim_Char("😀", 0xDE00), "\uFFFD\uFFFD"},
 		{String_IfEmpty("", func() string { return "e" }) + String_IfEmpty("x", func() string { return "e" }), "ex"},
 		{String_FilterNot("1 2\t3", ws) + String_FilterNot("a😀b", func(c rt.Char) bool { return c == 'b' }), "123a😀"},
 		{rt.ToString(List_SingleOrNull(EmptyList[int32]())) + rt.ToString(List_SingleOrNull(ListOf[int32](1, 2))), "nullnull"},

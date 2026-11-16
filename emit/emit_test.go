@@ -921,6 +921,26 @@ fun id(text: String): Uuid? = Uuid.parse(text)
 `)
 }
 
+// orEmpty and isNullOrBlank take a nullable receiver, and the second
+// firstOrNull and contains sit beside the first.
+func TestNullableAndOverloads(t *testing.T) {
+	expect(t, [][2]string{
+		{`t.Names(rt.Ptr("x"))`, "[x, 3]"},
+		{`t.Names(nil)`, "[]"},
+		{`t.Named(rt.Ptr(" "), "a@b")`, "false true"},
+		{`t.Named(nil, "ab")`, "false false"},
+		{`t.Named(rt.Ptr("Bo"), "")`, "true false"},
+		{`t.Over([]int64{1, 4, 6})`, "4 1 null"},
+	}, `package t
+
+fun names(name: String?): List<String> = name?.let { listOf(it, "3") }.orEmpty()
+
+fun named(name: String?, email: String): String = "${!name.isNullOrBlank()} ${email.contains('@')}"
+
+fun over(xs: List<Long>): String = "${xs.firstOrNull { it > 2L }} ${xs.firstOrNull()} ${xs.firstOrNull { it > 9L }}"
+`)
+}
+
 // What is not emitted yet is refused where it stands, never emitted
 // wrongly, and so are two declarations that Go cannot tell apart,
 // an enum's entries among them.

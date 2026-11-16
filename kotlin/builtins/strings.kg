@@ -7,9 +7,11 @@ fun strings(f: String, s: String, t: String, n: Int, m: Int): String? = when (f)
     "trim" -> "<${s.trim()}>"
     "trimChar" -> "${t.map { s.trim(it) }}"
     "isBlank" -> "${s.isBlank()} ${s.isNotBlank()}"
+    "isNullOrBlank" -> "${s.takeIf { n > m }.isNullOrBlank()} ${t.takeIf { n <= m }.isNullOrBlank()}"
     "ifEmpty" -> s.ifEmpty { t }
     "startsWith" -> "${s.startsWith(t)} ${(t + s).startsWith(t)}"
     "contains" -> "${s.contains(t)} ${(s + t + s).contains(t)}"
+    "containsChar" -> "${t.map { s.contains(it) }} ${s.map { (t + s).contains(it) }}"
     "lowercase" -> s.lowercase()
     "filterNot" -> s.filterNot { it.isWhitespace() }
     "filterNotIn" -> s.filterNot { t.map { c -> c }.toSet().contains(it) }

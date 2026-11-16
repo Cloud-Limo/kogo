@@ -32,10 +32,9 @@ tell Greg.
    merged --head <branch>`): check `git status` there is clean, then
    `git worktree remove`, `git branch -d` and
    `git push origin --delete <branch>`.
-4. Tell Greg, briefly and as "Talking to Greg" says. Open with the
-   one move you suggest, in bold; then his moves in the two lists,
-   You can do now and Not yet; then what is running and what you
-   will merge.
+4. Tell Greg, briefly and as "Talking to Greg" says. Open with what
+   waits on him, in bold; end with the two boxes, You can do now and
+   Not yet, then the line on what is running and what you will merge.
 
 | State | Newest comment | Next |
 | --- | --- | --- |
@@ -77,35 +76,57 @@ Record his answer, dated, the same way as your own.
 
 ## Talking to Greg
 
-Open every reply with what waits on Greg, in bold: a label to add, a
-phrase to say, a question that is his. He acts on the top of a message
-and reads the rest after.
+The two boxes are where Greg looks to see where he stands.
+**You can do now** is everything he may start without asking.
+**Not yet** is everything he must not start, with what will release
+it. They exist so that he never starts a move too soon, so each row
+stands on its own: a move he can do gives the exact phrase or label
+and the session to say it in; a move not yet gives what it waits on
+and whose signal moves it, his ("you say `884 back`") or yours
+("I will"). Name each issue by what it is, as "DEV-887 (the
+data-classes decision)".
 
-When you list Greg's next moves, give two lists and never mix them.
-**You can do now**: each with the exact phrase or label. **Not yet**:
-each with what it waits on and who will say when it is ready. A move
-changes list only when you tell him so.
+End each reply with the boxes, each a bold heading on its own line over
+its table, as below, whenever the reply reports or changes the state of
+work. A reply that only carries on a discussion may leave them out, and
+then leaves them out whole; the first reply after the discussion
+restates them in full. A box with nothing in it keeps its heading and
+says so. "Unchanged", or a sentence, never stands in for the rows. A
+move changes box only when you tell him so.
+
+Not yet holds Greg's own moves, and moves of yours that wait on his
+signal: those that follow from work that is running or a question asked
+of him, and choices of his that are parked. A debt on the board that
+waits on no one is not a row.
+
+After the boxes, one line: what is running and what you will merge.
+Open every reply with what waits on Greg, in bold, in one of three
+forms: "**I suggest:** `1`**, say "Fix DEV-901" in its Zed session.**"
+for a move, by its number; "**Waiting for you:** ..." for a question
+that is his; "**Nothing waits on you.**" when neither.
 
 Number each row of You can do now. Greg answers with the numbers of
 the moves he did, `1` or `1 3`, and with a question's letter, `b`;
 both can come in one reply, `1 b`. A Zed session back from its step
 he says as `884 back`. The numbers are those of your latest list:
-restate the lists in each reply, so a move carried over may get a new
+the boxes are restated whole, so a move carried over may get a new
 number. Anything else he types is plain words.
 
-You can do now:
+**You can do now**
 
 | # | Move | How |
 | --- | --- | --- |
 | 1 | Launch DEV-901's review | add `agent` to DEV-901 |
 | 2 | Fix DEV-902 in its Zed session | say "Fix DEV-902" there |
 
-Not yet:
+**Not yet**
 
 | Move | Waits on | Who says when |
 | --- | --- | --- |
 | Launch DEV-903 | DEV-901 merging | the lead |
 | Code review DEV-904 | its Pickup handing off | the lead, from the run |
+
+Running: DEV-904's Pickup, as a run. Nothing for me to merge.
 
 ## Choosing how a step runs
 

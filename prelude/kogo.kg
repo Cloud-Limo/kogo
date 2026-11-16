@@ -22,6 +22,7 @@ external fun <T> List<T>.get(index: Int): T
 external fun <T> List<T>.isNotEmpty(): Boolean
 external fun <T> List<T>.first(): T
 external fun <T> List<T>.firstOrNull(): T?
+external fun <T> List<T>.firstOrNull(predicate: (T) -> Boolean): T?
 external fun <T> List<T>.last(): T
 external fun <T> List<T>.lastOrNull(): T?
 external fun <T> List<T>.single(): T
@@ -38,6 +39,7 @@ external fun List<Long>.sum(): Long
 external fun <T> List<T>.sumOf(selector: (T) -> Int): Int
 external fun <T> List<T>.sumOf(selector: (T) -> Long): Long
 external fun <T> List<T>.plus(elements: List<T>): List<T>
+external fun <T> List<T>?.orEmpty(): List<T>
 
 external fun <T> setOf(vararg elements: T): Set<T>
 external fun <T> Set<T>.contains(element: T): Boolean
@@ -48,12 +50,14 @@ external fun String.trim(): String
 external fun String.trim(char: Char): String
 external fun String.isBlank(): Boolean
 external fun String.isNotBlank(): Boolean
+external fun String?.isNullOrBlank(): Boolean
 external fun String.ifEmpty(defaultValue: () -> String): String
 external fun String.startsWith(prefix: String): Boolean
 external fun String.replace(regex: Regex, replacement: String): String
 external fun String.filterNot(predicate: (Char) -> Boolean): String
 external fun String.lowercase(): String
 external fun String.contains(other: String): Boolean
+external fun String.contains(char: Char): Boolean
 external fun String.isNotEmpty(): Boolean
 external fun String.substring(startIndex: Int): String
 external fun String.substring(startIndex: Int, endIndex: Int): String

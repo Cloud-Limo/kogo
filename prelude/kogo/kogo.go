@@ -95,18 +95,27 @@ func List_Get[T any](this List[T], index int32) T {
 
 func List_IsNotEmpty[T any](this List[T]) bool { return len(this) > 0 }
 
-// List_FirstOrNull, as every nullable result, is a copy: a pointer
-// into the list would hold all of it and could change it.
-func List_FirstOrNull[T any](this List[T]) *T {
+// ListT_FirstOrNull_fun, as every nullable result, is a copy: a
+// pointer into the list would hold all of it and could change it.
+func ListT_FirstOrNull_fun[T any](this List[T]) *T {
 	if len(this) == 0 {
 		return nil
 	}
 	return rt.Ptr(this[0])
 }
 
+func ListT_FirstOrNull_TToBoolean[T any](this List[T], predicate func(T) bool) *T {
+	for _, x := range this {
+		if predicate(x) {
+			return rt.Ptr(x)
+		}
+	}
+	return nil
+}
+
 // List_First, List_Last and List_Single panic, with Kotlin's
 // messages, where their OrNull is null.
-func List_First[T any](this List[T]) T { return orPanic(List_FirstOrNull(this), "List is empty.") }
+func List_First[T any](this List[T]) T { return orPanic(ListT_FirstOrNull_fun(this), "List is empty.") }
 func List_Last[T any](this List[T]) T  { return orPanic(List_LastOrNull(this), "List is empty.") }
 
 func List_Single[T any](this List[T]) T {
@@ -206,6 +215,13 @@ func List_Plus[T any](this, elements List[T]) List[T] {
 	return append(append(make(List[T], 0, len(this)+len(elements)), this...), elements...)
 }
 
+func List_OrEmpty[T any](this *List[T]) List[T] {
+	if this == nil {
+		return List[T]{}
+	}
+	return *this
+}
+
 // ordered holds each key once, in the order first given, comparing
 // keys as == does (decisions.md). Set is built on it, and Map is to be
 // built on it, with a value beside each key. A lookup walks the keys.
@@ -288,6 +304,9 @@ func String_Trim_Char(this string, char rt.Char) string {
 
 func String_IsBlank(this string) bool    { return strings.TrimFunc(this, isWhitespace) == "" }
 func String_IsNotBlank(this string) bool { return !String_IsBlank(this) }
+func String_IsNullOrBlank(this *string) bool {
+	return this == nil || String_IsBlank(*this)
+}
 
 func String_IfEmpty(this string, defaultValue func() string) string {
 	if this == "" {
@@ -311,8 +330,15 @@ func String_FilterNot(this string, predicate func(rt.Char) bool) string {
 
 func String_Lowercase(this string) string { return strings.ToLower(this) }
 
-func String_Contains(this, other string) bool { return strings.Contains(this, other) }
-func String_IsNotEmpty(this string) bool      { return this != "" }
+func String_Contains_String(this, other string) bool { return strings.Contains(this, other) }
+
+// String_Contains_Char looks by UTF-16 units: a half of a pair is
+// found in a text holding the pair, as in Kotlin.
+func String_Contains_Char(this string, char rt.Char) bool {
+	return slices.Contains(units(this), uint16(char))
+}
+
+func String_IsNotEmpty(this string) bool { return this != "" }
 func String_Substring_Int(this string, startIndex int32) string {
 	return String_Substring_Int_Int(this, startIndex, String_Length(this))
 }

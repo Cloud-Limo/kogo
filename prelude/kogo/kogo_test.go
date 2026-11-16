@@ -278,8 +278,8 @@ func TestPortCalls(t *testing.T) {
 		{String_IfEmpty("", func() string { return "e" }) + String_IfEmpty("x", func() string { return "e" }), "ex"},
 		{String_FilterNot("1 2\t3", ws) + String_FilterNot("a😀b", func(c rt.Char) bool { return c == 'b' }), "123a😀"},
 		{rt.ToString(List_SingleOrNull(EmptyList[int32]())) + rt.ToString(List_SingleOrNull(ListOf[int32](1, 2))), "nullnull"},
-		{rt.ToString(List_SingleOrNull(ListOf[int32](3))) + rt.ToString(List_FirstOrNull(ListOf[int32](4, 5))), "34"},
-		{rt.ToString(List_FirstOrNull(EmptyList[int32]())), "null"},
+		{rt.ToString(List_SingleOrNull(ListOf[int32](3))) + rt.ToString(ListT_FirstOrNull_fun(ListOf[int32](4, 5))), "34"},
+		{rt.ToString(ListT_FirstOrNull_fun(EmptyList[int32]())), "null"},
 		{rt.ToString(List_ToSet(ListOf[int32](2, 1, 2, 3))), "[2, 1, 3]"},
 		{rt.ToString(A_To[int32, string](1, "a")), "(1, a)"},
 		{rt.ToString(Decimal("1.50")) + " " + rt.ToString(Decimal_ToDouble(Decimal("1.50"))), "1.50 1.5"},
@@ -304,7 +304,7 @@ func TestPortCalls(t *testing.T) {
 		t.Error("a Decimal's == is not Java's, which counts the scale")
 	}
 	list := ListOf[int32](1, 2)
-	*List_FirstOrNull(list), *List_SingleOrNull(list[1:]) = 8, 9
+	*ListT_FirstOrNull_fun(list), *List_SingleOrNull(list[1:]) = 8, 9
 	if !slices.Equal(list, []int32{1, 2}) {
 		t.Errorf("firstOrNull or singleOrNull gives a pointer into the list, which now holds %v", list)
 	}
@@ -389,5 +389,27 @@ func TestListEnds(t *testing.T) {
 			}()
 			c.f()
 		}()
+	}
+}
+
+// orEmpty, isNullOrBlank, firstOrNull with a predicate and
+// contains(char), as Kotlin's: contains looks by UTF-16 units.
+func TestNullableAndOverloads(t *testing.T) {
+	list := ListOf[int32](1, 2, 3)
+	odd := func(x int32) bool { return x%2 == 1 }
+	big := func(x int32) bool { return x > 1 }
+	for _, c := range [][2]string{
+		{rt.ToString(List_OrEmpty(&list)) + rt.ToString(List_OrEmpty[int32](nil)), "[1, 2, 3][]"},
+		{rt.ToString(ListT_FirstOrNull_TToBoolean(list, big)) + rt.ToString(ListT_FirstOrNull_TToBoolean(list, func(x int32) bool { return x > 3 })), "2null"},
+		{rt.ToString(ListT_FirstOrNull_TToBoolean(EmptyList[int32](), odd)), "null"},
+		{rt.ToString([]bool{String_IsNullOrBlank(nil), String_IsNullOrBlank(rt.Ptr(" \t")), String_IsNullOrBlank(rt.Ptr("\u0085")), String_IsNullOrBlank(rt.Ptr(" a"))}), "[true, true, false, false]"},
+		{rt.ToString([]bool{String_Contains_Char("a@b", '@'), String_Contains_Char("ab", '@'), String_Contains_Char("😀", 0xDE00), String_Contains_Char("", 'a')}), "[true, false, true, false]"},
+	} {
+		if c[0] != c[1] {
+			t.Errorf("got %q, want %q", c[0], c[1])
+		}
+	}
+	if List_OrEmpty[int32](nil) == nil {
+		t.Error("orEmpty of null is a nil list")
 	}
 }

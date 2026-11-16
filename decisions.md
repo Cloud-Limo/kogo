@@ -648,6 +648,29 @@ Each entry: what was decided, why, and what would reopen it.
   Numbers are those of the lead's latest list, restated each reply. Not taken: letters for
   moves, which a question's options already use; a "Done:" prefix, which numbers make
   needless. Reopen if a renumbered move gets answered by its old number.
+- **A type with fields is a data class, and its body holds only overrides** (16 Nov 2026,
+  Greg; spec 3.1, 3.4, 14). Every property is a `val` of its constructor, the body holds
+  only the `override fun`s of its interfaces, and everything else is a top-level or
+  extension function. Locality first (principle 2): a plain class can hold private, mutable
+  state that its methods read, as cusoon2's `Model` holds `tenantId`, and a call then
+  depends on what is not in its signature; with data classes a value's state is its
+  constructor and a function's inputs are its parameters, and the `tx` in
+  `held.acceptInHouse(tx)` is that rule showing. One way to do each thing second (principle
+  6): Kotlin gives a method three homes, Kogo two that mean the same. The compiler third:
+  `==`, the wire, a SQL row and `toString` are each one walk over a data class, where a
+  plain class would need `==` defined, which in Kotlin is identity and in Go a pointer. The
+  cost, measured on cusoon2's backend (about 18,000 lines outside generated code, by grep,
+  so rough), is small restated fields: `HeldBusiness`, two fields and three subclasses, cost
+  DEV-879's port about five `override val` lines, and `Failure`, one field and four
+  subclasses, would cost four. The other hierarchies share behaviour, not fields: the
+  thirteen GraphQL value classes extend generated types that typed RPC replaces, and the
+  email classes share functions (`closing`, `bcc`) and a lazy database read, which become
+  top-level functions and a parameter whatever this rule says. Not taken: plain classes,
+  which bring private state and identity; inheritance, to save the restated fields. The two
+  halves differ: no private or mutable state carries the principle, while no other
+  functions in the body is nearer taste, since allowing them would change nothing about
+  state. Reopen that half if ports keep reaching for a method in the body; reopen the
+  restating if a port meets a base with many fields and many implementers.
 
 ## Taken in the v0 spec, not yet discussed
 
@@ -657,7 +680,7 @@ Each entry: what was decided, why, and what would reopen it.
   row no longer get round that constructor (see "Agreed with Greg").
 - Value classes are out: cusoon2 has none, and binding distinct id types to SQL columns needs
   a design (foreign keys could supply it).
-- No `apply`/`run`/`with`, no labelled returns, no `object`, no classes beyond data classes.
+- No `apply`/`run`/`with`, no labelled returns, no `object`.
 - `Regex` is RE2: no lookaround or backreferences.
 
 ## Taken building the SQL pass (DEV-818), not yet discussed

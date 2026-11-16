@@ -568,6 +568,12 @@ Each entry: what was decided, why, and what would reopen it.
   DEV-875). About fifty listed names are not declared; building all is some 600 lines no
   program needs yet. Not taken: building them all now; cutting the spec to what exists,
   which hides what is coming. Reopen if ports keep meeting the same names.
+- **The side-by-side run is Kogo's regression test** (16 Nov 2026). The lead runs cusoon2's
+  `kogo/run.sh` against a PR's worktree before merging any change to Go or `.kg` files, and a
+  changed result does not merge (`doc/lead.md`, "Merging"). Not taken: running it in every
+  session's own tests, which needs cusoon2's Kotlin build where a run has none; running it
+  after the merge, which finds the break once it is on `main`. Reopen when Kogo has a
+  comparison of its own that needs no cusoon2 checkout.
 
 ## Taken in the v0 spec, not yet discussed
 

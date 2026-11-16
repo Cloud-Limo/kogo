@@ -152,18 +152,19 @@ when one is back, as `884 back`.
 
 ## Reading what comes back
 
-A `Ruling:` or a `Merged:` you post goes in full on the PR and its
-first line alone on the issue (`head -1 ruling.md | lin comment
-DEV-NNN`), as every step's comment does. For an issue whose PR is in
-another repository, the PR is that one. A Fix run's brief still quotes
-each Ruling in full.
+Read a Handoff, Review or Fixed on the PR, where it is whole. A
+`Ruling:` or a `Merged:` you post goes in full on the PR and its first
+line alone on the issue (`head -1 ruling.md | lin comment DEV-NNN`),
+as every step's comment does. For an issue whose PR is in another
+repository, the PR is that one. A Fix run's brief still quotes each
+Ruling in full.
 
 - Check a claim against the code before passing it on.
 - A Review of Fix and Won't fix only, which you agree with: suggest
   Fix. Disagree with an item and you post a `Ruling:` that says so.
-- A Question that is yours: post `Ruling: <n>: <the answer>`, in full
-  on the PR and its first line on the issue. One that is Greg's:
-  bring it to him as above, then post his answer as the Ruling.
+- A Question that is yours: post `Ruling: <n>: <the answer>`. One
+  that is Greg's: bring it to him as above, then post his answer as
+  the Ruling.
 
 ## Merging
 
@@ -198,8 +199,8 @@ If they match and pass, nothing is Open and both checks end
 `N cases` with `0 differ` (or "checks skipped") in full on the PR and
 its first line on the issue, remove the worktree and both branches
 as in Starting step 3, and pull `main`. Otherwise post a `Ruling:`,
-with any differing cases, and ask for another Fix. Go to Greg only when what is Open is
-a choice of his kind.
+with any differing cases, and ask for another Fix. Go to Greg only
+when what is Open is a choice of his kind.
 
 After a merge, look at what the issue was for. File the next issue if
 the work exposed one.

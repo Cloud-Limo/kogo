@@ -101,30 +101,30 @@ waits on no one is not a row.
 
 After the boxes, one line: what is running and what you will merge.
 Open every reply with what waits on Greg, in bold, in one of three
-forms: "**I suggest:** `1`**, say "Fix DEV-901" in its Zed session.**"
+forms: "**I suggest: `1`, say "Fix DEV-901" in its Zed session.**"
 for a move, by its number; "**Waiting for you:** ..." for a question
 that is his; "**Nothing waits on you.**" when neither.
 
 Number each row of You can do now. Greg answers with the numbers of
 the moves he did, `1` or `1 3`, and with a question's letter, `b`;
 both can come in one reply, `1 b`. A Zed session back from its step
-he says as `884 back`. The numbers are those of your latest list:
-the boxes are restated whole, so a move carried over may get a new
+he says as `884 back`. The numbers are those of your latest You can do
+now: the boxes are restated whole, so a move carried over may get a new
 number. Anything else he types is plain words.
 
 **You can do now**
 
 | # | Move | How |
 | --- | --- | --- |
-| 1 | Launch DEV-901's review | add `agent` to DEV-901 |
-| 2 | Fix DEV-902 in its Zed session | say "Fix DEV-902" there |
+| 1 | Fix DEV-901 (the parser's spans) in its Zed session | say "Fix DEV-901" there |
+| 2 | Launch DEV-902's review (the emitter's line directives) | add `agent` to DEV-902 |
 
 **Not yet**
 
 | Move | Waits on | Who says when |
 | --- | --- | --- |
-| Launch DEV-903 | DEV-901 merging | the lead |
-| Code review DEV-904 | its Pickup handing off | the lead, from the run |
+| Launch DEV-903 (the prelude's dates) | DEV-901 merging | I will |
+| Code review DEV-904 (the SQL pass's errors) | its Pickup handing off | I will, from the run's handoff |
 
 Running: DEV-904's Pickup, as a run. Nothing for me to merge.
 

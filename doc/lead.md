@@ -119,12 +119,23 @@ On `Fixed:`, or on a `Review:` or `Ruling:` that leaves nothing to
 change and that you agree with, in the issue's worktree, fast-forwarded
 (created from `origin/<branch>` when missing, as in Code review): read
 any fix commits against the Review and its Rulings, then run
-`mise run testdb` and `mise exec -- go test ./...`. If they match and
-pass and nothing is Open, `gh pr merge --merge`, which moves the issue
-to Done, post `Merged: <sha>` on the PR and the issue, remove the
-worktree and both branches as in Starting step 3, and pull `main`.
-Otherwise post a `Ruling:` and ask for another Fix. Go to Greg only
-when what is Open is a choice of his kind.
+`mise run testdb` and `mise exec -- go test ./...`. Unless the PR
+changes only `.md` files, run the comparison too,
+`KOGO=~/Dev/kogo-dev-NNN ~/Dev/cusoon2-tasks/kogo/run.sh` (the checkout
+Starting step 1 pulls), and read its last line. It needs cusoon2's
+Gradle build, `jq` and, for its cases on the database,
+`sudo -n -u postgres`, and takes a few minutes. If it stops before
+that line or differs, run it once with `KOGO=~/Dev/kogo`: if `main`
+fails the same way, the PR is not the cause, so it waits and you
+tell Greg.
+
+If they match and pass, nothing is Open and the comparison ends
+`N cases, 0 differ` or was skipped, `gh pr merge --merge`, which moves
+the issue to Done, post `Merged: <sha>` and that last line (or
+"comparison skipped") on the PR and the issue, remove the worktree and
+both branches as in Starting step 3, and pull `main`. Otherwise post a
+`Ruling:`, with any differing cases, and ask for another Fix. Go to
+Greg only when what is Open is a choice of his kind.
 
 After a merge, look at what the issue was for. File the next issue if
 the work exposed one.

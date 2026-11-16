@@ -23,7 +23,7 @@ import (
 // apart (whitespace, case, digits, a replacement's $ and \).
 var (
 	lists = [][]int64{{}, {1}, {-1}, {0, 0}, {1, 2, 3}, {math.MaxInt64}, {math.MinInt64, math.MaxInt64, -1}, {3, 1, 3, 2, 1}}
-	texts = []string{"", "a", " ", "😀", "\t a b\n", "a😀b", "abcabc", "$1", `\`, "٣4", "ABC é", "  x\u001f", "İΣ", "aaa", "$", "bb c", "\u001f", "\u0085"}
+	texts = []string{"", "a", " ", "😀", "\t a b\n", "a😀b", "abcabc", "$1", `\`, "٣4", "ABC é", "  x\u001f", "İΣ", "aaa", "$", "bb c", "\u001f", "\u0085", "$9", "${c}$10"}
 	ints  = []int64{0, 1, -1, 2, 3, math.MaxInt32, math.MinInt32, 7}
 	longs = []int64{0, 1, -1, math.MaxInt64, math.MinInt64, math.MaxInt32 + 1, 1 << 53, 10}
 	reals = []float64{0, math.Copysign(0, -1), 1.5, -1.5, math.NaN(), math.Inf(1), math.Inf(-1), math.MaxFloat64,
@@ -44,7 +44,8 @@ var kept = []struct{ names, from, to, why string }{
 	{"lowercaseContains", `^(?:true|false) (.*σ.*)$`, "_ $1", "spec.md section 12: lowercase maps one character at a time"},
 	{"get", `Empty list doesn't contain element at index (-?\d+)\.`, "Index $1 out of bounds for length 0", "spec.md section 12: an index into Kotlin's empty list"},
 	{"replace", `[Ii]llegal group reference.*`, "illegal group reference", "spec.md section 12: replace with a bad group"},
-	{"replace", "No group ", "no group ", "spec.md section 12: replace with a bad group"},
+	{"replace", `No group (\d)`, "no group $1", "spec.md section 12: replace with a bad group"},
+	{"replace", `(no group in ".*" at \d+|No group with name \{.*\}|named capturing group .*)$`, "no such named group", "spec.md section 12: replace with a bad group"},
 }
 
 func main() {
@@ -119,7 +120,7 @@ func gen(dir string) {
 		if e := pick(1, len(reals), 0); e >= 0 {
 			d = reals[e]
 		}
-		xs, ys, s, t := list(1), list(3), text(1), text(5)
+		xs, ys, s, t := list(1), list(3), text(1), text(3)
 		if i >= 40 && r.IntN(4) == 0 { // so that one is inside, or a reordering of, the other
 			ys = slices.Clone(xs)
 			r.Shuffle(len(ys), func(a, b int) { ys[a], ys[b] = ys[b], ys[a] })

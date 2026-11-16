@@ -202,7 +202,7 @@ func TestIds(t *testing.T) {
 	Check(false, func() string { return "no" })
 }
 
-// Uuid.parse reads what toString writes, hex of either case, and
+// Uuid.parse reads what a template writes, hex of either case, and
 // nothing else: anything else is null, never a panic (spec.md 12).
 func TestUuidParse(t *testing.T) {
 	want := Uuid{0x01, 0x93, 0x4f, 0x2a, 0xbc, 0xde, 0x7f, 0x01, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67}
@@ -212,14 +212,15 @@ func TestUuidParse(t *testing.T) {
 		}
 	}
 	for _, s := range []string{"", "01934f2a-bcde-7f01-89ab-cdef0123456", "01934f2a-bcde-7f01-89ab-cdef012345678",
-		"01934f2ab-cde-7f01-89ab-cdef01234567", "01934f2a-bcde-7f01-89ab-cdef0123456g", "{01934f2a-bcde-7f01-89ab-cdef01234567}"} {
+		"01934f2a0bcde-7f01-89ab-cdef01234567", "01934f2a-bcde07f01-89ab-cdef01234567", "01934f2a-bcde-7f01089ab-cdef01234567",
+		"01934f2a-bcde-7f01-89ab0cdef01234567", "01934f2a-bcde-7f01-89ab-cdef0123456g", "{01934f2a-bcde-7f01-89ab-cdef01234567}"} {
 		if u := Uuid_Parse(s); u != nil {
 			t.Errorf("Uuid.parse(%q) = %v, want null", s, u)
 		}
 	}
 	id := NewId()
 	if u := Uuid_Parse(id.String()); u == nil || *u != id {
-		t.Errorf("Uuid.parse(%s.toString()) = %v", id, u)
+		t.Errorf("Uuid.parse(\"%s\") = %v", id, u)
 	}
 }
 

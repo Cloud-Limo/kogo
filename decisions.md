@@ -1667,6 +1667,17 @@ Each entry: what was decided, why, and what would reopen it.
   which takes short groups (`1-2-3-4-5`). `Uuid` is Kogo's own, so nothing holds it to
   Java's. Reopen if a port's comparison depends on a text Java reads and this does not.
 
+## Refusing a marked data class as an input (DEV-890), agreed with Greg 16 Nov 2026
+
+- **A data class whose constructor is marked is never a wire input**, opt-in or not: a row
+  comes from the database, which the program trusts, a request does not. Answers stay open.
+  Not taken: reading from the wire as a use of the constructor, allowed where the file opts
+  in as a row is: an opt-in made for another purpose would open the wire silently, the error
+  would name a one-line way round the wall, and no case was found where a request should build a marked value. The error reuses `wire`.
+- **An input's walk does not stop at a type an answer or another input reached first**, so
+  a marked type behind it is still found; such a type's other wire errors are then named
+  for each operation that takes it. Not taken: a second walk for marks alone.
+
 ## The check against Kotlin (DEV-877)
 
 - **One entry point, `call`, in the shared source, and a case is a branch of a `when`** on

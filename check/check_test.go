@@ -827,16 +827,12 @@ func TestTransactions(t *testing.T) {
 func TestMarkers(t *testing.T) {
 	marked := "package a\n@RequiresOptIn\nannotation class M\n@M\nfun f(): Int = 1\n@M\nval limit: Int = 2\ndata class H @M constructor(val n: Int)\n---\n"
 	passes(t,
-		marked+"@file:OptIn(M::class)\npackage b\nimport a.M\nimport a.f\nimport a.limit\nimport a.H\nfun g(): Int = f() + limit + H(1).copy(n = 3).n",
+		marked+"@file:OptIn(M::class)\npackage b\nimport a.M\nimport a.f\nimport a.limit\nfun g(): Int = f() + limit",
 		marked+"package b\nimport a.H\nfun g(h: H): Int = h.n",
 	)
 	refused(t, [][3]string{
 		{marked + "package b\nimport a.f\nfun g(): Int = ‸f()", "opt-in", "f is marked @M: begin this file with @file:OptIn(M::class)"},
 		{marked + "package b\nimport a.limit\nfun g(): Int = ‸limit", "opt-in", "limit is marked @M"},
-		{marked + "package b\nimport a.H\nfun g(): H = ‸H(1)", "opt-in", "H is marked @M"},
-		// copy and a sql row build an H as its constructor does.
-		{marked + "package b\nimport a.H\nfun g(h: H): H = h.‸copy(n = 2)", "opt-in", "H is marked @M"},
-		{marked + "package b\nimport a.H\nfun g(tx: Tx): List<H> = tx.query<H>(‸sql\" -> n: Int\")", "opt-in", "H is marked @M"},
 		{marked + "package a\nfun g(): Int = ‸f()", "opt-in", "f is marked @M"},
 		{"data class X(val n: Int)\n‸@X\nfun f() {}", "marker", "X is not a marker: a marker is declared @RequiresOptIn annotation class X"},
 		{"@file:OptIn(‸X::class)\npackage t\ndata class X(val n: Int)", "marker", "X is not a marker"},
@@ -845,6 +841,37 @@ func TestMarkers(t *testing.T) {
 		{"@RequiresOptIn\nannotation class M\n‸@M\ndata class X(val n: Int)", "marker", "a marker goes on a fun, a val or a constructor"},
 		{"@RequiresOptIn\nannotation class M\nfun f(m: ‸M) {}", "not-a-type", "M is a marker, not a type"},
 	})
+}
+
+// The guarantee a marked constructor makes (spec.md 11): each way of
+// making a value of the data class, refused in a file without the
+// opt-in, and with it the ones the opt-in allows. A new way of making
+// a data class adds a row here and a clause to section 11.
+func TestMarkedConstructor(t *testing.T) {
+	head := "package kogo.rpc\nexternal class Request\n---\npackage a\n@RequiresOptIn\nannotation class M\ndata class H @M constructor(val n: Int)\n---\n"
+	body := "package b\nimport a.H\nimport a.M\nimport kogo.rpc.Request\ndata class Env(val n: Int)\n"
+	opt := "H is marked @M: begin this file with @file:OptIn(M::class)"
+	wire := "whose constructor is marked @M, and no request makes one: take the id or the slug in the input and make the value with the function that checks it"
+	for _, c := range []struct{ src, code, fix, withOptIn string }{
+		{"fun g(): H = ‸H(1)", "opt-in", opt, ""},
+		{"fun g(h: H): H = h.‸copy(n = 2)", "opt-in", opt, ""},
+		{"fun g(tx: Tx): List<H> = tx.query<H>(‸sql\" -> n: Int\")", "opt-in", opt, ""},
+		// The wire stays shut with the opt-in: a request is not trusted.
+		{"api ops { ‸f }\n" + op("H", "Unit"), "wire", "f's input is a H, " + wire, wire},
+		{"data class In(val h: H?)\napi ops { ‸f }\n" + op("In", "Unit"), "wire", "f's input holds In.h: H?, " + wire, wire},
+		{"api ops { ‸f }\n" + op("List<H>", "Unit"), "wire", "f's input holds a H, " + wire, wire},
+		// An answer reaches In first; the input is walked still.
+		{"data class In(val h: H)\napi ops { g, ‸f }\n" + op("In", "Unit") + strings.ReplaceAll(op("Unit", "In"), "fun f", "fun g"), "wire", "f's input holds In.h: H, " + wire, wire},
+	} {
+		refused(t, [][3]string{{head + body + c.src, c.code, c.fix}})
+		if src := head + "@file:OptIn(M::class)\n" + body + c.src; c.withOptIn == "" {
+			passes(t, strings.Replace(src, "‸", "", 1))
+		} else {
+			refused(t, [][3]string{{src, c.code, c.withOptIn}})
+		}
+	}
+	// Answering with one makes none.
+	passes(t, head+body+"api ops { f }\n"+op("Unit", "H"))
 }
 
 // For each literal, what each parameter binds and the property each

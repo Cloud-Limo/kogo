@@ -339,6 +339,9 @@ func TestListEnds(t *testing.T) {
 	if !slices.Equal(List_Take(xs, 2), []int32{1, 2}) || !slices.Equal(List_Take(xs, 9), xs) || !slices.Equal(List_Drop(xs, 1), []int32{2, 3}) || len(List_Drop(xs, 9)) != 0 {
 		t.Error("take or drop is wrong")
 	}
+	if List_Plus(List_Take(xs, 1), ListOf[int32](9)); !slices.Equal(xs, []int32{1, 2, 3}) {
+		t.Errorf("plus on a take wrote into its list: %v", xs)
+	}
 	empty, more, negative := "List is empty.", "List has more than one element.", "Requested element count -1 is less than zero."
 	for _, c := range []struct {
 		f    func()

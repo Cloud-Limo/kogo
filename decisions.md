@@ -553,10 +553,10 @@ Each entry: what was decided, why, and what would reopen it.
 - **Ids are UUID version 7, whatever an application used before** (16 Nov 2026). cusoon2's
   ids are its own layout, 65.5 µs ticks since 23 Feb 2018 in the first 48 bits, made for
   index locality, which version 7 gives; Postgres 18 has `uuidv7()`. The two never sort
-  together: a version 7 id sorts before every cusoon2 id. So a Kogo module must not write a
-  table that Kotlin code orders by id until the application either makes its ids in
-  Postgres, by a function both sides call, or moves to version 7 and orders those queries by
-  a time. That choice is the application's migration, not Kogo's. Not taken: cusoon2's
+  together: a version 7 id made now sorts after cusoon2's ids from before about November
+  2021 and before every later one. So a Kogo module must not write a table that Kotlin code
+  orders by id until the application either makes its ids in Postgres, by a function both
+  sides call, or moves to version 7 and orders those queries by a time. That choice is the application's migration, not Kogo's. Not taken: cusoon2's
   layout in the prelude, which is specific to one application.
 - **cusoon2's databases are transient, not forbidden** (16 Nov 2026, Greg). `cusoon` and
   `cusoon_b` are the stacks' own and re-created all the time, so a session uses a database of
@@ -564,6 +564,10 @@ Each entry: what was decided, why, and what would reopen it.
   taken: "read-only to you, never write or migrate them", whose weight turned one wiped
   database (DEV-853) into a halt, an incident report and a guard, when nothing in it was
   needed. Reopen if a stack's database comes to hold data that is not re-created.
+- **The spec's prelude lists are the target, built as ports need them** (16 Nov 2026;
+  DEV-875). About fifty listed names are not declared; building all is some 600 lines no
+  program needs yet. Not taken: building them all now; cutting the spec to what exists,
+  which hides what is coming. Reopen if ports keep meeting the same names.
 
 ## Taken in the v0 spec, not yet discussed
 

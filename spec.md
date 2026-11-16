@@ -434,8 +434,8 @@ error("unreachable")
 ```
 
 `require`, `check`, `requireNotNull`, `checkNotNull` and `error` panic, as
-do integer division by zero, an index out of range and `single()` on a
-list that does not hold exactly one element. Code cannot catch a panic.
+do integer division by zero, an index out of range and the list and
+string calls below. Code cannot catch a panic.
 An `Int` or `Long` `/` or `%` by zero panics with Kotlin's message,
 `/ by zero`; a `Double` divided by zero is an infinity or NaN. `list[i]`
 outside the list panics with `Index <i> out of bounds for length <size>`
@@ -759,7 +759,9 @@ No other annotation exists.
 The prelude is a library, not part of the core. Names match Kotlin's
 standard library and `java.time` where the meaning is the same. Its
 signatures are bindings (section 13) kept in `prelude/`: the lists below
-say what exists, and the declarations say what each takes and gives.
+are what Kogo will have, and the declarations say what each takes and
+gives. A name not built yet is `unknown-name` from `kogo check`; each is
+added when a program first needs it.
 
 The prelude adds no function or property to a type that Kotlin has: on
 a `Double`, a `String` or a `List`, every member is Kotlin's and means

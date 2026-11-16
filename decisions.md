@@ -648,16 +648,47 @@ Each entry: what was decided, why, and what would reopen it.
   Numbers are those of the lead's latest list, restated each reply. Not taken: letters for
   moves, which a question's options already use; a "Done:" prefix, which numbers make
   needless. Reopen if a renumbered move gets answered by its old number.
+- **A type with fields is a data class, and its body holds only overrides** (16 Nov 2026,
+  Greg; spec 3.1, 3.4, 14). Every property is a `val` of its constructor, the body holds
+  only the `override fun`s of its interfaces, and everything else is a top-level or
+  extension function. Locality first (principle 2): a plain class can hold private, mutable
+  state that its methods read, as cusoon2's `Model` holds `tenantId`, and a call then
+  depends on what is not in its signature; with data classes a value's state is its
+  constructor and a function's inputs are its parameters, and the `tx` in
+  `held.acceptInHouse(tx)` is that rule showing. One way to do each thing second (principle
+  6): Kotlin gives a method three homes, Kogo two that mean the same. The compiler third:
+  `==`, the wire, a SQL row and `toString` are each one walk over a data class, where a
+  plain class would need `==` defined, which in Kotlin is identity and in Go a pointer. The
+  cost, measured on cusoon2's backend (about 18,000 lines outside generated code, by grep,
+  so rough), is small restated fields and one wall. `HeldBusiness`, two fields and three
+  subclasses, cost DEV-879's port about five `override val` lines, and `Failure`, one field
+  and four subclasses, would cost four. The email classes share a field or two (`payload`;
+  `booker` and `invoice`), restated at a line each, as well as functions (`closing`, `bcc`)
+  and a lazy database read, which become top-level functions and a parameter whatever this
+  rule says; the thirteen GraphQL value classes extend generated types that typed RPC
+  replaces. The wall: a base class whose constructor carries a marker binds every subclass,
+  and an interface carries none, so a wall written as an interface can be implemented by a
+  file that does not opt in; DEV-879's port of `HeldBusiness` had that hole for reads. So a
+  class that is a wall becomes a data class with a marked constructor that the kinds hold
+  (`AtBusiness` holds a `HeldBusiness`; DEV-888), which walls reads and writes and restates
+  no field. It works where the shared part is data; a wall that needs different behaviour
+  behind one type still needs an interface, and has the hole. A marked data class is never
+  read from a request (DEV-890). Not taken: plain classes, which bring private state and
+  identity; inheritance, to save the restated fields. The two halves differ: no private or
+  mutable state carries the principle, while no other functions in the body is nearer
+  taste, since allowing them would change nothing about state. Reopen that half if ports
+  keep reaching for a method in the body; reopen the restating if a port meets a base with
+  many fields and many implementers, or a wall needs an interface, which would then have to
+  carry a marker that binds its implementers.
 
 ## Taken in the v0 spec, not yet discussed
 
 - Markers (`@RequiresOptIn`, `@file:OptIn`) are the one annotation form, so the access walls
-  port. Known hole: without inheritance, any file can implement an interface, so a wall is a
-  data class with a marked constructor, as example 19's `HeldBusiness` is. `copy` and a sql
-  row no longer get round that constructor (see "Agreed with Greg").
+  port. A wall is a data class with a marked constructor, as example 19's `HeldBusiness` is.
+  `copy` and a sql row no longer get round that constructor (see "Agreed with Greg").
 - Value classes are out: cusoon2 has none, and binding distinct id types to SQL columns needs
   a design (foreign keys could supply it).
-- No `apply`/`run`/`with`, no labelled returns, no `object`, no classes beyond data classes.
+- No `apply`/`run`/`with`, no labelled returns, no `object`.
 - `Regex` is RE2: no lookaround or backreferences.
 
 ## Taken building the SQL pass (DEV-818), not yet discussed

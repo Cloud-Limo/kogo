@@ -414,7 +414,9 @@ the parser.
 A function can only do what its parameters let it do.
 
 - There are no globals, singletons or ambient state. The clock, the
-  database and outbound calls arrive as parameters.
+  database and outbound calls arrive as parameters. `newId()` is the
+  one exception, because an id's value never changes what a program
+  does.
 - `Tx` is an open database transaction and `Db` is a connection pool
   (section 10). A function that touches the database has one of them as a
   parameter.
@@ -432,12 +434,23 @@ error("unreachable")
 ```
 
 `require`, `check`, `requireNotNull`, `checkNotNull` and `error` panic, as
-do integer division by zero, an index out of range and `single()` on a
-list that does not hold exactly one element. Code cannot catch a panic.
+do integer division by zero, an index out of range and the list and
+string calls below. Code cannot catch a panic.
 An `Int` or `Long` `/` or `%` by zero panics with Kotlin's message,
 `/ by zero`; a `Double` divided by zero is an infinity or NaN. `list[i]`
 outside the list panics with `Index <i> out of bounds for length <size>`
 (`listOf(1, 2, 3)[5]`: `Index 5 out of bounds for length 3`).
+`first()`, `last()` and `single()` of an empty list panic with
+`List is empty.`, and `single()` of two or more elements with
+`List has more than one element.` (`listOf(1, 2).single()`).
+`take(n)` and `drop(n)` of a negative `n` panic with
+`Requested element count <n> is less than zero.` (`take(-1)`:
+`Requested element count -1 is less than zero.`); an `n` past the end
+takes or drops every element. `substring` outside the string, counted
+in UTF-16 units, panics with
+`Range [<start>, <end>) out of bounds for length <length>`, where
+`substring(start)` ends at the string's length
+(`"abc".substring(5, 3)`: `Range [5, 3) out of bounds for length 3`).
 The server catches it at the request boundary, rolls the transaction back,
 logs it and answers 500 (section 15).
 
@@ -746,7 +759,9 @@ No other annotation exists.
 The prelude is a library, not part of the core. Names match Kotlin's
 standard library and `java.time` where the meaning is the same. Its
 signatures are bindings (section 13) kept in `prelude/`: the lists below
-say what exists, and the declarations say what each takes and gives.
+are what Kogo will have, and the declarations say what each takes and
+gives. A name not built yet is `unknown-name` from `kogo check`; each is
+added when a program first needs it.
 
 The prelude adds no function or property to a type that Kotlin has: on
 a `Double`, a `String` or a `List`, every member is Kotlin's and means

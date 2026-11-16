@@ -544,12 +544,30 @@ Each entry: what was decided, why, and what would reopen it.
   shifts that line by one; absolute paths, half the file's bytes and different on every
   machine. Reopen if Go stops resolving a relative path from the file's directory, or an
   application must move `<out>` after emitting.
+- **`newId()` is not a parameter** (16 Nov 2026; spec 7). It reads the clock and randomness,
+  yet is the one exception to "no ambient state", because an id's value never changes what a
+  program does. Not taken: an `Ids` handle passed as `Clock` is, which adds a parameter to
+  every function that writes a row and moves every port a step from its Kotlin. The
+  side-by-side run of DEV-853 compares rows without pinning ids, by pairing each side's own.
+  Reopen if a test needs fixed ids and cannot pair them.
+- **Ids are UUID version 7, whatever an application used before** (16 Nov 2026). cusoon2's
+  ids are its own layout, 65.5 µs ticks since 23 Feb 2018 in the first 48 bits, made for
+  index locality, which version 7 gives; Postgres 18 has `uuidv7()`. The two never sort
+  together: a version 7 id made now sorts after cusoon2's ids from before about November
+  2021 and before every later one. So a Kogo module must not write a table that Kotlin code
+  orders by id until the application either makes its ids in Postgres, by a function both
+  sides call, or moves to version 7 and orders those queries by a time. That choice is the application's migration, not Kogo's. Not taken: cusoon2's
+  layout in the prelude, which is specific to one application.
 - **cusoon2's databases are transient, not forbidden** (16 Nov 2026, Greg). `cusoon` and
   `cusoon_b` are the stacks' own and re-created all the time, so a session uses a database of
   its own for writes and reports a mistake in its step's comment rather than stopping. Not
   taken: "read-only to you, never write or migrate them", whose weight turned one wiped
   database (DEV-853) into a halt, an incident report and a guard, when nothing in it was
   needed. Reopen if a stack's database comes to hold data that is not re-created.
+- **The spec's prelude lists are the target, built as ports need them** (16 Nov 2026;
+  DEV-875). About fifty listed names are not declared; building all is some 600 lines no
+  program needs yet. Not taken: building them all now; cutting the spec to what exists,
+  which hides what is coming. Reopen if ports keep meeting the same names.
 
 ## Taken in the v0 spec, not yet discussed
 
@@ -1511,7 +1529,17 @@ Each entry: what was decided, why, and what would reopen it.
   filing it apart, for a change of three lines.
 - **`single()` is not added**: section 8 and the stdlib list name it, but the prelude has
   no `single` at all, so there is no message to correct; adding it is a feature, left to be
-  filed. Not taken: adding it here.
+  filed. Not taken: adding it here. (DEV-873 adds it.)
+
+## Taken adding `single()` and the list ends (DEV-873), not yet discussed
+
+- **`first`, `last` and `single` are built on their `OrNull`**, so each is one line and the
+  null and the panic cannot disagree. Not taken: three bodies that each test the length.
+- **`take` and `drop` share the list's array** rather than copy it: no list operation writes
+  an array it was given (`plus` copies), so a shared one is safe and costs nothing. Not taken:
+  a copy, which matches `firstOrNull`'s reason only if something writes through a list.
+- **`substring(start)` is `substring(start, length)`**, so both give the same message, as
+  Kotlin's do (`Range [4, 3)` for `"abc".substring(4)`).
 
 ## Spec gaps found by the leakage ports, unresolved
 

@@ -619,6 +619,21 @@ Each entry: what was decided, why, and what would reopen it.
   and whose review would be the lead's, not the reviewing model's. The mistakes behind it
   were made in DEV-880 and DEV-881 on 16 Nov 2026. Reopen if Greg asks the lead to make a
   step itself.
+- **Each step's comment is posted once** (16 Nov 2026, Greg; `AGENTS.md`, "Workflow").
+  A Handoff, Review, Fixed, Ruling or Merged goes in full on the PR and its first line alone
+  on the issue, which carries the PR, the sha and the counts and is all the board and the
+  lead's polling read. An async run is the exception: its `answer.md` is the full comment,
+  which the wrapper posts whole, and it holds an interrupted run's handoff. A comment with
+  no PR, a launch or `Lead:` comment, stays on the issue in full. Not taken: both copies in
+  full, as before, one more post a step and two texts that can differ; the issue alone,
+  which a run cannot read; a one-line `answer.md`, which costs a cusoon2 PR and loses an
+  interrupted run's handoff. Reopen if a reader needs the issue to tell the whole story.
+- **Greg answers the lead with numbers and letters** (16 Nov 2026, Greg; `doc/lead.md`,
+  "Talking to Greg"). Each move in You can do now is numbered and a question's options are
+  lettered, so `1 3 b` says two moves done and option b; a Zed session back is `884 back`.
+  Numbers are those of the lead's latest list, restated each reply. Not taken: letters for
+  moves, which a question's options already use; a "Done:" prefix, which numbers make
+  needless. Reopen if a renumbered move gets answered by its old number.
 
 ## Taken in the v0 spec, not yet discussed
 

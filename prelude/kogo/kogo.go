@@ -82,8 +82,14 @@ func List_Filter[T any](this List[T], predicate func(T) bool) List[T] {
 	return out
 }
 
-// List_Get is list[i]; an index outside the list is a bug.
-func List_Get[T any](this List[T], index int32) T { return this[index] }
+// List_Get is list[i]; an index outside the list is a bug, and panics
+// with Kotlin's message.
+func List_Get[T any](this List[T], index int32) T {
+	if uint32(index) >= uint32(len(this)) {
+		panic("Index " + strconv.Itoa(int(index)) + " out of bounds for length " + strconv.Itoa(len(this)))
+	}
+	return this[index]
+}
 
 func List_IsNotEmpty[T any](this List[T]) bool { return len(this) > 0 }
 

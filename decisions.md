@@ -1568,6 +1568,13 @@ Each entry: what was decided, why, and what would reopen it.
 - **`substring(start)` is `substring(start, length)`**, so both give the same message, as
   Kotlin's do (`Range [4, 3)` for `"abc".substring(4)`).
 
+## Taken adding `Uuid.parse` (DEV-881), not yet discussed
+
+- **`Uuid.parse` reads what the wire reads, and the wire calls it**: 36 characters, hyphens
+  at 8, 13, 18 and 23, hex of either case. It is stricter than Java's `UUID.fromString`,
+  which takes short groups (`1-2-3-4-5`). `Uuid` is Kogo's own, so nothing holds it to
+  Java's. Reopen if a port's comparison depends on a text Java reads and this does not.
+
 ## The check against Kotlin (DEV-877)
 
 - **One entry point, `call`, in the shared source, and a case is a branch of a `when`** on

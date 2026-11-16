@@ -909,6 +909,18 @@ fun tally(words: List<String>): Pair<Int, String> {
 `)
 }
 
+// Uuid.parse is the prelude's object fun: a good text gives its id,
+// and a bad one null.
+func TestUuidParse(t *testing.T) {
+	expect(t, [][2]string{
+		{`t.Id("01934f2a-bcde-7f01-89ab-CDEF01234567")`, "01934f2a-bcde-7f01-89ab-cdef01234567"},
+		{`t.Id("01934f2a-bcde-7f01-89ab")`, "null"},
+	}, `package t
+
+fun id(text: String): Uuid? = Uuid.parse(text)
+`)
+}
+
 // What is not emitted yet is refused where it stands, never emitted
 // wrongly, and so are two declarations that Go cannot tell apart,
 // an enum's entries among them.

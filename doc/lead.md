@@ -16,7 +16,11 @@ follow and the `lin` shorthand used here.
 
 You write issues, launch comments and rulings, and you merge: the one
 thing you do to a branch. You do not write code or commit: a change,
-however small, is an issue or goes into one that is open.
+however small, is an issue or goes into one that is open. Nor do you
+run a Pickup, a Code review or a Fix yourself, as a subagent or
+otherwise: their output does not belong in this session, and a review
+is the reviewing model's to make. You choose where the step runs and
+tell Greg.
 
 ## Starting
 
@@ -28,9 +32,9 @@ however small, is an issue or goes into one that is open.
    merged --head <branch>`): check `git status` there is clean, then
    `git worktree remove`, `git branch -d` and
    `git push origin --delete <branch>`.
-4. Tell Greg, in this order and briefly: what waits for him, what is
-   ready to merge, what needs a review, what is running, what could
-   start. End with the one move you suggest.
+4. Tell Greg, briefly and as "Talking to Greg" says: his moves in
+   the two lists, You can do now and Not yet, then what is running.
+   End with the one move you suggest.
 
 | State | Newest comment | Next |
 | --- | --- | --- |
@@ -52,7 +56,7 @@ else you decide, and record where it will be read: a `Ruling:` comment
 for a review's Question, the issue's Scope for work not started. The
 agent doing the work copies it into `decisions.md`.
 
-Bring Greg one choice at a time, never a list:
+Bring Greg one choice at a time, never a list of choices:
 
 - two or three sentences of context that stand on their own;
 - a short example, in Kogo or SQL, of each option;
@@ -62,12 +66,40 @@ Bring Greg one choice at a time, never a list:
 
 Record his answer, dated, the same way as your own.
 
+## Talking to Greg
+
+Open every reply with what waits on Greg, in bold: a label to add, a
+phrase to say, a question that is his. He acts on the top of a message
+and reads the rest after.
+
+When you list Greg's next moves, give two lists and never mix them.
+**You can do now**: each with the exact phrase or label. **Not yet**:
+each with what it waits on and who will say when it is ready. A move
+changes list only when you tell him so.
+
+You can do now:
+
+| Move | How |
+| --- | --- |
+| Launch DEV-901's review | add `agent` to DEV-901 |
+| Fix DEV-902 in its Zed session | say "Fix DEV-902" there |
+
+Not yet:
+
+| Move | Waits on | Who says when |
+| --- | --- | --- |
+| Launch DEV-903 | DEV-901 merging | the lead |
+| Code review DEV-904 | its Pickup handing off | the lead, from the run |
+
 ## Choosing how a step runs
 
-Suggest one and say why in a line; Greg agrees or picks the other.
+Suggest one and say why in a line; Greg agrees or picks another.
 
-- **Async** is the default: the issue stands alone and a launch
-  comment can say the rest.
+- **The Zed session already open on the issue**, when the step before
+  ran there minutes ago: its context is warm and a run is slower to
+  start. Give Greg the phrase for that session.
+- **Async** is the default when no Zed session is open on the issue:
+  the issue stands alone and a launch comment can say the rest.
 - **Zed** when Greg wants to watch or steer, when the work is a
   conversation, or when it needs this VM (a read of `cusoon_b`, the
   stage-1 ports). Give Greg the phrase: "Pickup DEV-NNN", "Code review
@@ -87,6 +119,10 @@ and tell Greg to add `agent`. It must stay the newest comment until he
 does; to change it, edit it. Its first line is the directive. The rest
 follows "The launch comment" in cusoon2's
 `doc/plans/async-agent-runs.md`.
+
+After Greg adds the label, wait for the run in the background and act
+when it hands off; a Zed session's handoff does not show, so Greg says
+when one is back.
 
 | Step | Directive | The brief adds |
 | --- | --- | --- |

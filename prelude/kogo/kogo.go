@@ -102,6 +102,44 @@ func List_FirstOrNull[T any](this List[T]) *T {
 	return rt.Ptr(this[0])
 }
 
+// List_First, List_Last and List_Single panic, with Kotlin's
+// messages, where their OrNull is null.
+func List_First[T any](this List[T]) T { return orPanic(List_FirstOrNull(this), "List is empty.") }
+func List_Last[T any](this List[T]) T  { return orPanic(List_LastOrNull(this), "List is empty.") }
+
+func List_Single[T any](this List[T]) T {
+	if len(this) > 1 {
+		panic("List has more than one element.")
+	}
+	return orPanic(List_SingleOrNull(this), "List is empty.")
+}
+
+func orPanic[T any](p *T, message string) T {
+	if p == nil {
+		panic(message)
+	}
+	return *p
+}
+
+func List_LastOrNull[T any](this List[T]) *T {
+	if len(this) == 0 {
+		return nil
+	}
+	return rt.Ptr(this[len(this)-1])
+}
+
+// List_Take and List_Drop share the list's array, which no list
+// operation writes.
+func List_Take[T any](this List[T], n int32) List[T] { return this[:min(count(n), len(this))] }
+func List_Drop[T any](this List[T], n int32) List[T] { return this[min(count(n), len(this)):] }
+
+func count(n int32) int {
+	if n < 0 {
+		panic("Requested element count " + strconv.Itoa(int(n)) + " is less than zero.")
+	}
+	return int(n)
+}
+
 // List_SingleOrNull is null for an empty list and for one of two or
 // more elements.
 func List_SingleOrNull[T any](this List[T]) *T {
@@ -263,11 +301,17 @@ func String_Lowercase(this string) string { return strings.ToLower(this) }
 func String_Contains(this, other string) bool { return strings.Contains(this, other) }
 func String_IsNotEmpty(this string) bool      { return this != "" }
 func String_Substring_Int(this string, startIndex int32) string {
-	return string(utf16.Decode(units(this)[startIndex:]))
+	return String_Substring_Int_Int(this, startIndex, String_Length(this))
 }
 
+// String_Substring_Int_Int counts in UTF-16 units and panics with
+// Kotlin's message for a range outside the string.
 func String_Substring_Int_Int(this string, startIndex, endIndex int32) string {
-	return string(utf16.Decode(units(this)[startIndex:endIndex]))
+	u := units(this)
+	if startIndex < 0 || endIndex < startIndex || int(endIndex) > len(u) {
+		panic(fmt.Sprintf("Range [%d, %d) out of bounds for length %d", startIndex, endIndex, len(u)))
+	}
+	return string(utf16.Decode(u[startIndex:endIndex]))
 }
 
 func String_Map[R any](this string, transform func(rt.Char) R) List[R] {

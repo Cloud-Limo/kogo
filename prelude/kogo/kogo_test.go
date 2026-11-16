@@ -328,3 +328,40 @@ func TestPostgres(t *testing.T) {
 		t.Error("a null is read as a value")
 	}
 }
+
+// first, last, single, take and drop give Kotlin's values and panic
+// with Kotlin's messages (spec.md section 8).
+func TestListEnds(t *testing.T) {
+	xs, none := ListOf[int32](1, 2, 3), EmptyList[int32]()
+	if List_First(xs) != 1 || List_Last(xs) != 3 || List_Single(ListOf[int32](7)) != 7 || List_LastOrNull(none) != nil || *List_LastOrNull(xs) != 3 {
+		t.Error("first, last, single or lastOrNull is wrong")
+	}
+	if !slices.Equal(List_Take(xs, 2), []int32{1, 2}) || !slices.Equal(List_Take(xs, 9), xs) || !slices.Equal(List_Drop(xs, 1), []int32{2, 3}) || len(List_Drop(xs, 9)) != 0 {
+		t.Error("take or drop is wrong")
+	}
+	empty, more, negative := "List is empty.", "List has more than one element.", "Requested element count -1 is less than zero."
+	for _, c := range []struct {
+		f    func()
+		want string
+	}{
+		{func() { List_First(none) }, empty},
+		{func() { List_Last(none) }, empty},
+		{func() { List_Single(none) }, empty},
+		{func() { List_Single(xs) }, more},
+		{func() { List_Take(xs, -1) }, negative},
+		{func() { List_Drop(xs, -1) }, negative},
+		{func() { String_Substring_Int_Int("abc", 5, 3) }, "Range [5, 3) out of bounds for length 3"},
+		{func() { String_Substring_Int_Int("abc", 2, 1) }, "Range [2, 1) out of bounds for length 3"},
+		{func() { String_Substring_Int("abc", -1) }, "Range [-1, 3) out of bounds for length 3"},
+		{func() { String_Substring_Int("a😀", 4) }, "Range [4, 3) out of bounds for length 3"},
+	} {
+		func() {
+			defer func() {
+				if p := recover(); p != c.want {
+					t.Errorf("panics with %v, want %s", p, c.want)
+				}
+			}()
+			c.f()
+		}()
+	}
+}

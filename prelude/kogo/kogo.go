@@ -14,6 +14,7 @@ package kogo
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"reflect"
@@ -503,6 +504,19 @@ type Uuid [16]byte
 
 func (u Uuid) String() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", u[0:4], u[4:6], u[6:8], u[8:10], u[10:16])
+}
+
+// Uuid_Parse is Uuid.parse(text): the id that toString writes as text,
+// hex of either case, or nil for any other text.
+func Uuid_Parse(s string) *Uuid {
+	if len(s) != 36 || s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-' {
+		return nil
+	}
+	var u Uuid
+	if _, err := hex.Decode(u[:], []byte(s[:8]+s[9:13]+s[14:18]+s[19:23]+s[24:])); err != nil {
+		return nil
+	}
+	return &u
 }
 
 // NewId gives an id that sorts by when it was made and is random

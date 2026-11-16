@@ -860,7 +860,9 @@ smallest `Double` ends in `5` here and `49` in Java. The difference is
 `plain`'s alone: a template and `toString` write these as Java does.
 
 **Ids.** `Uuid`, `Uuid.parse(text): Uuid?`, `newId(): Uuid` (time-ordered
-random).
+random). `Uuid.parse` reads 36 characters, hyphens at 8, 13, 18 and 23 and
+hex digits of either case elsewhere, and gives `null` for any other text;
+`Uuid.parse(id.toString()) == id`.
 
 **Requests** (`kogo.rpc`). A `Request` is what the server read of one
 HTTP request, passed to an operation (section 15):

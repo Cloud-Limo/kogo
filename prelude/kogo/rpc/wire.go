@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -129,14 +128,11 @@ func (r reader) read(t reflect.Type, j any, at string) (reflect.Value, error) {
 	case (t == uuidType || t.Kind() == reflect.String) && !isString:
 		return v, bad(at, "is not a string")
 	case t == uuidType:
-		if len(s) != 36 || s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-' {
+		u := kogo.Uuid_Parse(s)
+		if u == nil {
 			return v, bad(at, "is not a Uuid")
 		}
-		u, err := hex.DecodeString(s[:8] + s[9:13] + s[14:18] + s[19:23] + s[24:])
-		if err != nil {
-			return v, bad(at, "is not a Uuid")
-		}
-		v.Set(reflect.ValueOf(kogo.Uuid(u)))
+		v.Set(reflect.ValueOf(*u))
 	case t.Kind() == reflect.String && t != reflect.TypeFor[string](): // an enum
 		if names := r.enums[t]; !slices.Contains(names, s) {
 			return v, bad(at, "is not one of %s", strings.Join(names, ", "))

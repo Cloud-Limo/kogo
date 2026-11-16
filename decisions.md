@@ -546,10 +546,10 @@ Each entry: what was decided, why, and what would reopen it.
   application must move `<out>` after emitting.
 - **cusoon2's databases are transient, not forbidden** (16 Nov 2026, Greg). `cusoon` and
   `cusoon_b` are the stacks' own and re-created all the time, so a session uses a database of
-  its own for writes and reports a mistake in its handoff rather than stopping. Not taken:
-  "read-only to you, never write or migrate them", whose weight turned one wiped database
-  (DEV-853) into a halt, an incident report and a guard, when nothing in it was needed.
-  Reopen if a stack's database comes to hold data that is not re-created.
+  its own for writes and reports a mistake in its step's comment rather than stopping. Not
+  taken: "read-only to you, never write or migrate them", whose weight turned one wiped
+  database (DEV-853) into a halt, an incident report and a guard, when nothing in it was
+  needed. Reopen if a stack's database comes to hold data that is not re-created.
 
 ## Taken in the v0 spec, not yet discussed
 

@@ -123,5 +123,5 @@ with them. `$LINEAR_API_KEY` is already in the shell.
   re-created all the time. Reading them is fine; for anything that
   writes, cleans or migrates, use a database of your own and pass its
   name explicitly. Writing to one by mistake loses nothing that matters,
-  though it can break a test run in flight there: say so in the handoff
-  and carry on.
+  though it can break a test run in flight there: say so in your step's
+  comment and carry on.

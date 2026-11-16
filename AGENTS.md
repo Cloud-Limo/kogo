@@ -119,5 +119,9 @@ with them. `$LINEAR_API_KEY` is already in the shell.
 - Postgres 18 runs in this VM; `sudo -n -u postgres psql` is the
   superuser. Tests use their own database and a schema kept in this repo:
   `mise run testdb` creates it, then `mise exec -- go test ./...`.
-  cusoon2's databases (`cusoon`, `cusoon_b`) are read-only to you:
-  describe statements against them, never write or migrate them.
+  `cusoon` and `cusoon_b` belong to cusoon2's two stacks and are
+  re-created all the time. Reading them is fine; for anything that
+  writes, cleans or migrates, use a database of your own and pass its
+  name explicitly. Writing to one by mistake loses nothing that matters,
+  though it can break a test run in flight there: say so in your step's
+  comment and carry on.

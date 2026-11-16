@@ -518,13 +518,21 @@ Each entry: what was decided, why, and what would reopen it.
   taken: a Fix session that changes nothing, which adds a step and no reader.
 - **A merge needs both checks against Kotlin** (16 Nov 2026, DEV-880): `mise run kotlin`
   for the built-ins and cusoon2's `kogo/run.sh` for the ports, skipped only for a PR of
-  `.md` files. The comparison is started from `~/Dev/cusoon2-tasks`: its Kotlin side
-  reads `CUSOON_CONFIG_FILE`, which only cusoon2's mise environment sets. Not taken:
-  setting that variable in the command, which copies a cusoon2 path into this repo. A
-  failure of either is tried once on `main` before the PR is blamed. The comparison's
-  last line, `0 differ`, carries no count, so the lead also needs its `N cases` above zero
-  and quotes both in `Merged:`. Reopen when DEV-879's PR makes `run.sh` pass its own
-  default to Gradle.
+  `.md` files. A failure of either is tried once on `main` before the PR is blamed. The
+  comparison's last line, `0 differ`, carries no count, so the lead also needs its
+  `N cases` above zero and quotes both in `Merged:`. The comparison runs from any
+  directory since cusoon2 PR 1494 made `run.sh` export its own `CUSOON_CONFIG_FILE`
+  (DEV-889). Reopen if a check that ends `0 differ` lets a difference through.
+- **The lead approves a prelude name Kotlin has, with Kotlin's meaning** (16 Nov 2026,
+  Greg; DEV-889). A name a port needs that the spec does not list, from Kotlin's standard
+  library or `java.time`, wanted with exactly Kotlin's meaning, is the lead's to approve and
+  report to Greg; it joins section 12's list and the prelude together. Principle 3 already
+  says what it must do and `mise run kotlin` holds it to that, so there is nothing to
+  choose. An operator on a prelude type is such a name (`<` is `compareTo`). A name of
+  Kogo's own, or one differing from Kotlin's in ordinary use, stays Greg's. Not taken:
+  every unlisted name to Greg, which makes him the bottleneck for names with nothing to
+  choose; any name at the port's own word, which lets the prelude grow unseen. Reopen if
+  an approved name turns out to differ from Kotlin's.
 - **The lead hands over through the issues** (16 Nov 2026, Greg and the lead). Each agreed
   next step is on its issue before a lead session ends, as a launch comment, a `Ruling:` or
   a `Lead:` comment, so a new lead needs only the board. Not taken: a handover note or

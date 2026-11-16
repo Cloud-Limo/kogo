@@ -215,8 +215,10 @@ func (c *checker) add(id *syntax.Ident, what string, w *reach, d *TypeDecl) {
 
 // wire checks that whole, the input or the answer of the operation at
 // id, crosses the wire (spec.md 15.4), and adds the types it reaches
-// to w. A type already reached is not read again, so a type that holds
-// itself ends.
+// to w. An answer does not read a type the list already reached; an
+// input reads every type it reaches, so a marked constructor behind one
+// reached earlier is found. Each walk reads a type once, so a type that
+// holds itself ends.
 func (c *checker) wire(id *syntax.Ident, what string, whole Type, w *reach) {
 	bad := func(t Type, path, why string) {
 		where := "is a " + t.String()

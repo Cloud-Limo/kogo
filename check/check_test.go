@@ -410,10 +410,11 @@ func TestNarrowing(t *testing.T) {
 		{"fun f(s: String?): String = ‸s + \"\"", "nullable", "this String? may be null"},
 		{"fun f(x: Int?): Int = if (x != null) 0 else ‸x", "type-mismatch", "this is a Int? where a Int is wanted"},
 		{"fun f(x: Int?, y: Int?): Int = if (x != null || y != null) ‸x else 0", "type-mismatch", "this is a Int? where a Int is wanted"},
-		// A var never narrows, nor a path, nor does require.
+		// A var never narrows, nor a path, nor does require or isNullOrBlank.
 		{"fun f(a: Int?): Int {\n    var x = a\n    if (x != null) return ‸x\n    return 0\n}", "type-mismatch", "this is a Int? where a Int is wanted"},
 		{"data class P(val n: Int?)\nfun f(p: P): Int = if (p.n != null) ‸p.n else 0", "type-mismatch", "this is a Int? where a Int is wanted"},
 		{"fun f(x: Int?): Int {\n    require(x != null) { \"none\" }\n    return ‸x\n}", "type-mismatch", "this is a Int? where a Int is wanted"},
+		{"fun f(s: String?): Int {\n    if (!s.isNullOrBlank()) return s.‸length\n    return 0\n}", "nullable", "this String? may be null: write ?.length, or test it for null first"},
 		// The narrowing ends with the block that the test rules.
 		{"fun f(x: Int?): Int {\n    if (x != null) {\n        val y = x + 1\n    }\n    return ‸x\n}", "type-mismatch", "this is a Int? where a Int is wanted"},
 		{"interface I\ndata class D(val n: Int) : I\nfun f(i: I): Boolean = i is ‸D", "is-variant", "is tests for a variant of a sealed interface, and this value is a I"},

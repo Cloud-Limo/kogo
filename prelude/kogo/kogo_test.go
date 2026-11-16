@@ -305,6 +305,7 @@ func TestPortCalls(t *testing.T) {
 	}
 	list := ListOf[int32](1, 2)
 	*ListT_FirstOrNull_fun(list), *List_SingleOrNull(list[1:]) = 8, 9
+	*ListT_FirstOrNull_TToBoolean(list, func(x int32) bool { return x == 2 }) = 7
 	if !slices.Equal(list, []int32{1, 2}) {
 		t.Errorf("firstOrNull or singleOrNull gives a pointer into the list, which now holds %v", list)
 	}
@@ -400,7 +401,7 @@ func TestNullableAndOverloads(t *testing.T) {
 	big := func(x int32) bool { return x > 1 }
 	for _, c := range [][2]string{
 		{rt.ToString(List_OrEmpty(&list)) + rt.ToString(List_OrEmpty[int32](nil)), "[1, 2, 3][]"},
-		{rt.ToString(ListT_FirstOrNull_TToBoolean(list, big)) + rt.ToString(ListT_FirstOrNull_TToBoolean(list, func(x int32) bool { return x > 3 })), "2null"},
+		{rt.ToString(ListT_FirstOrNull_TToBoolean(list, odd)) + rt.ToString(ListT_FirstOrNull_TToBoolean(list, big)) + rt.ToString(ListT_FirstOrNull_TToBoolean(list, func(x int32) bool { return x > 3 })), "12null"},
 		{rt.ToString(ListT_FirstOrNull_TToBoolean(EmptyList[int32](), odd)), "null"},
 		{rt.ToString([]bool{String_IsNullOrBlank(nil), String_IsNullOrBlank(rt.Ptr(" \t")), String_IsNullOrBlank(rt.Ptr("\u0085")), String_IsNullOrBlank(rt.Ptr(" a"))}), "[true, true, false, false]"},
 		{rt.ToString([]bool{String_Contains_Char("a@b", '@'), String_Contains_Char("ab", '@'), String_Contains_Char("😀", 0xDE00), String_Contains_Char("", 'a')}), "[true, false, true, false]"},

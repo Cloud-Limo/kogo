@@ -120,22 +120,34 @@ change and that you agree with, in the issue's worktree, fast-forwarded
 (created from `origin/<branch>` when missing, as in Code review): read
 any fix commits against the Review and its Rulings, then run
 `mise run testdb` and `mise exec -- go test ./...`. Unless the PR
-changes only `.md` files, run the comparison too,
-`KOGO=~/Dev/kogo-dev-NNN ~/Dev/cusoon2-tasks/kogo/run.sh` (the checkout
-Starting step 1 pulls), and read its last line. It needs cusoon2's
-Gradle build, `jq` and, for its cases on the database,
-`sudo -n -u postgres`, and takes a few minutes. If it stops before
-that line or differs, run it once with `KOGO=~/Dev/kogo`: if `main`
-fails the same way, the PR is not the cause, so it waits and you
-tell Greg.
+changes only `.md` files, run two more checks:
 
-If they match and pass, nothing is Open and the comparison ends
-`N cases, 0 differ` or was skipped, `gh pr merge --merge`, which moves
-the issue to Done, post `Merged: <sha>` and that last line (or
-"comparison skipped") on the PR and the issue, remove the worktree and
-both branches as in Starting step 3, and pull `main`. Otherwise post a
-`Ruling:`, with any differing cases, and ask for another Fix. Go to
-Greg only when what is Open is a choice of his kind.
+- `mise run kotlin`, in the worktree after `mise install` there. It
+  compares every built-in with Kotlin's, takes about ten seconds and
+  ends `N cases of M names, 0 differ`.
+- `KOGO=~/Dev/kogo-dev-NNN kogo/run.sh`, started from
+  `~/Dev/cusoon2-tasks` (the checkout Starting step 1 pulls): from
+  anywhere else it stops in `useDatabase`, without cusoon2's
+  environment. It compares the ports with their Kotlin, needs
+  cusoon2's Gradle build, `jq` and, for its cases on the database,
+  `sudo -n -u postgres`, and takes a few minutes. Read its last three
+  lines, `N cases`, `T tables holding rows, R rows` and `0 differ`:
+  `0 differ` alone reads the same when no case ran.
+
+If either stops before its last line, differs, or the comparison
+counts no cases, run it once on `main` (in `~/Dev/kogo`, or with
+`KOGO=~/Dev/kogo`): if `main` fails the same way, the PR is not the
+cause, so it waits and you tell Greg.
+
+If they match and pass, nothing is Open and both checks end
+`0 differ` with a case count above zero, or were skipped,
+`gh pr merge --merge`, which moves the issue to Done, post
+`Merged: <sha>`, the built-ins check's last line and the comparison's
+`N cases` with `0 differ` (or "checks skipped") on the PR and the
+issue, remove the worktree and both branches as in Starting step 3,
+and pull `main`. Otherwise post a `Ruling:`, with any differing
+cases, and ask for another Fix. Go to Greg only when what is Open is
+a choice of his kind.
 
 After a merge, look at what the issue was for. File the next issue if
 the work exposed one.

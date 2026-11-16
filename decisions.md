@@ -516,6 +516,15 @@ Each entry: what was decided, why, and what would reopen it.
   DEV-861). On a `Review:` or `Ruling:` that leaves nothing to change and that it agrees
   with, the lead runs the tests and merges at the reviewed sha, without a `Fixed:`. Not
   taken: a Fix session that changes nothing, which adds a step and no reader.
+- **A merge needs both checks against Kotlin** (16 Nov 2026, DEV-880): `mise run kotlin`
+  for the built-ins and cusoon2's `kogo/run.sh` for the ports, skipped only for a PR of
+  `.md` files. The comparison is started from `~/Dev/cusoon2-tasks`: its Kotlin side
+  reads `CUSOON_CONFIG_FILE`, which only cusoon2's mise environment sets. Not taken:
+  setting that variable in the command, which copies a cusoon2 path into this repo. A
+  failure of either is tried once on `main` before the PR is blamed. The comparison's
+  last line, `0 differ`, carries no count, so the lead also needs its `N cases` above zero
+  and quotes both in `Merged:`. Reopen when DEV-879's PR makes `run.sh` pass its own
+  default to Gradle.
 - **The lead hands over through the issues** (16 Nov 2026, Greg and the lead). Each agreed
   next step is on its issue before a lead session ends, as a launch comment, a `Ruling:` or
   a `Lead:` comment, so a new lead needs only the board. Not taken: a handover note or

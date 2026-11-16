@@ -1,0 +1,22 @@
+// The prelude's number functions (see lists.kg), and call, which the
+// two drivers run: one case by its name.
+package builtins
+
+fun numbers(f: String, x: Long, y: Long, d: Double, n: Int): String? = when (f) {
+    "toLong" -> "${n.toLong()} ${n.toLong() + x}"
+    "toDouble" -> "${x.toDouble()} ${x.toDouble() == y.toDouble()}"
+    "coerce" -> "${x.coerceAtLeast(y)} ${x.coerceAtMost(y)}"
+    "doubleToLong" -> "${d.toLong()} ${(d * 2.0).toLong()}"
+    "doubleToInt" -> "${d.toInt()} ${(d / 3.0).toInt()}"
+    "double" -> "$d"
+    "roundTrip" -> "${x.toDouble().toLong()} ${d.toLong().toDouble()} ${d.toInt().toLong()}"
+    "clamp" -> "${n.toLong().coerceAtLeast(x).coerceAtMost(y)} ${d.toLong().coerceAtMost(x)}"
+    else -> null
+}
+
+fun call(
+    f: String, xs: List<Long>, ys: List<Long>, s: String, t: String,
+    n: Int, m: Int, x: Long, y: Long, d: Double,
+): String =
+    lists(f, xs, ys, n, m) ?: strings(f, s, t, n, m) ?: numbers(f, x, y, d, n)
+        ?: probes(f, xs, ys, s, t, n, m, x, y, d) ?: "no case $f"

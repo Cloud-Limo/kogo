@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+#MISE description="Compare the prelude's built-ins with Kotlin's: one source, both compilers, the same cases"
+# kotlin/README.md says what this checks. Everything it writes is under
+# kotlin/_work, which Go's ./... skips and git ignores.
+set -euo pipefail
+cd "$(dirname "$0")/../kotlin"
+rm -rf _work && mkdir _work
+go run ./cases gen builtins > _work/cases
+
+go run ../cmd/kogo emit builtins _work
+go build -tags kotlin -o _work/driver ./driver
+rm -r _work/builtins # built in: gofmt -l . stays clean
+_work/driver < _work/cases > _work/kogo
+
+# kotlinc reads only .kt: the same bytes, under that name.
+for f in builtins/*.kg; do cp "$f" "_work/$(basename "$f" .kg).kt"; done
+kotlinc -nowarn _work/*.kt main.kt -d _work/kotlin.jar
+kotlin -cp _work/kotlin.jar MainKt _work/cases > _work/kotlin
+
+go run ./cases diff _work/cases _work/kogo _work/kotlin

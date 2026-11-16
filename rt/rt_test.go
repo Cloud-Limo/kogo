@@ -98,6 +98,9 @@ func TestToString(t *testing.T) {
 		{9999999.0, "9999999.0"},
 		{1.0e7, "1.0E7"},
 		{1.5e300, "1.5E300"},
+		{math.SmallestNonzeroFloat64, "4.9E-324"}, // Java's closest two digits
+		{-2 * math.SmallestNonzeroFloat64, "-9.9E-324"},
+		{20 * math.SmallestNonzeroFloat64, "9.9E-323"},
 		{math.Copysign(0, -1), "-0.0"},
 		{math.NaN(), "NaN"},
 		{math.Inf(-1), "-Infinity"},

@@ -1,0 +1,2 @@
+# Kogo is Kotlin's syntax, so GitHub highlights .kg files as Kotlin.
+*.kg linguist-language=Kotlin

@@ -583,7 +583,7 @@ Agreed with Greg on 17 Nov 2026.
 ### The list of work
 
 A queue is declared beside its functions, and a list says what a
-worker runs and in what order.
+worker runs.
 
 ```kotlin
 // charge.kg
@@ -604,10 +604,9 @@ job notifyBooker {
 
 // daemon.kg
 work daemon {
-    urgent      saveCard, chargeCard
-    background  sendRunSheet, frequently, platformDaily, tenantDaily, runBatchJob,
-                notifyBooker, remindBooker, notifyDriver, remindDriver, warnAdmin,
-                chargeAndSendInvoice, resendInvoice, sendPaymentInvite, sendMail
+    saveCard, chargeCard, sendRunSheet, frequently, platformDaily, tenantDaily,
+    runBatchJob, notifyBooker, remindBooker, notifyDriver, remindDriver, warnAdmin,
+    chargeAndSendInvoice, resendInvoice, sendPaymentInvite, sendMail
 }
 ```
 
@@ -625,19 +624,19 @@ The checker holds that:
 - no step of a job acts;
 - every job states `failed`.
 
-The compiler prints each queue with its kind, table, attempts and
-lane into a file that is checked in, as it prints the gates, and
+The compiler prints each queue with its kind, table and attempts
+into a file that is checked in, as it prints the gates, and
 under each the tables it reads, writes and locks (`doc/gates.md`,
 "The table is printed"):
 
 ```
-chargeCard     effect   stripe_charge_job   attempts 1   urgent
+chargeCard     effect   stripe_charge_job   attempts 1
                runs     plain
                reads    booker, invoice, stripe_card
                writes   invoice, mail_job, payment
                locks    invoice
                acts     stripe.charge (keyed)
-notifyBooker   job      background
+notifyBooker   job
                runs     plain
                reads    booker, booking
                writes   booking, mail_job
@@ -665,8 +664,68 @@ an effect's table to the lines, which has the file state what
 Postgres did not report.
 
 The runner is hand-written Go in this repo, beside the request's
-handler: claiming, leases, backing off, parked rows, alerts, the lanes
-and their fairness.
+handler: claiming, leases, backing off, parked rows, alerts, and a
+loop for each queue.
+
+### Each queue is served on its own
+
+The Kotlin's daemon does one thing at a time, and its two lanes exist
+to work round that: the urgent one, saving and charging a card, is
+swept before and after each unit of the other (`daemon.kt`,
+`DaemonPass`). It is a soft priority. A send to a slow SMTP server
+still holds a payer's charge, and the Kotlin says what would end it:
+"give the urgent lane its own thread." Here a late charge is not made
+at all ("An effect someone is watching"), so the wait would cost
+more.
+
+So the runner gives every queue a loop of its own: claim one row, do
+it, and again, waiting a little when there is none. No queue waits
+for another, and the `work` list above is a list of queues, whose
+order means nothing. There are no lanes, no sweep and no pass.
+
+- **What the Kotlin needs of one thing at a time still holds**, since
+  both of its notes are about one queue. The lease "is safe only
+  because one daemon thread claims, sends and records one row at a
+  time" (`JobQueue.kt`), or a second worker takes a slow send's row
+  for abandoned: a queue still has one worker, and `act` has the
+  lease as its deadline besides. And "two concurrent jobs for one
+  card can still both insert" (`StripeQueues.kt`): both are the card
+  queue's, served one after the other.
+- **`soonest` and `fair` stay.** They order the rows of one queue,
+  which is still served a row at a time.
+- **A deadlock between two queues can now happen**, and the runner
+  runs the transaction again (`doc/gates.md`, "Two kinds of
+  transaction").
+- **Each busy queue holds a connection**: up to 16 for cusoon2, where
+  the daemon holds one.
+- **Idle queues ask no more than the pass did.** The Kotlin waits at
+  most 0.2 seconds when there is no work; 16 queues asking at that
+  rate is fewer statements than its pass makes.
+- **A test steps one queue at a time**, through an entry of the
+  runner that serves one row of a named queue, so that a run can be
+  repeated and compared with the Kotlin's.
+
+**It is made in Go alone, and the Kotlin's daemon stays as it is.**
+What goes into the Kotlin first is what the side-by-side run would
+see: the schema, a statement, a result. This changes when a row is
+served and nothing of what serving it does, and the runner is new Go
+and no port. So the two differ in timing, a difference Greg accepted
+on 17 Nov 2026. What the Kotlin would have shown is that no two
+queues rely, unsaid, on not running at once: the card job and a
+charge for one booker, say. That was not established. The daemon's
+functions lock what they read, since requests run beside them, which
+suggests they are written for company and proves nothing. So before
+the runner replaces the daemon, one test runs every queue side by
+side over a seeded database and one at a time over a copy of it, and
+the rows must be the same.
+
+Weighed and not taken: the two lanes as Kogo's words, which fixes
+their number and names them for cusoon2's daemon; lanes as rows of
+the application's own naming, in order of priority, with the sweep
+stated in the spec, which is three rules for what one sentence now
+says; and a pool of workers over all the queues, which needs a
+priority again once the pool is full. Agreed with Greg on 17 Nov
+2026.
 
 ### When a row fails
 
@@ -944,37 +1003,6 @@ would need to catch a panic, loop for ever, keep a timer and build SQL
 over a table's name, each of which it leaves out on purpose. This is
 code Greg does not read and the base everything trusts: it has the
 heaviest tests.
-
-### To research: each lane in its own goroutine
-
-Not agreed; an idea to check. The daemon runs one unit at a time. The
-urgent lane (saving and charging a card, a payer watching for 40
-seconds) is swept before and after each background unit but cannot
-interrupt one, and a send to a slow SMTP server holds it: the Kotlin
-says so (`daemon.kt`, "give the urgent lane its own thread"). With
-`act` timed by the lease, two minutes (`JobQueue.kt`), a payer's
-charge could wait past its `not_after` behind one email, and is then
-never made.
-
-The idea: the runner runs each lane in its own goroutine, so the
-urgent lane never waits behind the background one. What to check
-first, since cusoon2 has always run serially and says it relies on
-that:
-
-- `JobQueue.kt`, at `effectLease`: the lease "is safe only because
-  one daemon thread claims, sends and records one row at a time", and
-  a second thread would take a slow send's row for abandoned and send
-  it twice. The deadline above (`act` has the lease, with a margin)
-  is meant to end that, since no call outlives its lease; it is to be
-  shown, not assumed.
-- `StripeQueues.kt`: two concurrent card jobs for one card can both
-  insert a card row. Both are in the urgent lane, which stays serial
-  within itself.
-- Anything else that assumes one connection or one row at a time:
-  the alerts, the drain on shutdown, the pass's reading of tenants.
-
-Perhaps 20 lines of runner and a test that serves a charge while a
-send hangs.
 
 ## What it would change in the spec
 

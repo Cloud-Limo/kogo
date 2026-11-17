@@ -734,7 +734,7 @@ Each entry: what was decided, why, and what would reopen it.
     name the column of times its rows go first by, and mail names none.
   - Not taken: the one order, with the change to mail recorded as a change of behaviour.
   - A choice the runner makes for every queue is recorded here by name. Not yet looked at:
-    its two lanes, and where an alert goes.
+    where an alert goes. Its two lanes are gone (below).
   - Reopen if a queue needs an order that one column of times cannot give.
 - **A function that acts says so, with the marker `Acts`, and the call that changes
   something outside is `perform`** (17 Nov 2026, Greg; `doc/gates.md`, "A function that
@@ -807,6 +807,23 @@ Each entry: what was decided, why, and what would reopen it.
     proof's transaction written only before the dot (`doc/gates.md`), the five SQL calls
     on a `Tx` written before the dot (spec 10.2), and a lambda that fails or acts passed
     straight to a prelude function (spec 9; `doc/gates.md`). Another is recorded here.
+- **Each queue is served on its own, one row at a time, and there are no lanes**
+  (17 Nov 2026, Greg; `doc/work.md`, "Each queue is served on its own"). cusoon2's urgent
+  lane exists because its daemon does one thing at a time; a loop for each queue ends the
+  cause, where lanes in Kogo would have carried the work-round into the language.
+  - **Why it is safe to try.** Both of the Kotlin's notes on running one thing at a time
+    are about one queue, which still has one worker. A deadlock between queues is rerun.
+  - **Made in Go alone.** What goes into the Kotlin first is what the side-by-side run
+    would see: the schema, a statement, a result. This changes when a row is served and
+    nothing of what serving it does, and the runner is no port. The Kotlin's daemon stays
+    as it is, so the two differ in timing: a difference Greg accepted.
+  - **Not established:** that no two queues rely, unsaid, on not running at once. One
+    test stands in for the Kotlin's proof before the runner replaces the daemon: every
+    queue side by side, and one at a time over a copy, must leave the same rows.
+  - Not taken: two lanes as Kogo's words; lanes the application names, with a stated
+    sweep; a pool of workers.
+  - Reopen if that test, or production, finds two queues that must not run at once: the
+    answer is then to state that pair, not to make every queue wait.
 
 ## Taken in the v0 spec, not yet discussed
 

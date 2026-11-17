@@ -133,7 +133,9 @@ Agreed subject to this review:
   runner's lanes in parallel, there "To research") or less. Settled
   on 17 Nov, after this was written: an application has no bindings,
   and a binding passes four tests to enter the prelude
-  (`decisions.md`, "An application has no bindings").
+  (`decisions.md`, "An application has no bindings"); and the lanes
+  are gone, each queue served on its own (`doc/work.md`, "Each queue
+  is served on its own").
 - **The test form.** How a test makes a call time out, so that the
   rare path runs every day, waits on it; so does moving cusoon2's
   tests (DEV-893), and the record of Google's answers they replay

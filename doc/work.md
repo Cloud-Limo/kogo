@@ -1122,9 +1122,61 @@ What goes in Go is what another application of this shape would need
 unchanged: leases, backing off, HTTP, reading JSON. What knows what a
 booking is goes in Kogo. To write the runner in Kogo the language
 would need to catch a panic, loop for ever, keep a timer and build SQL
-over a table's name, each of which it leaves out on purpose. This is
-code Greg does not read and the base everything trusts: it has the
-heaviest tests.
+over a table's name, each of which it leaves out on purpose. It is
+the base everything trusts, and has the heaviest tests.
+
+Earlier drafts called it "code Greg does not read". Greg, 17 Nov
+2026: that is no hard rule. Agents write it and review it, and he
+will glance at it. The line between Kogo and Go does not rest on who
+reads: what moves into Go leaves the checker's sight, so it has no
+`@Acts`, no proofs and no printed table, whoever reads it.
+
+### How it is tested
+
+Until now this Go was the easy kind to test: the same input gives the
+same output. A runner with leases, a back-off and deadlines, and a
+binding that sorts a failure by how far a call got, are the hard
+kind: time and failure in the middle. The handler shows the trouble
+already: it decides that an operation's reruns have run out by
+reading the system clock itself (`prelude/kogo/rpc/rpc.go`), so a
+test reaches its 503 only by waiting.
+
+- **This Go keeps spec 7 itself.** It reads the time, and waits, only
+  through a clock it is handed, and reaches the database and the
+  network only through what it is handed. The runner's own SQL takes
+  the time as a parameter from that clock and never says `now()`, as
+  the Kotlin's runner does. `newId()` stays the one exception.
+- **Every boundary can be made to fail in a test.** The clock is
+  moved; the service is a local server that misbehaves on purpose
+  ("What Go would decide, Kogo states"); and the runner's steps are
+  called one at a time, so a test stops between `act` and `record`
+  and stands in for a crash.
+- **The spec states the runner's rules, in prose**: the eight or ten
+  an author relies on. When a row is owed; what an attempt is; when
+  `failed` and the alert are called; that a crash between `act` and
+  `record` sends again under the same key; that a row past its
+  `not_after` is never acted on.
+- **The full list of cases lives once, in Go**: a test over a table
+  whose rows read as sentences, which Greg can glance at and an agent
+  reviews against the spec's rules:
+
+```go
+{"act done, record commits: done_at is set", ...},
+{"act refused: the row is failed and nobody is alerted", ...},
+{"the process dies after act, before record: claimed again when the lease ends, same key", ...},
+```
+
+Changing the handler's reads of the clock is perhaps 10 lines; the
+table is perhaps 25 rows, written before the runner is. Weighed and
+not taken: the cases as a table in the spec with a test named for
+each row, two copies of one thing and a rule to keep them in step,
+proposed while the Go was to go unread; and Go's own fake time for
+tests (`testing/synctest`, in the pinned Go), whose documentation
+says to keep off the network and outside processes, where the
+runner's tests need Postgres. How an application tests its own Kogo
+code (the test form, DEV-893) stays open; it will need the same
+clock, server and steps, which are built once. Agreed with Greg on
+17 Nov 2026.
 
 ## What it would change in the spec
 
@@ -1148,8 +1200,9 @@ heaviest tests.
 - Errors a service puts in its body: Stripe's `card_error`, legacy
   Google's `status`. Each client reads its own.
 - Reading Postgres's idle limit at start, as the role is set there.
-- How a test makes a call time out, so that the rare path runs every
-  day: it waits on the test form.
+- How an application's own test makes a call time out, so that the
+  rare path runs every day: it waits on the test form. Kogo's own Go
+  does it by the clock it is handed ("How it is tested").
 - Whether `job`, `effect` and `work` are Kogo's own forms or calls
   that are valid Kotlin (DEV-894).
 - What sits behind cusoon2's PDF extension: a small writer of its

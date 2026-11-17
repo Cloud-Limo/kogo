@@ -114,7 +114,10 @@ Agreed subject to this review:
   Go holds what another application of this shape would need
   unchanged, and Kogo what knows what a booking is. Test that line
   against each of these, and ask whether more belongs in Go (the
-  runner's lanes in parallel, there "To research") or less.
+  runner's lanes in parallel, there "To research") or less. Settled
+  on 17 Nov, after this was written: an application has no bindings,
+  and a binding passes four tests to enter the prelude
+  (`decisions.md`, "An application has no bindings").
 - **The test form.** How a test makes a call time out, so that the
   rare path runs every day, waits on it; so does moving cusoon2's
   tests (DEV-893), and the record of Google's answers they replay
@@ -132,8 +135,9 @@ Agreed subject to this review:
 
 ## What the spec and the design doc would say
 
-Nothing has changed in the language, so `spec.md` and `decisions.md`
-are as they were. When any of this is built, the sections it changes
+Nothing has changed in the language, so `spec.md` is as it was, and
+`decisions.md` gained one entry: an application has no bindings.
+When any of this is built, the sections it changes
 are listed at the end of `doc/gates.md` and of `doc/work.md`; the
 largest are 15.2 ("Nothing runs before an operation", reversed for a
 gated one), 7 (a proof beside `Tx` and `Db`) and 13 (an outbound

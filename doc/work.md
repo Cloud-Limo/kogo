@@ -16,6 +16,10 @@ are Kogo code that builds a request and reads the answer. So
 `external` stays out of the application, the application stays out of
 this repo, and a charge is a dozen lines Greg can read.
 
+An application has no bindings at all, which reverses a decision of
+15 Nov. `decisions.md`, "An application has no bindings", has why,
+and the four tests a binding passes to enter the prelude.
+
 cusoon2 makes about 30 distinct calls: Stripe 4 (make a customer,
 attach a card, change an email, charge), Google Maps 5, the identity
 service about 20, and one send of mail. Its Kotlin already builds the
@@ -104,7 +108,7 @@ page is a list of marks that Kogo builds and Go draws:
 
 ```kotlin
 // kogo.pdf
-enum class Font { Helvetica, HelveticaBold }                      // the built-in fonts cusoon2 uses
+enum class Font { Helvetica, HelveticaBold }                      // PDF's standard fonts, added as needed
 sealed interface Mark
 data class Text(val x: Double, val y: Double, val text: String, val font: Font, val size: Double) : Mark
 data class Line(val x: Double, val y: Double, val toX: Double, val toY: Double) : Mark

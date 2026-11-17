@@ -2,11 +2,12 @@
 
 Asked for by Greg on 17 Nov 2026 (`doc/lists.md`, "Asked for: a deep
 dive"; DEV-901). It decides nothing: each choice is named at the end
-and is Greg's. Sizes are estimates of Kogo's own Go, code / tests,
-and none was measured. Kotlin was run with kotlinc 2.4.21, the
-version `.mise.toml` pins (the designs say 2.4.0), on files in
-`/tmp/lists` (way 1 in its reference form, in `/tmp/w1`); a claim not
-run says "unchecked".
+and is Greg's. All four were made on 17 Nov 2026 and are recorded
+in `decisions.md` (DEV-902). Sizes are estimates of Kogo's own Go,
+code / tests, and none was measured. Kotlin was run with kotlinc
+2.4.21, the version `.mise.toml` pins (the designs say 2.4.0), on
+files in `/tmp/lists` (way 1 in its reference form, in `/tmp/w1`); a
+claim not run says "unchecked".
 
 ## What is built, and what is on paper
 
@@ -270,8 +271,10 @@ mux.HandleFunc("POST /backend/smtp2go-webhook", func(w http.ResponseWriter, r *h
   with each route: cusoon2 has two.
 - **Size:** minus about 140 (`doc/gates.md`: 40 of prelude, 70 of
   handler, 30 of checker), with `Response`, `Secret`, `status`,
-  `redirect`, `Request.query`, `Request.body` and `Json.parse` on
-  text out of the spec; plus a way for Go to call one
+  `redirect`, `Request.query` and `Request.body` out of the spec,
+  and `Json.Companion.parse` no longer used on a route's body (it
+  stays, for passkeys: `doc/work.md`, "An endpoint is declared
+  once"); plus a way for Go to call one
   operation of a table, perhaps 20 / 20, and about 15 lines of Go a
   route in the application.
 
@@ -369,8 +372,8 @@ cannot be paired. It fails for five of the six lists.
    call's argument; and the one screen. Safety is not among them:
    with `db.effect` the prelude holds it as the runner does.
 2. **Take routes out, into Go (way 4).** Two routes do not pay for a
-   list, two prelude types, two members of `Request`, `Json.parse`
-   on text, `status`, `redirect` and a section of the spec, and what
+   list, two prelude types, two members of `Request`, `status`,
+   `redirect` and a section of the spec, and what
    each writes stays an operation in the printed file. Reopen at
    five routes. Commands stay: ten, read by property name, with no
    Go to grow.
@@ -415,17 +418,22 @@ written with its helpers or without.
 
 ## The choices, each Greg's
 
+All four made by Greg on 17 Nov 2026, as leaned: A (a), B (b), C (b)
+and D (a). `decisions.md` holds each with its reasons.
+
 - **A. The joint.** (a) keep the lists; (b) the application writes
-  the pipeline over prelude helpers (way 1). Lean (a).
+  the pipeline over prelude helpers (way 1). Lean (a). **Made: (a).**
 - **B. Routes.** (a) a `routes` list in Kogo; (b) Go in `main`, each
   route calling an ungated operation of a list that is not mounted,
-  revisited at five routes. Lean (b).
+  revisited at five routes. Lean (b). **Made: (b).**
 - **C. Where a reader finds a role's shape and order.** (a) only in
   the spec's table; (b) the outside step printed on the table's first
   line, beside the gate (about 5 / 5); (c) a line for each entry
   giving its order of calls, under a key other than `runs`, which
   already says the transaction's kind (about 15 / 10); (d) prelude
   signatures, which needs DEV-894 to take a call form. Lean (b),
-  unless DEV-894 takes (d).
+  unless DEV-894 takes (d). **Made: (b)**, and it stands if DEV-894
+  takes a call form.
 - **D. A queue that no `work` list names.** (a) an error; (b) allowed
-  and never run, as the designs now leave it. Lean (a).
+  and never run, as the designs now leave it. Lean (a). **Made:
+  (a).**

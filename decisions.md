@@ -854,7 +854,7 @@ Each entry: what was decided, why, and what would reopen it.
   most two forms, which DEV-894 inherits.
   - Asked for by Greg on agreeing: a deep dive into what the lists are for, how they do it,
     and other ways, more explicit or as magic and expressed differently. The mechanism
-    stands until then.
+    stands until then. Done: kept, below.
 - **Kogo's hand-written Go keeps spec 7 itself, and its cases are listed once, in a test**
   (17 Nov 2026, Greg; `doc/work.md`, "How it is tested"). It reads the time and waits only
   through a clock it is handed, the runner's SQL takes the time as a parameter, and every
@@ -868,7 +868,73 @@ Each entry: what was decided, why, and what would reopen it.
   checker can see, not on who reads: what moves into Go has no `@Acts`, no proofs and no
   printed table. So no decision of 17 Nov changes. One earlier reason leaned on it, for
   declaring routes in Kogo (`doc/gates.md`, "Weighed and not taken"): left for the deep
-  dive on the lists.
+  dive on the lists. Settled below: routes are Go.
+- **The lists stay: the runtime calls Kogo through a table, and a list is the one place a
+  function gets its role** (17 Nov 2026, Greg; `doc/lists-assessment.md`, choice A). This
+  closes the deep dive that `doc/lists.md` and `doc/remains.md` held the mechanism open
+  for, and leaves DEV-894 free to spell the lists as valid Kotlin.
+  - Not taken: the application writing the pipeline over prelude helpers (`db.gated`,
+    `db.effect`). The list would not go away, since the wire names and the TypeScript need
+    it; a gate's rules would start at an argument of a prelude call, against "A restriction
+    is carried by a form that looks special" above; and an effect written without the
+    helper can charge twice.
+- **Routes are Go in the application's `main`** (17 Nov 2026, Greg; `doc/lists-assessment.md`,
+  choice B; `doc/gates.md`, "Routes that are not operations"). Each route calls an ungated
+  operation of an `api` list that `main` does not serve to the browser. This reverses the
+  `routes` list agreed earlier the same day: the language loses that list, `Response`,
+  `Secret`, `status`, `redirect`, `Request.query` and `Request.body`, and `doc/design.md`'s
+  "paths and other routes stay out of the language" stands again. Commands are not
+  affected and stay a list. `Json.Companion.parse` stays, for passkeys.
+  - **Why.** cusoon2 has two routes, which do not pay for a list, two prelude types, two
+    members of `Request` and a section of the spec. The reason the list was taken, that
+    Greg does not read Go, is no hard rule (above), and a route's translation is pure code
+    at the edge, which the seam's rule below lets be Go.
+  - **Lost:** a route's path in the printed file, and the checker's sight of each route's
+    translation. What a route writes stays on its operation's lines.
+  - Open: how Go calls one operation of a table that is not mounted (DEV-903, which writes
+    cusoon2's `main` out on paper).
+  - Not taken: the `routes` list.
+  - Reopen at five routes.
+- **The printed table names an operation's outside step on its first line, beside the
+  gate** (17 Nov 2026, Greg; `doc/lists-assessment.md`, choice C; `doc/gates.md`, "The
+  table is printed"). It is the one part of a role's order the table hid; the rest follows
+  from the row's form and an effect's three steps. About 5 / 5. That the gate runs a second
+  time after an outside step is left to the spec alone. If DEV-894 takes a call form, the
+  prelude's signatures come with it and this still stands.
+  - Not taken: only the spec's table; a line of order on every entry, which prints
+    `gate, work` on most.
+  - Reopen if a reader is found misreading a row's order from the table.
+- **A `job` or `effect` that no `work` list names is an error** (17 Nov 2026, Greg;
+  `doc/lists-assessment.md`, choice D; `doc/work.md`, "The list of work"). The checker
+  refuses it, with a message that says to add it to a list's queues. About 10 / 10.
+  - **What it refuses:** a declared queue parked switched off.
+  - Not taken: allowed and never run, as the designs had left it, where its rows pile up
+    and nobody is told.
+  - Reopen if a queue needs to be declared and not served, for a deploy that switches one
+    off.
+- **Where Kogo ends and Go begins** (17 Nov 2026, Greg). The line rests on what the
+  checker can see:
+  1. Kogo is required for code that touches the database, acts outside, or decides who
+     may do what: the three things its checker guards.
+  2. Pure code at the edge may be Go where Go is clearly simpler. Code that Kogo calls is
+     an extension, as now (`doc/work.md`, "An application's own extensions"). Code that
+     calls Kogo is in `main`, as a route is.
+  3. An application's Go reaches the database and outside services only by calling an
+     operation. Nothing enforces it: `main` opens the pool, so a route written there
+     could query it. It is the rule a reviewer holds `main` to.
+  - **Why.** Two rules were written and disagreed on pure application code. "Go holds what
+    another application of this shape would need unchanged" (`doc/work.md`, "Hand-written
+    Go") put a route's translation and a PDF's layout in Kogo; the entry above, that the
+    line rests on what the checker can see, says that hardly matters, since neither
+    touches the database, acts, or decides access. This takes the second. The first stays
+    as the rule for Kogo's own Go. Application Go that calls Kogo had no rule at all.
+  - **The PDF's layout**, laid out in Kogo by the 17 Nov choice (`doc/work.md`, "A PDF is
+    data that Kogo builds"), may be reopened under this rule when the PDF is ported, not
+    before.
+  - Not taken: keeping "what another application would need unchanged" with routes as an
+    exception; writing no rule until cusoon2's `main` is on paper.
+  - Reopen if a reviewer finds `main` querying the pool or calling a service in practice:
+    the rule would then need the checker or the handler to hold it, not a reviewer.
 
 ## Taken in the v0 spec, not yet discussed
 

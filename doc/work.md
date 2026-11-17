@@ -249,7 +249,7 @@ external fun Json.at(key: String): Json?                    // a nested object
 external fun Json.list(key: String): List<Json>?            // an array of objects
 
 external fun Json.raw(): String                             // the object as JSON text, untouched
-external fun Json.Companion.parse(text: String): Json?      // JSON text as a Json (also a route's body)
+external fun Json.Companion.parse(text: String): Json?      // JSON text as a Json
 external fun field(name: String, json: Json): Field          // a JSON object sent as it is
 ```
 
@@ -688,7 +688,13 @@ The checker holds that:
 - no step of a job acts;
 - every job states `failed`;
 - every `work` list names an `alert`, a function marked `@Acts` that
-  takes the environment and an `Alert`.
+  takes the environment and an `Alert`;
+- every `job` and `effect` is in some `work` list's `queues`. One
+  that is not is refused, with a message that says to add it to a
+  list's queues, so no queue's rows pile up unserved and unseen. A
+  declared queue cannot be parked switched off. Perhaps 10 / 10.
+  Agreed with Greg on 17 Nov 2026 (`doc/lists-assessment.md`, choice
+  D), over allowing it and never running it.
 
 The compiler prints each queue with its kind, table and attempts
 into a file that is checked in, as it prints the gates, and
@@ -1124,6 +1130,12 @@ booking is goes in Kogo. To write the runner in Kogo the language
 would need to catch a panic, loop for ever, keep a timer and build SQL
 over a table's name, each of which it leaves out on purpose. It is
 the base everything trusts, and has the heaviest tests.
+
+That rule is for Kogo's own Go. An application's own Go, an extension
+or its `main`, is held by the seam's rule in `decisions.md` (17 Nov
+2026): Kogo for what touches the database, acts outside or decides
+who may do what, and Go for pure code at the edge where it is clearly
+simpler, such as a route's translation.
 
 Earlier drafts called it "code Greg does not read". Greg, 17 Nov
 2026: that is no hard rule. Agents write it and review it, and he

@@ -35,10 +35,11 @@ the design to work from, not built, not in `spec.md`, no example run.
 - **cusoon2's runner.** Agreed: `done_at` and `not_after` among its
   columns, and no condition of a queue's own (`doc/work.md`, "Owed is
   the runner's rule"). The order stays the queue's: the charge's
-  goes by `not_after`, and mail's is unchanged ("Soonest is each
-  queue's stated choice"). Made in the Kotlin first, with
-  `hasOpenStripeChargeJob` not counting a row never tried and past
-  its `not_after` (`doc/work.md`, "An effect someone is watching").
+  goes by a column the hosted page's request stamps, and mail's is
+  unchanged ("Soonest is each queue's stated choice"). Made in the
+  Kotlin first. A charge has no `not_after` and
+  `hasOpenStripeChargeJob` is unchanged (18 Nov 2026, "simple";
+  `doc/work.md`, "An effect someone is watching").
 - **cusoon2's schema.** Agreed, subject to the review below: a view
   for each queue that the runner finds its owed rows in, run with its
   owner's rights (`doc/work.md`, "Discover, then enter"). And a

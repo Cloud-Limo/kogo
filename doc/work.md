@@ -444,6 +444,14 @@ made. Not checked against this rule: the Go already written (the
 handler and the prelude) and `kogo.mail`. Agreed with Greg on 17 Nov
 2026.
 
+**Every refused send is logged.** The binding logs a 3xx or a 4xx in
+Go, with its method, path, status and body, so a decline's code and
+Stripe's request id reach support with no word from the application,
+and what a queue stores for a payer stays fixed words. Agreed with
+Greg on 18 Nov 2026 (`doc/charge.md`, Q9); weighed and not taken,
+`Act.Refused(words, detail)` with the runner storing `detail` in
+`last_error`, which widens `Act` for one caller.
+
 ## Workers
 
 Some work cannot be done in a request: it is due later, or on a
@@ -491,7 +499,7 @@ effect:   prepare  (transaction)  ──►  act      (none)  ──►  record 
 
 ```kotlin
 fun prepareCharge(tx: Tx, env: Env, row: StripeChargeJob): Either<String, ChargeFields> = ...
-fun recordCharge(tx: Tx, env: Env, row: StripeChargeJob, result: PaymentIntent) { ... }
+fun recordCharge(tx: Tx, env: Env, row: StripeChargeJob, result: PaymentIntent): Either<String, Unit> = ...
 
 @Acts fun charge(env: Env, key: EffectKey, fields: ChargeFields): Act<PaymentIntent> =
     charge(stripeFor(env.stripe, fields.accountId), key, fields).fold(
@@ -547,7 +555,11 @@ Kogo states").
 ### A key comes only from the runner
 
 A `KeyedAction` is sent with an `EffectKey`, which the runner makes
-from the effect's table and the row's id and hands to `act`.
+from the effect's table and the row's id and hands to `act`. Its text
+is one for every effect, `<table>-<id>`: the effect's table name
+without its schema, a hyphen, and the row's id as Postgres writes it
+as text, as `stripe_charge_job-0193a1f2-...`. No effect states a
+prefix.
 
 - A keyed call is reached only from an effect's `act`. A login or an
   outside step may `perform`; neither can charge a card. Three of
@@ -556,6 +568,18 @@ from the effect's table and the row's id and hands to `act`.
   attaching a card), so a replay makes no second customer.
 - The key is not built by hand, as the Kotlin's is.
 - A row has one key, so a replay after a crash sends the same one.
+- **The Kotlin takes the text first**, for the charge and the card
+  job (`cusoon2-charge-<id>` and `cusoon2-card-<id>` today), so a
+  side-by-side run sends the same header and a row in flight when
+  Kogo takes over is replayed under the same key. The change is safe
+  only before the Kotlin's effect runner is live, or with the charge
+  and card queues empty: a row that crashed under the old key and is
+  replayed under the new within Stripe's 24 hours is a second charge.
+  That runner is not live; what key production's present charge path
+  sends was not checked. Agreed with Greg on 18 Nov 2026, the text
+  the lead's; weighed and not taken, a prefix stated in the effect,
+  `key "cusoon2-charge-"`, a word of the language to keep a string
+  nothing depends on.
 
 ### Owed is the runner's rule
 
@@ -587,7 +611,9 @@ In the Kotlin's runner (`runEffectQueue`) it is small: `done_at` is
 one line beside `attempts = 0` where a done act is recorded, in the
 one `update` that carries the queue's own columns; `not_after` is
 only read, in the claim; three `owed` go, and the charge's `order`
-goes by `not_after` where it went by the customer's id; mail's
+goes by the column a waiting payer's row is stamped with where it
+went by the customer's id ("Soonest is each queue's stated choice");
+mail's
 `sent_at` becomes `done_at`. That runner is not yet live, so no
 finished row needs its `done_at` filled. Made in the Kotlin first,
 under its tests. Weighed and not taken: a view for each effect that
@@ -605,7 +631,7 @@ payer on the hosted page before an invoice run (`StripeQueues.kt`,
 
 ```kotlin
 effect chargeCard on stripe_charge_job {
-    soonest   not_after       // optional: rows with a time here go first, the soonest first
+    soonest   payer_waiting_since   // optional: rows with a time here go first, the soonest first
     attempts  1
     ...
 }
@@ -619,9 +645,15 @@ effect sendMail on outbound_message {
 - **With `soonest`** the runner orders by that column, rows with no
   value last, then by `next_attempt_at`. With none it orders by
   `next_attempt_at` alone.
-- **A watched request stamps its row** ("An effect someone is
-  watching" below), so a waiting payer's row goes before an invoice
-  run's, as the charge's own order has it.
+- **The charge names a column of the application's**, a
+  `timestamptz` that the hosted page's request stamps with the handed
+  clock's time and an invoice run leaves null, so a waiting payer's
+  row goes before an invoice run's, as the charge's own order has it.
+  `payer_waiting_since` is a name for the sketches; the column and
+  its name are cusoon2's to choose. It replaces the Kotlin's `order by
+  stripe_customer_id is null desc`, and goes into the Kotlin first.
+  A charge has no `not_after` ("An effect someone is watching"
+  below).
 - **`not_after` means one thing for every queue**: the time after
   which the write is not made.
 - **The checker holds**, by Postgres's answer, that the column is one
@@ -652,7 +684,7 @@ worker runs.
 // charge.kg
 effect chargeCard on stripe_charge_job {
     enter    bindTenantOf
-    soonest  not_after
+    soonest  payer_waiting_since
     attempts 1
     prepare  prepareCharge
     act      charge
@@ -685,6 +717,8 @@ The checker holds that:
 - `attempts` is stated;
 - a column named by `soonest` is a `timestamptz`, by Postgres's
   answer;
+- the properties of the row the steps take are columns of the
+  effect's table, by Postgres's answer ("Discover, then enter");
 - no step of a job acts;
 - every job states `failed`;
 - every `work` list names an `alert`, a function marked `@Acts` that
@@ -746,9 +780,8 @@ to work round that: the urgent one, saving and charging a card, is
 swept before and after each unit of the other (`daemon.kt`,
 `DaemonPass`). It is a soft priority. A send to a slow SMTP server
 still holds a payer's charge, and the Kotlin says what would end it:
-"give the urgent lane its own thread." Here a late charge is not made
-at all ("An effect someone is watching"), so the wait would cost
-more.
+"give the urgent lane its own thread." A payer watching the page
+is told "Timed out" when the charge comes late, so the wait is felt.
 
 So the runner gives every queue a loop of its own: claim one row, do
 it, and again, waiting a little when there is none. No queue waits
@@ -827,7 +860,14 @@ fun chargeRecovery(tx: Tx, env: Env, row: StripeChargeJob, why: Failure): String
 
 `Failure` is a sealed type beside `Act`, with the Kotlin's four
 cases: refused, not made, attempts exhausted, and done but not
-recorded. Both functions run in the transaction that fails the row,
+recorded. A `Left` from `record` is `Failure.Unrecorded`: it is how
+`record` reports an event that is nobody's bug, as an invoice voided
+while its card was charged, and it alerts. A `Left` from `prepare`
+stays a refusal; a broken invariant there, as a tenant with no
+Stripe account, is a panic, which fails the row as not made. A panic
+in any step is a bug the runner survives, never a way to report an
+outcome (agreed with Greg on 18 Nov 2026; `doc/charge.md`, Q6). Both
+functions run in the transaction that fails the row,
 after the runner has marked it, and their statements count in the
 queue's printed lines. A refusal alerts nobody. Where a queue gives
 no words the alert carries none, and the statement that resets the
@@ -914,6 +954,14 @@ data class Alert(val queue: String, val table: String?, val id: Uuid?,
   the queue's own words where it gave any; `reset` is the statement
   that resets an effect's row, which the runner knows; the sentence
   round them is the application's.
+- **The words and the statement meet in the alert function.** A
+  queue's recovery words refer to "the reset statement below", and
+  the alert function prints `alert.recovery` and then `alert.reset`,
+  so the statement has one source, the runner. `recovery` is not
+  handed it, and no role gives a label: a queue that wants its row
+  named ("hosted-page charge for invoice N") says so in its recovery
+  words, which have the row. Agreed with Greg on 18 Nov 2026
+  (`doc/charge.md`, Q11).
 
 It is what the Kotlin does, so nothing goes into the Kotlin first.
 Perhaps 15 lines of checker, 15 of runner and 20 of tests. Weighed
@@ -933,8 +981,14 @@ grows as queues times tenants. It protects nothing: the daemon may
 bind any tenant already.
 
 Kogo has no "for each". A queue finds its row unbound and may name a
-function, `enter`, that the runner calls on the claimed row before
-anything else; that cusoon2 binds a tenant there is cusoon2's. Its one
+function, `enter`, that the runner calls at the start of each of the
+row's transactions, with the claim it read in the first: before
+`prepare`, before `record`, and before `failed` and `recovery` where
+they run in a transaction of their own. What `enter` sets ends with
+its transaction, and the runner reads the row before it calls a
+step, so a step cannot do it for itself; the Kotlin's `withRow` binds
+the tenant each time (`JobQueue.kt:385`). That cusoon2 binds a tenant
+there is cusoon2's. Its one
 queue that already works this way, the tenant's daily job, finds its
 tenant in a table with no row-level security and binds it.
 
@@ -953,6 +1007,17 @@ effect chargeCard on stripe_charge_job {
 data class Claim(val id: ID, val tenantId: ID)      // read from the view, by the rule SQL's columns have
 fun bindTenantOf(tx: Tx, env: Env, claim: Claim) { ... }
 ```
+
+The row the steps take is a data class the application declares,
+and the runner fills it from the effect's table by id, locked, in
+each of the row's transactions after `enter`: the compiler builds the
+`select` from the class's properties by the same rule, the SQL pass
+checks it against Postgres, and the emitter writes its text and scan
+into the queue's entry. It is plain columns of the effect's own
+table, with no join and no expression; anything more is a query in
+the step. So the runner's hand-written Go names only its own columns
+and the names an effect's declaration states. Agreed with Greg on 18
+Nov 2026 (`doc/charge.md`, Q13; the seam is in `decisions.md`).
 
 The runner claims from `find`, calls `enter` with what it read there,
 and from then on works the table. The checker holds, by Postgres's
@@ -1026,9 +1091,21 @@ by one row. Kept on purpose, 17 Nov 2026: such a flood is rare and
 slow only on misses, and if it ever bites, the lookup leaves the job
 before fairness comes in.
 
+The charge queue names no `fair`. Fairness is so that one tenant's
+flood is not felt by another; in mail it is felt, but in charges the
+only one who feels a wait is a payer, and with `fair` a payer would
+wait behind one unwatched charge for each other busy tenant. So the
+charge says `soonest` of the column a waiting payer's row is stamped
+with, and waiting payers go first across all tenants, the longest
+waiting first, then every other row by `next_attempt_at`. One
+tenant's invoice run delays another's until it is done, where the
+Kotlin's pass serves this queue a tenant at a time: a difference of
+timing, of the kind accepted for "Each queue is served on its own".
+Greg, 18 Nov 2026, reversing item 9 of the Ruling on PR 66.
+
 Weighed and not taken: no fairness, the oldest first for every
 queue, which drops what the Kotlin has a test for where a flood is
-felt, in mail and charges; fairness for jobs, by handing each `next`
+felt, in mail; fairness for jobs, by handing each `next`
 the value served last, which all 13 statements would have to use
 rightly; nothing in Kogo, with cusoon2 letting its
 daemon see the job tables across tenants, which needs a second role
@@ -1086,34 +1163,42 @@ A timeout almost never happens, so it has no path of its own.
 
 ### An effect someone is watching
 
-A payer who presses "pay" inserts a row and polls for 40 seconds; the
-daemon is not in their request and has none of its time. Today
-Stripe's 35 seconds starts when the row is claimed, so a claim at 30
-runs to 65 and may charge a payer who was told it timed out.
+A payer who presses "pay" inserts a row and polls for 40 seconds, the
+page's (`standardTimeout` in cusoon2's frontend); the daemon is not in
+their request and has none of its time. When the daemon is down or
+the charge queue is backed up past those 40 seconds, the payer is
+told "Timed out" and the card is charged later: minutes, or hours
+after a long outage. One charge, recorded and emailed; the open row
+refuses a second attempt meanwhile. It is production's behaviour
+today, and it stays.
 
-The row says when its answer is needed: the request stamps it with
-the database's time and the handler's limit. `act` has the less of
-the lease and what is left until then, and a row claimed after it is
-never acted on, as cusoon2's outbox never sends a reminder after its
-pickup. In no case weighed is a card charged twice; what differs is
-whether the payer is told the truth.
+A charge is not stamped with a `not_after`. This section had it so,
+agreed on 17 Nov 2026: the request stamped the row with its limit,
+`act` had the less of the lease and what was left, a row claimed
+after it was never acted on, and the open check skipped a row never
+tried and past its time. Withdrawn for the charge on 18 Nov 2026
+("simple", `decisions.md`). Each of its consequences was a gotcha of
+its own (`doc/charge.md`, Q1 to Q5): where the 40 seconds comes from,
+a crashed row stranded past its time, which clock judges it, a "never
+tried" answer on the wire, application SQL over the runner's columns,
+and a reset that must not revive a late row. The Kotlin's main cause
+of a late claim, one daemon thread shared with mail, is already gone:
+each queue has its own loop ("Each queue is served on its own").
 
-A row left untried past its time must not block the payer's retry.
-cusoon2 allows one open charge for each invoice (DEV-674,
-`hasOpenStripeChargeJob`), and counts as open any row not failed and
-with no charge id, which a late row stays for ever. So its check
-gains one condition, made in the Kotlin when `not_after` lands there:
-a row never tried (`attempts = 0`) and past its `not_after` is not
-open. A row that was tried stays open, late or not, since it may have
-reached Stripe. The runner leaves a late row as it is. Agreed with
-Greg on 17 Nov 2026; weighed and not taken, the runner failing such a
-row, an outcome of its own and an alert ops does not need.
+So the charge is as the Kotlin's: owed until recorded, open while not
+failed and with no charge id (`hasOpenStripeChargeJob` unchanged), a
+crashed row replayed under its key after the lease. What is kept is
+the order: a waiting payer goes before an invoice run ("Soonest is
+each queue's stated choice"). `not_after` stays the runner's column
+with its one meaning, used by mail as in the Kotlin; it is stamped and
+judged by the handed clock, never `now()` (`doc/charge.md`, Q3).
+Reopen if a payer is in fact charged long after "Timed out" and it
+matters.
 
-Weighed beside it: nothing special, which tells the payer the wrong
-thing in just the rare case; and the request running the effect
-itself in an outside step, with the daemon as the net for a process
-that dies, which ends the polling and needs no stamp. The last is the
-direction, and a change of behaviour for after the port.
+The direction is unchanged: the request runs the effect itself in an
+outside step, with the daemon as the net for a process that dies,
+which ends the polling and needs no stamp. It is a change of
+behaviour for after the port.
 
 ## Hand-written Go
 
@@ -1167,7 +1252,7 @@ test reaches its 503 only by waiting.
   an author relies on. When a row is owed; what an attempt is; when
   `failed` and the alert are called; that a crash between `act` and
   `record` sends again under the same key; that a row past its
-  `not_after` is never acted on.
+  `not_after` is never acted on, which mail's reminders use.
 - **The full list of cases lives once, in Go**: a test over a table
   whose rows read as sentences, which Greg can glance at and an agent
   reviews against the spec's rules:
@@ -1211,6 +1296,11 @@ clock, server and steps, which are built once. Agreed with Greg on
 
 - Errors a service puts in its body: Stripe's `card_error`, legacy
   Google's `status`. Each client reads its own.
+- What of a refused body is safe to log for every service, when
+  `kogo.http`'s log of refused sends is built ("What Go would decide,
+  Kogo states").
+- The name of the column a waiting payer's charge is stamped with:
+  cusoon2's to choose. `payer_waiting_since` is the sketches' name.
 - Reading Postgres's idle limit at start, as the role is set there.
 - How an application's own test makes a call time out, so that the
   rare path runs every day: it waits on the test form. Kogo's own Go

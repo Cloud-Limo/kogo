@@ -47,7 +47,7 @@ A function the runtime calls takes, in this order:
 | enter | `effect` | a `Tx` | the claim | |
 | prepare | `effect` | that `Tx` | the row | a prepared value, or a refusal |
 | act | `effect` | nothing (`@Acts`) | the key; the prepared value | an `Act` of the result |
-| record | `effect` | a `Tx` | the row; the result | |
+| record | `effect` | a `Tx` | the row; the result | nothing, or a reason it could not record |
 | failed | `job`, `effect` | a `Tx` | the row; why | |
 | recovery | `job`, `effect` | that `Tx` | the row; why | words, or none |
 | alert | `work` | nothing (`@Acts`) | the alert | |

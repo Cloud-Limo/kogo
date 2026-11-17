@@ -42,7 +42,8 @@ Hand-written Kotlin is 18,172 lines: `src/main` is 21,184, of which
   about 43% of all the mutations' lines.
 - **Gates:** 8 functions on the GraphQL side. 48 fetchers call one;
   25 do not, on purpose: about 16 public reads, 4 bearer links, the 4
-  login steps and the logout. All 20 ops operations call one.
+  login steps and the logout. 14 of the 20 ops operations call one;
+  `me`, its four logins and its logout do not, on purpose.
 - **The access matrix:** 44 rows by 6 callers collapse to 7 patterns
   of allowed and refused, and three of them (an admin; an owner or an
   admin; a payer, an owner or an admin) cover 37 rows.

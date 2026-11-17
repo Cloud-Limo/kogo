@@ -129,8 +129,8 @@ work, and in what order, is read from one function.
 
 ### A gate reads and decides; it does not write
 
-Every gate of cusoon2 obeys this already: none writes a row, and two
-of the ops site's bind a tenant, which is a setting of the
+Every gate of cusoon2 obeys this already: none writes a row, and three
+of the ops site's steps bind a tenant, which is a setting of the
 transaction. Its routes do write, in front of the gates: each makes a
 session for a request that comes without a live one ("The first call"
 below). It makes a gate safe to run twice, which the outside step
@@ -160,6 +160,36 @@ gate.kg:41:9 gate-writes: this statement updates person, and a gate only reads: 
 gate.kg:52:9 gate-writes: this statement locks session, and a gate only reads: lock it in the work
 ```
 
+### The gate binds the tenant
+
+Which tenant's rows a statement sees is a setting of the transaction,
+and a gate may make it. The work does not change it, so a proof's
+`AtTenant` means one tenant for the whole of the work. In cusoon2 the
+model switches tenant for one row in three places on the ops site:
+queuing an invite's mail (`Outbox.kt`), linking a driver who accepts
+an in-house invite (`HeldInvite.acceptInHouse`), and reading a
+storefront's in-house drivers (`inHouseDrivers`). Each operation's gate
+binds the storefront instead, as `requireStorefront` does, and the
+model loses its `withTenant` and its opt-ins to `@BindsTenant`:
+
+```kotlin
+// gate.kt: beside requireBusinessToAct
+fun Raise<String>.requireStorefrontToAct(call: OpsCall, person: Driver, slug: String): ActingBusiness {
+    val business = requireBusinessToAct(call, person, slug)
+    val storefront = business.storefront ?: raise("Only a business with a storefront can invite.")
+    call.model.tenantId = storefront.id
+    return business
+}
+```
+
+Kogo holds nothing here: it knows no tenant. cusoon2's marker
+`@BindsTenant` ports as it is (spec 11), opted into by the gates'
+file alone, and in a port a binding in the work would run on a
+proof's transaction and bind nothing of it, which the rule on
+statements refuses. It is a habit and not yet a rule while
+`driverJobs` loops over tenants (Open). Agreed with Greg on 17 Nov
+2026; made in cusoon2's Kotlin first.
+
 ### A gate that reads no input is shared
 
 A gate that takes no input is named by many rows, and their operations
@@ -185,7 +215,16 @@ function says in its signature whose authority it acts under.
 - **Shared reads take a wider proof.** Places, areas and prices are
   read under many proofs, so every proof carries a tenant's, `AtTenant`:
   the caller is inside this tenant and may read what any of its users
-  may. Row-level security in Postgres scopes its statements.
+  may. Row-level security in Postgres scopes its statements on a table
+  that has it, and nothing scopes them on one that has not (cusoon2's
+  `person`, `session`, `business`). It is not held to the rule on
+  statements, so it may also write: a journey, a booking's number,
+  Google's answers, rows that belong to no caller. A function that
+  takes it acts with the whole tenant's authority, so each model
+  function demands the narrowest proof that does its job. Every proof
+  of a tenant's site carries one; the ops site's proofs (a driver, a
+  business, an invite) carry none, since its pages run with no tenant
+  bound and bind a storefront only where the gate names one.
 - **Making a thing gives its proof.** `insertBooking(held, ...)` takes
   the proof that the caller may book and gives the `HeldBooking` of the
   new row, which the writes that follow take.
@@ -217,6 +256,33 @@ binds, both of which it has; it does not read the SQL. The rule holds
 whichever way SQL's parameters come to be spelt (DEV-894). A proof
 with nothing but the transaction, as `AtTenant`, is not held to it.
 
+**A proof's transaction is used only before the dot.** It is written
+as the receiver of one of the five calls, `booking.tx.execute(...)`,
+and nowhere else: not kept in a `val`, passed or returned. Without
+this the rule is passed by a helper, the shape cusoon2's model is in
+already (`scoped.kt`: a public function takes the held row and calls a
+private one by id):
+
+```kotlin
+// Refused: the proof's transaction leaves it, and the helper's statement is on a plain Tx.
+fun removePassenger(booking: HeldBooking, passengerId: ID): Boolean =
+    deletePassenger(booking.tx, passengerId)
+```
+
+```
+model.kg:2:5 proof-tx-escapes: booking.tx is passed to deletePassenger; a proof's transaction is used only as booking.tx.query/execute/...: pass booking instead
+```
+
+So a helper takes the proof, and its statements are under the rule.
+Work done under several proofs takes an interface they implement
+(spec 3.4), `interface OnBooking { val id: ID; @UnscopedRead val tx:
+Tx }`. Code that holds a plain `Tx` (a gate, an ungated operation, the
+daemon) opts in and may make a proof, so it reaches a function written
+for proofs by wrapping its transaction: a login answers
+`bookerView(AtTenant(tx), booker)`, which gated work calls as
+`bookerView(held.tenant, held.booker)`. The cost is that wrapping, not
+a second form of each function. Agreed with Greg on 17 Nov 2026.
+
 The rule is odd for a general language. It fires only where a
 transaction is reached through a proof, so a program with no proofs
 never meets it, and it is no flag of `kogo check`: a flag would make
@@ -229,11 +295,31 @@ have one.
 
 - **A tenant's public reads** (about 16: areas, branding, place
   suggestions). Nobody logs in, but the read is of one tenant:
-  `gatedBy anyone`, whose proof is `AtTenant`. A search for `anyone`
-  lists the public doors.
+  `gatedBy anyone`, whose proof is `AtTenant`.
 - **Bearer links** (4: an invoice, a charge, a payment link, a new
   booker's secret). The secret in the input is the credential, and its
   gate gives the proof of that one thing.
+
+Some public reads use the caller when there is one: place suggestions
+put a booker's own places first, and past passengers answer a
+stranger with none. Their gate never refuses, and its proof says who,
+if anyone, is asking:
+
+```kotlin
+data class MaybeBooker @UnscopedRead constructor(val tenant: AtTenant, val booker: HeldBooker?)
+
+fun maybeBooker(tx: Tx, env: Env, request: Request): Either<String, MaybeBooker> = either {
+    MaybeBooker(atTenant(tx, request).bind(), booker(tx, env, request).getOrNull())
+}
+```
+
+So `anyone` is not the only public door: any gate that never refuses
+is one, and the printed table names it on each row it serves. A gate
+that checks several things gives a proof that holds a list, as hiding
+several bookings at once does
+(`data class AdminBookings(val bookings: List<AdminBooking>)`); each
+statement of the work binds one of them. Neither shape changes the
+language.
 
 ### Ungated: logins and logout
 
@@ -307,6 +393,114 @@ every response: the same cookies, since a session's deadline does not
 move. It changes how cusoon2 behaves, so it is made in the Kotlin
 first, under its tests, and ported after.
 
+### Routes that are not operations
+
+Some requests are not a browser's JSON call: a page the identity
+service sends the browser back to, a webhook from a server. cusoon2
+has two once its Google login goes: logout, a GET that ends the
+session, clears the cookies and redirects, and SMTP2GO's webhook,
+which sends a Bearer secret and JSON with keys like `message-id` and
+is answered with a status alone. They are declared and handled in
+Kogo, with their paths as literal strings:
+
+```kotlin
+routes inbound {
+    get   "/backend/logout"           logout
+    post  "/backend/smtp2go-webhook"  mailEvents
+}
+
+fun logout(db: Db, env: Env, request: Request): Response {
+    db.tx { tx -> endSession(tx, request) }
+    return redirect("/", clearedSessionCookies(isSecure(request)))
+}
+
+fun mailEvents(db: Db, env: Env, request: Request): Response {
+    if (!env.mailHookSecret.matches(request.header("Authorization"))) return status(401)
+    val event = Json.parse(request.body) ?: return status(400)
+    val failure = DeliveryFailure(event.string("message-id"), event.string("rcpt"), event.string("event"))
+    db.tx { tx -> recordDeliveryFailure(tx, failure) }
+    return status(200)
+}
+```
+
+- **A route has one shape**, `(db: Db, env: Env, request: Request):
+  Response`: trusted code with no gate, as an ungated operation is,
+  holding a `Db` so that it may act between its transactions.
+- **The prelude gains** `Response` (a status, a body, a location and
+  cookies) with `status` and `redirect`; `Secret`, made in `main` from
+  configuration and compared in Go, so Kogo holds no secret; on
+  `Request`, `query(name)` and `body`, read by a route alone; and
+  `Json.parse`, the reader of outside answers (`doc/work.md`) given
+  text. A request is read by key, as another's names always are.
+- **The handler** mounts each route at its method and path, reads the
+  body as text up to a limit, makes no Origin or CSRF check (a route's
+  caller need not be a browser), answers the `Response` as it is, and
+  turns a panic into a 500. The printed table lists each route, with
+  what it reads and writes.
+- **A route translates and no more**, as a habit: it reads the
+  request, calls functions that take typed values, and builds the
+  answer. `recordDeliveryFailure` knows nothing of HTTP.
+
+Perhaps 40 lines of prelude, 70 of handler and 30 of checker. It
+reverses a line of `doc/design.md`, "The server": paths and other
+routes, a webhook say, no longer stay out of the language. Agreed
+with Greg on 17 Nov 2026.
+
+### Commands
+
+cusoon2's binary takes `--op <name>` and flags (`Main.kt`). Ten of
+its operations are the application's work, run by Greg or the deploy
+script: granting and removing an admin, the support mark, recording
+an ABN, a PayID, invoicing and platform fees by hand, a test email,
+the pricing check at deploy, and setting up the identity service's
+tenants. Each reads its flags into values, runs a transaction and
+sometimes an outside call, and refuses on stderr with exit 1 or says
+what it did. They are declared and written in Kogo, as routes are:
+
+```kotlin
+commands admin {
+    "record-abn"  recordAbn
+    "set-payid"   setPayid
+    "mail-test"   mailTest
+}
+
+data class AbnInput(val business: String, val abn: String, val gstRegistered: Boolean)
+
+fun recordAbn(db: Db, env: Env, input: AbnInput): Either<String, String> = either {
+    db.tx(serializable = true) { tx -> recordAbnCheck(tx, input.business, input.abn, input.gstRegistered) }.bind()
+    "ABN checked: ${input.business}"
+}
+```
+
+```
+$ cusoon2 record-abn --business acme --abn "51 824 753 556" --gstRegistered true
+ABN checked: acme
+```
+
+- **A command has one shape**, `(db: Db, env: Env, input: I):
+  Either<String, String>`: no `Request` and no gate, since whoever
+  runs the binary on the server is trusted, as now. It holds a `Db`,
+  so it may act between its transactions.
+- **Its name is a literal string**, as a route's path is. **A flag is
+  a property's name as written**, as an operation's JSON key is (spec
+  15.4), and its value is read as JSON's are: `true`, an ISO date, a
+  number, text. The reader is strict: an unknown, missing or
+  unreadable flag is refused before the command runs, with its flags
+  listed, so a renamed property breaks a deploy script at its next
+  run and never in silence.
+- **The outcome is the exit code**: a `Right` printed with 0, a `Left`
+  on stderr with 1, a panic with 2 and its trace. The printed table
+  lists each command, with what it reads and writes.
+- **Not commands**: `web` and `batch` are modes of the Go `main`,
+  `migrate` is the migration tool's, and `check-config` checks the
+  configuration, which is Go's.
+
+Perhaps 80 lines of Go and 20 of checker. Weighed and not taken:
+flags in kebab-case made from property names, a name turned into text
+out of sight; input as JSON on the command line, one reader but
+painful by hand; commands in Go, as for routes. Agreed with Greg on
+17 Nov 2026.
+
 ### The table is printed
 
 A command of its own prints, from the list, the gate functions and
@@ -320,6 +514,10 @@ setBookingNotes     booking      input.id, ADMIN_OR_OWNER_ROLES, EDITABLE_STATES
                     gate reads   booking, booking_role, session
                     reads        booking
                     writes       booking
+submitBooking       booker
+                    gate reads   booker, session
+                    reads        area, booker, place, price_regime, stripe_card
+                    writes       booking, passenger, journey (tenant-wide)
 drivers             admin
                     gate reads   booker, session
                     reads        person, tenant_driver
@@ -357,6 +555,11 @@ The file enforces nothing: it is what a reviewer reads.
   the table, as an `update` does, and marks the lock apart, which is
   how the two are told. cusoon2's requests take no locks; its logins
   and its daemon do.
+- **A write made under `AtTenant` is marked `(tenant-wide)`**, since
+  no rule holds it: `journey` above is meant, and a `passenger` so
+  marked is a diff someone has to explain. The printer knows which
+  proof's transaction a statement runs on, as the rule on statements
+  does. Perhaps 10 lines. Agreed with Greg on 17 Nov 2026.
 - **A view is listed by its own name**, read or written.
 - **It does not see** inside a function, under a view, or a row that a
   foreign key's cascade or a trigger changes. It lists what the
@@ -386,8 +589,10 @@ row for the daemon, about 9 look something up (Google's places and
 distances, the identity service's "has a passkey?"), 4 are logins, and
 4 change something outside in the middle of their transaction (three
 passkey operations and a booker's change of address). The ops site
-has the same three passkey operations, so seven in all. Six comments
-argue, call by call, what a rerun would do.
+has the same three passkey operations, so seven in all. The logins
+act too, on both sites, inside their transaction today: they are
+`ungated` with a `Db` here, and act between their transactions. Six
+comments argue, call by call, what a rerun would do.
 
 - **A binding says what kind of call it is**: a `lookup` asks and
   changes nothing; an `action` changes something outside. The one
@@ -514,6 +719,8 @@ binding says `lookup` or `action` and nothing more.
 - A gate named with an input takes the work's input type.
 - Gated work takes no `Request`, `Tx` or `Db`.
 - A statement on a proof's transaction binds something of the proof.
+- A proof's transaction is written only as the receiver of one of the
+  five calls.
 
 What a held value's marked constructor and marked `tx` already give
 (spec 11) does the rest: no operation makes a proof, or takes the
@@ -528,8 +735,14 @@ transaction out of one.
   file.
 - **Whether a bound value scopes its statement.**
   `where id = $passengerId or booking_id = ${booking.id}` compiles.
-- **Anything in a file that opts in.** The model and the gates are the
-  trusted part.
+- **Whether a function takes the narrowest proof.**
+  `deletePassenger(at: AtTenant, passengerId: ID)` compiles, and work
+  that calls it with `booking.tenant` deletes any passenger of the
+  tenant. The signature and the call say so where they are written,
+  and the printed table marks the write `(tenant-wide)`.
+- **Anything in a file that opts in, past the rules above.** The model
+  and the gates are the trusted part; the two rules on a proof's
+  transaction hold in the model, the one place it is read.
 
 So the access matrix test stays: it sees policy, which no rule here
 does.
@@ -549,17 +762,44 @@ it: a habit of the application's code, not a rule.
   one, whose shape becomes environment, proof, input.
 - **7:** a function that touches the database has a `Tx`, a `Db` or a
   proof as a parameter.
-- **15, a new part:** proofs, the rule on statements, the read-only
-  gate and the outside step.
+- **15, a new part:** proofs, the rule on statements and on a proof's
+  transaction, the read-only gate and the outside step.
+- **3.4 and 11:** an interface may declare a marked `val`, so proofs
+  share one (`OnBooking`). Kotlin's acceptance of the marker there is
+  to be checked before it is promised.
 - **13:** a binding with an effect says `lookup` or `action`.
 - **12 and 15.2:** `Cookie` and `Reply` in `kogo.rpc`; an ungated
   operation may answer `Either<String, Reply<A>>`.
 - `doc/design.md`, "The server": the handler calls the gate, in a
   read-only savepoint, and the outside step; a command writes the
-  printed table; "Not designed, on purpose" loses the cookie. "The
+  printed table; "Not designed, on purpose" loses the cookie; `main`
+  no longer holds other routes, which a `routes` list declares. "The
   SQL pass": a statement's signature carries its tables.
+- **12 and 15, a new part:** the `routes` list, a route's shape,
+  `Response`, `Secret`, `Request.query` and `Request.body`, and
+  `Json.parse`; the `commands` list, a command's shape, and its flags
+  read by property name.
 
 ## Weighed and not taken
+
+- **A route in Go that calls a Kogo operation**: `main` reads the URL,
+  the headers and the body into a typed input, calls an ungated
+  operation of a list it does not serve to the browser, and turns the
+  answer into a redirect or a status. Less language, and typed inputs,
+  but each route is half Go, which Greg does not read, and Go grows
+  with every route.
+- **Following a proof's transaction through `val`s and arguments**, so
+  that a helper it reaches is held to the rule on statements. A walk of
+  where each value goes, perhaps 100 lines, and a rule that holds
+  somewhere other than where it is written. The rule as first written,
+  on the receiver alone, was passed by any helper.
+- **`AtTenant` narrowed**: to reads, to reads and inserts, or to
+  tables under row-level security, with a policy that admits everyone
+  on cusoon2's platform tables. Each refused writes cusoon2's requests
+  make to rows no caller owns (journeys, booking and invoice numbers,
+  Google's answers, about 13 statements), and each patch for those
+  needed a list of tables of its own. `AtTenant` exists for those
+  writes; the mark in the printed table shows them instead.
 
 - **The gate as a lambda in the list**
   (`gatedBy { tx, env, request, input -> ... }`). It put the policy in
@@ -618,15 +858,23 @@ it: a habit of the application's code, not a rule.
 
 ## Open
 
-- Whether `gatedBy`, `ungated` and `outside` are spelt as valid Kotlin
-  (DEV-894), and how a binding spells `lookup` and `action`.
+- Whether `gatedBy`, `ungated`, `outside`, `routes` and `commands`
+  are spelt as valid Kotlin (DEV-894), and how a binding spells `lookup` and
+  `action`.
 - The printed table's command has no name.
+- **`driverJobs` has no shape here.** It binds each of a driver's
+  operators in turn and reads its jobs, gate and work in one loop
+  (`eachOperator`). Putting the loop in the gate makes the gate the
+  whole operation, which a gate is not for; the work may not bind. It
+  waits on replacing cusoon2's loops over tenants, this one and the
+  daemon's ("Discover, then enter" in `doc/work.md`), which Greg has
+  wanted on other grounds.
 - Checked on paper against three fetchers only: setting a booking's
   notes, setting its driver, and submitting a booking. The work of
   adopting it is in the model: each of some 150 functions says which
   proof it demands.
 - Not sized as a whole. The rule on statements is perhaps 30 to 50
-  lines of checker. The tables of the printed table are perhaps 35
+  lines of checker, and the rule on a proof's transaction 20 to 30. The tables of the printed table are perhaps 35
   lines of the SQL pass to read them, 8 to tell a lock, 30 to print
   and 15 for the command, with the walk of the functions an operation
   reaches shared with the gate's read-only check, which is perhaps 10

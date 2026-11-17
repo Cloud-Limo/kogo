@@ -17,9 +17,16 @@ the design to work from, not built, not in `spec.md`, no example run.
   request that lacks one, and the page's first call makes it
   (`doc/gates.md`, "The first call makes the session"). Made in the
   Kotlin first, under its tests.
+- **The ops site's tenant.** Agreed: the gates of sending an invite,
+  accepting one and the suppliers page bind the storefront, and the
+  model stops switching tenant (`doc/gates.md`, "The gate binds the
+  tenant"). `driverJobs` stays open until the loops over tenants are
+  replaced. Made in the Kotlin first.
 - **cusoon2's runner.** Agreed: `done_at` and `not_after` among its
   columns, and no condition or order of a queue's own (`doc/work.md`,
-  "Owed is the runner's rule"). Made in the Kotlin first.
+  "Owed is the runner's rule"). Made in the Kotlin first, with
+  `hasOpenStripeChargeJob` not counting a row never tried and past
+  its `not_after` (`doc/work.md`, "An effect someone is watching").
 - **cusoon2's schema.** Agreed, subject to the review below: a view
   for each queue that the runner finds its owed rows in, run with its
   owner's rights (`doc/work.md`, "Discover, then enter"). And a
@@ -81,22 +88,38 @@ Agreed subject to this review:
   new projects, and the endpoints of its newer APIs.
 - **Every size.** None of this is sized as a whole. Guesses given: the
   rule that a statement binds something of its proof, 30 to 50 lines
-  of checker; the functions a gate reaches, for the read-only check,
+  of checker, and that a proof's transaction is used only before the
+  dot, 20 to 30; the functions a gate reaches, for the read-only check,
   60 to 100; the HTTP binding, 150 to 250 lines of Go, before its
   fields, its paths' ids and its `Json`, perhaps 90 more; the runner,
   about the Kotlin's 500; the tables of the printed table, about 90
-  lines beside that walk, and 10 more for the queues'; `failed` and
+  lines beside that walk, 10 more for the queues' and 10 for marking
+  a write made under `AtTenant`; `failed` and
   `recovery`, 25 of checker; `find`, 20; `fair`, 30.
 
 ## Choices that sit above these
 
 - **How SQL's parameters are spelt, and whether Kogo source is valid
   Kotlin** (DEV-894). It decides how `gatedBy`, `ungated`, `outside`,
-  `job`, `effect`, `work` and a binding's `lookup` and `action` are
-  spelt. Each design here was written to hold either way.
+  `routes`, `commands`, `job`, `effect`, `work` and a binding's
+  `lookup` and `action` are spelt. Each design here was written to
+  hold either way.
+- **Where Kogo ends and Go begins.** To research. The review of 17 Nov
+  leaned on Go more as it went: each service's handle states its
+  encoding; the binding sorts a failed send by status; Go draws a PDF
+  from Kogo's marks, writes an email's EML and speaks SMTP; it holds
+  the fonts' metrics, the secret a webhook is checked against, and the
+  runner with its lanes. Greg, 17 Nov: "maybe that is not a bad
+  thing." The line drawn so far (`doc/work.md`, "Hand-written Go"):
+  Go holds what another application of this shape would need
+  unchanged, and Kogo what knows what a booking is. Test that line
+  against each of these, and ask whether more belongs in Go (the
+  runner's lanes in parallel, there "To research") or less.
 - **The test form.** How a test makes a call time out, so that the
   rare path runs every day, waits on it; so does moving cusoon2's
-  tests (DEV-893).
+  tests (DEV-893), and the record of Google's answers they replay
+  (`GoogleMapsFileCache`, a test's files kept beside the code), which
+  `kogo.http` would need a mode for.
 - **The order of the migration** (DEV-893): GraphQL to Kotlin RPC and
   then to Kogo, or straight to Kogo; all at once or piece by piece.
   Not discussed on 17 Nov. The gate and its work are the shape a

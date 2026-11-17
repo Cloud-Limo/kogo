@@ -855,6 +855,20 @@ Each entry: what was decided, why, and what would reopen it.
   - Asked for by Greg on agreeing: a deep dive into what the lists are for, how they do it,
     and other ways, more explicit or as magic and expressed differently. The mechanism
     stands until then.
+- **Kogo's hand-written Go keeps spec 7 itself, and its cases are listed once, in a test**
+  (17 Nov 2026, Greg; `doc/work.md`, "How it is tested"). It reads the time and waits only
+  through a clock it is handed, the runner's SQL takes the time as a parameter, and every
+  boundary can be made to fail in a test. The spec states the runner's rules in prose; the
+  full list of cases is a Go test over a table whose rows read as sentences.
+  - Not taken: the cases as a table in the spec with a test for each row, two copies of
+    one thing; Go's fake time for tests, which keeps off the network where the runner's
+    tests need Postgres.
+- **That Greg does not read Go is no hard rule** (17 Nov 2026, Greg). Agents write and
+  review it, and he will glance at it. The line between Kogo and Go rests on what the
+  checker can see, not on who reads: what moves into Go has no `@Acts`, no proofs and no
+  printed table. So no decision of 17 Nov changes. One earlier reason leaned on it, for
+  declaring routes in Kogo (`doc/gates.md`, "Weighed and not taken"): left for the deep
+  dive on the lists.
 
 ## Taken in the v0 spec, not yet discussed
 

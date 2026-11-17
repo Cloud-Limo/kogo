@@ -95,5 +95,9 @@ Starting points for it, none of them weighed:
   `data object` that implements it, so that Kotlin's own types fit
   the stages and nothing but the list is Kogo's.
 - **A marker on each function** that says its role, with no list.
+- **Routes in Go, in the application's `main`**, each calling an
+  ungated operation, as `doc/gates.md` weighed and refused while Go
+  was to go unread. cusoon2 has two, and it would take the `routes`
+  list, `Response` and `Secret` out of the language.
 - **What the list buys that these do not**: the table on one screen,
   the printed file, and that nothing is an operation by accident.

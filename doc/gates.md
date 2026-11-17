@@ -1006,7 +1006,9 @@ it: a habit of the application's code, not a rule.
   operation of a list it does not serve to the browser, and turns the
   answer into a redirect or a status. Less language, and typed inputs,
   but each route is half Go, which Greg does not read, and Go grows
-  with every route.
+  with every route. The first of those reasons no longer stands
+  (`doc/work.md`, "Hand-written Go"), and cusoon2 has two routes: it
+  is left for the deep dive on the lists (`doc/lists.md`).
 - **Following a proof's transaction through `val`s and arguments**, so
   that a helper it reaches is held to the rule on statements. A walk of
   where each value goes, perhaps 100 lines, and a rule that holds

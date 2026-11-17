@@ -88,7 +88,10 @@ Agreed subject to this review:
   exact conditions were not traced; that sentence of cusoon2's is
   Greg's to keep or change.
 - **The Go already written against the rule on Go's defaults**: the
-  handler, the prelude, and `kogo.mail` when it is built.
+  handler, the prelude, and `kogo.mail` when it is built. And against
+  the rule that it is handed its clock (`doc/work.md`, "How it is
+  tested"): the handler reads the system clock for the limit on
+  reruns.
 - **What sits behind cusoon2's PDF extension** (`doc/work.md`, "An
   application's own extensions"): a small writer of its own, or a
   wrapped Go library. A survey named `fpdf`, now kept on Codeberg;

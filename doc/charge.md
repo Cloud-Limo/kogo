@@ -309,8 +309,10 @@ and "past its `not_after` is never acted on".
 - b. The runner fails it when its lease ends, as `Failure.Exhausted`:
   `chargeFailed` stores the unknown words and ops are alerted with the
   Stripe search.
-- c. Left as it is, and found by a query ops run: `where claimed_at <
-  now() - interval '2 minutes' and not failed`.
+- c. Left parked, as the Kotlin leaves a row claimed over 20 hours
+  ago, for a query ops run after an outage: `where claimed_at < now()
+  - interval '2 minutes' and not failed`. Releasing it does nothing:
+  it is still past its time.
 - Lean: b. It is the one late row ops do need to hear of.
 
 **Q3. Which clock judges `not_after`?** The request stamps with the

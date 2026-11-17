@@ -261,7 +261,7 @@ Each entry: what was decided, why, and what would reopen it.
 - **The server is an emitted table, a Go library and the application's own `main`**
   (15 Nov 2026; `doc/design.md` "The server"). `main` is Go that reads the
   configuration, opens the pool, builds the environment and mounts the handler: "about
-  fifteen lines" here, which DEV-903 found to be about 215 for cusoon2 (`doc/main.md`). Not
+  fifteen lines" here, which DEV-903 found to be about 240 for cusoon2 (`doc/main.md`). Not
   taken: an entry point in the language or a `kogo serve`, which would make Kogo say how
   configuration is read, how a handle is built from a secret and how other routes are
   added. An application already writes Go behind its own bindings.
@@ -1954,11 +1954,6 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken writing cusoon2's `main` on paper (DEV-903), not yet discussed
 
-- **A route calls its operation through a handler of its list that is not mounted**, so a
-  route's call has a request id, a `served` line, the request's limit and reruns, as a
-  browser's does. Both ways of handing it the input (`doc/main.md`, Q1) keep this. Not
-  taken: a route opening its own transaction around the Kogo function, which would copy
-  the handler's rules into each application's `main`.
 - **`check-config` reads the file and builds every handle, and opens nothing**, as the
   Kotlin's parses only. So a handle's constructor checks its values (an address, an
   encoding, SMTP's security) without the network, and a bad one fails the deploy's check.
@@ -1966,9 +1961,11 @@ Each entry: what was decided, why, and what would reopen it.
   --business acme`. Go's `flag` stops at the first word that is not one, so the command's
   reader is handed only its own flags. Not taken: the Kotlin's `--op <name>`, which mixes
   the two.
-- **The webhook answers a body missing a field with 200 and a log line**, as the Kotlin
-  does, so that SMTP2GO does not send it again; `doc/gates.md`'s sketch had 400. A body
-  that is not JSON is a 400, where the Kotlin answers 500 by accident.
+- **The webhook answers as `Bounces.kt` does**: 200 and a log line of the keys present
+  for a body missing a field, 200 for an event other than `bounce` or `reject` before
+  any other field is read, and 500 for a body that is not a JSON object, on purpose, so
+  SMTP2GO keeps form-encoded events for 48 hours rather than dropping them. Not taken:
+  `doc/gates.md`'s sketch, 400 for both.
 
 ## Spec gaps found by the leakage ports, unresolved
 

@@ -4,7 +4,8 @@ DEV-903, 17 Nov 2026. cusoon2's Go `main` written out whole, as the
 designs of 17 Nov would have it: `doc/gates.md`, `doc/work.md`, and
 `decisions.md`'s seam ("Where Kogo ends and Go begins"). Read from
 cusoon2 at `691aa93cf` (`Main.kt`, `CusoonApp.kt`, `CusoonAppState.kt`,
-`GracefulShutdown.kt`, `config/CusoonConfig.kt`, `Bounces.kt`). It is
+`GracefulShutdown.kt`, `config/CusoonConfig.kt`, `AuthConfig.kt`,
+`Bounces.kt`). It is
 not built. Every Go name below that is not `net/http`'s, `slog`'s or
 pgx's is invented: the emitted packages, and the prelude's handle,
 command and runner APIs, which no design has given a Go form yet. The
@@ -24,10 +25,12 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -65,6 +68,10 @@ func run() int {
 		return 1
 	}
 	mode := flag.Arg(0)
+	if flag.NArg() > 1 && (mode == "web" || mode == "batch" || mode == "check-config") {
+		fmt.Fprintln(os.Stderr, "--config goes before", mode) // else it is read from the environment
+		return 1
+	}
 	clock := ktime.SystemClock()
 	cfg, err := load(*path) // [1]
 	var env app.Env
@@ -108,14 +115,16 @@ func run() int {
 }
 
 // [1] cusoon2's file as it is, read strictly. Keys the Kotlin reads and
-// this does not are named and ignored, as the Kotlin's are.
+// this does not, and the keys the Kotlin itself ignores, are named and
+// ignored as json.RawMessage.
 type Config struct {
 	Deployment struct {
 		BackendHost, OpsOrigin string
 		BackendPort            int
-		Operators              []mail.Address
+		Operators, Dev         []mail.Address // "dev": the old name, still read
 		ExtraAllowedOrigins    []string
 		GoogleMapsBrowserKey   *string
+		PlatformAdminIds       json.RawMessage // retired; old files carry it
 
 		ShowTestModeBand, RefreshGooglePlaceIds, ExposeOneTimeCode, TrustDevTenantHeader bool
 	}
@@ -132,10 +141,13 @@ type Config struct {
 	}
 	AuthConfig struct {
 		FaURL, FaInternalURL, APIKey string
-		ClientSecret, BackendServer  json.RawMessage // Google's login, gone
+		ClientSecret, BackendServer  json.RawMessage // the login callback's (Not in main)
 	}
 	GooglePlaceAPIKey string
 	StripeConfig      struct{ PublicKey, SecretKey string }
+
+	UpstreamTimeouts, GoogleAnswers     json.RawMessage // CI's and agents' files; Q10
+	GoogleResponsesCacheDir, JooqConfig json.RawMessage // retired; old files carry them
 }
 
 func load(path string) (c Config, err error) {
@@ -149,12 +161,21 @@ func load(path string) (c Config, err error) {
 	if err = d.Decode(&c); err != nil {
 		return c, err
 	}
+	d := &c.Deployment
+	hasOperators := d.Operators != nil || d.Dev != nil // [] is present; a missing key silences every alert
+	d.Operators = append(d.Operators, d.Dev...)
+	c.AuthConfig.FaURL = strings.TrimRight(c.AuthConfig.FaURL, "/")
+	c.AuthConfig.FaInternalURL = strings.TrimRight(c.AuthConfig.FaInternalURL, "/")
 	for key, present := range map[string]bool{ // Q7: Go reads a missing key as zero
 		"dbConfig.uri": c.DbConfig.URI != "", "dbConfig.maximumPoolSize": c.DbConfig.MaximumPoolSize > 0,
-		"deployment.backendPort": c.Deployment.BackendPort > 0, "deployment.opsOrigin": c.Deployment.OpsOrigin != "",
-		"smtpConfig.server": c.SmtpConfig.Server != "", "smtpConfig.port": c.SmtpConfig.Port > 0,
-		"authConfig.faUrl": c.AuthConfig.FaURL != "", "authConfig.apiKey": c.AuthConfig.APIKey != "",
+		"dbConfig.user": c.DbConfig.User != "", "dbConfig.password": c.DbConfig.Password != "",
+		"deployment.backendPort": d.BackendPort > 0, "deployment.opsOrigin": d.OpsOrigin != "",
+		"deployment.operators": hasOperators,
+		"smtpConfig.server":    c.SmtpConfig.Server != "", "smtpConfig.port": c.SmtpConfig.Port > 0,
+		"smtpConfig.transport": c.SmtpConfig.Transport != "",
+		"authConfig.faUrl":     c.AuthConfig.FaURL != "", "authConfig.apiKey": c.AuthConfig.APIKey != "",
 		"googlePlaceApiKey": c.GooglePlaceAPIKey != "", "stripeConfig.secretKey": c.StripeConfig.SecretKey != "",
+		"stripeConfig.publicKey": c.StripeConfig.PublicKey != "",
 	} {
 		if !present {
 			return c, fmt.Errorf("%s is missing", key)
@@ -258,34 +279,40 @@ func logout(calls *rpc.Handler[app.Env]) http.HandlerFunc {
 	}
 }
 
-// SMTP2GO's bounces. A body that lacks a field is a 200 and a log line,
-// as the Kotlin's, so that SMTP2GO does not send it again.
+// SMTP2GO's bounces, as Bounces.kt answers them: 200 for any JSON object,
+// so only our own failure makes SMTP2GO send it again. A body that is not
+// a JSON object is a 500 on purpose: it most likely means SMTP2GO's output
+// is set to form encoding, and its retries keep those events for 48 hours.
 func webhook(calls *rpc.Handler[app.Env], secret *string, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if secret == nil || *secret == "" ||
+		if secret == nil || strings.TrimSpace(*secret) == "" ||
 			subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+*secret)) != 1 {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		var ev struct {
-			Event     string  `json:"event"`
-			MessageID string  `json:"message-id"`
-			Rcpt      string  `json:"rcpt"`
-			Bounce    *string `json:"bounce"`
-			Message   string  `json:"message"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		} else if ev.Event == "" || ev.MessageID == "" || ev.Rcpt == "" {
-			log.Warn("smtp2go webhook lacks message-id, rcpt or event")
-			return
-		} else if ev.Event != "bounce" && ev.Event != "reject" {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body == nil {
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		_, err := rpc.Call(calls, r, routes.RecordDeliveryFailure_op, routes.DeliveryFailure{
-			MessageId: ev.MessageID, Rcpt: ev.Rcpt, Event: ev.Event, Kind: ev.Bounce, Reason: ev.Message})
-		if err != nil {
+		field := func(k string) (string, bool) { s, ok := body[k].(string); return s, ok } // as? String
+		event, ok := field("event")
+		if ok && event != "bounce" && event != "reject" {
+			return
+		}
+		id, okID := field("message-id")
+		rcpt, okRcpt := field("rcpt")
+		if !ok || !okID || !okRcpt { // the 200 counts as delivered: the log is the only trace
+			log.Warn("smtp2go webhook lacks message-id, rcpt or event", "keys", slices.Collect(maps.Keys(body)))
+			return
+		}
+		kind, okKind := field("bounce")
+		reason, _ := field("message")
+		in := routes.DeliveryFailure{MessageId: id, Rcpt: rcpt, Event: event, Reason: reason}
+		if okKind {
+			in.Kind = &kind
+		}
+		if _, err := rpc.Call(calls, r, routes.RecordDeliveryFailure_op, in); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}
@@ -305,212 +332,185 @@ What a mistake in each part does, and when it shows: at **build**
 (Go's compiler), at **start** (the process exits, or `check-config`
 fails the deploy before anything stops), or at **use** (the first
 request, row or call that reaches it, which for the webhook may be
-days after a deploy).
+days after a deploy). **Never** means no test sees it.
 
 | Part | Lines | Grows with | Written wrong | Shows |
 | --- | --- | --- | --- | --- |
-| `run`: modes, flag, signals | 50 | nothing | a mode misspelt: it is taken for a command | start: "unknown command", exit 1 |
-| [1] the configuration | 55 | a key: 1 to 2 | a key unread or misspelt in the struct | start: unknown key |
+| `run`: modes, flag, signals | 55 | nothing | a mode misspelt: it is taken for a command | start: "unknown command", exit 1 |
+| | | | words after the mode not refused | never: `web --config f` reads `CUSOON_CONFIG_FILE`, the ambient file `-D` exists to beat |
+| [1] the configuration | 63 | a key: 1 to 2 | a key unread or misspelt in the struct | start: unknown key |
 | | | | a required key left off the list in `load` | use: a zero value, e.g. Stripe answers 401 at the first charge |
-| [2] the handles | 13 | a service: 3 | a wrong address or encoding | use: the first call fails, as a `Left` |
+| | | | `operators` not required | never: every alert goes to nobody |
+| [2] the handles | 11 | a service: 3 | a wrong address or encoding | use: the first call fails, as a `Left` |
 | | | | a credential in the wrong header | use: 401 from the service |
 | | | | no limit on an answer's length | start, if the constructor requires one (Q2) |
-| [2] the environment | 6 | a value Kogo reads: ⅓ | a field left out | use: Go's zero; build, if the emitter's `Env` can make a missing field a compile error (Q1) |
-| [3] the pool | 15 | nothing | a URL pgx cannot read; a database that is down | start (`Ping`) |
+| [2] the environment | 6 | a value Kogo reads: ⅓ | a field left out | use: Go's zero; build, under Q13's a |
+| [3] the pool | 13 | nothing | a URL pgx cannot read; a database that is down | start (`Ping`) |
 | [4] the lists at their paths | 10 | a list: ⅓ | a path that does not match nginx's or the TypeScript client's | use: 404 |
 | | | | a list left out | use: 404; nothing else, since a list's TypeScript still compiles |
-| [4] the client's address | 12 | nothing | X-Forwarded-For, or the server not on loopback | never, in a test: a client picks its own address, and per-address limits on logins count nothing |
-| [4] the limit, the body's limit, the drain | 16 | nothing | no `ReadHeaderTimeout`, `MaxBytesHandler` or drain | use, under load or at a deploy: a stop cuts requests mid-way |
-| [4] logout | 14 | a route: 10 to 25 | cookies not written before the redirect | use: the browser stays logged in on its side, its session gone |
-| [4] the webhook | 31 | | the secret compared with `==`, or an unset secret let through | never, in a test: anyone can mark a message bounced |
+| [4] Origin and CSRF | 0 | | absent, as written | never: any site's page can post as a logged-in user. This `main` serves no mutation until Q4 is settled |
+| [4] the client's address | 8 | nothing | X-Forwarded-For, or the server not on loopback | never: a client picks its own address |
+| | | | `behindProxy` left out | use: every request is 127.0.0.1, and everyone shares one per-address login limit |
+| [4] the limit, the body's limit, the drain | 17 | nothing | no `ReadHeaderTimeout`, `MaxBytesHandler` or drain | use, under load or at a deploy: a stop cuts requests mid-way |
+| [4] logout | 11 | a route: 10 to 35 | cookies not written before the redirect | use: the browser stays logged in on its side, its session gone |
+| [4] the webhook | 34 | | the secret unset or blank let through | never: anyone can mark a message bounced. `==` instead of `subtle` leaks timing |
+| | | | a 400 for a body that is not JSON | never: form-encoded events are dropped, not kept for 48 hours |
 | | | | the wrong key read from SMTP2GO's body | use: every bounce logged as lacking a field and dropped |
-| [5] the runner | 1 | nothing: a queue is Kogo's | | |
+| [5] the runner | 1 | nothing: a queue is Kogo's | `ctx`, the signal's, reaching a row's transaction or `act` | at a deploy: SIGTERM cancels a Stripe call in flight. `work.Run` stops claiming rows when `ctx` is done and finishes each row on a context of its own, as the Kotlin's `Drain` does (`GracefulShutdown.kt:31`) |
 | [6] commands, `check-config` | 10 | nothing: a command is Kogo's | `check-config` opening the pool | start: the deploy's check needs the database |
 
-About 280 lines in the file, 215 of them code, not imports, blanks
-or comments: about twice the issue's guess of 80 to 120. Written once:
-about 115 (`run`, `load`'s frame, the pool, `web`'s frame, the
-address, the drain, `or`). The other 100 grow: a service adds 3 lines
-and its keys; a key that Kogo reads adds about 2; a list adds a third
-of a line; a route adds 10 to 25 and a line of `web`. A queue or a
-command adds nothing. The configuration is the largest single part,
-and the one part the Kotlin also writes by hand (`CusoonConfig.kt`).
+About 310 lines in the file, 240 of them code, not imports, blanks
+or comments: twice the issue's guess of 80 to 120. Written once:
+about 135 (`run`, `load`'s frame, the pool, `web`'s frame, the
+address, the drain, `or`). The other 105 grow: a service adds 3 lines
+and its keys; a key adds 1 or 2; a list a third of a line; a route
+10 to 35 and a line of `web`. A queue or a command adds nothing. The
+configuration is the largest part, and the one the Kotlin also writes
+by hand (`CusoonConfig.kt`).
 
 **Not in `main`, as the designs have it.** `migrate` is the migration
-tool's (`doc/gates.md`, "Commands"), so cusoon2's deploy calls that
-tool where it calls `--op migrate`. The ten commands, `check-pricing`
-and `ensure-fusionauth-tenants` among them, are rows of `commands
-admin`, read and run by `command.Run`. Which cookies a login, `whoAmI`
-or logout sets is Kogo's (`Reply`), and the handler writes them; a
-route's own Go writes them only because it answers with a redirect.
-The tenant from the host or `X-Dev-Tenant`, `isSecure` from
-`X-Forwarded-Proto`, the session from its cookie: each is a gate's
-reading of the `Request`. The login callback goes with Google's login
-(`doc/gates.md`, "Routes that are not operations").
+tool's (`doc/gates.md`, "Commands"). The ten commands are rows of
+`commands admin`, run by `command.Run`. Which cookies a login, `whoAmI`
+or logout sets is Kogo's (`Reply`); a route's Go writes them only
+because it answers with a redirect. The tenant from the host or
+`X-Dev-Tenant`, `isSecure`, the session from its cookie: each is a
+gate's reading of the `Request`. The login callback goes with Google's
+login (`doc/gates.md`, "Routes that are not operations"), so
+`clientSecret` and `backendServer`, which it reads, are ignored here.
+
+**Where it differs from the Kotlin.**
+- The booker's path moves from `/backend/graphql` to `/backend/rpc`;
+  nginx and the TypeScript client move with it.
+- Logout redirects with 303, from `doc/gates.md`; Javalin's `redirect`
+  answers 302.
+- `upstreamTimeouts` is read and dropped: `doc/work.md` sets nothing
+  for Stripe, Google or mail, one deadline at the outer edge.
+- `--config f` before the mode replaces `-Dcusoon.configurationFile`,
+  and the mode or command replaces `--op X`.
 
 ## Two ways a route calls an operation
 
-Both go through a handler of the `routes` list that is not mounted, so
-a route's call has a request id, a `served` line, the request's limit,
-reruns and a 503, as a browser's does. The question is what Go hands
-it.
+What Go hands the operation (Q1's second half).
 
 **a. By wire name, JSON in and out.** `rpc.Handler` gains `Call(r,
 name, body) (answer []byte, cookies []*http.Cookie, err error)`, which
 runs `serve`'s middle with no `ResponseWriter`.
 
 ```go
-body, _ := json.Marshal(map[string]any{"messageId": ev.MessageID, "rcpt": ev.Rcpt,
-	"event": ev.Event, "kind": ev.Bounce, "reason": ev.Message})
+body, _ := json.Marshal(map[string]any{"messageId": id, "rcpt": rcpt,
+	"event": event, "kind": in.Kind, "reason": reason})
 _, _, err := calls.Call(r, "recordDeliveryFailure", body)
-
-_, cookies, err := calls.Call(r, "logout", nil)
 ```
 
-- It reuses the strict reader, and names no emitted Go type.
-- A renamed property, or a misspelt key or operation, is a 400 or a
-  404 at use: the first bounce in production, unless cusoon2 has a
-  test that posts to the route against a database.
-- About 15 lines of `rpc` and 30 of tests; nothing in the emitter.
+It reuses the strict reader and names no emitted Go type. A renamed
+property, or a misspelt key or operation, is a 400 or 404 at use: the
+first bounce in production. About 15 lines of `rpc` and 30 of tests.
 
 **b. By the emitted types, as written above.** The emitter writes,
-for each operation of a list, a typed value beside the table
-(`routes.Logout_op`, of `rpc.Op[Env, I, A]`), from which the table is
-built; `rpc.Call(h, r, op, input I) (A, error)` runs it.
-
-- A renamed property, a changed input or answer, or a removed
-  operation is a compile error at build.
-- Hand-written Go names emitted Go: the types, their fields and the
-  operation's value, so the emitter's naming rule (`export`, and the
-  `_api` and full names a clash gives) reaches `main`. `main` already
-  names `app.Env` and its fields, and each table, so this is more of a
-  tie it has, not a new kind.
-- About 10 lines of emitter, 20 of `rpc` and 40 of tests.
-
-Lean b: a mistake shows when Go compiles, where under a it shows at
-the first bounce, which no test of Kogo's sees and cusoon2's may not.
-Left open, as the issue asks.
+for each operation, a typed value beside the table (`routes.Logout_op`,
+of `rpc.Op[Env, I, A]`); `rpc.Call(h, r, op, input I) (A, error)` runs
+it. A renamed property or removed operation is a compile error.
+Hand-written Go then names emitted Go, so the emitter's naming rule
+reaches `main`; it already names `app.Env` and each table. About 10
+lines of emitter, 20 of `rpc` and 40 of tests.
 
 ## Checked against the designs
 
-- **Routes** (`doc/gates.md`, "Routes that are not operations"): Go
-  holds the method, the path and the translation; the secret is
-  configuration, compared in Go; logout writes the `Reply`'s cookies
-  and a 303 to `/`; each route touches the database only through its
-  operation. The sketch there answers 400 to a body missing a field;
-  the Kotlin answers 200 with a log line, which is kept here. A body
-  that is not JSON is a 400 here, where the Kotlin's parse throws and
-  answers 500, which no line of it chose.
-- **Commands** ("Commands"): `web` and `batch` are modes, `migrate`
-  is the tool's, `check-config` is Go's; a command's outcome is its
-  exit code, which `run` returns.
-- **Handles** (`doc/work.md`, "An endpoint is declared once"): one
-  per service, made in `main` with its address, credentials and
-  encoding; no secret in Kogo; the per-tenant headers
-  (`Stripe-Account`, `X-FusionAuth-TenantId`) are added in Kogo, and
-  `main` sets none of them.
-- **What Go would decide** ("What Go would decide, Kogo states"): a
-  limit on an answer's length is set in `main`, per handle; no proxy,
-  since `main` states none; redirects and the second send are the
-  binding's, with no line here.
-- **Time limits** ("One deadline at the outer edge"): one number for
-  a request, `requestLimit`; nothing for Stripe, Google or mail; a
-  queue's lease is the runner's (Q6); the database's idle limit is
-  read at start (Q9).
-- **Workers** ("The list of work", "Each queue is served on its
-  own"): one call starts every queue; the `work` list names the
-  queues and the alert, so `main` names neither. Each busy queue
-  holds a connection: the dev file's pool of 20 has room for
-  cusoon2's 16, and the batch process shares no pool with the web's.
-- **The handler** (`decisions.md`, DEV-850): `NewHandler` and
-  `Limit`; `main` mounts each list with `http.StripPrefix`, sets
-  `RemoteAddr` from the proxy's header, and limits the body with
-  `http.MaxBytesHandler`. `NewHandler` gains the clock, as "How it is
-  tested" has it.
-- **The seam** (`decisions.md`, "Where Kogo ends and Go begins"): no
-  line here reads the pool or calls a service, other than through
-  `Call`, `command.Run` and `work.Run`. The pool is open in `web`, so
-  nothing but this reading holds it.
+Each line of `main` was read against `doc/gates.md` ("Commands",
+"Routes that are not operations"), `doc/work.md` ("An endpoint is
+declared once", "What Go would decide, Kogo states", "Time limits",
+"The list of work") and `decisions.md` (DEV-850, the seam). What
+is not a plain reading of them:
+
+- **Departures**: the webhook's answers follow `Bounces.kt`, not the
+  sketch in `doc/gates.md` (200 for a missing field, 500 for a body
+  that is not a JSON object, where the sketch has 400 for both).
+- **Rules the Go holds**: the secret's check decides who may call
+  `recordDeliveryFailure`, which is access, and the seam puts access
+  in Kogo; `doc/gates.md` agreed to compare the secret in Go, so it is
+  that agreed exception. `pool.Ping` reads the pool outside `Call`,
+  `command.Run` and `work.Run`; it reads nothing of the application's
+  and stays. Origin and CSRF would be a third: Q4.
+- **Added to the prelude**: `NewHandler` gains the clock ("How it is
+  tested"); `rpc.Call` or `Handler.Call` (Q1); `khttp.New` (Q2).
 
 ## Open
 
-Each is left open; the lean is the writer's.
+Each is left open; the lean is the writer's. **Greg's** are Q1, Q4,
+Q5 and Q13: what the seam, `Request` and the emitter's `Env` are. The
+**lead** can settle the rest; Q2 amends an agreed handle, so Greg is
+told when it is.
 
-**Q1. How Go calls an operation of a list that is not mounted.** Above,
-"Two ways". Lean b. With b, whether the emitter's `Env` and inputs
-are built through a constructor that takes every field, so that a
-field left out is a compile error, as a Kotlin constructor makes it.
+**Q1 (Greg). How a route reaches its operation, and what Go hands it.**
+- First, the way in: (a) through a handler of the list that is not
+  mounted, so the call has a request id, a `served` line, the limit
+  and reruns, as a browser's does, as written; it adds an entry point
+  to `rpc`. (b) The route runs the emitted function in its own
+  transaction, which copies the handler's rules into each `main`.
+- Then the input: (a) the wire name with JSON; (b) the emitted types,
+  as written ("Two ways", above).
+- Lean a, then the emitted types: a mistake shows when Go compiles.
 
-**Q2. The handle's Go form, and Google's key.** `khttp.New` and its
-`Service` are not designed. Google's legacy APIs take the key in the
-query string, which a handle of headers alone cannot carry.
-- a. A handle states query fields beside its headers, as written.
-- b. Google's client adds `field("key", ...)`: a secret in Kogo,
-  against "Kogo code holds no secret".
-- Lean a. And whether `MaxAnswer` is required, so that a handle made
-  without one fails at start: lean yes.
+**Q2 (lead; tell Greg). The handle's Go form, and Google's key.**
+`khttp.New` is not designed, and Google's legacy APIs take the key in
+the query string. (a) A handle states query fields beside its
+headers, as written. (b) Google's client adds the key: a secret in
+Kogo, against "Kogo code holds no secret". Lean a, with `MaxAnswer`
+required so a handle made without one fails at start.
 
-**Q3. Where `Stripe-Version` is stated.** It decides which keys
-Stripe's answers carry, which `stripe.kg` reads by name.
-- a. In `main`, beside the key, as written.
-- b. In `stripe.kg`, a `val` that `main` reads from the emitted Go, so
-  the version and the keys read under it change in one file.
-- Lean b.
+**Q3 (lead). Where `Stripe-Version` is stated.** It decides which keys
+Stripe's answers carry, which `stripe.kg` reads. (a) In `main`, as
+written. (b) A `val` in `stripe.kg` that `main` reads from the emitted
+Go, so the version and the keys read under it change in one file.
+Lean b.
 
-**Q4. Origin and CSRF.** They were to be options of the handler
-(`doc/design.md`). cusoon2's Origin check reads the tenant table on every
-request (`isAllowedOrigin`), and its CSRF check reads the session row,
-so under the seam's rule neither can be Go in `main`, and an option of
-the handler would call Kogo. `Sec-Fetch-Site` alone is pure. No line
-is written for them here. Lean: an issue of its own, before any
-mutation is served.
+**Q4 (Greg). Origin and CSRF.** cusoon2's Origin check reads the
+tenant table and its CSRF check the session row, so under the seam
+neither can be Go in `main`. (a) `Sec-Fetch-Site` in Go in `main`,
+with Origin and the CSRF token checked by the session gates in Kogo,
+since a gate already reads and decides (`doc/gates.md`). (b) A
+handler option that calls a Kogo function. (c) An issue of its own
+before choosing. Lean c, with a as its start. Either way it lands
+before this `main` serves a mutation.
 
-**Q5. The storefront's admin from the ops site.** cusoon2 serves it at
-`/backend/ops/s/{storefront}/graphql`. A handler serves `POST /name`
-and reads no path, so either the storefront moves into each input,
-where its gate reads it, as `requireStorefront` takes it now, or
-`Request` gains the path. Written above as a list `storefront`, its
-rows the booker's admin work under gates that read the storefront.
-Lean: the input.
+**Q5 (Greg). The storefront in the ops admin's path**
+(`/backend/ops/s/{storefront}/graphql`). A handler reads no path.
+(a) The storefront moves into each input, where its gate reads it, as
+written. (b) `Request` gains the path. Lean a: `Request` stays as
+agreed.
 
-**Q6. Where a queue's lease is stated.** `doc/work.md` gives it to
-"the runner, for each queue"; cusoon2 has one, 2 minutes, for every
-effect. a. A constant of the runner. b. A part of the effect's form.
-c. A map `main` passes to `work.Run`. Lean a, until two queues differ
-(`decisions.md`: the runner holds facts, a queue states choices).
+**Q6 (lead). A queue's lease**: (a) a constant of the runner, (b) the
+effect's form, (c) a map passed to `work.Run`. Lean a.
 
-**Q7. Reading the configuration strictly.** Go's `encoding/json`
-refuses an unknown key when told to, but reads a missing one as zero,
-and matches a key whatever its case, so `URI` and `uri` both read.
-- a. A list of required keys in `main`, as written: it grows with each
-  key, and a key left off it is the Kotlin's old `Int` read as `0`.
-- b. Kogo's strict reader, exported for a Go struct: it already refuses
-  a missing key. Nothing is optional there (spec 15.4), and cusoon2's
-  file leaves keys out for their defaults.
-- Lean a, for one application.
+**Q7 (lead). Reading the configuration strictly.** `encoding/json`
+reads a missing key as zero and matches keys whatever their case.
+(a) A list of required keys in `main`, as written, which grows with
+each key. (b) Kogo's strict reader, exported for a Go struct, which
+refuses a missing key, but nothing is optional there (spec 15.4) and
+cusoon2's file leaves keys out for their defaults. Lean a.
 
-**Q8. The clock goes in twice**, in `Env` and to `NewHandler` and
-`work.Run`, since Kogo's Go cannot see into an application's `Env`. A
-test that moves one moves only that one. Lean: leave it.
+**Q8 (lead). The clock goes in twice**, in `Env` and to the handler
+and runner: (a) leave it, (b) the runner reads it from `Env` through
+an interface. Lean a.
 
-**Q9. Who reads Postgres's idle limit at start** (`doc/work.md`,
-"Open"): the handler and the runner from the pool, with no line here,
-or `main`, passing it to both. Lean: the handler and the runner.
+**Q9 (lead). Postgres's idle limit** is `doc/work.md`'s Open: (a) the
+handler and runner read it from the pool, (b) `main` passes it. Lean a.
 
-**Q10. Google's answers in CI.** cusoon2's CI replays Google from a
-file (`GoogleMapsFileCache`, the `googleAnswers` key). With Google's
-client in Kogo, either `main` points the handle at a local server
-that replays, its address from the configuration, or the binding
-gains a replay. Lean: the local server; nothing in Kogo.
+**Q10 (lead). Google's answers in CI** (`googleAnswers`). (a) `main`
+points the handle at a local server that replays. (b) The binding
+gains a replay. Lean a: nothing in Kogo.
 
-**Q11. Which configuration file.** As written, the Go reads the
-Kotlin's file as it is, for a side-by-side run: `jdbc:` cut from the
-URL, JDBC's keys and Google's login's ignored by name. A JDBC
-parameter in the URL that Postgres does not know fails at start. Or
-cusoon2 writes a file for the Go. Lean: the Kotlin's, until the port
-ends.
+**Q11 (lead). Which configuration file.** (a) The Kotlin's, as
+written: `jdbc:` cut, its other keys ignored by name, and a JDBC
+parameter Postgres does not know fails at start. (b) cusoon2 writes a
+file for the Go. Lean a, until the port ends.
 
-**Q12. Waiting for a connection.** Hikari gives up after 8 seconds
-when the pool has none free; pgx waits as long as the request's
-context, here 90 seconds. Lean: leave it, the one deadline covering
-it.
+**Q12 (lead). Waiting for a connection**: Hikari gives up at 8
+seconds, pgx at the request's 90. (a) Leave it. (b) A pool limit.
+Lean a.
+
+**Q13 (Greg). An `Env` that cannot be built short.** (a) The emitter
+writes a constructor taking every field, so a field left out of `Env`
+or of an input is a compile error, as a Kotlin constructor makes it.
+(b) A struct literal, as written, where a field left out is Go's zero.
+Lean a.

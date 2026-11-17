@@ -273,7 +273,7 @@ means a bug.
 configuration, open the pool, build the environment's handles, mount
 each list's handler at its path, write its routes, listen, and drain
 on a stop; or start the runner, or run a command. For cusoon2 it is
-about 280 lines, 215 of them code, of which about 100 grow with its
+about 310 lines, 240 of them code, of which about 105 grow with its
 services, keys and routes (`doc/main.md`). Configuration, ports,
 paths and other routes, a webhook say, stay out of the language: a
 route is Go in `main` that calls an ungated operation of a list `main`

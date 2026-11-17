@@ -501,11 +501,11 @@ fun recordCharge(tx: Tx, env: Env, row: StripeChargeJob, result: PaymentIntent) 
                 is SendFailure.Unknown -> Act.Unknown(failure.why)       // a 5xx, or it left and no answer came
                 is SendFailure.Refused ->                                // a 4xx: Stripe's own rules sort it
                     if (failure.status == 409 || stripeError(failure.body) == "idempotency_error") Act.Unknown("Stripe may have charged")
-                    else if (stripeError(failure.body) == "card_error") Act.Refused(declineWords(failure.body))
+                    else if (stripeError(failure.body) == "card_error") Act.Refused("Your card was declined")   // fixed words: the page is public
                     else Act.NotMade("Stripe did not process it: ${failure.status}")
             }
         },
-        { intent -> Act.Done(intent) })
+        { intent -> if (intent.status == "succeeded") Act.Done(intent) else Act.Refused(NEEDS_VERIFICATION_MESSAGE) })   // a 3DS card
 
 fun stripeError(body: Json?): String? = body?.at("error")?.string("type")
 ```

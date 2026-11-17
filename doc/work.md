@@ -446,11 +446,8 @@ handler and the prelude) and `kogo.mail`. Agreed with Greg on 17 Nov
 
 **Every refused send is logged.** The binding logs a 3xx or a 4xx in
 Go, with its method, path, status and body, so a decline's code and
-Stripe's request id reach support with no word from the application,
-and what a queue stores for a payer stays fixed words. Agreed with
-Greg on 18 Nov 2026 (`doc/charge.md`, Q9); weighed and not taken,
-`Act.Refused(words, detail)` with the runner storing `detail` in
-`last_error`, which widens `Act` for one caller.
+request id reach support and what a queue stores for a payer stays
+fixed words (Q9, `decisions.md`).
 
 ## Workers
 
@@ -568,18 +565,9 @@ prefix.
   attaching a card), so a replay makes no second customer.
 - The key is not built by hand, as the Kotlin's is.
 - A row has one key, so a replay after a crash sends the same one.
-- **The Kotlin takes the text first**, for the charge and the card
-  job (`cusoon2-charge-<id>` and `cusoon2-card-<id>` today), so a
-  side-by-side run sends the same header and a row in flight when
-  Kogo takes over is replayed under the same key. The change is safe
-  only before the Kotlin's effect runner is live, or with the charge
-  and card queues empty: a row that crashed under the old key and is
-  replayed under the new within Stripe's 24 hours is a second charge.
-  That runner is not live; what key production's present charge path
-  sends was not checked. Agreed with Greg on 18 Nov 2026, the text
-  the lead's; weighed and not taken, a prefix stated in the effect,
-  `key "cusoon2-charge-"`, a word of the language to keep a string
-  nothing depends on.
+- **The Kotlin takes the text first**, to be confirmed safe before it
+  changes (`doc/charge.md`, "What the Kotlin takes first"; Q8,
+  `decisions.md`).
 
 ### Owed is the runner's rule
 
@@ -957,11 +945,7 @@ data class Alert(val queue: String, val table: String?, val id: Uuid?,
 - **The words and the statement meet in the alert function.** A
   queue's recovery words refer to "the reset statement below", and
   the alert function prints `alert.recovery` and then `alert.reset`,
-  so the statement has one source, the runner. `recovery` is not
-  handed it, and no role gives a label: a queue that wants its row
-  named ("hosted-page charge for invoice N") says so in its recovery
-  words, which have the row. Agreed with Greg on 18 Nov 2026
-  (`doc/charge.md`, Q11).
+  so the statement has one source, the runner (Q11, `decisions.md`).
 
 It is what the Kotlin does, so nothing goes into the Kotlin first.
 Perhaps 15 lines of checker, 15 of runner and 20 of tests. Weighed
@@ -995,7 +979,8 @@ tenant in a table with no row-level security and binds it.
 The runner claims by its own rule ("Owed is the runner's rule"), and
 unbound it sees no row to claim, nor whose a row is until it sees
 one. So an effect may name where the runner looks: a view that holds
-the runner's columns and what `enter` needs, and no more.
+the runner's columns, what `enter` needs and the column `soonest`
+names, and no more.
 
 ```kotlin
 effect chargeCard on stripe_charge_job {
@@ -1091,17 +1076,11 @@ by one row. Kept on purpose, 17 Nov 2026: such a flood is rare and
 slow only on misses, and if it ever bites, the lookup leaves the job
 before fairness comes in.
 
-The charge queue names no `fair`. Fairness is so that one tenant's
-flood is not felt by another; in mail it is felt, but in charges the
-only one who feels a wait is a payer, and with `fair` a payer would
-wait behind one unwatched charge for each other busy tenant. So the
-charge says `soonest` of the column a waiting payer's row is stamped
-with, and waiting payers go first across all tenants, the longest
-waiting first, then every other row by `next_attempt_at`. One
-tenant's invoice run delays another's until it is done, where the
-Kotlin's pass serves this queue a tenant at a time: a difference of
-timing, of the kind accepted for "Each queue is served on its own".
-Greg, 18 Nov 2026, reversing item 9 of the Ruling on PR 66.
+The charge queue names no `fair`: in charges the only one who feels
+a wait is a payer, and with `fair` a payer would wait behind one
+unwatched charge for each other busy tenant. It says `soonest` of the
+column a waiting payer's row is stamped with, so waiting payers go
+first across all tenants (Q12, `decisions.md`).
 
 Weighed and not taken: no fairness, the oldest first for every
 queue, which drops what the Kotlin has a test for where a flood is
@@ -1163,37 +1142,13 @@ A timeout almost never happens, so it has no path of its own.
 
 ### An effect someone is watching
 
-A payer who presses "pay" inserts a row and polls for 40 seconds, the
-page's (`standardTimeout` in cusoon2's frontend); the daemon is not in
-their request and has none of its time. When the daemon is down or
-the charge queue is backed up past those 40 seconds, the payer is
-told "Timed out" and the card is charged later: minutes, or hours
-after a long outage. One charge, recorded and emailed; the open row
-refuses a second attempt meanwhile. It is production's behaviour
-today, and it stays.
-
-A charge is not stamped with a `not_after`. This section had it so,
-agreed on 17 Nov 2026: the request stamped the row with its limit,
-`act` had the less of the lease and what was left, a row claimed
-after it was never acted on, and the open check skipped a row never
-tried and past its time. Withdrawn for the charge on 18 Nov 2026
-("simple", `decisions.md`). Each of its consequences was a gotcha of
-its own (`doc/charge.md`, Q1 to Q5): where the 40 seconds comes from,
-a crashed row stranded past its time, which clock judges it, a "never
-tried" answer on the wire, application SQL over the runner's columns,
-and a reset that must not revive a late row. The Kotlin's main cause
-of a late claim, one daemon thread shared with mail, is already gone:
-each queue has its own loop ("Each queue is served on its own").
-
-So the charge is as the Kotlin's: owed until recorded, open while not
-failed and with no charge id (`hasOpenStripeChargeJob` unchanged), a
-crashed row replayed under its key after the lease. What is kept is
-the order: a waiting payer goes before an invoice run ("Soonest is
-each queue's stated choice"). `not_after` stays the runner's column
-with its one meaning, used by mail as in the Kotlin; it is stamped and
-judged by the handed clock, never `now()` (`doc/charge.md`, Q3).
-Reopen if a payer is in fact charged long after "Timed out" and it
-matters.
+A charge is not stamped with a `not_after`: agreed on 17 Nov 2026,
+withdrawn for the charge on 18 Nov because each of its consequences
+was a gotcha of its own ("simple", `decisions.md`; `doc/charge.md`,
+Q1 to Q5). The charge is as the Kotlin's, so a payer told "Timed out"
+when the daemon is down or backed up may be charged later, as in
+production today. The order is kept: a waiting payer goes before an
+invoice run ("Soonest is each queue's stated choice").
 
 The direction is unchanged: the request runs the effect itself in an
 outside step, with the daemon as the net for a process that dies,

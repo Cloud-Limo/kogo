@@ -1004,6 +1004,7 @@ Each entry: what was decided, why, and what would reopen it.
   the Kotlin's: each `withRow` binds the tenant (`JobQueue.kt:385`).
   - Not taken: `enter` once and each later step binding for itself: unbound, the runner
     finds no row to hand the step.
+  - No reopen condition was given.
 - **The runner's key has one text for every effect: `<table>-<id>`** (18 Nov 2026, Greg;
   the text the lead's, 18 Nov; `doc/charge.md`, Q8; `doc/work.md`, "A key comes only from
   the runner"). The effect's table name without its schema, a hyphen, and the row's id as
@@ -1019,6 +1020,7 @@ Each entry: what was decided, why, and what would reopen it.
     production's present charge path sends.
   - Not taken: `key "cusoon2-charge-"` in the effect, a word of the language to keep a
     string nothing depends on.
+  - No reopen condition was given.
 - **`kogo.http` logs every refused send** (18 Nov 2026, Greg; `doc/charge.md`, Q9;
   `doc/work.md`, "What Go would decide, Kogo states"). A 3xx or 4xx is logged in Go with
   its method, path, status and body. So a decline's code and request id reach support with
@@ -1026,6 +1028,7 @@ Each entry: what was decided, why, and what would reopen it.
   - To settle when built: what of a refused body is safe to log for every service.
   - Not taken: `Act.Refused(words, detail)`, with the runner storing `detail` in
     `last_error`: it widens `Act` for one caller.
+  - No reopen condition was given.
 - **A proof's transaction may also be passed to a proof's constructor, as that proof's
   marked `tx`** (18 Nov 2026, Greg; `doc/charge.md`, Q10; `doc/gates.md`, "A proof's
   transaction is used only before the dot"). It is written in two places: as the receiver
@@ -1039,6 +1042,7 @@ Each entry: what was decided, why, and what would reopen it.
     any proof: that the facts put into the new proof are the new row's.
   - Not taken: the new proof holding the old (`booking.from.tx`): two shapes for one
     proof, and the rule on statements would have to say which nested proof it means.
+  - No reopen condition was given.
 - **`recovery` is not handed the reset statement, and no role gives a label** (18 Nov 2026,
   Greg; `doc/charge.md`, Q11; `doc/work.md`, "An alert is the application's to send"). A
   queue's recovery words refer to "the reset statement below", and the application's
@@ -1092,6 +1096,25 @@ Each entry: what was decided, why, and what would reopen it.
     every effect, with the lock the author's to remember; no row type, each step handed
     the claim and reading the row itself, which rested on "every query is a literal",
     stricter than the design is anywhere else.
+  - No reopen condition was given.
+- **The checker's own rules each live in a file of their own in `check/`** (18 Nov 2026,
+  Greg; the Ruling on PR 69; `doc/design.md`, "The checker"). The checker stays one
+  package. Kogo's own rules, those on proofs, gates, `@Acts` and the lists with their
+  roles, each live in a file of their own in `check/`, run after type checking over its
+  result, and each has its own error code. The files that check types (`expr.go`,
+  `call.go`, `stmt.go`, `types.go`, `decls.go`) hold none of them. The spec states each
+  such rule in a section of its own, apart from the general language, as sections 10, 11
+  and 15 do. It binds the rules agreed on 17 and 18 Nov, none of which is built; code
+  already written is not moved by it.
+  - **Why.** The checker is domain specific on purpose, with rules meant to make it hard
+    for an agent to go wrong, so the plain type checking is marked apart from them. A
+    reader finds a rule in one file, and the type checker can be read without the rules.
+  - Not taken: a second package that reads the checker's result, where Go's imports would
+    hold the line, at the cost of exporting that result (a guess, about 150 code / 50
+    tests) and of changing rule 3's list of components; nothing, each rule written where
+    its construct is checked.
+  - Reopen if a rule cannot be written over the type checker's result without reaching
+    into it.
 
 ## Taken in the v0 spec, not yet discussed
 

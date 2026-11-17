@@ -140,6 +140,16 @@ the Go to be emitted. The emitter therefore handles every surface form.
 A simplifying step can be added between the two later, reading the same
 facts.
 
+Kogo's own rules, those on proofs, gates, `@Acts` and the lists with
+their roles, are kept apart from the type checking. The checker stays
+one package, but each such rule lives in a file of its own in `check/`,
+runs after type checking over its result, and has its own error code;
+the files that check types (`expr.go`, `call.go`, `stmt.go`,
+`types.go`, `decls.go`) hold none of them, and the spec states each in
+a section of its own. A reader finds a rule in one file and can read
+the type checker without the rules. It binds the rules agreed on 17
+and 18 Nov 2026; code already written is not moved (`decisions.md`).
+
 ## The emitter
 
 The emitter writes Go from a checked program and the checker's facts.

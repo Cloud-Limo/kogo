@@ -259,8 +259,11 @@ fun chargeView(job: ChargeJob): ChargeView =
     ChargeView(job.id, job.stripeChargeId != null, job.failed, job.failedMessage)
 ```
 
+On the wire: open, failed as not made, and refused.
+
 ```
 {"type": "ok", "value": {"id": "0193a1f2-...", "isComplete": false, "isFailed": false, "failedMessage": null}}
+{"type": "ok", "value": {"id": "0193a1f2-...", "isComplete": false, "isFailed": true, "failedMessage": "Payment could not be processed. Your card has not been charged. ..."}}
 {"type": "refused", "message": "This payment is not available"}
 ```
 
@@ -352,11 +355,8 @@ says `now()`", and the open check and the poll read it too.
 - b. The handed clock everywhere: the stamp binds a time from it, and
   every check binds `$now`.
 - c. Mixed, with a margin.
-- **Settled: b** (Greg, 17 Nov 2026). It stands for mail alone: a
-  row's `not_after` is stamped and judged by the handed clock, and no
-  statement that reads or writes it says `now()`. The stamp for the
-  charge's order is the handed clock's too. Reopens if web and batch
-  run on two machines.
+- **Settled: b** (Greg, 17 Nov 2026), for mail alone: the handed
+  clock stamps and judges `not_after`, never `now()`.
 
 **Q4. What the poll says of a row never tried.** A late row was not
 done and not failed, and the wire has only those two. **Closed by
@@ -382,12 +382,8 @@ expected, and spec 8 keeps a panic for bugs.
 - b. `record` gives `Either<String, Unit>`, a `Left` being
   `Unrecorded`; and `prepare`'s `Left` says which it is,
   `Stop.Refused(words)` or `Stop.NotMade(why)`.
-- **Settled: b for `record`, a for `prepare`** (Greg, 18 Nov 2026).
-  `recordCharge` is an `either` with `ensure` for the status and keeps
-  `checkNotNull` for the missing invoice; a tenant with no Stripe
-  account is a setup fault and panics. A panic is never a way to
-  report an outcome. Reopens if a second queue has an expected,
-  alerting stop in `prepare`.
+- **Settled: b for `record`, a for `prepare`** (Greg, 18 Nov 2026):
+  `record` gives `Either<String, Unit>`; a broken setup panics.
 
 **Q7. `enter` once for a row, or once for each of its transactions?**
 A row has two or three: prepare's, record's, and a fresh one that
@@ -395,9 +391,7 @@ fails it after a panic. A bound tenant ends with its transaction.
 - a. At the start of each, with the claim kept from the first.
 - b. Once, and each later step binds for itself; but the runner reads
   the row before it calls the step, and unbound sees none.
-- **Settled: a** (Greg, 18 Nov 2026), as the Kotlin's `withRow` does
-  (`JobQueue.kt:385`). `doc/work.md`, "Discover, then enter", and
-  `doc/lists-assessment.md` say so.
+- **Settled: a** (Greg, 18 Nov 2026), as the Kotlin's `withRow` does.
 
 **Q8. The key's text changes.** The Kotlin sends
 `cusoon2-charge-<id>`; the runner makes its own from the table and the
@@ -405,11 +399,8 @@ id. A side-by-side run differs in that header, and a row in flight at
 the change is replayed under a new key.
 - a. The Kotlin takes the runner's text first.
 - b. The effect states a prefix: `key "cusoon2-charge-"`.
-- **Settled: a** (Greg, 18 Nov 2026). The text, the lead's: `<table>-<id>`,
-  the effect's table name without its schema, a hyphen, and the row's
-  id as Postgres writes it as text (`doc/work.md`, "A key comes only
-  from the runner"). The Kotlin's change and its condition are under
-  "What the Kotlin takes first".
+- **Settled: a** (Greg, 18 Nov 2026), the text `<table>-<id>`, the
+  lead's; see "What the Kotlin takes first".
 
 **Q9. A decline's detail has nowhere to go.** The Kotlin logs
 Stripe's code and request id for support and stores fixed words. Kogo
@@ -417,9 +408,7 @@ code has no log.
 - a. The binding logs every refused send, status and body, in Go.
 - b. `Act.Refused(words, detail)`, and the runner stores `detail` in
   `last_error`.
-- **Settled: a** (Greg, 18 Nov 2026): `kogo.http` logs every 3xx or
-  4xx with its method, path, status and body. What of a body is safe
-  to log for every service is open until it is built.
+- **Settled: a** (Greg, 18 Nov 2026): `kogo.http` logs every refused send.
 
 **Q10. "Making a thing gives its proof" breaks "used only before the
 dot".** A model function that makes the new row's proof must pass the
@@ -428,10 +417,8 @@ invoice.tenant, invoice.tx)` was `proof-tx-escapes`.
 - a. A marked constructor is excepted from the rule.
 - b. The new proof holds the old: `HeldCharge(job, invoice)`, with
   statements on `charge.invoice.tx`.
-- **Settled: a** (Greg, 18 Nov 2026): a proof's transaction may also
-  be the argument of a proof's constructor in the position of that
-  proof's marked `tx` (`doc/gates.md`). The insert here may stay a
-  plain row.
+- **Settled: a** (Greg, 18 Nov 2026): also allowed as a proof's
+  marked `tx` in a constructor (`doc/gates.md`).
 
 **Q11. What the alert can say.** The Kotlin's recovery words end "4.
 Otherwise run" and the reset statement, and its alert opens with the
@@ -441,10 +428,8 @@ is not handed the statement, and `label` has no role.
   `alert.reset` under them, and the label is lost.
 - b. `recovery` takes the statement as a fifth parameter.
 - c. A role `label` whose words `Alert` carries.
-- **Settled: a** (Greg, 18 Nov 2026). `chargeRecovery`'s step 4
-  points at the statement and no longer contains it; a queue that
-  wants its row named says so in its words. Reopens if an alert
-  proves hard to read.
+- **Settled: a** (Greg, 18 Nov 2026): step 4 points at the reset
+  statement printed below the words.
 
 **Q12. Is the charge queue fair between tenants?** The Kotlin runs
 this queue one tenant at a time (`runEffectQueue(tenantId, ...)`).
@@ -454,10 +439,7 @@ this queue one tenant at a time (`runEffectQueue(tenantId, ...)`).
   invoice runs, but never a payer.
 - c. Fair only among unwatched rows, a new rule.
 - **Settled: b** (Greg, 18 Nov 2026), reversing item 9 of the Ruling
-  on PR 66. With no `not_after` on a charge, the order is the only
-  protection a waiting payer has. Mail keeps `fair tenant_id`.
-  Reopens if a tenant's invoice run is ever held long enough by
-  another's to matter.
+  on PR 66.
 
 **Q13. How does the runner read the row a step takes?** `doc/work.md`
 said `Claim` is "read from the view, by the rule SQL's columns have";
@@ -466,7 +448,4 @@ nothing said how `ChargeRow` is read, which `prepare`, `record`,
 - a. The same rule: the runner selects the type's properties by name
   from the effect's table, checked by the SQL pass.
 - b. A step of the application's: `row chargeRow`.
-- **Settled: a** (Greg, 18 Nov 2026): by id, locked, in each of the
-  row's transactions after `enter`; plain columns of the effect's own
-  table, no join and no expression. The seam it rests on is stated in
-  `decisions.md`. A sketched error code: `effect-row-column`.
+- **Settled: a** (Greg, 18 Nov 2026): by id, locked, after `enter`.

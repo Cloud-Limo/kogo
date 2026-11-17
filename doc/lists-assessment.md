@@ -5,7 +5,8 @@ dive"; DEV-901). It decides nothing: each choice is named at the end
 and is Greg's. Sizes are estimates of Kogo's own Go, code / tests,
 and none was measured. Kotlin was run with kotlinc 2.4.21, the
 version `.mise.toml` pins (the designs say 2.4.0), on files in
-`/tmp/lists`; a claim not run says "unchecked".
+`/tmp/lists` (way 1 in its reference form, in `/tmp/w1`); a claim not
+run says "unchecked".
 
 ## What is built, and what is on paper
 
@@ -23,8 +24,10 @@ Checked against `spec.md`, `check/`, `emit/` and `prelude/kogo/rpc/`:
   that is a plan. And the fit of an operation's shape is held twice
   today, by `check/api.go` and by Go's generics in `rpc.Tx`.
 - **"A gate run twice" is the outside step's alone** (`doc/gates.md`):
-  a plain gated operation runs its gate once, in a read-only
-  savepoint, and an operation wholly outside runs it once.
+  a plain gated operation runs its gate once, and an operation
+  wholly outside runs it once. A gate on a `SerializableTx` runs in
+  a read-only savepoint; a gate on a `Tx` cannot, since read-only
+  mode refuses its locks, and is held by the checker alone.
 
 So five of the six lists can still be changed for the price of a
 document.
@@ -53,9 +56,9 @@ lists are that joint, and the question is only where it is written.
 | A function is called by its role: nothing at `setNotes` says it is served, or by whom | the row; the checker's shape | to look for a list that names it |
 | A shape is given by position: `act(env, key, fields)` is told from `record(tx, env, row, result)` by order and type | the checker, by the table of fifteen roles | the rule of four slots and the role's row |
 | The gate's proof becomes the work's second parameter | the checker's fit | that the two are one row |
-| The gate runs in a read-only savepoint: an `update` there is refused | Postgres at run, the checker before | that the function is a gate, which only the list says |
+| A gate only reads: on a `SerializableTx` it runs in a read-only savepoint; on a `Tx` it is held by the checker alone, which misses a `select` of a function that writes | Postgres at run and the checker before; for a `Tx`, the checker | that the function is a gate, which only the list says |
 | With an outside step the gate runs twice, and its second run may refuse after the service was changed | the handler; the word `outside` | the order: gate, end, step, gate, work |
-| The first parameter's type opens the transaction, sets its level, and has the function rerun on a conflict; an answer commits, a refusal rolls back | the handler; `needs-serializable` | spec 15.3; that the body may run several times |
+| The first parameter's type opens the transaction and sets its level: a `SerializableTx` is rerun on a conflict, a `Tx` on a deadlock; an answer commits, a refusal rolls back | the handler; `needs-serializable` | `doc/gates.md`, "Two kinds of transaction", not yet in the spec (15.3 still says always SERIALIZABLE); that the body may run several times |
 | The input is read from JSON, or flags, by property name, and a 400 comes before the function | the handler | spec 15.4 |
 | An effect's row is claimed, keyed, entered, prepared, acted on, recorded and marked done; `failed` and `recovery` run in the failing transaction and the alert after it | the runner; the checker for the fit and the columns | the runner's eight or ten rules |
 | A table is emitted, and `main` mounts it | the emitter | that a function in no list is never called |
@@ -105,41 +108,52 @@ runner, which every way but 1 needs unchanged.
 ### 1. The application writes the pipeline
 
 The runtime is a library, and an operation is spec 15's as built:
-it takes the `Db` and the request and runs its own gate.
+it takes the `Db` and the request and runs its own gate. In its best
+form the stages stay top-level functions, passed by reference
+(spec 5 allows `::name` to one):
 
 ```kotlin
-api booker { setNotes }
+api booker { setBookingNotes }
 
-fun setNotes(db: Db, env: Env, request: Request, input: NotesInput): Either<String, BookingView> =
-    db.gated({ tx -> setNotesGate(tx, env, request, input) }) { booking ->
-        saveNotes(booking, input.notes)
-        bookingView(booking)
-    }
+fun setBookingNotes(db: Db, env: Env, request: Request, input: NotesInput): Either<String, BookingView> =
+    db.gated(env, request, input, ::setNotesGate, ::setNotes)
 
 @Acts fun chargeCard(db: Db, env: Env, claim: Claim<ChargeJob>) =
-    db.effect(claim,
-        prepare = { tx -> prepareCharge(tx, env, claim.row) },
-        act     = { key, fields -> charge(env, key, fields) },
-        record  = { tx, result -> recordCharge(tx, env, claim.row, result) })
+    db.effect(env, claim, ::prepareCharge,
+        { key, fields -> charge(env, key, fields) }, ::recordCharge)
 ```
+
+`act` stays a lambda, since an action has no `::` reference as
+designed.
 
 - **Written where:** the order of the stages is at the operation, in
   a call a reader can open. `gated` and `effect` are two prelude
   functions with ordinary generic signatures, which fit the stages:
-  no rule of the checker's. kotlinc accepts both and refuses
-  `chargeCard` without `@Acts` (run).
-- **Still held:** proofs, the rule on statements, `@Acts`. A list of
-  names is still needed for the wire and the TypeScript, and
-  something in Go must still call `chargeCard` for each claimed row.
-- **Lost:** the work is a lambda that sees `request` and `db`, so
-  "gated work takes no `Request`, `Tx` or `Db`" goes, unless the
-  checker learns `gated` by name, which is the list again as a call.
-  The printed file cannot tell `gate reads` from `reads` without the
-  same knowledge. A function that holds a `Db` and acts is what the
-  17 Nov rules exist to refuse. Written with no helper at all, as
-  two `db.tx` blocks round a call, the effect must itself mark the
-  row done in `record`'s transaction, and a forgotten line sends a
-  charge twice: the one invariant that must not rest on the author.
+  no rule of the checker's. kotlinc accepts both, refuses a work
+  whose proof is another type at its reference, and refuses
+  `chargeCard` without `@Acts` (run). Principle 2 (meaning from
+  "the signatures it calls") favours this most of all the ways.
+- **Still held:** proofs, the rule on statements, `@Acts`, and
+  "gated work takes no `Request`, `Tx` or `Db`", since `setNotes` is
+  unchanged. With `db.effect` the prelude marks the row done, so the
+  safety holds as it does with a list (`doc/work.md`, "When a row
+  fails": it "does not rest on the list"). A list of names is still
+  needed for the wire and the TypeScript, and something in Go must
+  still call `chargeCard` for each claimed row.
+- **Lost:** a gate's rules (it only reads, it passes no proof to an
+  outside step) must start at an argument of `gated`, so the checker
+  learns `gated` by name. That is the rule on "how an ordinary call's
+  argument is written" which the 17 Nov entry ("A restriction is
+  carried by a form that looks special, or by a type") refuses; the
+  lists, which look like Kogo's own, are its example of the other
+  kind. The printed file cannot tell `gate reads` from `reads`
+  without the same knowledge. Every gated operation now holds a
+  `Db`, as only ungated ones and routes do today, and may act
+  around its call of `gated`. And the effect can be written with the
+  helper or without it, as two `db.tx` blocks round a call, against
+  principle 6 ("one way to do each thing"); without it the author
+  marks the row done in `record`'s transaction, and a forgotten line
+  sends a charge twice.
 - **Size:** perhaps 150 / 150 of prelude, and three lines more at
   each of the application's operations and queues.
 
@@ -222,8 +236,9 @@ fun recordCharge(tx: Tx, env: Env, row: ChargeJob, result: PaymentIntent) { ... 
   be the only table, and it is the one that enforces nothing. A new
   file anywhere adds an operation. The steps of one effect are tied
   by spelling. And it is a second annotation form, refused on 15 Nov
-  ("markers are the one annotation form").
-- **Size:** perhaps 450 / 400: more than the lists.
+  ("markers are the one annotation form"), and the "annotation magic"
+  that principle 2 names.
+- **Size:** perhaps 450 / 400: about as much as the lists.
 
 ### 4. Routes in Go, in `main`
 
@@ -245,12 +260,18 @@ mux.HandleFunc("POST /backend/smtp2go-webhook", func(w http.ResponseWriter, r *h
 - **Still held:** the operation's shape and wire types, and its
   lines in the printed file. The secret is compared in Go either
   way.
+- **Logout**, the harder route, works the same way: `main` calls an
+  ungated operation that answers a `Reply` (`doc/gates.md`, "Ungated:
+  logins and logout"), and Go writes its cookies as `Set-Cookie`
+  headers and then a 303 to `/` in place of the JSON. The cookies
+  stay Kogo's; only the redirect is Go's.
 - **Lost:** the route's path in the printed file, and the checker's
   sight of a dozen lines of translation for each route. Go grows
   with each route: cusoon2 has two.
 - **Size:** minus about 140 (`doc/gates.md`: 40 of prelude, 70 of
-  handler, 30 of checker), with `Response`, `Secret`, `Request.query`
-  and `Request.body` out of the spec; plus a way for Go to call one
+  handler, 30 of checker), with `Response`, `Secret`, `status`,
+  `redirect`, `Request.query`, `Request.body` and `Json.parse` on
+  text out of the spec; plus a way for Go to call one
   operation of a table, perhaps 20 / 20, and about 15 lines of Go a
   route in the application.
 
@@ -287,8 +308,12 @@ be about fifteen signatures in the prelude, which a reader opens,
 where today it is prose. And `::charge` needs `@Acts` on the list or
 an opt-in (run: refused without, accepted with either), against "no
 `::` reference" to an action. Greg's objection stands as it was: it
-looks like a call, and the compiler does the work. Perhaps 400 /
-350: the lists less their parser.
+looks like a call, and the compiler does the work. Principle 3 says
+additions look unlike Kotlin, and the 17 Nov entry says a
+restriction is carried by a form that looks special, not by a rule
+on an ordinary call's argument: here a gate's read-only rule would
+start at an argument of `gated`. Perhaps 400 / 350: the lists less
+their parser.
 
 **A block that holds the functions, with the context declared once.**
 
@@ -304,7 +329,9 @@ effect chargeCard on charge_job(env: Env, row: ChargeJob) {
 It fits an effect better than it fitted `api`: three steps of one
 row are one thing, and a role is a keyword. It still hides
 parameters, the steps stop being functions a test can call, and a
-gated operation gains nothing by it. Not Kotlin. Perhaps 800 / 600.
+gated operation gains nothing by it. Not Kotlin. Perhaps 550 / 450:
+the lists' parser, and the parameters the block supplies to its
+functions.
 
 **A file outside the source** (`lists.toml`: `setNotes = { gatedBy =
 "setNotesGate" }`). Every `.kg` file is then valid Kotlin with no
@@ -325,7 +352,7 @@ cannot be paired. It fails for five of the six lists.
 | The lists | yes | yes | yes | the checker's table | no |
 | 1. Pipeline as code | names only | no `gate reads` | yes | a generic signature | yes |
 | 2. Interfaces | names only | yes | yes | implementing an interface | yes |
-| 3. Markers | no | yes | yes | the checker, by strings | yes, unchecked |
+| 3. Markers | no | yes | yes | the checker, by strings | yes (strings) |
 | 4. Routes in Go | all but routes | all but paths | yes | as the lists | Go |
 | 5. A call | yes | yes | yes | a generic signature | yes |
 | 5. A block | yes | yes | yes | the checker | no |
@@ -335,55 +362,70 @@ cannot be paired. It fails for five of the six lists.
 
 1. **Keep the mechanism: the runtime calls Kogo through a table,
    and a list is the one place a function gets its role.** No other
-   way keeps all three of the reviewer's goods, and the explicit
-   pipeline gives back the two things the 17 Nov designs were made
-   to take away: work that holds the request, and an effect whose
-   safety is the author's care.
+   way keeps all three of the reviewer's goods. Against the explicit
+   pipeline, its best rival, the list keeps three things: the fit of
+   the stages in one form; the root of each rule in a form that
+   looks special, as the 17 Nov entry asks, and not at a prelude
+   call's argument; and the one screen. Safety is not among them:
+   with `db.effect` the prelude holds it as the runner does.
 2. **Take routes out, into Go (way 4).** Two routes do not pay for a
-   list, three prelude types and a section of the spec, and what
+   list, two prelude types, two members of `Request`, `Json.parse`
+   on text, `status`, `redirect` and a section of the spec, and what
    each writes stays an operation in the printed file. Reopen at
    five routes. Commands stay: ten, read by property name, with no
    Go to grow.
-3. **Put the roles' shapes where a reader can open them.** Most of
-   the hiding found above is that a shape is known only from the
-   spec. If DEV-894 takes a call form, the prelude's signatures are
-   the table. If it keeps Kogo's own syntax, the printed file can
-   carry it: a line for each entry saying what runs, in order
-   (`runs  gate, renameLogins, gate, work`), perhaps 15 / 10.
+3. **Print the outside step beside the gate.** A gated row's order
+   already follows from its form (`gatedBy`, `outside`), and an
+   effect's from its three steps. The one thing hidden is the outside
+   step, since the printed table's first line names the gate and not
+   the step; printing it there shows it, perhaps 5 / 5. If DEV-894
+   takes a call form, the prelude's signatures are the roles' table
+   and say the shapes as well.
 4. **Refuse a `job` or `effect` that no `work` list names**, perhaps
    10 / 10, so that nothing is left unserved by accident either.
 5. **Do not take** markers, interfaces, the block, or the file
-   outside. Each costs as much as the lists and loses the row.
+   outside. Each costs about as much as the lists and loses the row.
+
+Weighed against `doc/design.md`: principle 2 (locality) favours the
+pipeline and the call, where the order is in a signature one can
+open, and weighs against markers; principle 3 (additions look unlike
+Kotlin) and the 17 Nov entry favour the lists over the call;
+principle 6 (one way) weighs against the pipeline, which can be
+written with its helpers or without.
 
 **What DEV-894 should know.**
 
-- Compiles as Kotlin (kotlinc 2.4.21): way 1, way 2, way 3 with
-  strings, and the call. Needs Kogo's own syntax: the lists as
-  drawn, and the block.
 - Its sketch, `(Nothing, E, Request, Nothing) -> Either<String,
   Any?>`, accepts any first and last parameter, so kotlinc fits
-  nothing there. Signatures with real type parameters fit the
-  stages; kotlinc's message for a misfit is "cannot infer type for
-  type parameter 'A'", so Kogo's checker keeps its own (principle 7).
-- A list that names `act`, an outside step or `alert` by `::` must
-  carry `@Acts` or opt in, and Kogo today lets no file opt in and
-  refuses `::` on an action. `@Acts val chargeCard = effect(...)`
-  compiles, and reads as true.
-- An annotation takes no function reference.
-- The call form needs `vararg` in a prelude declaration, which spec
-  13 already allows. Way 2 needs default bodies in an interface,
-  which spec 3.4 refuses, for a shared gate and an optional role.
+  nothing there; signatures with real type parameters fit the
+  stages. For a misfit kotlinc says "inapplicable candidate(s): fun
+  badNotes(env: Env, booking: Other, …)" at the reference and
+  "cannot infer type for type parameter 'A'" at the call, so Kogo's
+  checker keeps its own messages (principle 7).
+- A call spelling that names `act`, an outside step or `alert` by
+  `::` must carry `@Acts` on the list or opt in (run: refused
+  without, accepted with either; `@Acts val chargeCard =
+  effect(...)` compiles, and reads as true). That collides with the
+  designed rule that an action has no `::` reference, and the design
+  lets no file opt in. This is a condition on a call spelling, not a
+  choice of its own.
 - Unchecked: the rows of `routes` and `commands` as Kotlin, and
   whether Kogo's own inference (spec 5.1) settles `P` from a
   function reference as kotlinc does.
 
 ## The choices, each Greg's
 
-1. Keep the lists as the joint, or have the application write the
-   pipeline (way 1).
-2. Routes in a `routes` list, or in Go in `main`.
-3. Whether the roles' shapes are prelude signatures (with a call
-   form) or stay a table in the spec.
-4. Whether a list that names an action carries `@Acts`.
-5. Whether the printed file states the order of calls.
-6. Whether a queue in no `work` list is an error.
+- **A. The joint.** (a) keep the lists; (b) the application writes
+  the pipeline over prelude helpers (way 1). Lean (a).
+- **B. Routes.** (a) a `routes` list in Kogo; (b) Go in `main`, each
+  route calling an ungated operation of a list that is not mounted,
+  revisited at five routes. Lean (b).
+- **C. Where a reader finds a role's shape and order.** (a) only in
+  the spec's table; (b) the outside step printed on the table's first
+  line, beside the gate (about 5 / 5); (c) a line for each entry
+  giving its order of calls, under a key other than `runs`, which
+  already says the transaction's kind (about 15 / 10); (d) prelude
+  signatures, which needs DEV-894 to take a call form. Lean (b),
+  unless DEV-894 takes (d).
+- **D. A queue that no `work` list names.** (a) an error; (b) allowed
+  and never run, as the designs now leave it. Lean (a).

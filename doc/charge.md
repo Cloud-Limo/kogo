@@ -88,8 +88,9 @@ fun insertChargeJob(invoice: PayableInvoice, id: ID, receiptEmail: String, token
 // charge.kg: the daemon's file; opts in to UnscopedRead and BindsTenant.
 effect chargeCard on stripe_charge_job {
     find      stripe_charge_queue     // a view: id, tenant_id, not_after and the runner's columns
+    fair      tenant_id               // Q12
     enter     bindTenantOf
-    soonest   not_after
+    soonest   not_after               // within one tenant
     attempts  1
     prepare   prepareCharge
     act       chargeInvoice
@@ -105,6 +106,12 @@ data class ChargeFields(val accountId: String, val jobId: ID, val amountCents: L
                         val receiptEmail: String, val customerId: String?, val paymentMethod: String)
 data class Charged(val paymentId: String, val amountCents: Long)
 
+// model.kg: the writes a request shares, each on an interface (doc/gates.md, "A proof made both ways")
+interface OnInvoice { val id: ID; @UnscopedRead val tx: Tx }       // as doc/gates.md's OnBooking
+data class WorkerInvoice @UnscopedRead constructor(override val id: ID, @UnscopedRead override val tx: Tx) : OnInvoice
+fun recordPayment(on: OnInvoice, invoice: Invoice, amountCents: Long, at: Instant, reference: String?): Invoice = ...  // the invoice as it now is
+fun enqueueMail(at: InTenant, id: ID, now: Instant, mail: Mail, label: String, notAfter: Instant?) = ...
+
 fun bindTenantOf(tx: Tx, env: Env, claim: Claim) { bindTenant(tx, claim.tenantId) }       // Q7
 
 fun prepareCharge(tx: Tx, env: Env, row: ChargeRow): Either<String, ChargeFields> = either {
@@ -118,7 +125,7 @@ fun prepareCharge(tx: Tx, env: Env, row: ChargeRow): Either<String, ChargeFields
 }
 
 @Acts fun chargeInvoice(env: Env, key: EffectKey, fields: ChargeFields): Act<Charged> =    // Q8
-    charge(env.stripe.withHeader("Stripe-Account", fields.accountId), key, fields).fold(     // stripe.kg's client
+    stripe.charge(env.stripe.withHeader("Stripe-Account", fields.accountId), key, fields).fold(     // the client's package
         { failure ->
             when (failure) {
                 is SendFailure.NotSent -> Act.NotMade(failure.why)
@@ -178,32 +185,36 @@ work daemon { alert opsAlert   queues chargeCard, ... }
   (`setChargeId(tx, row.id, ...)`), so the rule on statements never
   fires there. A write shared with a request takes an interface the
   daemon wraps its transaction for: `recordPayment` is also an admin's
-  marking paid, `enqueueMail` every request's (`WorkerInvoice`,
-  `WorkerTenant`: "A proof made both ways shares an interface").
-  `doc/work.md` spells `enqueueMail` both ways; this is the one that
-  fits `doc/gates.md`.
+  marking paid, whose proof also implements `OnInvoice`, and
+  `enqueueMail` every request's. So `enqueueMail` takes `InTenant`, not
+  `AtTenant` as `doc/work.md` declares it: `doc/gates.md` refuses a
+  `WorkerTenant` passed as an `AtTenant`. `doc/work.md`'s job sketch,
+  `enqueueMail(tx, ...)`, cannot be called at all.
 - **The row** is `ChargeRow`, which names the columns the steps read.
-  That the runner reads it from the table by the rule SQL's columns
-  have is said of `Claim` alone, and assumed here.
+  How the runner reads it is not said anywhere (Q13).
 - **`prepare`** runs in the transaction that claimed the row. A `Left`
   is a refusal: no alert, and its words go to the payer's page through
   `chargeFailed`, as the Kotlin's `Refusal` does. A missing invoice is
   a bug and panics, which fails the row as not made.
 - **`act` alone carries `@Acts`**; it takes the environment, the key
-  and the prepared value, and no transaction. `charge` is
-  `doc/work.md`'s client, which must also send `receipt_email` and
-  `metadata[cusoon_charge_job]` and read `status`. That sketch differs
-  from cusoon2 in three places, put right here: an intent that did not
-  succeed is a refusal, a decline stores fixed words and never
-  Stripe's, and the result carries the amount `prepare` chose.
+  and the prepared value, and no transaction. `stripe.charge` is
+  `doc/work.md`'s client, in its own package, so the act's name does
+  not clash with it; the client must also send `receipt_email` and
+  `metadata[cusoon_charge_job]` and read `status`. `doc/work.md`'s act
+  differed from cusoon2 in two places, put right there in this PR: an
+  intent that did not succeed (a 3DS card) is a refusal
+  (`StripeQueues.kt:309-314`), and a decline stores fixed words, never
+  Stripe's, on a public page (`:301-304`). A third is of shape alone:
+  the result carries `prepare`'s amount, which is the intent's, since
+  Stripe refuses a replay whose parameters changed (`:277-282`).
 - **`record`** locks the invoice, since an admin may be recording a
   payment by hand. The Kotlin changes the invoice's record in place
   and mails from it; here `recordPayment` gives the invoice as it now
   is, and the mail is built from that.
 - **`attempts 1`**, so `Act.Unknown` fails the row at once as
-  exhausted, with the alert. **`soonest not_after`** puts a waiting
-  payer first; no `fair`, which would put another tenant's invoice run
-  between two payers.
+  exhausted, with the alert. **`fair tenant_id`** serves the tenants
+  in turn, as the Kotlin's pass does one tenant at a time; within one,
+  **`soonest not_after`** puts a waiting payer first (Q12).
 - **`failed` and `recovery`** run in the transaction that fails the
   row, after the runner marked it. A refusal alerts nobody.
 
@@ -222,7 +233,7 @@ fun stripeChargeGate(tx: SerializableTx, env: Env, request: Request, input: Char
 fun chargeJob(tx: SerializableTx, id: ID): ChargeJob? =
     tx.queryOne<ChargeJob>(sql"""
         select id, stripe_charge_id, failed, failed_message,
-               coalesce(attempts = 0 and not failed and stripe_charge_id is null and not_after <= now(), false) as lapsed   -- Q3, Q5
+               coalesce(attempts = 0 and not failed and done_at is null and not_after <= now(), false) as lapsed   -- Q3, Q5
         from stripe_charge_job where id = $id
     """)
 
@@ -257,7 +268,7 @@ fun chargeView(job: ChargeJob): ChargeView =
 createStripeCharge  createStripeChargeGate
                     runs         serializable
                     gate reads   invoice, stripe_charge_job, tenant
-                    reads        booker
+                    reads        booker, stripe_charge_job
                     writes       stripe_charge_job
 stripeCharge        stripeChargeGate
                     runs         serializable
@@ -265,20 +276,26 @@ stripeCharge        stripeChargeGate
 
 chargeCard     effect   stripe_charge_job   attempts 1
                runs     plain
-               reads    booker, invoice, tenant
+               reads    booker, invoice, stripe_charge_job, tenant
                writes   invoice, outbound_message, stripe_charge_job
                locks    booker, invoice, tenant
                acts     stripe.charge (keyed)
 ```
 
-`stripe_charge_job` is under `writes` because `record` and `failed`
-write the queue's own columns; the runner's marks are not listed. That
-a request's row is stamped for a waiting payer shows nowhere.
+`stripe_charge_job` is on both lines of each: `insert ... returning`
+needs SELECT as well, and `setChargeId` and `setChargeFailure` are an
+`update` with a `where`, which reads the table it writes
+(`doc/gates.md`). The runner's own claims and marks are not listed. So
+this reads `doc/work.md`'s "on its first line and not below" as "the
+printer adds nothing of the runner's", where that document's example
+leaves the queue's table out. That a request's row is stamped for a
+waiting payer shows nowhere.
 
 ## What does not fit
 
-In the order to bring them, and all Greg's. Q2, Q5, Q6, Q7 and Q10
-change a rule of the designs; the rest choose among forms that exist.
+In the order to bring them, and all Greg's. Q2, Q5, Q6, Q7, Q10, Q12
+and Q13 change a rule of the designs; the rest choose among forms that
+exist.
 
 **Q1. Where does the work learn the limit, and whose limit is it?**
 Gated work is handed the environment, the proof and the input. And the
@@ -299,10 +316,14 @@ the same number.
 The runner dies in `act`. The Kotlin replays the row under its key
 when the 2 minute lease ends. A watched row's 40 seconds have passed
 by then, so it is not owed: never replayed, never failed, nobody
-alerted, and it stays open, so every later payment of that invoice is
-refused "already in progress" for ever. `doc/work.md` promises both
-"a crash between `act` and `record` sends again under the same key"
-and "past its `not_after` is never acted on".
+alerted. It stays open, and every later payment of that invoice is
+refused "already in progress"; that block is cusoon2's intent, since
+`hasOpenStripeChargeJob` keeps a parked row open because it "may have
+charged" (`database.kt:1600-1604`). The misfit is narrower: Kogo parks
+every crashed watched row after 2 minutes and tells nobody, where the
+Kotlin parks a row only after 20 hours of replays. `doc/work.md`
+promises both "a crash between `act` and `record` sends again under
+the same key" and "past its `not_after` is never acted on".
 - a. A replay is exempt: owed is `... and (claimed_at is not null or
   not_after > now)`. It may charge a payer whose page gave up two
   minutes before.
@@ -349,19 +370,25 @@ and not failed, and the wire has only those two.
 `attempts = 0` is not "never tried".** The rule is written in
 `hasOpenCharge`, in `chargeJob` and in the runner's Go, over the
 runner's columns (`failed` is cusoon2's `is_failed`). The Kotlin's
-runner also sets `attempts` back to 0 when an act is done and when ops
-reset a row, so the poll needs `stripe_charge_id is null` beside it,
-and a watched row that ops reset reads as never tried and is never
-owed again.
-- a. As sketched: the spec names the runner's columns and what each
-  means, and each statement spells the rule out.
+runner sets `attempts` back to 0 when an act is done
+(`JobQueue.kt:460`) and when ops reset a row (`:219`). The done case
+is met by the agreed `done_at`, which the poll tests; only a poll that
+ignored `done_at` would tell a payer whose charge succeeded that
+nothing was charged. The reset remains: a watched row that ops reset
+reads as never tried, and is past its time, so the reset does nothing
+for it.
+- a. The spec names the runner's columns and
+  what each means, and each statement spells the rule out.
 - b. The runner keeps a column of its own that says it, set at the
   first claim and never cleared: `where tried_at is null and not_after
   <= now()`.
 - c. cusoon2's schema holds it once: `create view charge_state as
   select id, (...) as lapsed`.
-- Lean: b. The rule `doc/work.md` agreed rests on a column that means
-  three things.
+- d. Kogo's reset statement, printed by Kogo (`alert.reset`), leaves
+  `attempts` alone, and the runner does not zero it on done; the rule
+  stays `attempts = 0`, as sketched.
+- Lean: d. It adds nothing to the runner's columns, and with Q2's
+  lean a past-time row neither failed nor done was never tried.
 
 **Q6. `record` and `prepare` can fail a row only by a panic.** An
 admin voids the invoice while its card is charged: the Kotlin's
@@ -386,7 +413,11 @@ fails it after a panic. A bound tenant ends with its transaction, and
 - b. Once, and each later step binds for itself: `bindTenant(tx,
   row.tenantId)` as the first line of `recordCharge`. But the runner
   reads the row before it calls the step, and unbound sees none.
-- Lean: a; one sentence in `doc/work.md`.
+- Lean: a, as the Kotlin does: each `withRow` binds the tenant again
+  (`JobQueue.kt:385`). One sentence in `doc/work.md`.
+- `doc/lists-assessment.md`'s "claimed, keyed, entered, prepared, acted
+  on, recorded" reads as `enter` once; under a it needs "entered before
+  each of its transactions".
 
 **Q8. The key's text changes.** The Kotlin sends
 `cusoon2-charge-<id>`; the runner makes its own from the table and the
@@ -425,3 +456,25 @@ is not handed the statement, and `label` has no role.
   why, reset)`.
 - c. A role `label` whose words `Alert` carries: `label chargeLabel`.
 - Lean: a, until an alert proves hard to read.
+
+**Q12. Is the charge queue fair between tenants?** `doc/work.md`
+turned down "no fairness" because it drops what the Kotlin has a test
+for, "in mail and charges"; the Kotlin runs this queue one tenant at a
+time (`runEffectQueue(tenantId, ...)`).
+- a. `fair tenant_id` with `soonest not_after`, as sketched. A waiting
+  payer may wait behind one act for each busy tenant, as in the
+  Kotlin's pass.
+- b. No `fair`: one tenant's invoice run delays other tenants' invoice
+  runs, but never a payer.
+- c. Fair only among rows with no `not_after`, a new rule.
+- Lean: a. It is what the Kotlin does and tests.
+
+**Q13. How does the runner read the row a step takes?** `doc/work.md`
+says `Claim` is "read from the view, by the rule SQL's columns have";
+nothing says how `ChargeRow` is read, which `prepare`, `record`,
+`failed` and `recovery` take.
+- a. The same rule: the runner selects the type's properties by name
+  from the effect's table, checked by the SQL pass.
+- b. A step of the application's: `row chargeRow`, with `fun
+  chargeRow(tx: Tx, claim: Claim): ChargeRow` holding the `select`.
+- Lean: a. It is the rule `Claim` already has.

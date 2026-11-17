@@ -258,7 +258,14 @@ with nothing but the transaction, as `AtTenant`, is not held to it.
 
 **A proof's transaction is used only before the dot.** It is written
 as the receiver of one of the five calls, `booking.tx.execute(...)`,
-and nowhere else: not kept in a `val`, passed or returned. Without
+or as the argument of a proof's constructor in the position of that
+proof's own marked `tx`, `HeldBooking(id, booker.tenant, booker.tx)`,
+so that making a thing can give its proof; and nowhere else: not kept
+in a `val`, passed to a function or to any other constructor, or
+returned. In a constructor it goes from one proof into another, where
+both rules hold it again, and only a file that opts in can call the
+constructor; that the facts put into the new proof are the new row's
+is not held, as for any proof (agreed with Greg on 18 Nov 2026). Without
 this the rule is passed by a helper, the shape cusoon2's model is in
 already (`scoped.kt`: a public function takes the held row and calls a
 private one by id):
@@ -934,7 +941,8 @@ binding says `lookup` or `action` and nothing more.
 - Gated work takes no `Request`, `Tx` or `Db`.
 - A statement on a proof's transaction binds something of the proof.
 - A proof's transaction is written only as the receiver of one of the
-  five calls.
+  five calls, or as a proof constructor's argument for that proof's
+  marked `tx`.
 
 What a held value's marked constructor and marked `tx` already give
 (spec 11) does the rest: no operation makes a proof, or takes the

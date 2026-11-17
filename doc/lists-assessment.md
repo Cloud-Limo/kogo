@@ -61,7 +61,7 @@ lists are that joint, and the question is only where it is written.
 | With an outside step the gate runs twice, and its second run may refuse after the service was changed | the handler; the word `outside` | the order: gate, end, step, gate, work |
 | The first parameter's type opens the transaction and sets its level: a `SerializableTx` is rerun on a conflict, a `Tx` on a deadlock; an answer commits, a refusal rolls back | the handler; `needs-serializable` | `doc/gates.md`, "Two kinds of transaction", not yet in the spec (15.3 still says always SERIALIZABLE); that the body may run several times |
 | The input is read from JSON, or flags, by property name, and a 400 comes before the function | the handler | spec 15.4 |
-| An effect's row is claimed, keyed, entered, prepared, acted on, recorded and marked done; `failed` and `recovery` run in the failing transaction and the alert after it | the runner; the checker for the fit and the columns | the runner's eight or ten rules |
+| An effect's row is claimed, keyed, entered before each of its transactions, prepared, acted on, recorded and marked done; `failed` and `recovery` run in the failing transaction and the alert after it | the runner; the checker for the fit and the columns | the runner's eight or ten rules |
 | A table is emitted, and `main` mounts it | the emitter | that a function in no list is never called |
 | A file is printed, and enforces nothing | a command; the application's `git diff` | to read it |
 

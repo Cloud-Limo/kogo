@@ -745,6 +745,9 @@ Each entry: what was decided, why, and what would reopen it.
     in the outbox went before a tenant's other mail. `soonest` replaced it: a queue may
     name the column of times its rows go first by, and mail names none.
   - Not taken: the one order, with the change to mail recorded as a change of behaviour.
+  - The charge's half of "An effect someone is watching" (`doc/work.md`, agreed 17 Nov), a
+    hosted-page charge stamped with a `not_after`, is withdrawn: see "A hosted-page charge
+    has no `not_after`" below.
   - A choice the runner makes for every queue is recorded here by name. Its two lanes are
     gone, and where an alert goes is the application's (both below).
   - Reopen if a queue needs an order that one column of times cannot give.
@@ -819,6 +822,8 @@ Each entry: what was decided, why, and what would reopen it.
     proof's transaction written only before the dot (`doc/gates.md`), the five SQL calls
     on a `Tx` written before the dot (spec 10.2), and a lambda that fails or acts passed
     straight to a prelude function (spec 9; `doc/gates.md`). Another is recorded here.
+    The first was widened on 18 Nov 2026 to the position of a proof's marked `tx` in a
+    proof's constructor (below).
 - **Each queue is served on its own, one row at a time, and there are no lanes**
   (17 Nov 2026, Greg; `doc/work.md`, "Each queue is served on its own"). cusoon2's urgent
   lane exists because its daemon does one thing at a time; a loop for each queue ends the
@@ -936,6 +941,180 @@ Each entry: what was decided, why, and what would reopen it.
     exception; writing no rule until cusoon2's `main` is on paper.
   - Reopen if a reviewer finds `main` querying the pool or calling a service in practice:
     the rule would then need the checker or the handler to hold it, not a reviewer.
+
+- **A hosted-page charge has no `not_after`** ("simple"; 18 Nov 2026, Greg; `doc/work.md`,
+  "An effect someone is watching"; `doc/charge.md`). It is not stamped with a time after
+  which it is not made: "An effect someone is watching" (`doc/work.md`, agreed 17 Nov) is
+  withdrawn for the charge. The charge behaves as the Kotlin's does today: owed until
+  recorded, open while not failed and with no charge id (`hasOpenStripeChargeJob`
+  unchanged), a crashed row replayed under its key after the lease, the poll's three
+  fields as they are, the reset statement as the Kotlin prints it. `not_after` stays a
+  runner's column with its one meaning, used by mail as in the Kotlin. It replaces
+  `doc/charge.md`'s Q1, Q2, Q4 and Q5, which it closes.
+  - **Why.** Greg, on Q5: the code had become "a nest of gotchas", from handling the
+    0.99% and the 0.999% cases; he leans to simple code even where a rare, probably
+    immaterial event falls through. Every gotcha of Q1 to Q5 came from this one rule:
+    where the 40 seconds comes from, a crashed row stranded past its time, which clock, a
+    "never tried" answer, application SQL over the runner's columns, a `tried_at` column,
+    and a reset that must not revive a late row. The Kotlin's main cause of a late claim,
+    one daemon thread shared with mail, is already gone: each queue has its own loop.
+  - **Accepted cost.** When the daemon is down or the charge queue is backed up past the
+    page's 40 seconds, the payer is told "Timed out" and the card is charged later:
+    minutes, or hours after a long outage. One charge, recorded and emailed; the open row
+    refuses a second attempt meanwhile. It is production's behaviour today.
+  - **Kept: a waiting payer goes before an invoice run's charges.** `soonest` names a
+    column of cusoon2's own, a `timestamptz` that the hosted page's request stamps with the
+    handed clock's time and the invoice run leaves null (`payer_waiting_since` in the
+    sketches; the name is cusoon2's to choose). The view `find` names carries it. The
+    runner orders by it, nulls last, then `next_attempt_at`. It replaces the Kotlin's
+    `order by stripe_customer_id is null desc`, and goes into the Kotlin first.
+  - **Direction, unchanged.** The request makes the charge itself in an outside step, with
+    the daemon as the net, which ends the polling: after the port.
+  - Not taken: keeping `not_after` on the charge, with an answer to each of Q1 to Q5 and a
+    guarded reset.
+  - Reopen if a payer is in fact charged long after "Timed out" and it matters.
+- **A row's `not_after` is stamped and judged by the handed clock** (17 Nov 2026, Greg;
+  `doc/charge.md`, Q3). What inserts the row binds a time from it, and the runner's claim
+  binds its own. No statement that reads or writes `not_after` says `now()`. It is spec
+  7's rule and the Kotlin's habit (`JobQueue.kt:386`, `Outbox.kt:36-45`, `:99`), and
+  `doc/work.md`'s `enqueueMail` already does it. With no `not_after` on a charge it stands
+  for mail alone; the stamp for the charge's order is the handed clock's too.
+  - Not taken: the database's `now()` everywhere, which reverses "the runner never says
+    `now()`" (17 Nov); two clocks and a margin.
+  - Reopen if web and batch run on two machines.
+- **`record` gives `Either<String, Unit>`; `prepare` stays as it is** (18 Nov 2026, Greg;
+  `doc/charge.md`, Q6; `doc/lists.md`). A `Left` from `record` fails the row as
+  unrecorded, with the alert, and is how a step reports an event that is nobody's bug, as
+  an invoice voided while its card was charged. A `Left` from `prepare` is a refusal, and
+  a broken invariant there, as a tenant with no Stripe account, is a panic, which fails
+  the row as not made with the alert. A panic in any step is a bug that the runner
+  survives, never a way to report an outcome (spec 8 and 9 unchanged).
+  - **Why.** Greg's concern: panics used as exceptions, a Go no-no. Catching one at the
+    row's edge is the accepted pattern; raising one on purpose for a normal event is not,
+    and a panic for `record` would have had the spec say "`check` is also how a step gives
+    up".
+  - Not taken: a panic for both; a `Left` for both, with a type `Stop.Refused` /
+    `Stop.NotMade` for `prepare`, a new type for a case that is a setup fault.
+  - Reopen if a second queue has an expected, alerting stop in `prepare`.
+- **The runner calls `enter` at the start of each of a row's transactions** (18 Nov 2026,
+  Greg; `doc/charge.md`, Q7; `doc/work.md`, "Discover, then enter"). With the claim it read
+  in the first: before `prepare`, before `record`, and before `failed` and `recovery` where
+  they run in a transaction of their own. What `enter` sets ends with its transaction, and
+  the runner reads the row before it calls a step, so a step cannot do it for itself. It is
+  the Kotlin's: each `withRow` binds the tenant (`JobQueue.kt:385`).
+  - Not taken: `enter` once and each later step binding for itself: unbound, the runner
+    finds no row to hand the step.
+  - No reopen condition was given.
+- **The runner's key has one text for every effect: `<table>-<id>`** (18 Nov 2026, Greg;
+  the text the lead's, 18 Nov; `doc/charge.md`, Q8; `doc/work.md`, "A key comes only from
+  the runner"). The effect's table name without its schema, a hyphen, and the row's id as
+  Postgres writes it as text, as `stripe_charge_job-0193a1f2-...`. No effect states a
+  prefix. The Kotlin adopts that text for the charge and the card job
+  (`cusoon2-charge-<id>` and `cusoon2-card-<id>` today) before its effect runner is live,
+  so a side-by-side run sends the same header and a row in flight when Kogo takes over is
+  replayed under the same key.
+  - **Condition, to confirm before the Kotlin changes.** The change is safe only before
+    the Kotlin's effect runner is live, or with the charge and card queues empty: a row
+    that crashed under the old key and is replayed under the new within Stripe's 24 hours
+    is a second charge. `doc/work.md` says that runner is not live. Not checked: what key
+    production's present charge path sends.
+  - Not taken: `key "cusoon2-charge-"` in the effect, a word of the language to keep a
+    string nothing depends on.
+  - No reopen condition was given.
+- **`kogo.http` logs every refused send** (18 Nov 2026, Greg; `doc/charge.md`, Q9;
+  `doc/work.md`, "What Go would decide, Kogo states"). A 3xx or 4xx is logged in Go with
+  its method, path, status and body. So a decline's code and request id reach support with
+  no word from the application, and what is stored for the payer stays fixed words.
+  - To settle when built: what of a refused body is safe to log for every service.
+  - Not taken: `Act.Refused(words, detail)`, with the runner storing `detail` in
+    `last_error`: it widens `Act` for one caller.
+  - No reopen condition was given.
+- **A proof's transaction may also be passed to a proof's constructor, as that proof's
+  marked `tx`** (18 Nov 2026, Greg; `doc/charge.md`, Q10; `doc/gates.md`, "A proof's
+  transaction is used only before the dot"). It is written in two places: as the receiver
+  of one of the five SQL calls, and as the argument of a proof's constructor in the
+  position of that proof's own marked `tx` (`HeldBooking(id, booker.tenant, booker.tx)`).
+  So "making a thing gives its proof" can be written. Still refused: kept in a `val`,
+  passed to a function, returned, or passed to a constructor whose property is not a
+  proof's marked `tx`.
+  - **Why it holds.** The transaction goes from one proof into another, where both rules
+    hold it again; only a file that opts in can call the constructor. Not held, as for
+    any proof: that the facts put into the new proof are the new row's.
+  - Not taken: the new proof holding the old (`booking.from.tx`): two shapes for one
+    proof, and the rule on statements would have to say which nested proof it means.
+  - No reopen condition was given.
+- **`recovery` is not handed the reset statement, and no role gives a label** (18 Nov 2026,
+  Greg; `doc/charge.md`, Q11; `doc/work.md`, "An alert is the application's to send"). A
+  queue's recovery words refer to "the reset statement below", and the application's
+  alert function prints `alert.recovery` and then `alert.reset`, so the statement has one
+  source, the runner. A queue that wants its row named in the alert ("hosted-page charge
+  for invoice N") says so in its recovery words, which have the row.
+  - **Accepted cost.** Step 4 of the charge's words points at the statement and no longer
+    contains it. The alert's opening line has the queue, the table and the id and not the
+    Kotlin's `label(row)`; for a charge not made, where the Kotlin gives no recovery
+    words, ops see no invoice unless `chargeRecovery` gives words for that case too,
+    which is cusoon2's to choose.
+  - Not taken: `recovery` taking the statement as a fifth parameter; a role `label` whose
+    words `Alert` carries.
+  - Reopen if an alert proves hard to read.
+- **The charge queue is not fair between tenants** (18 Nov 2026, Greg; `doc/charge.md`,
+  Q12; `doc/work.md`, "Fair by a column"). It names no `fair`: it says `soonest` of the
+  column a waiting payer's row is stamped with, so waiting payers go first across all
+  tenants, the longest waiting first, then every other row by `next_attempt_at`. Mail
+  keeps `fair tenant_id`. This reverses item 9 of the Ruling on PR 66.
+  - **Why.** Fairness is so that one tenant's flood is not felt by another. In mail it is
+    felt. In charges the only one who feels a wait is a payer, and with `fair` a payer
+    waits behind one unwatched charge for each other busy tenant, where without it never.
+    With no `not_after` on a charge (above), the order is the only protection a waiting
+    payer has.
+  - **Accepted cost.** One tenant's invoice run delays another's until it is done; nobody
+    watches either. It differs from the Kotlin's pass, which serves this queue a tenant at
+    a time: a difference of timing, of the kind accepted for "Each queue is served on its
+    own".
+  - Not taken: `fair tenant_id` with `soonest` within a tenant (the Ruling on PR 66, item
+    9); fair only among unwatched rows, a new rule of the runner's.
+  - Reopen if a tenant's invoice run is ever held long enough by another's to matter.
+- **The row a step takes is a data class the application declares, read by the runner**
+  (18 Nov 2026, Greg; `doc/charge.md`, Q13; `doc/work.md`, "Discover, then enter"). The
+  runner fills it from the effect's table by id, locked, in each of the row's
+  transactions after `enter`: the compiler builds the `select` from the class's properties
+  by the rule SQL's columns have, the SQL pass checks it against Postgres, and the emitter
+  writes its text and scan into the queue's entry. The row is plain columns of the
+  effect's own table: no join and no expression; anything more is a query in the step. An
+  error code was sketched for a property that is no such column, `effect-row-column`.
+  - **The seam, as Greg asked for it stated.** What the runtime hands a function is a data
+    class the application declares, filled by name and checked at compile time (an
+    operation's input, a command's flags, the claim, the row). Every query a function
+    makes for itself is an `sql` literal in Kogo. The runner's hand-written Go names only
+    its own columns and the names an effect's declaration states; an application's
+    columns appear only in generated Go that Postgres has checked. Day-to-day work on an
+    application needs no Go: his test, and it passes.
+  - **Why.** Greg's four conditions hold: seamless, type safe, no judgement in the read for
+    an author to exercise, and the Go is written once. It keeps a port's steps as the
+    Kotlin has them (`JobQueue.kt:389`).
+  - Not taken: a role `row chargeRow` of the application's, one more role and function for
+    every effect, with the lock the author's to remember; no row type, each step handed
+    the claim and reading the row itself, which rested on "every query is a literal",
+    stricter than the design is anywhere else.
+  - No reopen condition was given.
+- **The checker's own rules each live in a file of their own in `check/`** (18 Nov 2026,
+  Greg; the Ruling on PR 69; `doc/design.md`, "The checker"). The checker stays one
+  package. Kogo's own rules, those on proofs, gates, `@Acts` and the lists with their
+  roles, each live in a file of their own in `check/`, run after type checking over its
+  result, and each has its own error code. The files that check types (`expr.go`,
+  `call.go`, `stmt.go`, `types.go`, `decls.go`) hold none of them. The spec states each
+  such rule in a section of its own, apart from the general language, as sections 10, 11
+  and 15 do. It binds the rules agreed on 17 and 18 Nov, none of which is built; code
+  already written is not moved by it.
+  - **Why.** The checker is domain specific on purpose, with rules meant to make it hard
+    for an agent to go wrong, so the plain type checking is marked apart from them. A
+    reader finds a rule in one file, and the type checker can be read without the rules.
+  - Not taken: a second package that reads the checker's result, where Go's imports would
+    hold the line, at the cost of exporting that result (a guess, about 150 code / 50
+    tests) and of changing rule 3's list of components; nothing, each rule written where
+    its construct is checked.
+  - Reopen if a rule cannot be written over the type checker's result without reaching
+    into it.
 
 ## Taken in the v0 spec, not yet discussed
 

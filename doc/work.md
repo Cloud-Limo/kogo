@@ -16,9 +16,10 @@ are Kogo code that builds a request and reads the answer. So
 `external` stays out of the application, the application stays out of
 this repo, and a charge is a dozen lines Greg can read.
 
-An application has no bindings at all, which reverses a decision of
-15 Nov. `decisions.md`, "An application has no bindings", has why,
-and the four tests a binding passes to enter the prelude.
+An application has no bindings with an effect. `decisions.md`, "An
+application has no bindings with an effect", has why, and the four
+tests a binding passes to enter the prelude. What an application may
+add is a pure function, as an extension (below).
 
 cusoon2 makes about 30 distinct calls: Stripe 4 (make a customer,
 attach a card, change an email, charge), Google Maps 5, the identity
@@ -45,10 +46,55 @@ A port calls the endpoints the Kotlin calls, the legacy Google ones
 included, so that it can be compared side by side. Moving to Google's
 newer APIs changes behaviour and is a later step of its own.
 
-Mail and PDF are bindings too. For PDF the survey's match for the
-Kotlin's drawing (the core fonts, their widths, a PNG) is `fpdf`, now
-kept on Codeberg; that its widths cover the core fonts was from
-memory. It is to be checked before anything is promised.
+Mail is a binding too, in the prelude, since it has an effect. PDF
+is not Kogo's: it is cusoon2's own extension ("An application's own
+extensions" below).
+
+### An application's own extensions
+
+An application may wrap Go of its own and call it from Kogo, where
+the Go has no effect. The prelude holds what every application of
+this shape needs, and every binding with an effect. A PDF is neither:
+few applications draw one, and drawing one is values in and bytes
+out.
+
+```kotlin
+// cusoon2's own binding file, in a directory it names to the compiler.
+@RequiresOptIn
+annotation class Extension
+
+@Extension external fun textWidth(text: String, font: Font, size: Double): Double
+@Extension external fun render(pages: List<Page>): ByteArray
+```
+
+- **Pure only.** An extension's function takes values and gives a
+  value. It takes no handle and cannot carry `@Acts`. What reaches a
+  database, a network or a clock stays in the prelude, which this
+  repo tests.
+- **Marked.** Each carries a marker the application declares, so a
+  file that calls one opts in at its top, as a file does for
+  `@UnscopedRead` (spec 11). No syntax is added.
+- **The application's own.** The binding file, the Go behind it and
+  that Go's dependencies live in the application's repo. Kogo's
+  `go.mod` does not change.
+- **Its purity is its author's word.** Nothing checks the Go. It is
+  handed no connection, no credentials and no context, so a mistake
+  there makes no effect by accident.
+- **What is behind it can change.** Kogo sees the declarations alone:
+  Go written by hand and Go that wraps a library look the same, and
+  one replaces the other with no `.kg` file touched.
+
+Other languages do this three ways: wide open (C extensions, cgo),
+open and marked (Rust's `unsafe`, Haskell's foreign functions) or
+closed (Elm, whose core alone wraps native code). Kogo was closed for
+a morning; it is now closed for effects and open, marked, for pure
+functions (`decisions.md`, "An application has no bindings with an
+effect").
+
+Perhaps 50 lines to read binding files from a second directory, and
+tests. Not designed: how a data class that a binding file declares
+reaches its Go. The prelude declares none today, and `Mail` below
+meets the same question. Agreed with Greg on 17 Nov 2026.
 
 ### Mail is a message Kogo builds and Go sends
 
@@ -107,8 +153,8 @@ centres, right-justifies and wraps. Kogo has no mutable object, so a
 page is a list of marks that Kogo builds and Go draws:
 
 ```kotlin
-// kogo.pdf
-enum class Font { Helvetica, HelveticaBold }                      // PDF's standard fonts, added as needed
+// cusoon2's extension: its own binding file, with its Go beside it.
+enum class Font { Helvetica, HelveticaBold, HelveticaOblique, TimesBold }   // the four the Kotlin uses
 sealed interface Mark
 data class Text(val x: Double, val y: Double, val text: String, val font: Font, val size: Double) : Mark
 data class Line(val x: Double, val y: Double, val toX: Double, val toY: Double) : Mark
@@ -117,8 +163,8 @@ data class Image(val x: Double, val y: Double, val width: Double, val height: Do
 data class Link(val x: Double, val y: Double, val width: Double, val height: Double, val url: String) : Mark
 data class Page(val marks: List<Mark>)
 
-external fun textWidth(text: String, font: Font, size: Double): Double   // from the font's own metrics
-external fun render(pages: List<Page>): ByteArray
+@Extension external fun textWidth(text: String, font: Font, size: Double): Double   // from the font's own metrics
+@Extension external fun render(pages: List<Page>): ByteArray
 ```
 
 ```kotlin
@@ -143,11 +189,28 @@ fun rightJustify(x: Double, y: Double, text: String, font: Font, size: Double): 
   name keeps a port's signatures as the Kotlin has them. Weighed and
   not taken: a type of Kogo's own, `Bytes`, which needs the same two
   refusals and is not Kotlin's.
-- Perhaps 150 lines of Go, 30 of prelude and 20 for `ByteArray` in the
-  SQL pass. Weighed and not taken: a drawing API on a stream, which
-  needs a mutable object; and a binding that draws the whole invoice
-  from its data, which moves the layout into Go. Agreed with Greg on
-  17 Nov 2026.
+- **What sits behind it is cusoon2's to choose, and to change.**
+  The Kotlin's vocabulary is small: four of PDF's standard fonts,
+  which need no font file, a text's width and a font's height, a
+  line, a box, a colour, an image from bytes, a link, and A4 pages.
+  A writer of that alone is perhaps 300 lines of Go over the standard
+  library, by a guess, with the four fonts' widths as data; a wrapped
+  library is perhaps 60, and is the way to real Unicode text, which
+  the Kotlin leaves as a TODO. Either sits behind the same
+  declarations.
+- **The sketch above is short of the Kotlin** (`pdf/markup.kt`, read
+  on 17 Nov): it has no font height and no colour.
+- **The Kotlin's layout is in 32-bit floats, and Kogo has `Double`
+  alone.** A line that just fits in one may not in the other, so a
+  side-by-side run of the layout can differ at the edges. To be
+  decided when the PDF code is ported.
+- In Kogo, perhaps 20 lines for `ByteArray` in the SQL pass; the
+  rest is cusoon2's. Weighed and not taken: PDF in the prelude,
+  behind a library that every application would then carry or a
+  writer of our own that Kogo would then own; a drawing API on a
+  stream, which needs a mutable object; and a binding that draws the
+  whole invoice from its data, which moves the layout into Go. Agreed
+  with Greg on 17 Nov 2026.
 
 ### An endpoint is declared once
 
@@ -1050,7 +1113,8 @@ direction, and a change of behaviour for after the port.
 
 It is part of Kogo, as `doc/design.md` has the prelude and the
 handler. This adds the runner (about 500 lines in the Kotlin), the
-HTTP binding (150 to 250 lines by the survey's guess), mail and PDF.
+HTTP binding (150 to 250 lines by the survey's guess) and mail. PDF
+is cusoon2's extension, and its Go is cusoon2's.
 The prelude and `rt` are about 2,150 lines today, with 1,170 of
 tests.
 
@@ -1068,7 +1132,9 @@ heaviest tests.
   action, the second with `@Acts`. Application code holds no
   `external`, as now.
 - **12, the prelude:** `kogo.http`, and `Act`, `EffectKey` and
-  `SendFailure` with the runner's package; `kogo.pdf`.
+  `SendFailure` with the runner's package.
+- **13:** an application's extensions: bindings with no effect, each
+  marked, read from a directory it names.
 - **10.4 and 3:** `bytea` maps to `ByteArray`, which has no
   operations and no `==`; the one array.
 - **12, the prelude:** `kogo.mail`.
@@ -1086,7 +1152,9 @@ heaviest tests.
   day: it waits on the test form.
 - Whether `job`, `effect` and `work` are Kogo's own forms or calls
   that are valid Kotlin (DEV-894).
-- A Go library for PDF: the built-in fonts' widths, PNGs and links.
+- What sits behind cusoon2's PDF extension: a small writer of its
+  own, or a wrapped library.
+- How a data class that a binding file declares reaches its Go.
 - Which package holds `Acts`: `kogo.mail` uses it as `kogo.http`
   does.
 - A hash in the prelude. The run sheet's job keeps a SHA-1 of what it

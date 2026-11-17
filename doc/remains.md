@@ -89,10 +89,12 @@ Agreed subject to this review:
   Greg's to keep or change.
 - **The Go already written against the rule on Go's defaults**: the
   handler, the prelude, and `kogo.mail` when it is built.
-- **A Go library for PDF** that does what cusoon2 does with PDFBox:
-  the core fonts and their widths for layout, lines and rectangles, a
-  PNG. A survey named `fpdf`, now kept on Codeberg; that its widths
-  cover the core fonts was from memory.
+- **What sits behind cusoon2's PDF extension** (`doc/work.md`, "An
+  application's own extensions"): a small writer of its own, or a
+  wrapped Go library. A survey named `fpdf`, now kept on Codeberg;
+  that its widths cover the standard fonts was from memory. Also
+  unchecked: whether PDFBox kerns when it measures a string, and the
+  Kotlin's 32-bit floats against Kogo's `Double` in the layout.
 - **Reading Postgres's limit on a session idle in a transaction** when
   the server starts, as cusoon2's role is set.
 - **What the printed table and the gate's check miss.** A cascade, a
@@ -117,7 +119,7 @@ Agreed subject to this review:
   transaction, 40 of checker and 30 of Go; the five places where
   `kogo.http` states what Go would decide, 25 of Go; the table's
   `asks` and `acts` lines, 25; the `alert` function, 15 of checker
-  and 15 of runner.
+  and 15 of runner; extensions, 50.
 
 ## Choices that sit above these
 
@@ -140,9 +142,10 @@ Agreed subject to this review:
   unchanged, and Kogo what knows what a booking is. Test that line
   against each of these, and ask whether more belongs in Go (the
   runner's lanes in parallel, there "To research") or less. Settled
-  on 17 Nov, after this was written: an application has no bindings,
-  and a binding passes four tests to enter the prelude
-  (`decisions.md`, "An application has no bindings"); and the lanes
+  on 17 Nov, after this was written: an application has no bindings
+  with an effect and may add pure functions as extensions, and a
+  binding passes four tests to enter the prelude (`decisions.md`,
+  "An application has no bindings with an effect"); and the lanes
   are gone, each queue served on its own (`doc/work.md`, "Each queue
   is served on its own").
 - **The test form.** How a test makes a call time out, so that the

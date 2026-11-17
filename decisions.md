@@ -80,8 +80,8 @@ Each entry: what was decided, why, and what would reopen it.
   language built for none of them. Accepted cost: a binding is Go the checker cannot see
   into, so a careless one can bring in the hidden state section 7 rules out. Not built:
   no example makes an outbound call. Build it with the handle design for outbound calls
-  (see the gaps below) when a port first needs one. Reversed on 17 Nov 2026: see "An
-  application has no bindings" below.
+  (see the gaps below) when a port first needs one. Narrowed on 17 Nov 2026 to pure
+  functions: see "An application has no bindings with an effect" below.
 - **`db.tx` keeps its two outcomes: commit when the block finishes, roll back on a failure
   or a panic** (15 Nov 2026). cusoon2's `commit = false` appears five times and every block
   under it only reads, where rolling back and committing are the same. A true dry run,
@@ -695,16 +695,26 @@ Each entry: what was decided, why, and what would reopen it.
   only carries on a discussion leaves them out whole. Not taken: boxes in every reply, a
   discussion's included, which pushes the open question off his screen. Reopen if Greg
   starts a move too soon.
-- **An application has no bindings: the Go that Kogo code can call is all in this repo**
-  (17 Nov 2026, Greg; spec 13; `doc/work.md`, "Outside services"). It reverses "An
-  application may have binding files of its own" (15 Nov), which was never built. An
-  application's only Go is its `main`, which makes the prelude's handles and implements
+- **An application has no bindings with an effect; it may add pure functions in Go, as
+  extensions** (17 Nov 2026, Greg; spec 13; `doc/work.md`, "An application's own
+  extensions"). It narrows "An application may have binding files of its own" (15 Nov),
+  which was never built. Every binding that reaches a database, a network or a clock is
+  in this repo, and an application's `main` makes the prelude's handles and implements
   none.
-  - **Why.** The rules of 17 Nov hold only over a closed set of bindings. "`act` cannot
-    reach the database" and "no action runs in a transaction" are true while no binding
-    does either out of the checker's sight, and an application's binding is Go that this
-    repo never tests: one that kept a connection pool of its own would write from `act`,
-    and the checker would pass it.
+  - **Why effects are closed.** The rules of 17 Nov hold only over a closed set of
+    bindings with an effect. "`act` cannot reach the database" and "no action runs in a
+    transaction" are true while no binding does either out of the checker's sight, and an
+    application's binding is Go that this repo never tests: one that kept a connection
+    pool of its own would write from `act`, and the checker would pass it.
+  - **Why pure functions are open.** This entry first closed every binding, the same
+    morning, and named what would reopen it: a dependency Kogo should not carry. PDF was
+    that, the first time it was tested. Greg: a PDF library in Kogo, as pgx is, is
+    premature and overkill; and other languages let a program wrap a library. Only
+    effects needed closing.
+  - **An extension**: its functions take values and give a value, with no handle and no
+    `@Acts`; each carries a marker of the application's, so a file that calls one opts
+    in at its top; its binding file, its Go and that Go's dependencies live with the
+    application. Kogo's own Go stays with no new dependency (15 Nov).
   - **What the entry of 15 Nov feared.** It refused clients written in Kogo over a general
     HTTP handle for "signing, JSON and retries". None stands: no call of cusoon2's signs a
     request (searched on 17 Nov), and the credentials sit on the handle, made in `main`;
@@ -714,12 +724,13 @@ Each entry: what was decided, why, and what would reopen it.
     of one application; it says whether it has no effect, is a `lookup` or is an `action`;
     and it lands with its Go and a test (15 Nov). One that fails a test and is taken anyway
     is recorded here by name, with the test it fails.
-  - Not taken: the entry of 15 Nov left standing and unused, under which every guarantee
-    of `doc/gates.md` and `doc/work.md` gains "unless an application's binding does".
-  - Accepted cost: each new kind of outside thing is a change to Kogo, the library behind
-    it included: mail and PDF so far, with a hash open.
-  - Reopen when an application needs something that fails the tests: it cannot be declared
-    without that application's names, or it needs a dependency Kogo should not carry.
+  - Not taken: every binding closed, with PDF in the prelude behind a library or a writer
+    of our own; and every binding open, under which each guarantee of `doc/gates.md` and
+    `doc/work.md` gains "unless an application's binding does".
+  - Accepted cost: that an extension is pure is its author's word, and its Go is tested
+    in the application's repo, not here. It is handed no connection, no credentials and
+    no context, so a mistake there does not make an effect by accident.
+  - Reopen if an application needs an effect the prelude cannot give in a general form.
 - **The runner holds what is a fact for every queue, and a queue states what is a choice**
   (17 Nov 2026, Greg; `doc/work.md`, "Workers"). The line for hand-written Go is what
   another application would need unchanged, and cusoon2's own queues are its first test:
@@ -1863,6 +1874,7 @@ Each entry: what was decided, why, and what would reopen it.
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no
-  design. (An application's own binding files stood here until 17 Nov 2026: it has none.)
+  design. (An application's own binding files stood here until 17 Nov 2026: `doc/work.md` has them,
+  as extensions.)
 - Operations (spec 15) leave out, on purpose: how one sets a cookie, which a login needs;
   Origin and CSRF checks; a limit on the reruns of a `db.tx` written in a `Db` operation.

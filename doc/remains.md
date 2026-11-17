@@ -74,6 +74,15 @@ Agreed subject to this review:
 
 ## To check before relying on it
 
+- **Whether cusoon2's Kotlin sends a Stripe call twice today.** Its
+  `effect-runner.md` says one is never retried. The JDK under it
+  sends an unsuccessful `POST` on a kept connection again unless
+  `sun.net.http.retryPost` is off, and cusoon2 does not set it
+  (`doc/work.md`, "What Go would decide, Kogo states"). The JDK's
+  exact conditions were not traced; that sentence of cusoon2's is
+  Greg's to keep or change.
+- **The Go already written against the rule on Go's defaults**: the
+  handler, the prelude, and `kogo.mail` when it is built.
 - **A Go library for PDF** that does what cusoon2 does with PDFBox:
   the core fonts and their widths for layout, lines and rectangles, a
   PNG. A survey named `fpdf`, now kept on Codeberg; that its widths
@@ -99,7 +108,8 @@ Agreed subject to this review:
   a write made under `AtTenant`; `failed` and
   `recovery`, 25 of checker; `find`, 20; `fair`, 30; `soonest`, 15;
   `@Acts`, 40; the two kinds of
-  transaction, 40 of checker and 30 of Go.
+  transaction, 40 of checker and 30 of Go; the five places where
+  `kogo.http` states what Go would decide, 25 of Go.
 
 ## Choices that sit above these
 

@@ -775,6 +775,25 @@ Each entry: what was decided, why, and what would reopen it.
     mode, so a `select` of a function that writes passes it.
   - Not taken: the level on the list or in `main`; a flag on the handle.
   - Reopen if the two functions of a shared read become the common case in a port.
+- **A binding's behaviour is Kogo's: the spec states it, and a Go default it does not
+  state is turned off, with a test** (17 Nov 2026, Greg; `doc/design.md`, "Keeping the
+  general language open"; `doc/work.md`, "What Go would decide, Kogo states"). The rule
+  for values, never to inherit Go's by accident, now holds for what reaches the network.
+  For `kogo.http` it settles five things: a second send, redirects, a proxy from the
+  environment, an answer's length and JSON's numbers.
+  - The rule does not say which way a default goes, only that it is written and tested.
+- **A keyed call may be sent a second time, at once and under its key, when a kept
+  connection fails before any answer** (17 Nov 2026, Greg; the same section). It is Go's
+  own behaviour, kept on purpose and stated: `performOnce` may be sent again, `perform`
+  never, `ask` may be, and each second send is logged.
+  - **Why kept.** It is none of the three retries cusoon2 refused in its DEV-714: it
+    never follows a timeout, has no delay and keeps the key. Of a charge's three cases it
+    turns two that are `Unknown` today into a recorded answer and leaves the third as it
+    is. A key already means a repeat is the same call, and the runner relies on that after
+    a crash. cusoon2's JVM very probably does the same today, unchosen.
+  - Not taken: the second send turned off, the letter of DEV-714.
+  - Reopen if a service is found that charges twice under one key, or if a second send is
+    ever seen to end worse than `Unknown`.
 
 ## Taken in the v0 spec, not yet discussed
 

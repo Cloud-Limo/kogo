@@ -323,6 +323,64 @@ Weighed and not taken:
   argument of every `ask` and `perform`**, which grows every call
   for the few that need one.
 
+### What Go would decide, Kogo states
+
+A binding's behaviour is Kogo's: the spec states it, and where Go has
+a default the spec does not state, the binding turns it off and a
+test shows it. `doc/design.md` has the rule for values ("never
+inherit Go's by accident"); this is the same rule for what reaches
+the network.
+
+The case that raised it, read in Go 1.27.4 (`net/http`,
+`request.go` and `transport.go`): a request that carries an
+`Idempotency-Key` header, which is Stripe's, is sent a second time by
+Go's transport when a kept connection fails before the first byte of
+an answer. No line of Kogo would have written that second send.
+
+| Go's default | Kogo's rule |
+| --- | --- |
+| Sends a keyed request again when a kept connection fails | `performOnce` may be sent a second time; `perform` never is; `ask` may be |
+| Follows up to 10 redirects, a redirected `POST` as a `GET` with no body | No redirect is followed: a 3xx is reported with its status, as a 4xx is |
+| Takes a proxy from `HTTP_PROXY` and its kin in the environment | No proxy unless `main` states one: the environment is ambient state (spec 7) |
+| Reads an answer of any length | An answer past a limit set in `main` is a failure: for an action, `Unknown` |
+| Reads every JSON number as a `float64` | `Json.long` is exact, and `null` for a number that is not whole or does not fit |
+
+**The second send is kept, and stated.** A `performOnce` may be sent
+again, at once and under the same key, when a kept connection fails
+before any answer, and never after a timeout. A key says the service
+treats a repeat as the same call, and the runner already relies on
+that after a crash.
+
+- **It is none of the retries cusoon2 refused** (DEV-714 there,
+  `effect-runner.md`): stripe-java's, which sent again after a read
+  timeout, so a slow charge met its own first request; a delayed one
+  under the same key, with a hand payment or a void in the gap; and a
+  delayed one under a new key.
+- **For a charge it changes two cases of three.** A first send that
+  never arrived is today `Unknown`, an alert and a payer told it
+  failed with nothing charged, and becomes a charge that is recorded.
+  One that arrived and finished is today charged and not recorded,
+  and Stripe gives the second its stored answer. One still running
+  gets a 409, which the client already reads as `Unknown`.
+- **`perform` has no key**, so nothing makes a repeat the same call,
+  and the binding stops Go sending it again. **`ask` changes
+  nothing**, so it may be.
+- **Each second send is logged** with the request's id.
+- **cusoon2 very probably does this today.** Its JDK 21 sends an
+  unsuccessful `POST` on a kept connection again, once, unless
+  `sun.net.http.retryPost` is off; it defaults to on, cusoon2 sets it
+  nowhere in its repo, and stripe-java 31.4.1 uses the client that
+  reads it. The JDK's exact conditions were not traced.
+
+Each row has a test against a local server that misbehaves on
+purpose: for the first, one that drops a kept connection once it has
+read the request. Perhaps 25 lines of Go and 80 of tests. Weighed and
+not taken: the second send turned off, which is the letter of DEV-714
+and leaves a dead connection as an alert for a charge that was never
+made. Not checked against this rule: the Go already written (the
+handler and the prelude) and `kogo.mail`. Agreed with Greg on 17 Nov
+2026.
+
 ## Workers
 
 Some work cannot be done in a request: it is due later, or on a
@@ -390,9 +448,9 @@ fun stripeError(body: Json?): String? = body?.at("error")?.string("type")
 ```
 
 The binding sorts a failed send by how far it got and by status
-alone, for every service: never left is `NotSent`; a 4xx is
-`Refused(status, body)`; a 5xx or no answer is `Unknown`, since the
-service may have acted. What a refusal means is the client's: for
+alone, for every service: never left is `NotSent`; a 3xx or a 4xx
+is `Refused(status, body)`; a 5xx or no answer is `Unknown`, since
+the service may have acted. What a refusal means is the client's: for
 Stripe a 409 or an `idempotency_error` may have charged
 (`StripeQueues.kt`, DEV-714 there), a `card_error` is a decline, and
 any other 4xx was not processed. Agreed with Greg on 17 Nov 2026.
@@ -418,7 +476,10 @@ repeat and is retried without limit, since a second message is a
 nuisance and a lost one is worse; its charge is safe to repeat under
 its key and is never retried (DEV-714 there, 27 Sep 2026), since every
 retry weighed had a silent double charge as its worst case. So each
-queue states its attempts, with no default, as the Kotlin has it.
+queue states its attempts, with no default, as the Kotlin has it. An
+attempt is one call of `act`: the one second send of a keyed call on
+a dead connection is the binding's, inside it ("What Go would decide,
+Kogo states").
 
 ### A key comes only from the runner
 

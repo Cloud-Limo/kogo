@@ -794,6 +794,19 @@ Each entry: what was decided, why, and what would reopen it.
   - Not taken: the second send turned off, the letter of DEV-714.
   - Reopen if a service is found that charges twice under one key, or if a second send is
     ever seen to end worse than `Unknown`.
+- **A restriction is carried by a form that looks special, or by a type, and not by a rule
+  on how an ordinary call's argument is written** (17 Nov 2026, Greg; `doc/gates.md`, "The
+  table is printed"). The `sql` literal and the lists look like Kogo's own, so their
+  rules surprise nobody; a call that looks like any function should take what any function
+  takes.
+  - **First applied to the printed table.** Its `asks` and `acts` lines name the function
+    that calls the service, which needs no rule. Naming the endpoint needed its argument
+    written as a top-level `val` or a call of a top-level function: a sharper table, and a
+    straitjacket on `perform`. Greg took the slightly less useful table.
+  - **Rules of this kind already taken**, each because nothing else held what it holds: a
+    proof's transaction written only before the dot (`doc/gates.md`), the five SQL calls
+    on a `Tx` written before the dot (spec 10.2), and a lambda that fails or acts passed
+    straight to a prelude function (spec 9; `doc/gates.md`). Another is recorded here.
 
 ## Taken in the v0 spec, not yet discussed
 

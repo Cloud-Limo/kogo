@@ -109,7 +109,8 @@ Agreed subject to this review:
   `recovery`, 25 of checker; `find`, 20; `fair`, 30; `soonest`, 15;
   `@Acts`, 40; the two kinds of
   transaction, 40 of checker and 30 of Go; the five places where
-  `kogo.http` states what Go would decide, 25 of Go.
+  `kogo.http` states what Go would decide, 25 of Go; the table's
+  `asks` and `acts` lines, 25.
 
 ## Choices that sit above these
 

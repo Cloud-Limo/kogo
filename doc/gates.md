@@ -520,6 +520,7 @@ submitBooking       booker
                     gate reads   booker, session
                     reads        area, booker, place, price_regime, stripe_card
                     writes       booking, passenger, journey (tenant-wide)
+                    asks         google.distance (in transaction)
 drivers             admin
                     runs         serializable
                     gate reads   booker, session
@@ -532,6 +533,7 @@ completeEmailLogin  ungated
                     reads        booker, session
                     writes       login_attempt, session
                     locks        session
+                    acts         idp.redeemEmailCode
 ```
 
 The file enforces nothing: it is what a reviewer reads.
@@ -551,14 +553,29 @@ The file enforces nothing: it is what a reviewer reads.
   alone.** Work that reads the session for itself then shows, where
   one list for the request would hide it behind the gate. A gate has
   no `writes`, since Postgres refuses one there; an ungated operation
-  has no `gate reads`; an outside step has no lines, since it holds no
-  transaction. A shared gate that reads a new table changes a line of
+  has no `gate reads`; an outside step has no lines of tables, since
+  it holds no transaction. A shared gate that reads a new table changes a line of
   every operation behind it, which is noisy and true.
 - **`locks` is a row lock, of any strength**, printed where there is
   one. Postgres reports a `select ... for update` as needing update on
   the table, as an `update` does, and marks the lock apart, which is
   how the two are told. cusoon2's requests take no locks; its logins
   and its daemon do.
+- **`asks` and `acts` are the calls to outside services**, each by
+  the name of the application's function that makes it: one that
+  calls `ask` itself, or a binding marked `@Acts` itself. It is
+  printed as its package's last name and its own, `stripe.charge`. A
+  gate's lookups are on a `gate asks` line. So a change to what an
+  operation reaches outside is a diff, a lookup added to a helper
+  three calls down included.
+- **A lookup made while a transaction is open is marked `(in
+  transaction)`**: it holds the transaction open while the service
+  answers, and a rerun asks again. An action needs no mark, since
+  none runs there. A call made with a key is marked `(keyed)`.
+- **These lines are as sharp as the code.** A function that makes
+  two calls is printed once, and a wrapper that takes its endpoint
+  as a parameter is printed as itself on every operation that uses
+  it. Nothing is refused for the table's sake.
 - **A write made under `AtTenant` is marked `(tenant-wide)`**, since
   no rule holds it: `journey` above is meant, and a `passenger` so
   marked is a diff someone has to explain. The printer knows which
@@ -1054,6 +1071,15 @@ it: a habit of the application's code, not a rule.
 - **A view printed as the tables under it.** A walk of the catalog,
   about 25 lines, for cusoon2's three views, and the one place the
   table would look past the statement's text.
+- **The endpoint's name on the `asks` and `acts` lines**, held by
+  two rules: the first argument of `ask`, `perform` and `performOnce`
+  written as a top-level `val` or a call of a top-level function,
+  and an endpoint made only at the top level. It shows both calls of
+  a function that makes two. But `perform` looks like any function,
+  and a rule on how one of its arguments is written is a
+  straitjacket on it: Greg, 17 Nov, took the slightly less useful
+  table. And the method and path as literal strings at the call,
+  which undoes "An endpoint is declared once" (`doc/work.md`).
 
 ## Open
 
@@ -1077,7 +1103,8 @@ it: a habit of the application's code, not a rule.
   lines of the SQL pass to read them, 8 to tell a lock, 30 to print
   and 15 for the command, with the walk of the functions an operation
   reaches shared with the gate's read-only check, which is perhaps 10
-  lines more. The rule on an outside step's proof is perhaps 15,
+  lines more, and the `asks` and `acts` lines perhaps 25 on that
+  walk. The rule on an outside step's proof is perhaps 15,
   and an operation wholly outside 20 of checker and 15 of handler.
   A `Reply` is perhaps 50 lines over the prelude, the checker, the
   handler and the TypeScript.

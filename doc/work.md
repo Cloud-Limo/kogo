@@ -636,17 +636,20 @@ chargeCard     effect   stripe_charge_job   attempts 1   urgent
                reads    booker, invoice, stripe_card
                writes   invoice, mail_job, payment
                locks    invoice
+               acts     stripe.charge (keyed)
 notifyBooker   job      background
                runs     plain
                reads    booker, booking
                writes   booking, mail_job
                locks    booking
+               asks     google.placeDetails (in transaction)
 ```
 
 - **A queue has one set of lines**, over every function it names
   that holds a transaction: `enter`, `prepare` and `record`, or `next`
   and `run`. Which step touches a table is in the code. `act` holds no
-  transaction and adds nothing.
+  transaction and adds no table: what it calls is on the `acts` line
+  (`doc/gates.md`, "The table is printed").
 - **An effect's table is on its first line and not below.** The
   runner claims and marks its rows in Go, which the SQL pass never
   sees, so the lines are what the queue's own functions touch. A job

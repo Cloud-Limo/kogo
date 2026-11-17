@@ -259,8 +259,9 @@ Each entry: what was decided, why, and what would reopen it.
   own checks with `git diff`, so Kogo has no flag for it. cusoon2's generator is 111 lines
   and works by reflection at run time; this one reads the checker's facts.
 - **The server is an emitted table, a Go library and the application's own `main`**
-  (15 Nov 2026; `doc/design.md` "The server"). `main` is about fifteen lines of Go that
-  read the configuration, open the pool, build the environment and mount the handler. Not
+  (15 Nov 2026; `doc/design.md` "The server"). `main` is Go that reads the
+  configuration, opens the pool, builds the environment and mounts the handler: "about
+  fifteen lines" here, which DEV-903 found to be about 240 for cusoon2 (`doc/main.md`). Not
   taken: an entry point in the language or a `kogo serve`, which would make Kogo say how
   configuration is read, how a handle is built from a secret and how other routes are
   added. An application already writes Go behind its own bindings.
@@ -891,8 +892,8 @@ Each entry: what was decided, why, and what would reopen it.
     at the edge, which the seam's rule below lets be Go.
   - **Lost:** a route's path in the printed file, and the checker's sight of each route's
     translation. What a route writes stays on its operation's lines.
-  - Open: how Go calls one operation of a table that is not mounted (DEV-903, which writes
-    cusoon2's `main` out on paper).
+  - Open: how Go calls one operation of a table that is not mounted: by wire name with
+    JSON, or by the emitted types. `doc/main.md` (DEV-903) writes both out, Q1.
   - Not taken: the `routes` list.
   - Reopen at five routes.
 - **The printed table names an operation's outside step on its first line, beside the
@@ -1950,6 +1951,21 @@ Each entry: what was decided, why, and what would reopen it.
   so principle 3 holds it to Kotlin's; `plain` is Kogo's own and keeps its difference.
 - **`trim(char)` trims by UTF-16 units**, as Kotlin's does and section 3 says, so a half
   of a pair trims and leaves U+FFFD.
+
+## Taken writing cusoon2's `main` on paper (DEV-903), not yet discussed
+
+- **`check-config` reads the file and builds every handle, and opens nothing**, as the
+  Kotlin's parses only. So a handle's constructor checks its values (an address, an
+  encoding, SMTP's security) without the network, and a bad one fails the deploy's check.
+- **`main`'s own flag comes before the mode or command**: `cusoon2 --config f record-abn
+  --business acme`. Go's `flag` stops at the first word that is not one, so the command's
+  reader is handed only its own flags. Not taken: the Kotlin's `--op <name>`, which mixes
+  the two.
+- **The webhook answers as `Bounces.kt` does**: 200 and a log line of the keys present
+  for a body missing a field, 200 for an event other than `bounce` or `reject` before
+  any other field is read, and 500 for a body that is not a JSON object, on purpose, so
+  SMTP2GO keeps form-encoded events for 48 hours rather than dropping them. Not taken:
+  `doc/gates.md`'s sketch, 400 for both.
 
 ## Spec gaps found by the leakage ports, unresolved
 

@@ -269,9 +269,12 @@ here with a limit, since a person is waiting: 90 seconds unless `main`
 says otherwise, and past it the answer is 503, so that a 500 always
 means a bug.
 
-**The application's `main`** is Go that it writes once, about fifteen
-lines: read the configuration, open the pool, build the environment's
-handles, mount the handler at a path, listen. Configuration, ports,
+**The application's `main`** is Go that it writes once: read the
+configuration, open the pool, build the environment's handles, mount
+each list's handler at its path, write its routes, listen, and drain
+on a stop; or start the runner, or run a command. For cusoon2 it is
+about 310 lines, 240 of them code, of which about 105 grow with its
+services, keys and routes (`doc/main.md`). Configuration, ports,
 paths and other routes, a webhook say, stay out of the language: a
 route is Go in `main` that calls an ungated operation of a list `main`
 does not serve to the browser (`doc/gates.md`, "Routes that are not
@@ -296,9 +299,11 @@ shows a change, so Kogo needs no flag for a stale file. The client
 that calls `fetch` is the application's: it depends on its cookies and
 its UI framework.
 
-**Not designed, on purpose:** how an operation sets a cookie (logins);
-Origin and CSRF checks, which will be options of the handler; workers;
-timeouts and retries of outbound calls.
+**Not designed yet:** Origin and CSRF checks. cusoon2's read
+the tenant table and the session row, so they cannot be Go in `main`
+(`doc/main.md`, Q4). Cookies are designed in `doc/gates.md`
+("Ungated: logins and logout"), and workers and the time limits of
+outbound calls in `doc/work.md`.
 
 ## MVP steps
 

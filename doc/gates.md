@@ -409,7 +409,7 @@ mux.HandleFunc("POST /backend/smtp2go-webhook", func(w http.ResponseWriter, r *h
     if !hook.Matches(r.Header.Get("Authorization")) { w.WriteHeader(401); return }
     event, ok := readEvent(r.Body)                  // message-id, rcpt, event
     if !ok { w.WriteHeader(400); return }
-    // an ungated operation, in a table not mounted (its form is DEV-903's)
+    // an ungated operation, in a table not mounted (doc/main.md has both forms)
     if err := hooks.Call(r.Context(), "recordDeliveryFailure", event); err != nil {
         w.WriteHeader(500); return
     }
@@ -432,8 +432,8 @@ mux.HandleFunc("POST /backend/smtp2go-webhook", func(w http.ResponseWriter, r *h
   `decisions.md` has the seam (17 Nov 2026). `main` opens the pool,
   so nothing enforces it: a reviewer holds `main` to it.
 - **Open:** how Go calls one operation of a table that is not
-  mounted. DEV-903, which writes cusoon2's `main` out on paper, shows
-  it.
+  mounted: by wire name with JSON, or by the emitted types.
+  `doc/main.md` writes both out (Q1).
 
 So the language has no `routes` list, no `Response` or `Secret`, no
 `status` or `redirect`, and `Request` gains no `query` or `body`. The

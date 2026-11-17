@@ -98,7 +98,8 @@ Agreed subject to this review:
   lines beside that walk, 10 more for the queues' and 10 for marking
   a write made under `AtTenant`; `failed` and
   `recovery`, 25 of checker; `find`, 20; `fair`, 30; `soonest`, 15;
-  `@Acts`, 40.
+  `@Acts`, 40; the two kinds of
+  transaction, 40 of checker and 30 of Go.
 
 ## Choices that sit above these
 

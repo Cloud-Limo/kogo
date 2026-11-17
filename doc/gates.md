@@ -84,9 +84,9 @@ val EDITABLE_STATES: Set<BookingState> = setOf(
 
 data class HeldBooking @UnscopedRead constructor(
     val id: ID, val state: BookingState, val isAdmin: Boolean,
-    val tenant: AtTenant, @UnscopedRead val tx: Tx)
+    val tenant: AtTenant, @UnscopedRead val tx: SerializableTx)
 
-fun booking(tx: Tx, env: Env, request: Request, id: ID, roles: Set<BookingRole>,
+fun booking(tx: SerializableTx, env: Env, request: Request, id: ID, roles: Set<BookingRole>,
             states: Set<BookingState>, action: String): Either<String, HeldBooking> = either { ... }
 ```
 
@@ -96,7 +96,7 @@ package cusoon.booker
 
 data class NotesInput(val id: ID, val notes: String)
 
-fun setBookingNotesGate(tx: Tx, env: Env, request: Request, input: NotesInput): Either<String, HeldBooking> =
+fun setBookingNotesGate(tx: SerializableTx, env: Env, request: Request, input: NotesInput): Either<String, HeldBooking> =
     booking(tx, env, request, input.id, ADMIN_OR_OWNER_ROLES, EDITABLE_STATES, "set the notes on")
 
 fun setBookingNotes(env: Env, booking: HeldBooking, input: NotesInput): Either<String, BookingView> = either {
@@ -196,7 +196,7 @@ A gate that takes no input is named by many rows, and their operations
 have no gate function of their own:
 
 ```kotlin
-fun admin(tx: Tx, env: Env, request: Request): Either<String, Admin> = either { ... }
+fun admin(tx: SerializableTx, env: Env, request: Request): Either<String, Admin> = either { ... }
 
 fun drivers(env: Env, admin: Admin, input: DriversInput): Either<String, List<DriverView>> = either { ... }
 ```
@@ -264,7 +264,7 @@ already (`scoped.kt`: a public function takes the held row and calls a
 private one by id):
 
 ```kotlin
-// Refused: the proof's transaction leaves it, and the helper's statement is on a plain Tx.
+// Refused: the proof's transaction leaves it, and the helper's statement is on a bare Tx.
 fun removePassenger(booking: HeldBooking, passengerId: ID): Boolean =
     deletePassenger(booking.tx, passengerId)
 ```
@@ -276,12 +276,12 @@ model.kg:2:5 proof-tx-escapes: booking.tx is passed to deletePassenger; a proof'
 So a helper takes the proof, and its statements are under the rule.
 Work done under several proofs takes an interface they implement
 (spec 3.4), `interface OnBooking { val id: ID; @UnscopedRead val tx:
-Tx }`. Code that holds a plain `Tx` (a gate, an ungated operation, the
-daemon) opts in and may make a proof, so it reaches a function written
-for proofs by wrapping its transaction: a login answers
-`bookerView(AtTenant(tx), booker)`, which gated work calls as
-`bookerView(held.tenant, held.booker)`. The cost is that wrapping, not
-a second form of each function. Agreed with Greg on 17 Nov 2026.
+Tx }`. Code that holds a bare transaction (a gate, an ungated
+operation, the daemon) opts in and may make a proof, so it reaches a
+function written for proofs by wrapping its transaction: a login
+answers `bookerView(AtTenant(tx), booker)`, which gated work calls as
+`bookerView(held.tenant, held.booker)`. The cost is that wrapping,
+not a second form of each function. Agreed with Greg on 17 Nov 2026.
 
 The rule is odd for a general language. It fires only where a
 transaction is reached through a proof, so a program with no proofs
@@ -308,7 +308,7 @@ if anyone, is asking:
 ```kotlin
 data class MaybeBooker @UnscopedRead constructor(val tenant: AtTenant, val booker: HeldBooker?)
 
-fun maybeBooker(tx: Tx, env: Env, request: Request): Either<String, MaybeBooker> = either {
+fun maybeBooker(tx: SerializableTx, env: Env, request: Request): Either<String, MaybeBooker> = either {
     MaybeBooker(atTenant(tx, request).bind(), booker(tx, env, request).getOrNull())
 }
 ```
@@ -378,7 +378,7 @@ api booker {
     whoAmI  ungated        // the page's first call: makes the session when there is none
 }
 
-fun whoAmI(tx: Tx, env: Env, request: Request, input: Unit): Either<String, Reply<BookerView?>> = either {
+fun whoAmI(tx: SerializableTx, env: Env, request: Request, input: Unit): Either<String, Reply<BookerView?>> = either {
     val live = liveSession(tx, env, request)
     val session = live ?: createSession(tx, tenantOf(tx, request).bind())
     val cookies = if (live == null) sessionCookies(session, env.clock.now(), isSecure(request)) else emptyList()
@@ -511,17 +511,21 @@ is then a diff, made on purpose or by accident:
 
 ```
 setBookingNotes     booking      input.id, ADMIN_OR_OWNER_ROLES, EDITABLE_STATES
+                    runs         serializable
                     gate reads   booking, booking_role, session
                     reads        booking
                     writes       booking
 submitBooking       booker
+                    runs         serializable
                     gate reads   booker, session
                     reads        area, booker, place, price_regime, stripe_card
                     writes       booking, passenger, journey (tenant-wide)
 drivers             admin
+                    runs         serializable
                     gate reads   booker, session
                     reads        person, tenant_driver
 areas               anyone
+                    runs         serializable
                     gate reads   tenant
                     reads        area
 completeEmailLogin  ungated
@@ -573,6 +577,114 @@ a table named only in an `exists`, a `select ... for update`, a
 listed), and a `delete`; and, for the gate's check, `for share` and
 `for key share`, which Postgres marks as it does `for update`. Not
 run: a cascade, a trigger and `for no key update`.
+
+## Two kinds of transaction
+
+cusoon2 runs its requests at SERIALIZABLE with no locks, and reruns
+one on a conflict; its daemon, logins and logout run at READ
+COMMITTED and lock what they read. Most programs work the second way
+throughout. In the Kotlin a flag on `Model`, read as a statement is
+built (`withLocking`), decides whether a read locks, so one call
+sends three statements:
+
+```kotlin
+unscopedInvoice(id)                                     // a request:           select ... where id = ?
+model.unscopedInvoice(row.invoiceId)                    // the charge's prepare: select ... for share
+model.unscopedInvoice(row.invoiceId, forUpdate = true)  // the charge's record:  select ... for update
+```
+
+Kogo's statements are constants and a transaction has no flag, so the
+kind is the handle's type, and every function that takes a
+transaction writes one of two:
+
+- **`Tx` is any transaction.** A function that takes it assumes
+  nothing, and locks what it needs.
+- **`SerializableTx` is one that is rerun on a conflict.** A function
+  that takes it may read with no lock. It fits wherever a `Tx` is
+  wanted.
+
+```kotlin
+fun invoice(tx: SerializableTx, id: ID): Invoice? =            // relies on serializable
+    tx.queryOne<Invoice>(sql"select * from invoice where id = $id")
+
+fun sharedInvoice(tx: Tx, id: ID): Invoice? =                  // holds the row against a change
+    tx.queryOne<Invoice>(sql"select * from invoice where id = $id for share")
+
+fun lockedInvoice(tx: Tx, id: ID): Invoice? =                  // about to write it
+    tx.queryOne<Invoice>(sql"select * from invoice where id = $id for update")
+```
+
+```
+invoices.kg:40:19 needs-serializable: invoice takes a SerializableTx and sendInvoice holds a Tx: call a function that locks
+```
+
+- **Who opens which is read from the type.** `db.tx { }` gives a `Tx`
+  at READ COMMITTED, set by the handle and not left to the database's
+  default; `db.tx(serializable = true) { }` gives a `SerializableTx`.
+  For a transaction the server or the runner opens, the first
+  parameter of the gate, the ungated operation or the queue's step
+  says which. There is no default.
+- **A gate on a `Tx` may lock, and still may not write.** Where
+  nothing is rerun on a conflict the gate is where the lock belongs:
+  without it, what the gate found can change before the work writes.
+  A gate on a `SerializableTx` is as above: a lock is refused.
+- **A rerun is safe at either level**, since nothing marked `@Acts`
+  runs in a transaction. A `Tx` the server or the runner opened is
+  rerun on a deadlock.
+- **The printed table says which**, on a line of its own: `runs
+  serializable` or `runs plain`. An operation that takes a `Db` has
+  no such line: it opens its own.
+
+**A proof made both ways shares an interface**, as work done under
+several proofs does. A tenant's proof is made by a request and by the
+daemon (the names here are invented):
+
+```kotlin
+interface InTenant { @UnscopedRead val tx: Tx }                // the tenant is bound; assume no more
+
+data class AtTenant @UnscopedRead constructor(@UnscopedRead override val tx: SerializableTx) : InTenant   // a request's
+data class WorkerTenant @UnscopedRead constructor(@UnscopedRead override val tx: Tx) : InTenant           // the daemon's, or a login's
+
+fun nextInvoiceNumber(at: AtTenant): Long = ...                // relies on serializable: a request alone calls it
+fun lockedInvoice(at: InTenant, id: ID): Invoice? = ...        // locks for itself: either calls it
+```
+
+Run on Kotlin 2.4.0 on 17 Nov 2026: it compiles and runs, a marked
+`val` in an interface included, and a `WorkerTenant` passed where an
+`AtTenant` is wanted is refused. Kogo gains one thing for it: a data
+class may implement an interface's `val` with a type that fits it.
+
+**For a port of cusoon2.** The gates and proofs of its requests say
+`SerializableTx`, as the examples above do, and the daemon's
+functions say `Tx`. Each read of the daemon's writes its lock in its
+statement, where the Kotlin's flag added it out of sight. A read used
+both ways becomes two functions, so that a request sends the
+statement the Kotlin sends. About 30 reads of `database.kt` go
+through the flag; how many are used both ways was not counted.
+
+**What a gate on a `Tx` loses.** The server cannot put it in
+Postgres's read-only mode, which refuses a lock as it refuses a
+write, and Postgres has no mode that allows the one and refuses the
+other. So such a gate is held by the check made when it compiles,
+which does not see a `select` of a function that writes, or of
+`nextval`. Postgres knows which functions may write, so the checker
+could refuse those in a gate; that was not tried, and binding the
+tenant is itself such a function.
+
+Perhaps 40 lines of checker, 30 of Go and 60 of tests. Weighed and
+not taken:
+
+- **The level stated on the list, or in `main`.** A function would
+  then rely on what its signature does not say, and one called from
+  both kinds of transaction would be wrong in one of them in silence.
+- **A flag on the handle, read when the program runs**, as the Kotlin
+  has: one call that sends different SQL by who opened the
+  connection.
+- **One function that locks, for a read used both ways.** It is
+  allowed, since a `SerializableTx` fits a `Tx`, and costs a lock the
+  Kotlin does not take; a port writes two.
+
+Agreed with Greg on 17 Nov 2026.
 
 ## Outside calls
 
@@ -688,7 +800,7 @@ api booker {
 }
 
 // In a transaction that then ends. Our own refusals belong here.
-fun updateBookerGate(tx: Tx, env: Env, request: Request, input: BookerInput): Either<String, HeldBooker> = either {
+fun updateBookerGate(tx: SerializableTx, env: Env, request: Request, input: BookerInput): Either<String, HeldBooker> = either {
     val booker = booker(tx, env, request, input.id).bind()
     if (input.email != booker.email) {
         ensure(booker.isAdmin) { EMAIL_CHANGE_BY_US_MESSAGE }
@@ -777,8 +889,9 @@ binding says `lookup` or `action` and nothing more.
 
 ## What the checker holds
 
-- A gate reaches no statement that writes or locks, by Postgres's
-  answer.
+- A gate reaches no statement that writes, by Postgres's answer, nor
+  one that locks where its transaction is a `SerializableTx`.
+- A function that takes a `SerializableTx` is not handed a `Tx`.
 - A function that calls an action carries `@Acts`, and one that
   carries it calls one.
 - A function that carries `@Acts` takes no `Tx`, and a proof only as
@@ -809,6 +922,8 @@ transaction out of one.
   nothing but the policy, and the printed table shows a change to it.
 - **Whether a gate's own code is right.** There are few gates, in one
   file.
+- **Whether a gate on a `Tx` locks enough**, or calls a function
+  that writes ("Two kinds of transaction").
 - **Whether a bound value scopes its statement.**
   `where id = $passengerId or booking_id = ${booking.id}` compiles.
 - **Whether a function takes the narrowest proof.**
@@ -841,8 +956,13 @@ it: a habit of the application's code, not a rule.
 - **15, a new part:** proofs, the rule on statements and on a proof's
   transaction, the read-only gate and the outside step.
 - **3.4 and 11:** an interface may declare a marked `val`, so proofs
-  share one (`OnBooking`). Kotlin's acceptance of the marker there is
-  to be checked before it is promised.
+  share one (`OnBooking`), and a data class may implement a `val`
+  with a type that fits it. Kotlin 2.4.0 accepts both (run on 17
+  Nov 2026).
+- **7, 10.7 and 15.3:** `SerializableTx` beside `Tx`; `db.tx` states
+  READ COMMITTED; the first parameter of a gate or an ungated
+  operation says which the server opens, where 15.3 has it always
+  SERIALIZABLE.
 - **13:** a binding with an effect says `lookup` or `action`.
 - **11 and 13:** a binding that acts carries the prelude's marker
   `Acts`, and so does every function that calls one: the one marker

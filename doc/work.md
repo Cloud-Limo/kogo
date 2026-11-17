@@ -338,6 +338,12 @@ effect only by inserting a row; "a remote write happens in no
 transaction, ever." Every job keeps to it, and nothing holds them to
 it: `sendOpsEmail` sends at once and any job may call it.
 
+Its transactions are at READ COMMITTED, and it locks what it reads.
+So a worker's functions take a `Tx`, not a `SerializableTx`, and each
+read writes its lock in its statement (`doc/gates.md`, "Two kinds of
+transaction"). A queue whose steps took a `SerializableTx` would be
+run that way.
+
 ### A job cannot call an action
 
 A job is a function that holds a `Tx`, so the rule for requests holds
@@ -565,10 +571,12 @@ under each the tables it reads, writes and locks (`doc/gates.md`,
 
 ```
 chargeCard     effect   stripe_charge_job   attempts 1   urgent
+               runs     plain
                reads    booker, invoice, stripe_card
                writes   invoice, mail_job, payment
                locks    invoice
 notifyBooker   job      background
+               runs     plain
                reads    booker, booking
                writes   booking, mail_job
                locks    booking

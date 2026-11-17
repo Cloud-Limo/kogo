@@ -757,6 +757,24 @@ Each entry: what was decided, why, and what would reopen it.
     plainer and keeps spec 11 to one rule; two environments, one that can act.
   - Reopen with DEV-894: if Kogo's additions are to stay unlike Kotlin, respell it
     `action fun`, with the binding's words.
+- **A transaction's kind is its handle's type: `Tx` is any, and `SerializableTx` is one
+  that is rerun on a conflict** (17 Nov 2026, Greg; `doc/gates.md`, "Two kinds of
+  transaction"). Kogo is to support explicit locking as naturally as cusoon2's way.
+  - **Why.** The designs assumed SERIALIZABLE in three places: spec 15.3 has the server
+    always open it, a gate could not lock, and no level was stated for a worker. cusoon2
+    itself runs both ways, its requests serializable and its daemon and logins at READ
+    COMMITTED with locks, and chooses a read's lock by a flag on `Model` when it runs, so
+    one call sends three statements. Which kind of transaction a function is in was the
+    last thing it relied on that nothing wrote.
+  - **The rule.** A function that takes a `Tx` assumes nothing and locks what it needs;
+    one that takes a `SerializableTx` may read with no lock, and is not handed a `Tx`. A
+    `SerializableTx` fits a `Tx`. The type says which `db.tx` gives and which the server or
+    the runner opens, with no default. A gate on a `Tx` may lock.
+  - **Accepted cost.** A read used both ways is two functions in a port, or one that
+    takes a lock the Kotlin does not. A gate on a `Tx` cannot run in Postgres's read-only
+    mode, so a `select` of a function that writes passes it.
+  - Not taken: the level on the list or in `main`; a flag on the handle.
+  - Reopen if the two functions of a shared read become the common case in a port.
 
 ## Taken in the v0 spec, not yet discussed
 

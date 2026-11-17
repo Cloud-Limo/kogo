@@ -966,6 +966,8 @@ it: a habit of the application's code, not a rule.
 
 ## What it would change in the spec
 
+- **1 and 15:** lists are stated once, by one rule for a role's
+  shape and one table of roles (`doc/lists.md`).
 - **15.1:** a row names a gate or says `ungated`.
 - **15.2:** "Nothing runs before an operation" is reversed for a gated
   one, whose shape becomes environment, proof, input.

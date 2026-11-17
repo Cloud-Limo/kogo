@@ -38,6 +38,12 @@ the design to work from, not built, not in `spec.md`, no example run.
 
 ## For whoever reviews the whole design
 
+Greg, 17 Nov, asked for one thing more: a deep-dive assessment of
+what the lists are trying to do, a dispassionate look at how, and
+other ways of doing the same, more explicit ones and ones with as
+much magic expressed differently (`doc/lists.md`, "Asked for: a deep
+dive").
+
 Greg, 17 Nov: the design has kept clear of magic, needs a little, and
 any of it makes him nervous. Look hard at each place where something
 happens that is not written where it is used. The test that came of
@@ -120,7 +126,9 @@ Agreed subject to this review:
   `routes`, `commands`, `job`, `effect`, `work` and a binding's
   `lookup` are spelt, and whether `@Acts` stays a marker or becomes
   `action fun` (`doc/gates.md`, "A function that acts says so"). Each
-  design here was written to hold either way.
+  design here was written to hold either way. One constraint on it,
+  agreed 17 Nov: the lists have at most two forms, a list of rows and
+  a block of named parts (`doc/lists.md`).
 - **Where Kogo ends and Go begins.** To research. The review of 17 Nov
   leaned on Go more as it went: each service's handle states its
   encoding; the binding sorts a failed send by status; Go draws a PDF

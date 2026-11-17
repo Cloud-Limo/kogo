@@ -834,6 +834,16 @@ Each entry: what was decided, why, and what would reopen it.
     the Kotlin does not write; the runner sending mail, with the wording in Go.
   - Reopen if an alert lost to a server that was down is ever missed: a row would then
     hold it.
+- **The lists are one mechanism, stated once: one rule for a role's shape and one table of
+  roles** (17 Nov 2026, Greg; `doc/lists.md`). Six lists and fifteen roles had each been
+  designed alone, against principle 6. A function the runtime calls takes the handle it
+  runs in, the environment, what it is about and what it works on, in that order; the
+  checker fits stages from the table; spec 1 keeps three additions, the third being lists.
+  `enter` gains the environment, the one shape that broke the rule. The spelling has at
+  most two forms, which DEV-894 inherits.
+  - Asked for by Greg on agreeing: a deep dive into what the lists are for, how they do it,
+    and other ways, more explicit or as magic and expressed differently. The mechanism
+    stands until then.
 
 ## Taken in the v0 spec, not yet discussed
 

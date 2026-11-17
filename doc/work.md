@@ -882,7 +882,7 @@ effect chargeCard on stripe_charge_job {
 }
 
 data class Claim(val id: ID, val tenantId: ID)      // read from the view, by the rule SQL's columns have
-fun bindTenantOf(tx: Tx, claim: Claim) { ... }
+fun bindTenantOf(tx: Tx, env: Env, claim: Claim) { ... }
 ```
 
 The runner claims from `find`, calls `enter` with what it read there,
@@ -1072,7 +1072,8 @@ heaviest tests.
 - **10.4 and 3:** `bytea` maps to `ByteArray`, which has no
   operations and no `==`; the one array.
 - **12, the prelude:** `kogo.mail`.
-- **A new section:** `job`, `effect` and `work`.
+- **A new section:** `job`, `effect` and `work`, stated with the
+  other lists by one rule and one table of roles (`doc/lists.md`).
 - `doc/design.md`: "Not designed, on purpose" loses workers, and the
   timeouts of outbound calls.
 

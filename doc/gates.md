@@ -1,0 +1,636 @@
+# Gates: who may call an operation
+
+Agreed with Greg in discussion on 17 Nov 2026, as the design to work
+from. `doc/work.md` has the rest of that day: workers, outside
+services and time limits; `doc/measured.md` has the counts both rest
+on. It is not built and not in `spec.md`: until it is, the spec
+stands as written. No example here has been through `kogo check`, the
+names in them are invented, and every size is a guess.
+
+## The problem
+
+Every request comes from someone, names a thing, and asks to read or
+change it. Before any work, one question must be settled: may this
+caller do this action to this thing, in the state the thing is in now?
+If not, the request is refused in words that reveal nothing. If so, the
+work is done on the thing that was checked, and on nothing else.
+
+A request is therefore a pipeline, and each stage consumes what the
+stage before produced:
+
+```
+bytes ──read──► input ──gate──► proof ──work──► answer ──write──► JSON
+        400 if it       refused if
+        does not fit    not allowed
+```
+
+Kogo already runs the first stage: an operation never sees the body,
+only its typed input. This design has it run the second as well: the
+work never sees the request, only the gate's proof.
+
+## What was measured
+
+Counted in cusoon2 at `691aa93cf` on 17 Nov 2026, by regex over the
+source, so approximate.
+
+- 73 GraphQL fetchers and 20 RPC operations. 48 fetchers call a gate
+  and 25 do not, on purpose; a 26th by mistake would compile.
+- The gates are 8 functions. A fetcher's policy is its first two
+  lines: `requireVisibleBooking(id)`, then
+  `access.require(roles, states) { action }`.
+- The access matrix test's 44 rows by 6 callers collapse to 7 patterns
+  of allowed and refused, and three of them cover 37 rows: admin only;
+  owner and admin; payer, owner and admin.
+- 23 of the 48 gated fetchers are for an admin alone. The 14 booking
+  writes that call `require` use three sets of roles and eight sets of
+  states.
+- 11 of the 48 read the caller's role again inside the work.
+- 28 of the 48 gates read nothing of the input (16 admin, 9 booker,
+  3 viewer); 20 name a thing in it.
+- 74 functions of `Model` take a bare id unmarked, and 26 of the public
+  ones write. `deletePassenger(passengerId)` deletes any passenger of
+  the tenant.
+
+## The design
+
+### The list states each operation's gate
+
+A row of an `api` list is an operation and its gate, or an operation
+marked `ungated`:
+
+```kotlin
+api booker {
+    setBookingNotes     gatedBy setBookingNotesGate
+    drivers             gatedBy admin
+    areas               gatedBy anyone
+    completeEmailLogin  ungated
+}
+```
+
+### A gate and its work are two functions
+
+The gate takes what an operation takes today and gives a proof or a
+refusal. The work takes the proof where the request was.
+
+```kotlin
+// Gate file: the only file that makes a HeldBooking.
+@file:OptIn(UnscopedRead::class)
+package cusoon.gate
+
+val ADMIN_OR_OWNER_ROLES: Set<BookingRole> = setOf(BookingRole.Admin, BookingRole.Owner)
+val EDITABLE_STATES: Set<BookingState> = setOf(
+    BookingState.Unpriced, BookingState.Priced, BookingState.Assigned,
+    BookingState.Confirmed, BookingState.Complete)
+
+data class HeldBooking @UnscopedRead constructor(
+    val id: ID, val state: BookingState, val isAdmin: Boolean,
+    val tenant: AtTenant, @UnscopedRead val tx: Tx)
+
+fun booking(tx: Tx, env: Env, request: Request, id: ID, roles: Set<BookingRole>,
+            states: Set<BookingState>, action: String): Either<String, HeldBooking> = either { ... }
+```
+
+```kotlin
+// Operation file: does not opt in.
+package cusoon.booker
+
+data class NotesInput(val id: ID, val notes: String)
+
+fun setBookingNotesGate(tx: Tx, env: Env, request: Request, input: NotesInput): Either<String, HeldBooking> =
+    booking(tx, env, request, input.id, ADMIN_OR_OWNER_ROLES, EDITABLE_STATES, "set the notes on")
+
+fun setBookingNotes(env: Env, booking: HeldBooking, input: NotesInput): Either<String, BookingView> = either {
+    setNotes(booking, input.notes)
+    bookingView(booking)
+}
+```
+
+```kotlin
+// Model file: opts in, and holds the SQL.
+fun setNotes(booking: HeldBooking, notes: String) {
+    booking.tx.execute(sql"update booking set notes = $notes where id = ${booking.id}")
+}
+```
+
+For one request the server:
+
+1. reads the body into the work's input type, or answers 400;
+2. opens the transaction and calls the gate with it, the environment,
+   the request and the input;
+3. on a refusal, rolls back and answers with the gate's words;
+4. otherwise calls the work with the environment, the proof and the
+   input, and commits and answers as it does today.
+
+A gate is ordinary code and may run any number of steps before it
+answers, each with `bind`: who is asking, then what they are to the
+thing named, then whether its state allows the action. There is one
+gate for an operation and no stack of layers: what ran before the
+work, and in what order, is read from one function.
+
+### A gate reads and decides; it does not write
+
+Every gate of cusoon2 obeys this already: none writes a row, and two
+of the ops site's bind a tenant, which is a setting of the
+transaction. Its routes do write, in front of the gates: each makes a
+session for a request that comes without a live one ("The first call"
+below). It makes a gate safe to run twice, which the outside step
+below needs. A count of attempts writes, so it is no gate's: it
+belongs to an ungated operation or an outside step. Both checks were
+run on Postgres 18.7 on 17 Nov 2026:
+
+- **When it runs.** The server runs the gate in a savepoint with
+  `transaction_read_only` on and releases it before the work. Postgres
+  then refuses a write in the gate, one inside a SQL function
+  included, and `nextval`, and a row lock (`for update`, `for share`,
+  `for key share`); it allows `set_config`. After the release the
+  transaction writes again, and a setting made in the gate is still
+  set, until the transaction ends.
+- **When it compiles.** A statement a gate reaches is refused unless
+  every table that Postgres's tree lists for it needs select alone:
+  the tree the printed table is read from ("The table is printed"
+  below). Over twelve statements it refused what the run refused: an
+  `update`, an `insert ... returning`, an `update` through a view, a
+  `with` that deletes and the three locks; and it passed a `select`, a
+  `select` from a view and the tenant's binding. A `select` of a
+  function that writes, or of `nextval`, is not caught; the run finds
+  it. The message is Kogo's and names the table:
+
+```
+gate.kg:41:9 gate-writes: this statement updates person, and a gate only reads: move it to the work
+gate.kg:52:9 gate-writes: this statement locks session, and a gate only reads: lock it in the work
+```
+
+### A gate that reads no input is shared
+
+A gate that takes no input is named by many rows, and their operations
+have no gate function of their own:
+
+```kotlin
+fun admin(tx: Tx, env: Env, request: Request): Either<String, Admin> = either { ... }
+
+fun drivers(env: Env, admin: Admin, input: DriversInput): Either<String, List<DriverView>> = either { ... }
+```
+
+### The proof is the only handle
+
+A proof (a *held* value) is a data class whose constructor is marked,
+so only a file that opts in makes one: the gate's, or the model's for a
+row it has just inserted. It carries the facts the gate found and the
+transaction, in a marked property that only such a file reads.
+
+So the work has no `Request` and no `Tx`. It cannot write SQL, and it
+cannot call a function that takes a `Tx` and a bare id. A model
+function says in its signature whose authority it acts under.
+
+- **Shared reads take a wider proof.** Places, areas and prices are
+  read under many proofs, so every proof carries a tenant's, `AtTenant`:
+  the caller is inside this tenant and may read what any of its users
+  may. Row-level security in Postgres scopes its statements.
+- **Making a thing gives its proof.** `insertBooking(held, ...)` takes
+  the proof that the caller may book and gives the `HeldBooking` of the
+  new row, which the writes that follow take.
+- **An admin's proof is its own type.** `AdminBooking` is not a
+  `HeldBooking`, and the model's admin-only functions take the first,
+  so work for an admin paired with a gate that admits an owner does not
+  compile. Owner against payer, and the states, are arguments of the
+  gate.
+- **A proof carries facts.** A rule that needs data the gate has not
+  read stays in the work and reads the proof: `held.isAdmin`.
+
+### A statement binds something from its proof
+
+A statement run on a proof's transaction binds at least one other
+property of that proof, written directly.
+
+```kotlin
+// Refused: runs on booking's transaction and binds nothing of booking.
+fun deletePassenger(booking: HeldBooking, passengerId: ID): Boolean =
+    booking.tx.execute(sql"delete from passenger where id = $passengerId") == 1
+
+// Accepted.
+fun deletePassenger(booking: HeldBooking, passengerId: ID): Boolean =
+    booking.tx.execute(sql"delete from passenger where id = $passengerId and booking_id = ${booking.id}") == 1
+```
+
+The checker reads the receiver of the call and the values the literal
+binds, both of which it has; it does not read the SQL. The rule holds
+whichever way SQL's parameters come to be spelt (DEV-894). A proof
+with nothing but the transaction, as `AtTenant`, is not held to it.
+
+The rule is odd for a general language. It fires only where a
+transaction is reached through a proof, so a program with no proofs
+never meets it, and it is no flag of `kogo check`: a flag would make
+two dialects and put the safety outside the source.
+
+### Gates that admit anyone
+
+What cusoon2 leaves without a gate is three things, and two of them
+have one.
+
+- **A tenant's public reads** (about 16: areas, branding, place
+  suggestions). Nobody logs in, but the read is of one tenant:
+  `gatedBy anyone`, whose proof is `AtTenant`. A search for `anyone`
+  lists the public doors.
+- **Bearer links** (4: an invoice, a charge, a payment link, a new
+  booker's secret). The secret in the input is the credential, and its
+  gate gives the proof of that one thing.
+
+### Ungated: logins and logout
+
+Five fetchers on the booker side, and the ops site's logins. They read
+the request's own session and address, must keep the count of a failed
+attempt after a refusal, call the identity service, and make the
+session that every gate reads. An `ungated` operation takes today's
+four parameters, a `Db` among them where it runs its own transactions
+(spec 15.3). It is trusted code and sits beside the gates.
+
+A login ends the caller's session and starts another, and the browser
+must be given the new one's cookies. cusoon2's fetcher leaves the
+session in a slot of the request's context (`renewedSession`), which
+the route reads after, and guards against the slot being filled
+twice. Here the answer carries them, in two types of `kogo.rpc`:
+
+```kotlin
+// kogo.rpc
+data class Cookie(val name: String, val value: String, val path: String, val maxAgeSeconds: Long,
+                  val sameSite: SameSite, val secure: Boolean, val httpOnly: Boolean)
+data class Reply<A>(val answer: A, val cookies: List<Cookie>)
+```
+
+```kotlin
+fun completeEmailLogin(db: Db, env: Env, request: Request, input: CodeInput): Either<String, Reply<BookerView>> = either {
+    val user = redeemEmailCode(db, env, request, input.oneTimeCode).bind()
+    val session = db.tx(serializable = true) { tx -> completeLogin(tx, env, request, user) }.bind()
+    Reply(bookerView(session), sessionCookies(session, env.clock.now(), isSecure(request)))
+}
+
+// The application's own: which cookies, and their names, paths and flags.
+fun sessionCookies(session: Session, now: Instant, secure: Boolean): List<Cookie> = ...
+```
+
+The server sends `answer` as the JSON and each cookie as a
+`Set-Cookie` header, when the operation answers; a refusal sets none.
+Only an ungated operation answers with a `Reply`, so a search for it
+lists every place a cookie is set. The browser's TypeScript has the
+answer's type alone.
+
+### The first call makes the session
+
+A session's row is there before anyone logs in: it holds the CSRF
+token, the emailed code and the count of attempts. cusoon2's routes
+make it for any request that comes without a live one, before a
+fetcher runs. A first load's many requests then each made a session,
+so its page already makes one request and waits for it before it
+draws anything (`InitializeSession.tsx`): the `Booker` query.
+
+A gate does not write and nothing runs before one, so in Kogo that
+first call is an ungated operation that says what it does, and no
+other request makes a session. Kogo gains nothing for it:
+
+```kotlin
+api booker {
+    whoAmI  ungated        // the page's first call: makes the session when there is none
+}
+
+fun whoAmI(tx: Tx, env: Env, request: Request, input: Unit): Either<String, Reply<BookerView?>> = either {
+    val live = liveSession(tx, env, request)
+    val session = live ?: createSession(tx, tenantOf(tx, request).bind())
+    val cookies = if (live == null) sessionCookies(session, env.clock.now(), isSecure(request)) else emptyList()
+    Reply(bookerOf(tx, session), cookies)
+}
+```
+
+A request with no live session is refused by a gate that needs one
+and served by `anyone`, which needs the tenant alone. Cookies are set
+by the first call, a login and a logout, where cusoon2 sets them on
+every response: the same cookies, since a session's deadline does not
+move. It changes how cusoon2 behaves, so it is made in the Kotlin
+first, under its tests, and ported after.
+
+### The table is printed
+
+A command of its own prints, from the list, the gate functions and
+Postgres's answers, each operation with its gate, the arguments it
+passes and the tables it touches, into a file that is checked in. A
+change of who may do what, or of what an operation reads and writes,
+is then a diff, made on purpose or by accident:
+
+```
+setBookingNotes     booking      input.id, ADMIN_OR_OWNER_ROLES, EDITABLE_STATES
+                    gate reads   booking, booking_role, session
+                    reads        booking
+                    writes       booking
+drivers             admin
+                    gate reads   booker, session
+                    reads        person, tenant_driver
+areas               anyone
+                    gate reads   tenant
+                    reads        area
+completeEmailLogin  ungated
+                    reads        booker, session
+                    writes       login_attempt, session
+                    locks        session
+```
+
+The file enforces nothing: it is what a reviewer reads.
+
+- **It is kept fresh as the TypeScript file is** (`doc/design.md`,
+  "The server"): the application's checks run the command and fail
+  when `git diff` shows a change, so Kogo has no rule for a stale
+  file. The command needs a database, as `kogo check` does.
+- **The tables are those a statement names**, over the statements the
+  gate or the work reaches. Postgres gives them: the tree the SQL pass
+  already reads for what can be null lists every table of a statement,
+  however deep, with the permissions it needs there. A table can be on
+  two lines: an `update` with a `where` reads the table it writes.
+  Tables are in alphabetical order, so the order statements are
+  written in is no diff.
+- **`gate reads` is the gate's; `reads` and `writes` are the work's
+  alone.** Work that reads the session for itself then shows, where
+  one list for the request would hide it behind the gate. A gate has
+  no `writes`, since Postgres refuses one there; an ungated operation
+  has no `gate reads`; an outside step has no lines, since it holds no
+  transaction. A shared gate that reads a new table changes a line of
+  every operation behind it, which is noisy and true.
+- **`locks` is a row lock, of any strength**, printed where there is
+  one. Postgres reports a `select ... for update` as needing update on
+  the table, as an `update` does, and marks the lock apart, which is
+  how the two are told. cusoon2's requests take no locks; its logins
+  and its daemon do.
+- **A view is listed by its own name**, read or written.
+- **It does not see** inside a function, under a view, or a row that a
+  foreign key's cascade or a trigger changes. It lists what the
+  statement's text names.
+
+Run on Postgres 18.7 on 17 Nov 2026, in a scratch database made from
+`testdata/schema.sql` with a view and a function added: a join, an
+`update`, an `insert ... select ... returning`, a `with` that deletes,
+a table named only in an `exists`, a `select ... for update`, a
+`select` from a view, a `select` of a function that writes (nothing is
+listed), and a `delete`; and, for the gate's check, `for share` and
+`for key share`, which Postgres marks as it does `for update`. Not
+run: a cascade, a trigger and `for no key update`.
+
+## Outside calls
+
+A transaction is all or nothing and may be run again from the start.
+A call to another service is neither: it cannot be rolled back, and
+run twice it happens twice. Made inside a transaction it can be done
+twice, be done and then undone on our side alone, or hold the
+transaction open while the service answers.
+
+cusoon2's daemon already has the rule, agreed 25 Sep 2026
+(`doc/plans/effect-runner.md` there): "A remote write happens in no
+transaction, ever." Its requests do not. Of the 73 fetchers, 7 queue a
+row for the daemon, about 9 look something up (Google's places and
+distances, the identity service's "has a passkey?"), 4 are logins, and
+4 change something outside in the middle of their transaction (three
+passkey operations and a booker's change of address). The ops site
+has the same three passkey operations, so seven in all. Six comments
+argue, call by call, what a rerun would do.
+
+- **A binding says what kind of call it is**: a `lookup` asks and
+  changes nothing; an `action` changes something outside. The one
+  outbound binding is a general HTTP call, and each endpoint of a
+  service is declared once with its kind (`doc/work.md`).
+- **An action is refused where a transaction is open**: in a function
+  that holds a `Tx` or a proof, and in a `db.tx { }` block. A function
+  that calls an action is one, so a helper hides none. The outside
+  step is the one function that holds a proof and may act.
+- **An action has three homes**: a worker, fed by a row; an ungated
+  operation, between its own transactions; and the outside step.
+- **A lookup is allowed anywhere.** A slow one still holds a
+  transaction open, as today.
+
+### The outside step
+
+An operation may name a step that runs between its gate and its work
+with no transaction open:
+
+```kotlin
+api booker {
+    updateBooker gatedBy updateBookerGate outside renameLogins
+}
+
+// In a transaction that then ends. Our own refusals belong here.
+fun updateBookerGate(tx: Tx, env: Env, request: Request, input: BookerInput): Either<String, HeldBooker> = either {
+    val booker = booker(tx, env, request, input.id).bind()
+    if (input.email != booker.email) {
+        ensure(booker.isAdmin) { EMAIL_CHANGE_BY_US_MESSAGE }
+        ensure(emailIsFree(booker, input.email)) { "A booker with this email already exists." }
+    }
+    booker
+}
+
+// No transaction is open. The service may refuse, and nothing is written.
+fun renameLogins(env: Env, booker: HeldBooker, input: BookerInput): Either<String, Unit> = either {
+    if (input.email != booker.email) {
+        booker.idpUserId?.let { ensure(setUserEmail(env.idp, it, input.email)) { EMAIL_HAS_LOGIN_MESSAGE } }
+        booker.stripeCustomerId?.let { updateCustomerEmail(env.stripe, it, input.email) }
+    }
+}
+
+// A new transaction, in which the server runs the gate again first.
+fun updateBooker(env: Env, booker: HeldBooker, input: BookerInput): Either<String, BookerView> = either {
+    saveBooker(booker, input)
+    bookerView(booker)
+}
+```
+
+The step is handed the gate's proof after that proof's transaction
+has ended, for the facts in it: an address, an id at the identity
+service. cusoon2's four read nothing else there. So an outside step
+passes no proof to a call, and SQL in one is an error of the checker
+and not a failure of the runs that reach it, after the service has
+been changed:
+
+```
+booker.kg:31:5 outside-passes-proof: renameLogins passes booker to saveBooker, and an outside step has no transaction: move the call to the work
+```
+
+The refusal comes before any write, so nothing is rolled back for it,
+and the order is in the shape of the code. It is the daemon's own
+shape for a remote write: prepare in a transaction, act with none,
+record in another.
+
+The two services can still disagree: when the step succeeds and the
+last transaction fails, the outside is ahead, as it is today, and
+saving again finishes the change. Only a row and a worker close that.
+
+### An operation that runs wholly outside
+
+Six of cusoon2's seven write nothing of ours after the gate: the
+three passkey operations, on both sites, change the identity service
+and are done, and starting a registration answers with what the
+service said. So a gated operation may have no work in a transaction:
+
+```kotlin
+api booker {
+    setBookingNotes           gatedBy setBookingNotesGate                      // gate, then work, in one transaction
+    updateBooker              gatedBy updateBookerGate   outside renameLogins  // gate; outside step; gate again and work
+    startPasskeyRegistration  gatedBy booker             outside               // gate; then the operation itself, outside
+}
+
+// No transaction is open.
+fun startPasskeyRegistration(env: Env, booker: HeldBooker, input: Unit): Either<String, PasskeyCeremony> = either {
+    if (booker.isAdmin && !booker.isPasskeySession) {
+        ensure(!hasPasskey(env.idp, booker.idpUserId).bind()) { ADD_PASSKEY_MESSAGE }      // a lookup
+    }
+    PasskeyCeremony(startRegistration(env.idp, booker.idpUserId, booker.deviceName).bind())   // an action
+}
+```
+
+The server runs the gate in a transaction, ends it, and calls the
+operation with none open; its answer is the request's. It is held as
+an outside step is: it may act, and it passes its proof to nothing.
+The gate runs once. The printed table gives it a `gate reads` line
+and no other. What it needs of the request is a fact of the proof:
+the Kotlin names a new passkey from the User-Agent (`deviceName`).
+
+An outside step's answer is not handed to the work: `updateBooker`
+alone has both, and its step answers nothing. Nothing gated in
+cusoon2 needs a `Db`: by a scan of its mutations every gated one is
+one transaction but these seven.
+
+A third kind of call, `repeatable` (an action that is safe to make
+twice, allowed in a transaction), was weighed for these four and not
+taken: it rests on the binding's word, and fits one of them. Nor does
+it decide a worker's retry: cusoon2's mail is not safe to repeat and
+is retried without limit, and its charge is safe to repeat under its
+key and is never retried. Retry is a judgment for each queue, so a
+binding says `lookup` or `action` and nothing more.
+
+## What the checker holds
+
+- A gate reaches no statement that writes or locks, by Postgres's
+  answer.
+- An action is called in no function that holds a `Tx` or a proof,
+  but an outside step.
+- An outside step, or an operation that runs wholly outside, passes
+  no proof to a call.
+- Every row is `gatedBy` a function or `ungated`.
+- The gate's result is `Either<String, P>`, and `P` is the type of the
+  work's second parameter.
+- A gate named with an input takes the work's input type.
+- Gated work takes no `Request`, `Tx` or `Db`.
+- A statement on a proof's transaction binds something of the proof.
+
+What a held value's marked constructor and marked `tx` already give
+(spec 11) does the rest: no operation makes a proof, or takes the
+transaction out of one.
+
+## What it does not hold
+
+- **Whether the policy is right.** Notes for an admin or an owner
+  where an admin alone was meant compiles. The gate function holds
+  nothing but the policy, and the printed table shows a change to it.
+- **Whether a gate's own code is right.** There are few gates, in one
+  file.
+- **Whether a bound value scopes its statement.**
+  `where id = $passengerId or booking_id = ${booking.id}` compiles.
+- **Anything in a file that opts in.** The model and the gates are the
+  trusted part.
+
+So the access matrix test stays: it sees policy, which no rule here
+does.
+
+## What stays the application's
+
+The gates, the roles and states, the refusals' words, the proofs and
+their facts. The language gains two words in the `api` list, the shape
+of gated work, and one rule on statements. Constants are named in
+upper case, with `_ROLES` and `_STATES`, as Kotlin's conventions have
+it: a habit of the application's code, not a rule.
+
+## What it would change in the spec
+
+- **15.1:** a row names a gate or says `ungated`.
+- **15.2:** "Nothing runs before an operation" is reversed for a gated
+  one, whose shape becomes environment, proof, input.
+- **7:** a function that touches the database has a `Tx`, a `Db` or a
+  proof as a parameter.
+- **15, a new part:** proofs, the rule on statements, the read-only
+  gate and the outside step.
+- **13:** a binding with an effect says `lookup` or `action`.
+- **12 and 15.2:** `Cookie` and `Reply` in `kogo.rpc`; an ungated
+  operation may answer `Either<String, Reply<A>>`.
+- `doc/design.md`, "The server": the handler calls the gate, in a
+  read-only savepoint, and the outside step; a command writes the
+  printed table; "Not designed, on purpose" loses the cookie. "The
+  SQL pass": a statement's signature carries its tables.
+
+## Weighed and not taken
+
+- **The gate as a lambda in the list**
+  (`gatedBy { tx, env, request, input -> ... }`). It put the policy in
+  another file from the work that relies on it.
+- **The gate as the work's first statements**, held there by the
+  checker. The work would hold the request and the transaction, and
+  the checker would need rules about the order of statements.
+- **The row's arguments written with borrowed names** (`input.id` in
+  the list, `tx` and the rest left out). Too much was undeclared where
+  it was used.
+- **Row-level security for each caller**, as tenants have. It decides
+  by row, not by action, so a payer who may choose a card and not edit
+  the notes has no place in it; it does nothing for an admin; and it
+  needs a policy on about 15 tables. The rule on statements took its
+  place.
+- **A proof type for each role and state.** Eight sets of states for
+  14 operations is a type for nearly each one. The admin's type alone
+  was taken.
+- **Another form for small operations.** Shared gates removed the need.
+- **No change to the language**, and a wider matrix test. It sees
+  policy, but only for the cases someone put in the table.
+- **The gate's statements prepared a second time**, each wrapped as
+  `select 1 from (<statement>) _`, for Postgres to refuse one that
+  writes. It accepts a lock, which every run then refuses, and its
+  refusal of an `update` is a syntax error in text the author did not
+  write.
+- **The outside step handed a plain copy of the proof's facts.** The
+  rules as they stood would hold it, but each such operation gains a
+  data class, a function that fills it and a fourth name in its row.
+  And the step left as first sketched: its own example broke the rule
+  on actions, and SQL in it failed only when run.
+- **An empty work for an operation that writes nothing of ours**,
+  with the outside step's answer handed to it. A transaction for
+  nothing, and a second run of the gate that can refuse after the
+  service has been changed. And such an operation as `ungated` with a
+  `Db`: the printed table would lose its gate.
+- **A slot of the request that a login fills with its cookies**, as
+  the Kotlin has: it needs a guard against a second filling, and Kogo
+  code changes nothing else it is handed. And a handler that knows
+  what a session is: sessions are the application's.
+- **A function the server runs before every gate, which may write**,
+  to make the session. A layer in front of the gate again, and a
+  write that must outlast a refusal, so a transaction of its own on
+  every request. And a gate that writes: not safe to run twice.
+- **`kogo check` failing on a stale printed table.** It would read a
+  generated file, and the two generated files would be kept fresh in
+  two ways.
+- **A row lock printed as a read or as a write.** The first hides it;
+  the second has a login that only reads the session say it writes it.
+- **The gate's tables in one list with the work's**, or each gate's
+  once in a section of its own. The first hides what the work reads;
+  the second puts one operation in two places.
+- **A view printed as the tables under it.** A walk of the catalog,
+  about 25 lines, for cusoon2's three views, and the one place the
+  table would look past the statement's text.
+
+## Open
+
+- Whether `gatedBy`, `ungated` and `outside` are spelt as valid Kotlin
+  (DEV-894), and how a binding spells `lookup` and `action`.
+- The printed table's command has no name.
+- Checked on paper against three fetchers only: setting a booking's
+  notes, setting its driver, and submitting a booking. The work of
+  adopting it is in the model: each of some 150 functions says which
+  proof it demands.
+- Not sized as a whole. The rule on statements is perhaps 30 to 50
+  lines of checker. The tables of the printed table are perhaps 35
+  lines of the SQL pass to read them, 8 to tell a lock, 30 to print
+  and 15 for the command, with the walk of the functions an operation
+  reaches shared with the gate's read-only check, which is perhaps 10
+  lines more. The rule on an outside step's proof is perhaps 15,
+  and an operation wholly outside 20 of checker and 15 of handler.
+  A `Reply` is perhaps 50 lines over the prelude, the checker, the
+  handler and the TypeScript.

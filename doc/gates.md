@@ -554,8 +554,9 @@ The file enforces nothing: it is what a reviewer reads.
   one list for the request would hide it behind the gate. A gate has
   no `writes`, since Postgres refuses one there; an ungated operation
   has no `gate reads`; an outside step has no lines of tables, since
-  it holds no transaction. A shared gate that reads a new table changes a line of
-  every operation behind it, which is noisy and true.
+  it holds no transaction. A shared gate that reads a new table
+  changes a line of every operation behind it, which is noisy and
+  true.
 - **`locks` is a row lock, of any strength**, printed where there is
   one. Postgres reports a `select ... for update` as needing update on
   the table, as an `update` does, and marks the lock apart, which is

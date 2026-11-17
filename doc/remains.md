@@ -110,7 +110,8 @@ Agreed subject to this review:
   `@Acts`, 40; the two kinds of
   transaction, 40 of checker and 30 of Go; the five places where
   `kogo.http` states what Go would decide, 25 of Go; the table's
-  `asks` and `acts` lines, 25.
+  `asks` and `acts` lines, 25; the `alert` function, 15 of checker
+  and 15 of runner.
 
 ## Choices that sit above these
 

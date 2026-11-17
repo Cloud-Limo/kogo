@@ -604,9 +604,10 @@ job notifyBooker {
 
 // daemon.kg
 work daemon {
-    saveCard, chargeCard, sendRunSheet, frequently, platformDaily, tenantDaily,
-    runBatchJob, notifyBooker, remindBooker, notifyDriver, remindDriver, warnAdmin,
-    chargeAndSendInvoice, resendInvoice, sendPaymentInvite, sendMail
+    alert   opsAlert            // "An alert is the application's to send" below
+    queues  saveCard, chargeCard, sendRunSheet, frequently, platformDaily, tenantDaily,
+            runBatchJob, notifyBooker, remindBooker, notifyDriver, remindDriver, warnAdmin,
+            chargeAndSendInvoice, resendInvoice, sendPaymentInvite, sendMail
 }
 ```
 
@@ -622,7 +623,9 @@ The checker holds that:
 - a column named by `soonest` is a `timestamptz`, by Postgres's
   answer;
 - no step of a job acts;
-- every job states `failed`.
+- every job states `failed`;
+- every `work` list names an `alert`, a function marked `@Acts` that
+  takes the environment and an `Alert`.
 
 The compiler prints each queue with its kind, table and attempts
 into a file that is checked in, as it prints the gates, and
@@ -680,8 +683,8 @@ more.
 
 So the runner gives every queue a loop of its own: claim one row, do
 it, and again, waiting a little when there is none. No queue waits
-for another, and the `work` list above is a list of queues, whose
-order means nothing. There are no lanes, no sweep and no pass.
+for another, and the `queues` of the `work` list above are a list
+whose order means nothing. There are no lanes, no sweep and no pass.
 
 - **What the Kotlin needs of one thing at a time still holds**, since
   both of its notes are about one queue. The lease "is safe only
@@ -758,8 +761,9 @@ cases: refused, not made, attempts exhausted, and done but not
 recorded. Both functions run in the transaction that fails the row,
 after the runner has marked it, and their statements count in the
 queue's printed lines. A refusal alerts nobody. Where a queue gives
-no words the runner's are used: fix the cause, then run the statement
-that resets the row. Weighed and not taken: one function that writes
+no words the alert carries none, and the statement that resets the
+row beside it ("An alert is the application's to send"). Weighed and
+not taken: one function that writes
 and gives the words, which leaves the Kotlin's shape and makes words
 for a refusal that are thrown away; and `record` taking every
 outcome, which loses the fit of `act` to `record`.
@@ -795,6 +799,60 @@ The safety does not rest on the list: no action in a transaction, and
 a key only from the runner, hold however queues reach the runner. The
 list adds the fit of the three steps, the table's check and the one
 screen. It is built after the request side.
+
+### An alert is the application's to send
+
+The Kotlin's runner tells ops when a row fails for good: an email
+sent straight to SMTP, not through the outbox, to
+`deployment.operators`, once the transaction that failed the row has
+committed, "so the alert never holds a connection open on SMTP and
+never rolls the failure back" (`JobQueue.kt`). It is best effort: a
+send that fails is logged. Kogo's runner cannot know that an alert is
+an email, who the operators are or how the application words it. So
+the runner says when and hands over what it knows, and a function of
+the application's says where it goes and how it reads:
+
+```kotlin
+// daemon.kg
+work daemon {
+    alert   opsAlert
+    queues  saveCard, chargeCard, sendRunSheet, frequently, platformDaily, tenantDaily,
+            runBatchJob, notifyBooker, remindBooker, notifyDriver, remindDriver, warnAdmin,
+            chargeAndSendInvoice, resendInvoice, sendPaymentInvite, sendMail
+}
+
+// The runner's package. A sketch: the fields are to be settled.
+data class Alert(val queue: String, val table: String?, val id: Uuid?,
+                 val cause: String, val recovery: String?, val reset: String?)
+
+// The application's.
+@Acts fun opsAlert(env: Env, alert: Alert): Either<SendFailure, Unit> =
+    env.smtp.send(eml(opsMail(env.operators, alert)))
+```
+
+- **The runner decides when**, as the Kotlin does: after the commit
+  that failed the row, for a failure that is not a refusal, and after
+  a job's `failed` has committed.
+- **The function takes the environment and the alert, and no
+  transaction**, so it may send at once, and it carries `@Acts`.
+- **It is best effort.** Where it answers a failure or panics the
+  runner logs that and carries on: the record of the failure never
+  rests on it.
+- **Every `work` list names one, with no default.** A worker with
+  none would fail rows in silence; an application that wants silence
+  writes a function that does nothing, where it is seen.
+- **The runner hands over what it knows, not words.** `recovery` is
+  the queue's own words where it gave any; `reset` is the statement
+  that resets an effect's row, which the runner knows; the sentence
+  round them is the application's.
+
+It is what the Kotlin does, so nothing goes into the Kotlin first.
+Perhaps 15 lines of checker, 15 of runner and 20 of tests. Weighed
+and not taken: each queue's `failed` queuing the alert as mail, which
+needs no form and outlasts an SMTP server that is down, but makes
+"every failed row alerts ops" a habit of 16 queues, and writes a row
+the Kotlin does not; and the runner sending the mail, which puts the
+operators and the wording in Go. Agreed with Greg on 17 Nov 2026.
 
 ### Discover, then enter
 

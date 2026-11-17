@@ -733,8 +733,8 @@ Each entry: what was decided, why, and what would reopen it.
     in the outbox went before a tenant's other mail. `soonest` replaced it: a queue may
     name the column of times its rows go first by, and mail names none.
   - Not taken: the one order, with the change to mail recorded as a change of behaviour.
-  - A choice the runner makes for every queue is recorded here by name. Not yet looked at:
-    where an alert goes. Its two lanes are gone (below).
+  - A choice the runner makes for every queue is recorded here by name. Its two lanes are
+    gone, and where an alert goes is the application's (both below).
   - Reopen if a queue needs an order that one column of times cannot give.
 - **A function that acts says so, with the marker `Acts`, and the call that changes
   something outside is `perform`** (17 Nov 2026, Greg; `doc/gates.md`, "A function that
@@ -824,6 +824,16 @@ Each entry: what was decided, why, and what would reopen it.
     sweep; a pool of workers.
   - Reopen if that test, or production, finds two queues that must not run at once: the
     answer is then to state that pair, not to make every queue wait.
+- **The runner says when to alert, and a function of the application's sends it**
+  (17 Nov 2026, Greg; `doc/work.md`, "An alert is the application's to send"). Every
+  `work` list names one, with no default: it takes the environment and an `Alert` of what
+  the runner knows, holds no transaction and is marked `@Acts`. It is called after the
+  commit that failed the row and is best effort, as the Kotlin's is, so nothing goes into
+  the Kotlin first.
+  - Not taken: each queue's `failed` queuing the alert, a habit of 16 queues and a row
+    the Kotlin does not write; the runner sending mail, with the wording in Go.
+  - Reopen if an alert lost to a server that was down is ever missed: a row would then
+    hold it.
 
 ## Taken in the v0 spec, not yet discussed
 

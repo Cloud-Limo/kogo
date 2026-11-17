@@ -80,7 +80,8 @@ Each entry: what was decided, why, and what would reopen it.
   language built for none of them. Accepted cost: a binding is Go the checker cannot see
   into, so a careless one can bring in the hidden state section 7 rules out. Not built:
   no example makes an outbound call. Build it with the handle design for outbound calls
-  (see the gaps below) when a port first needs one.
+  (see the gaps below) when a port first needs one. Narrowed on 17 Nov 2026 to pure
+  functions: see "An application has no bindings with an effect" below.
 - **`db.tx` keeps its two outcomes: commit when the block finishes, roll back on a failure
   or a panic** (15 Nov 2026). cusoon2's `commit = false` appears five times and every block
   under it only reads, where rolling back and committing are the same. A true dry run,
@@ -694,6 +695,166 @@ Each entry: what was decided, why, and what would reopen it.
   only carries on a discussion leaves them out whole. Not taken: boxes in every reply, a
   discussion's included, which pushes the open question off his screen. Reopen if Greg
   starts a move too soon.
+- **An application has no bindings with an effect; it may add pure functions in Go, as
+  extensions** (17 Nov 2026, Greg; spec 13; `doc/work.md`, "An application's own
+  extensions"). It narrows "An application may have binding files of its own" (15 Nov),
+  which was never built. Every binding that reaches a database, a network or a clock is
+  in this repo, and an application's `main` makes the prelude's handles and implements
+  none.
+  - **Why effects are closed.** The rules of 17 Nov hold only over a closed set of
+    bindings with an effect. "`act` cannot reach the database" and "no action runs in a
+    transaction" are true while no binding does either out of the checker's sight, and an
+    application's binding is Go that this repo never tests: one that kept a connection
+    pool of its own would write from `act`, and the checker would pass it.
+  - **Why pure functions are open.** This entry first closed every binding, the same
+    morning, and named what would reopen it: a dependency Kogo should not carry. PDF was
+    that, the first time it was tested. Greg: a PDF library in Kogo, as pgx is, is
+    premature and overkill; and other languages let a program wrap a library. Only
+    effects needed closing.
+  - **An extension**: its functions take values and give a value, with no handle and no
+    `@Acts`; each carries a marker of the application's, so a file that calls one opts
+    in at its top; its binding file, its Go and that Go's dependencies live with the
+    application. Kogo's own Go stays with no new dependency (15 Nov).
+  - **What the entry of 15 Nov feared.** It refused clients written in Kogo over a general
+    HTTP handle for "signing, JSON and retries". None stands: no call of cusoon2's signs a
+    request (searched on 17 Nov), and the credentials sit on the handle, made in `main`;
+    JSON is read by key through `Json`, in Go; retries are off, and the runner's.
+  - **What may enter the prelude.** A binding that passes four tests: it is mechanism, and
+    decides nothing an application would decide differently; its declaration names nothing
+    of one application; it says whether it has no effect, is a `lookup` or is an `action`;
+    and it lands with its Go and a test (15 Nov). One that fails a test and is taken anyway
+    is recorded here by name, with the test it fails.
+  - Not taken: every binding closed, with PDF in the prelude behind a library or a writer
+    of our own; and every binding open, under which each guarantee of `doc/gates.md` and
+    `doc/work.md` gains "unless an application's binding does".
+  - Accepted cost: that an extension is pure is its author's word, and its Go is tested
+    in the application's repo, not here. It is handed no connection, no credentials and
+    no context, so a mistake there does not make an effect by accident.
+  - Reopen if an application needs an effect the prelude cannot give in a general form.
+- **The runner holds what is a fact for every queue, and a queue states what is a choice**
+  (17 Nov 2026, Greg; `doc/work.md`, "Workers"). The line for hand-written Go is what
+  another application would need unchanged, and cusoon2's own queues are its first test:
+  where two of them differ, the matter is a choice, and the queue states it as a number or
+  as a name that Postgres checks.
+  - **The runner's.** Whether a row is done (`done_at`), what is owed, the lease and the
+    back-off: no queue of cusoon2's varies them.
+  - **The queue's.** `attempts`, `soonest`, `fair` and `find`.
+  - **First applied to the order.** `doc/work.md` had one order for every queue, rows with
+    a `not_after` first. It was drawn from the charge alone, and under it every reminder
+    in the outbox went before a tenant's other mail. `soonest` replaced it: a queue may
+    name the column of times its rows go first by, and mail names none.
+  - Not taken: the one order, with the change to mail recorded as a change of behaviour.
+  - A choice the runner makes for every queue is recorded here by name. Its two lanes are
+    gone, and where an alert goes is the application's (both below).
+  - Reopen if a queue needs an order that one column of times cannot give.
+- **A function that acts says so, with the marker `Acts`, and the call that changes
+  something outside is `perform`** (17 Nov 2026, Greg; `doc/gates.md`, "A function that
+  acts says so"; `doc/work.md`, "An endpoint is declared once").
+  - **Why written.** A function's type and its failures are in its signature; whether it
+    changes something outside was the one thing a caller relied on that was worked out
+    through what it calls. A line added to a helper changed what its callers were with no
+    word of theirs changed, the error came up files away, and a lambda kept in a value, a
+    `::` reference and an interface's `fun` carried an action past the walk.
+  - **Why a marker.** It adds no syntax, and it is Kotlin's own rule: a function that uses
+    a marked declaration carries the mark and demands it of its callers (run on Kotlin
+    2.4.0). Kogo only restricts it: no file opts in, the mark must be true, a marked
+    function keeps out of a transaction, and an action is not kept in a value.
+  - **Accepted cost.** `Acts` is the one marker held by the function and never by the
+    file, against spec 11's rule for every other, and spec 11 says so. It is also a marker
+    the checker knows by name, which comes near the annotation magic principle 2 refuses.
+  - **Why `perform`.** `send` was too weak a word for a call that changes something, and
+    the method does not say it: a `DELETE` is an action and a lookup may be a `POST`.
+  - Not taken: the kind left worked out; `action fun`, a word of Kogo's own, which is
+    plainer and keeps spec 11 to one rule; two environments, one that can act.
+  - Reopen with DEV-894: if Kogo's additions are to stay unlike Kotlin, respell it
+    `action fun`, with the binding's words.
+- **A transaction's kind is its handle's type: `Tx` is any, and `SerializableTx` is one
+  that is rerun on a conflict** (17 Nov 2026, Greg; `doc/gates.md`, "Two kinds of
+  transaction"). Kogo is to support explicit locking as naturally as cusoon2's way.
+  - **Why.** The designs assumed SERIALIZABLE in three places: spec 15.3 has the server
+    always open it, a gate could not lock, and no level was stated for a worker. cusoon2
+    itself runs both ways, its requests serializable and its daemon and logins at READ
+    COMMITTED with locks, and chooses a read's lock by a flag on `Model` when it runs, so
+    one call sends three statements. Which kind of transaction a function is in was the
+    last thing it relied on that nothing wrote.
+  - **The rule.** A function that takes a `Tx` assumes nothing and locks what it needs;
+    one that takes a `SerializableTx` may read with no lock, and is not handed a `Tx`. A
+    `SerializableTx` fits a `Tx`. The type says which `db.tx` gives and which the server or
+    the runner opens, with no default. A gate on a `Tx` may lock.
+  - **Accepted cost.** A read used both ways is two functions in a port, or one that
+    takes a lock the Kotlin does not. A gate on a `Tx` cannot run in Postgres's read-only
+    mode, so a `select` of a function that writes passes it.
+  - Not taken: the level on the list or in `main`; a flag on the handle.
+  - Reopen if the two functions of a shared read become the common case in a port.
+- **A binding's behaviour is Kogo's: the spec states it, and a Go default it does not
+  state is turned off, with a test** (17 Nov 2026, Greg; `doc/design.md`, "Keeping the
+  general language open"; `doc/work.md`, "What Go would decide, Kogo states"). The rule
+  for values, never to inherit Go's by accident, now holds for what reaches the network.
+  For `kogo.http` it settles five things: a second send, redirects, a proxy from the
+  environment, an answer's length and JSON's numbers.
+  - The rule does not say which way a default goes, only that it is written and tested.
+- **A keyed call may be sent a second time, at once and under its key, when a kept
+  connection fails before any answer** (17 Nov 2026, Greg; the same section). It is Go's
+  own behaviour, kept on purpose and stated: `performOnce` may be sent again, `perform`
+  never, `ask` may be, and each second send is logged.
+  - **Why kept.** It is none of the three retries cusoon2 refused in its DEV-714: it
+    never follows a timeout, has no delay and keeps the key. Of a charge's three cases it
+    turns two that are `Unknown` today into a recorded answer and leaves the third as it
+    is. A key already means a repeat is the same call, and the runner relies on that after
+    a crash. cusoon2's JVM very probably does the same today, unchosen.
+  - Not taken: the second send turned off, the letter of DEV-714.
+  - Reopen if a service is found that charges twice under one key, or if a second send is
+    ever seen to end worse than `Unknown`.
+- **A restriction is carried by a form that looks special, or by a type, and not by a rule
+  on how an ordinary call's argument is written** (17 Nov 2026, Greg; `doc/gates.md`, "The
+  table is printed"). The `sql` literal and the lists look like Kogo's own, so their
+  rules surprise nobody; a call that looks like any function should take what any function
+  takes.
+  - **First applied to the printed table.** Its `asks` and `acts` lines name the function
+    that calls the service, which needs no rule. Naming the endpoint needed its argument
+    written as a top-level `val` or a call of a top-level function: a sharper table, and a
+    straitjacket on `perform`. Greg took the slightly less useful table.
+  - **Rules of this kind already taken**, each because nothing else held what it holds: a
+    proof's transaction written only before the dot (`doc/gates.md`), the five SQL calls
+    on a `Tx` written before the dot (spec 10.2), and a lambda that fails or acts passed
+    straight to a prelude function (spec 9; `doc/gates.md`). Another is recorded here.
+- **Each queue is served on its own, one row at a time, and there are no lanes**
+  (17 Nov 2026, Greg; `doc/work.md`, "Each queue is served on its own"). cusoon2's urgent
+  lane exists because its daemon does one thing at a time; a loop for each queue ends the
+  cause, where lanes in Kogo would have carried the work-round into the language.
+  - **Why it is safe to try.** Both of the Kotlin's notes on running one thing at a time
+    are about one queue, which still has one worker. A deadlock between queues is rerun.
+  - **Made in Go alone.** What goes into the Kotlin first is what the side-by-side run
+    would see: the schema, a statement, a result. This changes when a row is served and
+    nothing of what serving it does, and the runner is no port. The Kotlin's daemon stays
+    as it is, so the two differ in timing: a difference Greg accepted.
+  - **Not established:** that no two queues rely, unsaid, on not running at once. One
+    test stands in for the Kotlin's proof before the runner replaces the daemon: every
+    queue side by side, and one at a time over a copy, must leave the same rows.
+  - Not taken: two lanes as Kogo's words; lanes the application names, with a stated
+    sweep; a pool of workers.
+  - Reopen if that test, or production, finds two queues that must not run at once: the
+    answer is then to state that pair, not to make every queue wait.
+- **The runner says when to alert, and a function of the application's sends it**
+  (17 Nov 2026, Greg; `doc/work.md`, "An alert is the application's to send"). Every
+  `work` list names one, with no default: it takes the environment and an `Alert` of what
+  the runner knows, holds no transaction and is marked `@Acts`. It is called after the
+  commit that failed the row and is best effort, as the Kotlin's is, so nothing goes into
+  the Kotlin first.
+  - Not taken: each queue's `failed` queuing the alert, a habit of 16 queues and a row
+    the Kotlin does not write; the runner sending mail, with the wording in Go.
+  - Reopen if an alert lost to a server that was down is ever missed: a row would then
+    hold it.
+- **The lists are one mechanism, stated once: one rule for a role's shape and one table of
+  roles** (17 Nov 2026, Greg; `doc/lists.md`). Six lists and fifteen roles had each been
+  designed alone, against principle 6. A function the runtime calls takes the handle it
+  runs in, the environment, what it is about and what it works on, in that order; the
+  checker fits stages from the table; spec 1 keeps three additions, the third being lists.
+  `enter` gains the environment, the one shape that broke the rule. The spelling has at
+  most two forms, which DEV-894 inherits.
+  - Asked for by Greg on agreeing: a deep dive into what the lists are for, how they do it,
+    and other ways, more explicit or as magic and expressed differently. The mechanism
+    stands until then.
 
 ## Taken in the v0 spec, not yet discussed
 
@@ -1712,7 +1873,8 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Spec gaps found by the leakage ports, unresolved
 
-- Outbound calls are handles (above), but their timeouts and retries, workers, and an
-  application's own binding files have no design.
+- Outbound calls are handles (above), but their timeouts and retries, and workers, have no
+  design. (An application's own binding files stood here until 17 Nov 2026: `doc/work.md` has them,
+  as extensions.)
 - Operations (spec 15) leave out, on purpose: how one sets a cookie, which a login needs;
   Origin and CSRF checks; a limit on the reruns of a `db.tx` written in a `Db` operation.

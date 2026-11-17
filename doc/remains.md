@@ -23,8 +23,10 @@ the design to work from, not built, not in `spec.md`, no example run.
   tenant"). `driverJobs` stays open until the loops over tenants are
   replaced. Made in the Kotlin first.
 - **cusoon2's runner.** Agreed: `done_at` and `not_after` among its
-  columns, and no condition or order of a queue's own (`doc/work.md`,
-  "Owed is the runner's rule"). Made in the Kotlin first, with
+  columns, and no condition of a queue's own (`doc/work.md`, "Owed is
+  the runner's rule"). The order stays the queue's: the charge's
+  goes by `not_after`, and mail's is unchanged ("Soonest is each
+  queue's stated choice"). Made in the Kotlin first, with
   `hasOpenStripeChargeJob` not counting a row never tried and past
   its `not_after` (`doc/work.md`, "An effect someone is watching").
 - **cusoon2's schema.** Agreed, subject to the review below: a view
@@ -35,6 +37,12 @@ the design to work from, not built, not in `spec.md`, no example run.
   cusoon2's schema.
 
 ## For whoever reviews the whole design
+
+Greg, 17 Nov, asked for one thing more: a deep-dive assessment of
+what the lists are trying to do, a dispassionate look at how, and
+other ways of doing the same, more explicit ones and ones with as
+much magic expressed differently (`doc/lists.md`, "Asked for: a deep
+dive").
 
 Greg, 17 Nov: the design has kept clear of magic, needs a little, and
 any of it makes him nervous. Look hard at each place where something
@@ -72,10 +80,21 @@ Agreed subject to this review:
 
 ## To check before relying on it
 
-- **A Go library for PDF** that does what cusoon2 does with PDFBox:
-  the core fonts and their widths for layout, lines and rectangles, a
-  PNG. A survey named `fpdf`, now kept on Codeberg; that its widths
-  cover the core fonts was from memory.
+- **Whether cusoon2's Kotlin sends a Stripe call twice today.** Its
+  `effect-runner.md` says one is never retried. The JDK under it
+  sends an unsuccessful `POST` on a kept connection again unless
+  `sun.net.http.retryPost` is off, and cusoon2 does not set it
+  (`doc/work.md`, "What Go would decide, Kogo states"). The JDK's
+  exact conditions were not traced; that sentence of cusoon2's is
+  Greg's to keep or change.
+- **The Go already written against the rule on Go's defaults**: the
+  handler, the prelude, and `kogo.mail` when it is built.
+- **What sits behind cusoon2's PDF extension** (`doc/work.md`, "An
+  application's own extensions"): a small writer of its own, or a
+  wrapped Go library. A survey named `fpdf`, now kept on Codeberg;
+  that its widths cover the standard fonts was from memory. Also
+  unchecked: whether PDFBox kerns when it measures a string, and the
+  Kotlin's 32-bit floats against Kogo's `Double` in the layout.
 - **Reading Postgres's limit on a session idle in a transaction** when
   the server starts, as cusoon2's role is set.
 - **What the printed table and the gate's check miss.** A cascade, a
@@ -95,15 +114,23 @@ Agreed subject to this review:
   about the Kotlin's 500; the tables of the printed table, about 90
   lines beside that walk, 10 more for the queues' and 10 for marking
   a write made under `AtTenant`; `failed` and
-  `recovery`, 25 of checker; `find`, 20; `fair`, 30.
+  `recovery`, 25 of checker; `find`, 20; `fair`, 30; `soonest`, 15;
+  `@Acts`, 40; the two kinds of
+  transaction, 40 of checker and 30 of Go; the five places where
+  `kogo.http` states what Go would decide, 25 of Go; the table's
+  `asks` and `acts` lines, 25; the `alert` function, 15 of checker
+  and 15 of runner; extensions, 50.
 
 ## Choices that sit above these
 
 - **How SQL's parameters are spelt, and whether Kogo source is valid
   Kotlin** (DEV-894). It decides how `gatedBy`, `ungated`, `outside`,
   `routes`, `commands`, `job`, `effect`, `work` and a binding's
-  `lookup` and `action` are spelt. Each design here was written to
-  hold either way.
+  `lookup` are spelt, and whether `@Acts` stays a marker or becomes
+  `action fun` (`doc/gates.md`, "A function that acts says so"). Each
+  design here was written to hold either way. One constraint on it,
+  agreed 17 Nov: the lists have at most two forms, a list of rows and
+  a block of named parts (`doc/lists.md`).
 - **Where Kogo ends and Go begins.** To research. The review of 17 Nov
   leaned on Go more as it went: each service's handle states its
   encoding; the binding sorts a failed send by status; Go draws a PDF
@@ -114,7 +141,13 @@ Agreed subject to this review:
   Go holds what another application of this shape would need
   unchanged, and Kogo what knows what a booking is. Test that line
   against each of these, and ask whether more belongs in Go (the
-  runner's lanes in parallel, there "To research") or less.
+  runner's lanes in parallel, there "To research") or less. Settled
+  on 17 Nov, after this was written: an application has no bindings
+  with an effect and may add pure functions as extensions, and a
+  binding passes four tests to enter the prelude (`decisions.md`,
+  "An application has no bindings with an effect"); and the lanes
+  are gone, each queue served on its own (`doc/work.md`, "Each queue
+  is served on its own").
 - **The test form.** How a test makes a call time out, so that the
   rare path runs every day, waits on it; so does moving cusoon2's
   tests (DEV-893), and the record of Google's answers they replay
@@ -132,8 +165,9 @@ Agreed subject to this review:
 
 ## What the spec and the design doc would say
 
-Nothing has changed in the language, so `spec.md` and `decisions.md`
-are as they were. When any of this is built, the sections it changes
+Nothing has changed in the language, so `spec.md` is as it was, and
+`decisions.md` gained one entry: an application has no bindings.
+When any of this is built, the sections it changes
 are listed at the end of `doc/gates.md` and of `doc/work.md`; the
 largest are 15.2 ("Nothing runs before an operation", reversed for a
 gated one), 7 (a proof beside `Tx` and `Db`) and 13 (an outbound

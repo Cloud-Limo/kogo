@@ -16,6 +16,11 @@ are Kogo code that builds a request and reads the answer. So
 `external` stays out of the application, the application stays out of
 this repo, and a charge is a dozen lines Greg can read.
 
+An application has no bindings with an effect. `decisions.md`, "An
+application has no bindings with an effect", has why, and the four
+tests a binding passes to enter the prelude. What an application may
+add is a pure function, as an extension (below).
+
 cusoon2 makes about 30 distinct calls: Stripe 4 (make a customer,
 attach a card, change an email, charge), Google Maps 5, the identity
 service about 20, and one send of mail. Its Kotlin already builds the
@@ -41,10 +46,55 @@ A port calls the endpoints the Kotlin calls, the legacy Google ones
 included, so that it can be compared side by side. Moving to Google's
 newer APIs changes behaviour and is a later step of its own.
 
-Mail and PDF are bindings too. For PDF the survey's match for the
-Kotlin's drawing (the core fonts, their widths, a PNG) is `fpdf`, now
-kept on Codeberg; that its widths cover the core fonts was from
-memory. It is to be checked before anything is promised.
+Mail is a binding too, in the prelude, since it has an effect. PDF
+is not Kogo's: it is cusoon2's own extension ("An application's own
+extensions" below).
+
+### An application's own extensions
+
+An application may wrap Go of its own and call it from Kogo, where
+the Go has no effect. The prelude holds what every application of
+this shape needs, and every binding with an effect. A PDF is neither:
+few applications draw one, and drawing one is values in and bytes
+out.
+
+```kotlin
+// cusoon2's own binding file, in a directory it names to the compiler.
+@RequiresOptIn
+annotation class Extension
+
+@Extension external fun textWidth(text: String, font: Font, size: Double): Double
+@Extension external fun render(pages: List<Page>): ByteArray
+```
+
+- **Pure only.** An extension's function takes values and gives a
+  value. It takes no handle and cannot carry `@Acts`. What reaches a
+  database, a network or a clock stays in the prelude, which this
+  repo tests.
+- **Marked.** Each carries a marker the application declares, so a
+  file that calls one opts in at its top, as a file does for
+  `@UnscopedRead` (spec 11). No syntax is added.
+- **The application's own.** The binding file, the Go behind it and
+  that Go's dependencies live in the application's repo. Kogo's
+  `go.mod` does not change.
+- **Its purity is its author's word.** Nothing checks the Go. It is
+  handed no connection, no credentials and no context, so a mistake
+  there makes no effect by accident.
+- **What is behind it can change.** Kogo sees the declarations alone:
+  Go written by hand and Go that wraps a library look the same, and
+  one replaces the other with no `.kg` file touched.
+
+Other languages do this three ways: wide open (C extensions, cgo),
+open and marked (Rust's `unsafe`, Haskell's foreign functions) or
+closed (Elm, whose core alone wraps native code). Kogo was closed for
+a morning; it is now closed for effects and open, marked, for pure
+functions (`decisions.md`, "An application has no bindings with an
+effect").
+
+Perhaps 50 lines to read binding files from a second directory, and
+tests. Not designed: how a data class that a binding file declares
+reaches its Go. The prelude declares none today, and `Mail` below
+meets the same question. Agreed with Greg on 17 Nov 2026.
 
 ### Mail is a message Kogo builds and Go sends
 
@@ -68,7 +118,7 @@ external fun eml(mail: Mail): ByteArray              // headers, parts, Message-
 external fun subjectOf(eml: ByteArray): String?      // for the bounce handler
 
 external class Smtp                                  // a handle, made in main with server, port and login
-external action fun Smtp.send(eml: ByteArray): Either<SendFailure, Unit>
+@Acts external fun Smtp.send(eml: ByteArray): Either<SendFailure, Unit>
 ```
 
 ```kotlin
@@ -103,8 +153,8 @@ centres, right-justifies and wraps. Kogo has no mutable object, so a
 page is a list of marks that Kogo builds and Go draws:
 
 ```kotlin
-// kogo.pdf
-enum class Font { Helvetica, HelveticaBold }                      // the built-in fonts cusoon2 uses
+// cusoon2's extension: its own binding file, with its Go beside it.
+enum class Font { Helvetica, HelveticaBold, HelveticaOblique, TimesBold }   // the four the Kotlin uses
 sealed interface Mark
 data class Text(val x: Double, val y: Double, val text: String, val font: Font, val size: Double) : Mark
 data class Line(val x: Double, val y: Double, val toX: Double, val toY: Double) : Mark
@@ -113,8 +163,8 @@ data class Image(val x: Double, val y: Double, val width: Double, val height: Do
 data class Link(val x: Double, val y: Double, val width: Double, val height: Double, val url: String) : Mark
 data class Page(val marks: List<Mark>)
 
-external fun textWidth(text: String, font: Font, size: Double): Double   // from the font's own metrics
-external fun render(pages: List<Page>): ByteArray
+@Extension external fun textWidth(text: String, font: Font, size: Double): Double   // from the font's own metrics
+@Extension external fun render(pages: List<Page>): ByteArray
 ```
 
 ```kotlin
@@ -139,11 +189,28 @@ fun rightJustify(x: Double, y: Double, text: String, font: Font, size: Double): 
   name keeps a port's signatures as the Kotlin has them. Weighed and
   not taken: a type of Kogo's own, `Bytes`, which needs the same two
   refusals and is not Kotlin's.
-- Perhaps 150 lines of Go, 30 of prelude and 20 for `ByteArray` in the
-  SQL pass. Weighed and not taken: a drawing API on a stream, which
-  needs a mutable object; and a binding that draws the whole invoice
-  from its data, which moves the layout into Go. Agreed with Greg on
-  17 Nov 2026.
+- **What sits behind it is cusoon2's to choose, and to change.**
+  The Kotlin's vocabulary is small: four of PDF's standard fonts,
+  which need no font file, a text's width and a font's height, a
+  line, a box, a colour, an image from bytes, a link, and A4 pages.
+  A writer of that alone is perhaps 300 lines of Go over the standard
+  library, by a guess, with the four fonts' widths as data; a wrapped
+  library is perhaps 60, and is the way to real Unicode text, which
+  the Kotlin leaves as a TODO. Either sits behind the same
+  declarations.
+- **The sketch above is short of the Kotlin** (`pdf/markup.kt`, read
+  on 17 Nov): it has no font height and no colour.
+- **The Kotlin's layout is in 32-bit floats, and Kogo has `Double`
+  alone.** A line that just fits in one may not in the other, so a
+  side-by-side run of the layout can differ at the edges. To be
+  decided when the PDF code is ported.
+- In Kogo, perhaps 20 lines for `ByteArray` in the SQL pass; the
+  rest is cusoon2's. Weighed and not taken: PDF in the prelude,
+  behind a library that every application would then carry or a
+  writer of our own that Kogo would then own; a drawing API on a
+  stream, which needs a mutable object; and a binding that draws the
+  whole invoice from its data, which moves the layout into Go. Agreed
+  with Greg on 17 Nov 2026.
 
 ### An endpoint is declared once
 
@@ -156,6 +223,9 @@ external class KeyedAction                  // an action that needs a key
 external class Field                        // one name and its value
 external class Json                         // an answer
 
+@RequiresOptIn
+annotation class Acts                       // on a function that changes something outside
+
 external fun lookup(method: String, path: String): Lookup
 external fun lookup(method: String, before: String, id: String): Lookup
 external fun lookup(method: String, before: String, id: String, after: String): Lookup
@@ -166,8 +236,8 @@ external fun group(name: String, fields: List<Field>): Field
 external fun field(name: String, values: List<String>): Field   // Stripe's expand[]=a&expand[]=b, or a JSON array
 
 external lookup fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpError, Json>
-external action fun Http.send(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
-external action fun Http.sendOnce(key: EffectKey, endpoint: KeyedAction, fields: List<Field>): Either<SendFailure, Json>
+@Acts external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
+@Acts external fun Http.performOnce(key: EffectKey, endpoint: KeyedAction, fields: List<Field>): Either<SendFailure, Json>
 
 external fun Http.withHeader(name: String, value: String): Http   // a new handle with one more header
 
@@ -221,15 +291,15 @@ fun chargeFields(charge: ChargeFields): List<Field> =
     else
         listOf(group("payment_method_data", listOf(field("type", "card"), group("card", listOf(field("token", charge.paymentMethod))))))
 
-fun charge(stripe: Http, key: EffectKey, fields: ChargeFields): Either<SendFailure, PaymentIntent> = either {
-    val intent = stripe.sendOnce(key, CHARGE, chargeFields(fields)).bind()
+@Acts fun charge(stripe: Http, key: EffectKey, fields: ChargeFields): Either<SendFailure, PaymentIntent> = either {
+    val intent = stripe.performOnce(key, CHARGE, chargeFields(fields)).bind()
     PaymentIntent(
         intent.string("id") ?: raise(unreadable("id")),
         intent.string("status") ?: raise(unreadable("status")))
 }
 
-fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<SendFailure, Unit> = either {
-    stripe.send(customerEmail(id), listOf(field("email", email))).bind()
+@Acts fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<SendFailure, Unit> = either {
+    stripe.perform(customerEmail(id), listOf(field("email", email))).bind()
 }
 ```
 
@@ -277,12 +347,18 @@ fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<SendFai
   names. A mistyped key reads as `null` on every call; a test that
   makes the call finds it.
 - **The kind is said once, with the path.** `ask` takes only a
-  `Lookup`, `send` only an `Action`, `sendOnce` only a `KeyedAction`,
-  so `stripe.ask(CHARGE, ...)` does not compile.
-- **The checker needs no new rule.** A function that calls only `ask`
-  is a lookup and may run in a transaction; one that calls `send` or
-  `sendOnce` is an action and may not (`doc/gates.md`, "Outside
-  calls").
+  `Lookup`, `perform` only an `Action`, `performOnce` only a
+  `KeyedAction`, so `stripe.ask(CHARGE, ...)` does not compile.
+- **The call that changes something is `perform`**, since a weaker
+  word would not carry it. It is not the method: an endpoint states
+  its own, a `DELETE` is an action, and a lookup may be a `POST`, as
+  a search is. `Smtp.send` keeps its name. Agreed with Greg on 17 Nov
+  2026; first written `send`.
+- **A function that acts says so.** `perform`, `performOnce` and
+  `Smtp.send` carry the marker `Acts`, and so does every function
+  that calls one: `charge` and `updateCustomerEmail` above. One that
+  only calls `ask` carries nothing and may run in a transaction
+  (`doc/gates.md`, "A function that acts says so").
 
 Whether a call changes anything is still someone's word: the author of
 a service's list of endpoints, about 30 lines in Kogo, where it is read
@@ -300,15 +376,73 @@ Weighed and not taken:
   every call.
 - **A placeholder in the path**, `{id}`, filled from the request's
   property of that name: a match by name. And a hole filled by an
-  argument of `send` (`sendAt(endpoint, id, fields)`), which doubles
-  the three kinds of endpoint and their calls; and a string template,
-  which escapes nothing.
+  argument of `perform` (`performAt(endpoint, id, fields)`), which
+  doubles the three kinds of endpoint and their calls; and a string
+  template, which escapes nothing.
 - **The walk that reads an operation's input**, loosened to read an
   answer into a data class.
 - **A handle for each tenant, made in `main`**, which would read the
   tenants at start and miss one added later; and **headers as an
-  argument of every `ask` and `send`**, which grows every call for the
-  few that need one.
+  argument of every `ask` and `perform`**, which grows every call
+  for the few that need one.
+
+### What Go would decide, Kogo states
+
+A binding's behaviour is Kogo's: the spec states it, and where Go has
+a default the spec does not state, the binding turns it off and a
+test shows it. `doc/design.md` has the rule for values ("never
+inherit Go's by accident"); this is the same rule for what reaches
+the network.
+
+The case that raised it, read in Go 1.27.4 (`net/http`,
+`request.go` and `transport.go`): a request that carries an
+`Idempotency-Key` header, which is Stripe's, is sent a second time by
+Go's transport when a kept connection fails before the first byte of
+an answer. No line of Kogo would have written that second send.
+
+| Go's default | Kogo's rule |
+| --- | --- |
+| Sends a keyed request again when a kept connection fails | `performOnce` may be sent a second time; `perform` never is; `ask` may be |
+| Follows up to 10 redirects, a redirected `POST` as a `GET` with no body | No redirect is followed: a 3xx is reported with its status, as a 4xx is |
+| Takes a proxy from `HTTP_PROXY` and its kin in the environment | No proxy unless `main` states one: the environment is ambient state (spec 7) |
+| Reads an answer of any length | An answer past a limit set in `main` is a failure: for an action, `Unknown` |
+| Reads every JSON number as a `float64` | `Json.long` is exact, and `null` for a number that is not whole or does not fit |
+
+**The second send is kept, and stated.** A `performOnce` may be sent
+again, at once and under the same key, when a kept connection fails
+before any answer, and never after a timeout. A key says the service
+treats a repeat as the same call, and the runner already relies on
+that after a crash.
+
+- **It is none of the retries cusoon2 refused** (DEV-714 there,
+  `effect-runner.md`): stripe-java's, which sent again after a read
+  timeout, so a slow charge met its own first request; a delayed one
+  under the same key, with a hand payment or a void in the gap; and a
+  delayed one under a new key.
+- **For a charge it changes two cases of three.** A first send that
+  never arrived is today `Unknown`, an alert and a payer told it
+  failed with nothing charged, and becomes a charge that is recorded.
+  One that arrived and finished is today charged and not recorded,
+  and Stripe gives the second its stored answer. One still running
+  gets a 409, which the client already reads as `Unknown`.
+- **`perform` has no key**, so nothing makes a repeat the same call,
+  and the binding stops Go sending it again. **`ask` changes
+  nothing**, so it may be.
+- **Each second send is logged** with the request's id.
+- **cusoon2 very probably does this today.** Its JDK 21 sends an
+  unsuccessful `POST` on a kept connection again, once, unless
+  `sun.net.http.retryPost` is off; it defaults to on, cusoon2 sets it
+  nowhere in its repo, and stripe-java 31.4.1 uses the client that
+  reads it. The JDK's exact conditions were not traced.
+
+Each row has a test against a local server that misbehaves on
+purpose: for the first, one that drops a kept connection once it has
+read the request. Perhaps 25 lines of Go and 80 of tests. Weighed and
+not taken: the second send turned off, which is the letter of DEV-714
+and leaves a dead connection as an alert for a charge that was never
+made. Not checked against this rule: the Go already written (the
+handler and the prelude) and `kogo.mail`. Agreed with Greg on 17 Nov
+2026.
 
 ## Workers
 
@@ -324,6 +458,12 @@ in one transaction, which may look things up outside and causes an
 effect only by inserting a row; "a remote write happens in no
 transaction, ever." Every job keeps to it, and nothing holds them to
 it: `sendOpsEmail` sends at once and any job may call it.
+
+Its transactions are at READ COMMITTED, and it locks what it reads.
+So a worker's functions take a `Tx`, not a `SerializableTx`, and each
+read writes its lock in its statement (`doc/gates.md`, "Two kinds of
+transaction"). A queue whose steps took a `SerializableTx` would be
+run that way.
 
 ### A job cannot call an action
 
@@ -353,7 +493,7 @@ effect:   prepare  (transaction)  ──►  act      (none)  ──►  record 
 fun prepareCharge(tx: Tx, env: Env, row: StripeChargeJob): Either<String, ChargeFields> = ...
 fun recordCharge(tx: Tx, env: Env, row: StripeChargeJob, result: PaymentIntent) { ... }
 
-fun charge(env: Env, key: EffectKey, fields: ChargeFields): Act<PaymentIntent> =
+@Acts fun charge(env: Env, key: EffectKey, fields: ChargeFields): Act<PaymentIntent> =
     charge(stripeFor(env.stripe, fields.accountId), key, fields).fold(
         { failure ->
             when (failure) {
@@ -371,9 +511,9 @@ fun stripeError(body: Json?): String? = body?.at("error")?.string("type")
 ```
 
 The binding sorts a failed send by how far it got and by status
-alone, for every service: never left is `NotSent`; a 4xx is
-`Refused(status, body)`; a 5xx or no answer is `Unknown`, since the
-service may have acted. What a refusal means is the client's: for
+alone, for every service: never left is `NotSent`; a 3xx or a 4xx
+is `Refused(status, body)`; a 5xx or no answer is `Unknown`, since
+the service may have acted. What a refusal means is the client's: for
 Stripe a 409 or an `idempotency_error` may have charged
 (`StripeQueues.kt`, DEV-714 there), a `card_error` is a decline, and
 any other 4xx was not processed. Agreed with Greg on 17 Nov 2026.
@@ -399,7 +539,10 @@ repeat and is retried without limit, since a second message is a
 nuisance and a lost one is worse; its charge is safe to repeat under
 its key and is never retried (DEV-714 there, 27 Sep 2026), since every
 retry weighed had a silent double charge as its worst case. So each
-queue states its attempts, with no default, as the Kotlin has it.
+queue states its attempts, with no default, as the Kotlin has it. An
+attempt is one call of `act`: the one second send of a keyed call on
+a dead connection is the binding's, inside it ("What Go would decide,
+Kogo states").
 
 ### A key comes only from the runner
 
@@ -407,7 +550,7 @@ A `KeyedAction` is sent with an `EffectKey`, which the runner makes
 from the effect's table and the row's id and hands to `act`.
 
 - A keyed call is reached only from an effect's `act`. A login or an
-  outside step may `send`; neither can charge a card. Three of
+  outside step may `perform`; neither can charge a card. Three of
   Stripe's four calls are keyed in the Kotlin: the charge, and both of
   the card job's (`cusoon2-card-<id>` on making a customer and on
   attaching a card), so a replay makes no second customer.
@@ -434,18 +577,17 @@ not_after     -- null, or the time after which the write is not made; set by wha
 - **Owed**, for every queue: `done_at is null and (not_after is null
   or not_after > now)`, with the runner's own rules for a lease, a
   back-off and a failed row.
-- **The order**, for every queue: rows with a `not_after` first, the
-  soonest first, then by `next_attempt_at`. A watched request stamps
-  its row ("An effect someone is watching" below), so a waiting
-  payer's row goes before an invoice run's, as the charge's own order
-  has it.
+- **The order is not the runner's**: the oldest `next_attempt_at`
+  first, unless the queue says otherwise ("Soonest is each queue's
+  stated choice" below).
 - **A queue's own result stays**: `record` writes `stripe_charge_id`
   as before, and the runner no longer reads it.
 
 In the Kotlin's runner (`runEffectQueue`) it is small: `done_at` is
 one line beside `attempts = 0` where a done act is recorded, in the
 one `update` that carries the queue's own columns; `not_after` is
-only read, in the claim; three `owed` and one `order` go; mail's
+only read, in the claim; three `owed` go, and the charge's `order`
+goes by `not_after` where it went by the customer's id; mail's
 `sent_at` becomes `done_at`. That runner is not yet live, so no
 finished row needs its `done_at` filled. Made in the Kotlin first,
 under its tests. Weighed and not taken: a view for each effect that
@@ -453,15 +595,64 @@ holds its condition, one more object of the schema for each queue;
 and a claiming statement of the queue's own, as a job's `next` is,
 which has each author write the lease and the back-off again.
 
+### Soonest is each queue's stated choice
+
+Whether a row is done is a fact, and the runner holds it. Which row
+goes first is a choice, and the Kotlin's queues make two: mail and
+the card job take the oldest `next_attempt_at`, and the charge puts a
+payer on the hosted page before an invoice run (`StripeQueues.kt`,
+`order`). So, as with retries, the queue says:
+
+```kotlin
+effect chargeCard on stripe_charge_job {
+    soonest   not_after       // optional: rows with a time here go first, the soonest first
+    attempts  1
+    ...
+}
+
+effect sendMail on outbound_message {
+    // no soonest: the oldest next_attempt_at first, as the Kotlin has it
+    ...
+}
+```
+
+- **With `soonest`** the runner orders by that column, rows with no
+  value last, then by `next_attempt_at`. With none it orders by
+  `next_attempt_at` alone.
+- **A watched request stamps its row** ("An effect someone is
+  watching" below), so a waiting payer's row goes before an invoice
+  run's, as the charge's own order has it.
+- **`not_after` means one thing for every queue**: the time after
+  which the write is not made.
+- **The checker holds**, by Postgres's answer, that the column is one
+  of what the runner claims from, the `find` view where there is one
+  and the table where not, and that it is a `timestamptz`.
+
+Perhaps 10 lines of checker, 5 of runner and 20 of tests. Weighed and
+not taken:
+
+- **One order for every queue**, rows with a `not_after` first, as
+  this section first had it. It was drawn from the charge alone. In
+  mail a `not_after` marks a reminder, no use once its pickup has
+  passed (`Outbox.kt`), so every reminder of a tenant would go before
+  its other mail, a confirmation queued earlier included: a change to
+  mail's order that nobody chose.
+- **The name `first`**, which reads as a step the runner calls, as
+  `enter` is, and does not say which end goes first; and **`order`**,
+  which invites a fragment.
+
+Agreed with Greg on 17 Nov 2026.
+
 ### The list of work
 
 A queue is declared beside its functions, and a list says what a
-worker runs and in what order.
+worker runs.
 
 ```kotlin
 // charge.kg
 effect chargeCard on stripe_charge_job {
     enter    bindTenantOf
+    soonest  not_after
     attempts 1
     prepare  prepareCharge
     act      charge
@@ -476,10 +667,10 @@ job notifyBooker {
 
 // daemon.kg
 work daemon {
-    urgent      saveCard, chargeCard
-    background  sendRunSheet, frequently, platformDaily, tenantDaily, runBatchJob,
-                notifyBooker, remindBooker, notifyDriver, remindDriver, warnAdmin,
-                chargeAndSendInvoice, resendInvoice, sendPaymentInvite, sendMail
+    alert   opsAlert            // "An alert is the application's to send" below
+    queues  saveCard, chargeCard, sendRunSheet, frequently, platformDaily, tenantDaily,
+            runBatchJob, notifyBooker, remindBooker, notifyDriver, remindDriver, warnAdmin,
+            chargeAndSendInvoice, resendInvoice, sendPaymentInvite, sendMail
 }
 ```
 
@@ -492,29 +683,38 @@ The checker holds that:
 - the effect's table has the runner's columns, by Postgres's answer
   (the Kotlin's `EffectFields`, written by hand for each table);
 - `attempts` is stated;
+- a column named by `soonest` is a `timestamptz`, by Postgres's
+  answer;
 - no step of a job acts;
-- every job states `failed`.
+- every job states `failed`;
+- every `work` list names an `alert`, a function marked `@Acts` that
+  takes the environment and an `Alert`.
 
-The compiler prints each queue with its kind, table, attempts and
-lane into a file that is checked in, as it prints the gates, and
+The compiler prints each queue with its kind, table and attempts
+into a file that is checked in, as it prints the gates, and
 under each the tables it reads, writes and locks (`doc/gates.md`,
 "The table is printed"):
 
 ```
-chargeCard     effect   stripe_charge_job   attempts 1   urgent
+chargeCard     effect   stripe_charge_job   attempts 1
+               runs     plain
                reads    booker, invoice, stripe_card
                writes   invoice, mail_job, payment
                locks    invoice
-notifyBooker   job      background
+               acts     stripe.charge (keyed)
+notifyBooker   job
+               runs     plain
                reads    booker, booking
                writes   booking, mail_job
                locks    booking
+               asks     google.placeDetails (in transaction)
 ```
 
 - **A queue has one set of lines**, over every function it names
   that holds a transaction: `enter`, `prepare` and `record`, or `next`
   and `run`. Which step touches a table is in the code. `act` holds no
-  transaction and adds nothing.
+  transaction and adds no table: what it calls is on the `acts` line
+  (`doc/gates.md`, "The table is printed").
 - **An effect's table is on its first line and not below.** The
   runner claims and marks its rows in Go, which the SQL pass never
   sees, so the lines are what the queue's own functions touch. A job
@@ -530,8 +730,68 @@ an effect's table to the lines, which has the file state what
 Postgres did not report.
 
 The runner is hand-written Go in this repo, beside the request's
-handler: claiming, leases, backing off, parked rows, alerts, the lanes
-and their fairness.
+handler: claiming, leases, backing off, parked rows, alerts, and a
+loop for each queue.
+
+### Each queue is served on its own
+
+The Kotlin's daemon does one thing at a time, and its two lanes exist
+to work round that: the urgent one, saving and charging a card, is
+swept before and after each unit of the other (`daemon.kt`,
+`DaemonPass`). It is a soft priority. A send to a slow SMTP server
+still holds a payer's charge, and the Kotlin says what would end it:
+"give the urgent lane its own thread." Here a late charge is not made
+at all ("An effect someone is watching"), so the wait would cost
+more.
+
+So the runner gives every queue a loop of its own: claim one row, do
+it, and again, waiting a little when there is none. No queue waits
+for another, and the `queues` of the `work` list above are a list
+whose order means nothing. There are no lanes, no sweep and no pass.
+
+- **What the Kotlin needs of one thing at a time still holds**, since
+  both of its notes are about one queue. The lease "is safe only
+  because one daemon thread claims, sends and records one row at a
+  time" (`JobQueue.kt`), or a second worker takes a slow send's row
+  for abandoned: a queue still has one worker, and `act` has the
+  lease as its deadline besides. And "two concurrent jobs for one
+  card can still both insert" (`StripeQueues.kt`): both are the card
+  queue's, served one after the other.
+- **`soonest` and `fair` stay.** They order the rows of one queue,
+  which is still served a row at a time.
+- **A deadlock between two queues can now happen**, and the runner
+  runs the transaction again (`doc/gates.md`, "Two kinds of
+  transaction").
+- **Each busy queue holds a connection**: up to 16 for cusoon2, where
+  the daemon holds one.
+- **Idle queues ask no more than the pass did.** The Kotlin waits at
+  most 0.2 seconds when there is no work; 16 queues asking at that
+  rate is fewer statements than its pass makes.
+- **A test steps one queue at a time**, through an entry of the
+  runner that serves one row of a named queue, so that a run can be
+  repeated and compared with the Kotlin's.
+
+**It is made in Go alone, and the Kotlin's daemon stays as it is.**
+What goes into the Kotlin first is what the side-by-side run would
+see: the schema, a statement, a result. This changes when a row is
+served and nothing of what serving it does, and the runner is new Go
+and no port. So the two differ in timing, a difference Greg accepted
+on 17 Nov 2026. What the Kotlin would have shown is that no two
+queues rely, unsaid, on not running at once: the card job and a
+charge for one booker, say. That was not established. The daemon's
+functions lock what they read, since requests run beside them, which
+suggests they are written for company and proves nothing. So before
+the runner replaces the daemon, one test runs every queue side by
+side over a seeded database and one at a time over a copy of it, and
+the rows must be the same.
+
+Weighed and not taken: the two lanes as Kogo's words, which fixes
+their number and names them for cusoon2's daemon; lanes as rows of
+the application's own naming, in order of priority, with the sweep
+stated in the spec, which is three rules for what one sentence now
+says; and a pool of workers over all the queues, which needs a
+priority again once the pool is full. Agreed with Greg on 17 Nov
+2026.
 
 ### When a row fails
 
@@ -564,8 +824,9 @@ cases: refused, not made, attempts exhausted, and done but not
 recorded. Both functions run in the transaction that fails the row,
 after the runner has marked it, and their statements count in the
 queue's printed lines. A refusal alerts nobody. Where a queue gives
-no words the runner's are used: fix the cause, then run the statement
-that resets the row. Weighed and not taken: one function that writes
+no words the alert carries none, and the statement that resets the
+row beside it ("An alert is the application's to send"). Weighed and
+not taken: one function that writes
 and gives the words, which leaves the Kotlin's shape and makes words
 for a refusal that are thrown away; and `record` taking every
 outcome, which loses the fit of `act` to `record`.
@@ -602,6 +863,60 @@ a key only from the runner, hold however queues reach the runner. The
 list adds the fit of the three steps, the table's check and the one
 screen. It is built after the request side.
 
+### An alert is the application's to send
+
+The Kotlin's runner tells ops when a row fails for good: an email
+sent straight to SMTP, not through the outbox, to
+`deployment.operators`, once the transaction that failed the row has
+committed, "so the alert never holds a connection open on SMTP and
+never rolls the failure back" (`JobQueue.kt`). It is best effort: a
+send that fails is logged. Kogo's runner cannot know that an alert is
+an email, who the operators are or how the application words it. So
+the runner says when and hands over what it knows, and a function of
+the application's says where it goes and how it reads:
+
+```kotlin
+// daemon.kg
+work daemon {
+    alert   opsAlert
+    queues  saveCard, chargeCard, sendRunSheet, frequently, platformDaily, tenantDaily,
+            runBatchJob, notifyBooker, remindBooker, notifyDriver, remindDriver, warnAdmin,
+            chargeAndSendInvoice, resendInvoice, sendPaymentInvite, sendMail
+}
+
+// The runner's package. A sketch: the fields are to be settled.
+data class Alert(val queue: String, val table: String?, val id: Uuid?,
+                 val cause: String, val recovery: String?, val reset: String?)
+
+// The application's.
+@Acts fun opsAlert(env: Env, alert: Alert): Either<SendFailure, Unit> =
+    env.smtp.send(eml(opsMail(env.operators, alert)))
+```
+
+- **The runner decides when**, as the Kotlin does: after the commit
+  that failed the row, for a failure that is not a refusal, and after
+  a job's `failed` has committed.
+- **The function takes the environment and the alert, and no
+  transaction**, so it may send at once, and it carries `@Acts`.
+- **It is best effort.** Where it answers a failure or panics the
+  runner logs that and carries on: the record of the failure never
+  rests on it.
+- **Every `work` list names one, with no default.** A worker with
+  none would fail rows in silence; an application that wants silence
+  writes a function that does nothing, where it is seen.
+- **The runner hands over what it knows, not words.** `recovery` is
+  the queue's own words where it gave any; `reset` is the statement
+  that resets an effect's row, which the runner knows; the sentence
+  round them is the application's.
+
+It is what the Kotlin does, so nothing goes into the Kotlin first.
+Perhaps 15 lines of checker, 15 of runner and 20 of tests. Weighed
+and not taken: each queue's `failed` queuing the alert as mail, which
+needs no form and outlasts an SMTP server that is down, but makes
+"every failed row alerts ops" a habit of 16 queues, and writes a row
+the Kotlin does not; and the runner sending the mail, which puts the
+operators and the wording in Go. Agreed with Greg on 17 Nov 2026.
+
 ### Discover, then enter
 
 cusoon2's daemon binds each active tenant in turn and asks each queue
@@ -630,7 +945,7 @@ effect chargeCard on stripe_charge_job {
 }
 
 data class Claim(val id: ID, val tenantId: ID)      // read from the view, by the rule SQL's columns have
-fun bindTenantOf(tx: Tx, claim: Claim) { ... }
+fun bindTenantOf(tx: Tx, env: Env, claim: Claim) { ... }
 ```
 
 The runner claims from `find`, calls `enter` with what it read there,
@@ -683,7 +998,7 @@ select id, tenant_id from outbound_message_queue
 where <owed>
 order by tenant_id <= $last,                      -- values past the last one first, then the rest
          tenant_id,
-         not_after nulls last, next_attempt_at    -- within one value, the order every queue has
+         next_attempt_at                          -- within one value, the queue's own order
 limit 1 for update skip locked
 ```
 
@@ -798,7 +1113,8 @@ direction, and a change of behaviour for after the port.
 
 It is part of Kogo, as `doc/design.md` has the prelude and the
 handler. This adds the runner (about 500 lines in the Kotlin), the
-HTTP binding (150 to 250 lines by the survey's guess), mail and PDF.
+HTTP binding (150 to 250 lines by the survey's guess) and mail. PDF
+is cusoon2's extension, and its Go is cusoon2's.
 The prelude and `rt` are about 2,150 lines today, with 1,170 of
 tests.
 
@@ -810,47 +1126,20 @@ over a table's name, each of which it leaves out on purpose. This is
 code Greg does not read and the base everything trusts: it has the
 heaviest tests.
 
-### To research: each lane in its own goroutine
-
-Not agreed; an idea to check. The daemon runs one unit at a time. The
-urgent lane (saving and charging a card, a payer watching for 40
-seconds) is swept before and after each background unit but cannot
-interrupt one, and a send to a slow SMTP server holds it: the Kotlin
-says so (`daemon.kt`, "give the urgent lane its own thread"). With
-`act` timed by the lease, two minutes (`JobQueue.kt`), a payer's
-charge could wait past its `not_after` behind one email, and is then
-never made.
-
-The idea: the runner runs each lane in its own goroutine, so the
-urgent lane never waits behind the background one. What to check
-first, since cusoon2 has always run serially and says it relies on
-that:
-
-- `JobQueue.kt`, at `effectLease`: the lease "is safe only because
-  one daemon thread claims, sends and records one row at a time", and
-  a second thread would take a slow send's row for abandoned and send
-  it twice. The deadline above (`act` has the lease, with a margin)
-  is meant to end that, since no call outlives its lease; it is to be
-  shown, not assumed.
-- `StripeQueues.kt`: two concurrent card jobs for one card can both
-  insert a card row. Both are in the urgent lane, which stays serial
-  within itself.
-- Anything else that assumes one connection or one row at a time:
-  the alerts, the drain on shutdown, the pass's reading of tenants.
-
-Perhaps 20 lines of runner and a test that serves a charge while a
-send hangs.
-
 ## What it would change in the spec
 
-- **13:** an outbound binding says `lookup` or `action`. Application
-  code holds no `external`, as now.
+- **13:** an outbound binding says whether it is a lookup or an
+  action, the second with `@Acts`. Application code holds no
+  `external`, as now.
 - **12, the prelude:** `kogo.http`, and `Act`, `EffectKey` and
-  `SendFailure` with the runner's package; `kogo.pdf`.
+  `SendFailure` with the runner's package.
+- **13:** an application's extensions: bindings with no effect, each
+  marked, read from a directory it names.
 - **10.4 and 3:** `bytea` maps to `ByteArray`, which has no
   operations and no `==`; the one array.
 - **12, the prelude:** `kogo.mail`.
-- **A new section:** `job`, `effect` and `work`.
+- **A new section:** `job`, `effect` and `work`, stated with the
+  other lists by one rule and one table of roles (`doc/lists.md`).
 - `doc/design.md`: "Not designed, on purpose" loses workers, and the
   timeouts of outbound calls.
 
@@ -863,6 +1152,10 @@ send hangs.
   day: it waits on the test form.
 - Whether `job`, `effect` and `work` are Kogo's own forms or calls
   that are valid Kotlin (DEV-894).
-- A Go library for PDF: the built-in fonts' widths, PNGs and links.
+- What sits behind cusoon2's PDF extension: a small writer of its
+  own, or a wrapped library.
+- How a data class that a binding file declares reaches its Go.
+- Which package holds `Acts`: `kogo.mail` uses it as `kogo.http`
+  does.
 - A hash in the prelude. The run sheet's job keeps a SHA-1 of what it
   last sent, to see a change (`daemon.kt`, `sha1Hex`); Kogo has none.

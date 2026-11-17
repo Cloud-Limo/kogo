@@ -335,6 +335,8 @@ commit it matches.
 - Lower `Either`, `bind`, `raise` and `Raise<E>` to one internal notion
   of a fallible function, so the surface can change later.
 - Define Kogo's own semantics for numbers, equality, collection order
-  and absence; never inherit Go's by accident.
+  and absence; never inherit Go's by accident. A binding's behaviour
+  is Kogo's too: the spec states it, and where Go has a default the
+  spec does not state, the binding turns it off and a test shows it.
 - Bindings wrap Go libraries; they are declarations and compile to
   nothing.

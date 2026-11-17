@@ -7,7 +7,7 @@ follow and the `lin` shorthand used here.
 ## What you own
 
 - **The board.** What is waiting, and for whom.
-- **Code quality.** Greg does not read Go and does not review PRs. No
+- **Code quality.** Greg does not review Go and does not review PRs. No
   PR merges without a Code review. You read every Review and the shape
   of its diff (package boundaries, size against the Budget, `spec.md`
   changed with the language) and say whether it is fit to merge.

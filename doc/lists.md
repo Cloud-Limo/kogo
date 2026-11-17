@@ -6,8 +6,8 @@ and not in `spec.md`: until it is, the spec stands as written.
 
 ## What the lists share
 
-The designs have six lists: `api`, `routes`, `commands`, `job`,
-`effect` and `work`. Each was designed in its own section, and they
+The designs have five lists: `api`, `commands`, `job`, `effect` and
+`work`. Each was designed in its own section, and they
 are one idea:
 
 - a list names ordinary top-level functions and gives each a role;
@@ -41,7 +41,6 @@ A function the runtime calls takes, in this order:
 | work | `api` | the proof's transaction | the proof; the input | the answer |
 | outside | `api` | nothing (`@Acts`) | the proof; the input | nothing, or the answer where there is no work |
 | ungated | `api` | a `SerializableTx`, `Tx` or `Db` | the request; the input | the answer, or a `Reply` |
-| route | `routes` | a `Db` | the request | a `Response` |
 | command | `commands` | a `Db` | the input | words |
 | next | `job` | a `Tx` | | a row, or none |
 | run | `job` | that `Tx` | the row | |
@@ -65,16 +64,16 @@ is owed.
 - **The spec states lists once**: one section with the rule and the
   table, and in each list's section only what is its own.
 - **The checker is driven by the table**: one piece of code that fits
-  stages, with the fifteen rows as data, and no rule written by hand
+  stages, with the fourteen rows as data, and no rule written by hand
   for each list.
 - **The next list is a row**, or a few, and not a section.
 - **The spelling has at most two forms** (DEV-894 decides it): a list
-  of rows, for many small entries (`api`, `routes`, `commands`), and
+  of rows, for many small entries (`api`, `commands`), and
   a block of named parts, for one entry (`job`, `effect`, `work`).
 
 No role, shape or rule of the two designs changes but `enter`. The
 checker is no larger than the separate rules would have been; the
-spec is smaller, by perhaps one section of 60 lines where six would
+spec is smaller, by perhaps one section of 60 lines where five would
 each have explained shapes.
 
 ## Asked for: a deep dive
@@ -83,8 +82,9 @@ Greg, 17 Nov 2026, on agreeing to this: he wants a deep-dive
 assessment of what the lists are trying to do, a dispassionate look
 at how they do it, and other ways of doing the same thing: ways that
 are more explicit, so with less magic, and ways with about as much
-magic, expressed differently. Until it is done the mechanism stands
-as it is here.
+magic, expressed differently. Done: `doc/lists-assessment.md`
+(DEV-901). Greg chose on 17 Nov 2026 to keep the lists
+(`decisions.md`), and routes went to Go, which made six lists five.
 
 Starting points for it, none of them weighed:
 
@@ -97,7 +97,7 @@ Starting points for it, none of them weighed:
 - **A marker on each function** that says its role, with no list.
 - **Routes in Go, in the application's `main`**, each calling an
   ungated operation, as `doc/gates.md` weighed and refused while Go
-  was to go unread. cusoon2 has two, and it would take the `routes`
-  list, `Response` and `Secret` out of the language.
+  was to go unread. cusoon2 has two. Taken on 17 Nov 2026
+  (`doc/gates.md`, "Routes that are not operations").
 - **What the list buys that these do not**: the table on one screen,
   the printed file, and that nothing is an operation by accident.

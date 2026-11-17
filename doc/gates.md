@@ -400,51 +400,44 @@ service sends the browser back to, a webhook from a server. cusoon2
 has two once its Google login goes: logout, a GET that ends the
 session, clears the cookies and redirects, and SMTP2GO's webhook,
 which sends a Bearer secret and JSON with keys like `message-id` and
-is answered with a status alone. They are declared and handled in
-Kogo, with their paths as literal strings:
+is answered with a status alone. They are Go, in the application's
+`main`: each route calls an ungated operation of an `api` list that
+`main` does not serve to the browser.
 
-```kotlin
-routes inbound {
-    get   "/backend/logout"           logout
-    post  "/backend/smtp2go-webhook"  mailEvents
-}
-
-fun logout(db: Db, env: Env, request: Request): Response {
-    db.tx { tx -> endSession(tx, request) }
-    return redirect("/", clearedSessionCookies(isSecure(request)))
-}
-
-fun mailEvents(db: Db, env: Env, request: Request): Response {
-    if (!env.mailHookSecret.matches(request.header("Authorization"))) return status(401)
-    val event = Json.parse(request.body) ?: return status(400)
-    val failure = DeliveryFailure(event.string("message-id"), event.string("rcpt"), event.string("event"))
-    db.tx { tx -> recordDeliveryFailure(tx, failure) }
-    return status(200)
-}
+```go
+mux.HandleFunc("POST /backend/smtp2go-webhook", func(w http.ResponseWriter, r *http.Request) {
+    if !hook.Matches(r.Header.Get("Authorization")) { w.WriteHeader(401); return }
+    event, ok := readEvent(r.Body)                  // message-id, rcpt, event
+    if !ok { w.WriteHeader(400); return }
+    hooks.Call(r.Context(), "recordDeliveryFailure", event)   // an ungated operation, in a table not mounted
+    w.WriteHeader(200)
+})
 ```
 
-- **A route has one shape**, `(db: Db, env: Env, request: Request):
-  Response`: trusted code with no gate, as an ungated operation is,
-  holding a `Db` so that it may act between its transactions.
-- **The prelude gains** `Response` (a status, a body, a location and
-  cookies) with `status` and `redirect`; `Secret`, made in `main` from
-  configuration and compared in Go, so Kogo holds no secret; on
-  `Request`, `query(name)` and `body`, read by a route alone; and
-  `Json.parse`, the reader of outside answers (`doc/work.md`) given
-  text. A request is read by key, as another's names always are.
-- **The handler** mounts each route at its method and path, reads the
-  body as text up to a limit, makes no Origin or CSRF check (a route's
-  caller need not be a browser), answers the `Response` as it is, and
-  turns a panic into a 500. The printed table lists each route, with
-  what it reads and writes.
-- **A route translates and no more**, as a habit: it reads the
-  request, calls functions that take typed values, and builds the
-  answer. `recordDeliveryFailure` knows nothing of HTTP.
+- **Go holds the method, the path and the translation**: it reads the
+  URL, the headers and the body into the operation's typed input, and
+  turns the answer into a status or a redirect. The secret is
+  configuration, compared in Go.
+- **Kogo holds what the route does**: the operation's shape and wire
+  types, and its lines in the printed file. `recordDeliveryFailure`
+  knows nothing of HTTP.
+- **Logout** calls an ungated operation that answers a `Reply`
+  ("Ungated: logins and logout"); Go writes its cookies as
+  `Set-Cookie` headers and then a 303 to `/` in place of the JSON. The
+  cookies stay Kogo's; only the redirect is Go's.
+- **A route touches the database only through its operation**, as
+  `decisions.md` has the seam (17 Nov 2026). `main` opens the pool,
+  so nothing enforces it: a reviewer holds `main` to it.
+- **Open:** how Go calls one operation of a table that is not
+  mounted. DEV-903, which writes cusoon2's `main` out on paper, shows
+  it.
 
-Perhaps 40 lines of prelude, 70 of handler and 30 of checker. It
-reverses a line of `doc/design.md`, "The server": paths and other
-routes, a webhook say, no longer stay out of the language. Agreed
-with Greg on 17 Nov 2026.
+So the language has no `routes` list, no `Response` or `Secret`, no
+`status` or `redirect`, and `Request` gains no `query` or `body`. The
+printed table lists no route; what each route writes is its
+operation's. Reopen at five routes. Commands are not affected and stay
+a list. Agreed with Greg on 17 Nov 2026 (`doc/lists-assessment.md`,
+choice B), reversing a `routes` list agreed earlier the same day.
 
 ### Commands
 
@@ -455,7 +448,7 @@ an ABN, a PayID, invoicing and platform fees by hand, a test email,
 the pricing check at deploy, and setting up the identity service's
 tenants. Each reads its flags into values, runs a transaction and
 sometimes an outside call, and refuses on stderr with exit 1 or says
-what it did. They are declared and written in Kogo, as routes are:
+what it did. They are declared and written in Kogo:
 
 ```kotlin
 commands admin {
@@ -481,7 +474,7 @@ ABN checked: acme
   Either<String, String>`: no `Request` and no gate, since whoever
   runs the binary on the server is trusted, as now. It holds a `Db`,
   so it may act between its transactions.
-- **Its name is a literal string**, as a route's path is. **A flag is
+- **Its name is a literal string**, as an operation's is. **A flag is
   a property's name as written**, as an operation's JSON key is (spec
   15.4), and its value is read as JSON's are: `true`, an ISO date, a
   number, text. The reader is strict: an unknown, missing or
@@ -498,8 +491,9 @@ ABN checked: acme
 Perhaps 80 lines of Go and 20 of checker. Weighed and not taken:
 flags in kebab-case made from property names, a name turned into text
 out of sight; input as JSON on the command line, one reader but
-painful by hand; commands in Go, as for routes. Agreed with Greg on
-17 Nov 2026.
+painful by hand; commands in Go, which for ten commands would grow
+Go with each and lose the reading by property name. Agreed with Greg
+on 17 Nov 2026, and kept when routes went to Go the same day.
 
 ### The table is printed
 
@@ -542,6 +536,16 @@ The file enforces nothing: it is what a reviewer reads.
   "The server"): the application's checks run the command and fail
   when `git diff` shows a change, so Kogo has no rule for a stale
   file. The command needs a database, as `kogo check` does.
+- **The outside step is on the first line, beside the gate**:
+  `updateBooker  updateBookerGate  outside renameLogins`, and
+  `outside` alone for an operation that runs wholly outside. A row's
+  order of calls is then read where its gate is: a line with no
+  `outside` is gate, then work. That the gate runs a second time
+  after an outside step is left to the spec. Perhaps 5 / 5. Agreed
+  with Greg on 17 Nov 2026 (`doc/lists-assessment.md`, choice C), over
+  a line of order on every entry, which prints `gate, work` on most.
+- **It lists no route**: routes are Go ("Routes that are not
+  operations"), and what each writes is on its operation's lines.
 - **The tables are those a statement names**, over the statements the
   gate or the work reaches. Postgres gives them: the tree the SQL pass
   already reads for what can be null lists every table of a statement,
@@ -991,24 +995,25 @@ it: a habit of the application's code, not a rule.
   operation may answer `Either<String, Reply<A>>`.
 - `doc/design.md`, "The server": the handler calls the gate, in a
   read-only savepoint, and the outside step; a command writes the
-  printed table; "Not designed, on purpose" loses the cookie; `main`
-  no longer holds other routes, which a `routes` list declares. "The
-  SQL pass": a statement's signature carries its tables.
-- **12 and 15, a new part:** the `routes` list, a route's shape,
-  `Response`, `Secret`, `Request.query` and `Request.body`, and
-  `Json.parse`; the `commands` list, a command's shape, and its flags
-  read by property name.
+  printed table; "Not designed, on purpose" loses the cookie. Its
+  sentence that paths and other routes stay out of the language
+  stands. "The SQL pass": a statement's signature carries its tables.
+- **12 and 15, a new part:** the `commands` list, a command's shape,
+  and its flags read by property name.
 
 ## Weighed and not taken
 
-- **A route in Go that calls a Kogo operation**: `main` reads the URL,
-  the headers and the body into a typed input, calls an ungated
-  operation of a list it does not serve to the browser, and turns the
-  answer into a redirect or a status. Less language, and typed inputs,
-  but each route is half Go, which Greg does not read, and Go grows
-  with every route. The first of those reasons no longer stands
-  (`doc/work.md`, "Hand-written Go"), and cusoon2 has two routes: it
-  is left for the deep dive on the lists (`doc/lists.md`).
+- **A `routes` list in Kogo**, each route `(db: Db, env: Env,
+  request: Request): Response`, declared with its method and path as
+  literal strings; the prelude gaining `Response` with `status` and
+  `redirect`, `Secret`, and `Request.query` and `Request.body`.
+  Agreed on 17 Nov 2026 and reversed the same day (choice B of
+  `doc/lists-assessment.md`): two routes do not pay for a list, two
+  prelude types, two members of `Request` and a section of the spec,
+  perhaps 140 lines of Kogo's Go, and the reason it was taken, that
+  Greg does not read Go, is no hard rule. What it gave, the route's
+  path in the printed file and the checker's sight of each route's
+  translation, is lost. Reopen at five routes.
 - **Following a proof's transaction through `val`s and arguments**, so
   that a helper it reaches is held to the rule on statements. A walk of
   where each value goes, perhaps 100 lines, and a rule that holds
@@ -1088,7 +1093,7 @@ it: a habit of the application's code, not a rule.
 
 ## Open
 
-- Whether `gatedBy`, `ungated`, `outside`, `routes` and `commands`
+- Whether `gatedBy`, `ungated`, `outside` and `commands`
   are spelt as valid Kotlin (DEV-894), and how a binding spells
   `lookup`; an action is `@Acts`.
 - The printed table's command has no name.

@@ -11,6 +11,16 @@ the design to work from, not built, not in `spec.md`, no example run.
   and their tables (`doc/gates.md`, "The table is printed";
   `doc/work.md`, "The list of work").
 
+## Not yet filed
+
+- **The runner's columns are one Go list**, read by the runner's SQL
+  and by the checker's check of each queue's table (`doc/work.md`,
+  "The list of work"), where as designed they would be written twice.
+  About 5 lines.
+- **A command's flags are read by the walk that reads an operation's
+  input** (`prelude/kogo/rpc/wire.go`), not by a reader of their own
+  (`doc/gates.md`, "Commands").
+
 ## Agreed, and made in cusoon2's Kotlin first
 
 - **cusoon2's routes.** Agreed: they stop making a session for any
@@ -42,7 +52,9 @@ Greg, 17 Nov, asked for one thing more: a deep-dive assessment of
 what the lists are trying to do, a dispassionate look at how, and
 other ways of doing the same, more explicit ones and ones with as
 much magic expressed differently (`doc/lists.md`, "Asked for: a deep
-dive").
+dive"). Done: `doc/lists-assessment.md` (DEV-901), and Greg's four
+choices on it, 17 Nov, are in `decisions.md` (DEV-902): the lists
+stay, and routes are Go in `main`.
 
 Greg, 17 Nov: the design has kept clear of magic, needs a little, and
 any of it makes him nervous. Look hard at each place where something
@@ -128,29 +140,27 @@ Agreed subject to this review:
 
 - **How SQL's parameters are spelt, and whether Kogo source is valid
   Kotlin** (DEV-894). It decides how `gatedBy`, `ungated`, `outside`,
-  `routes`, `commands`, `job`, `effect`, `work` and a binding's
+  `commands`, `job`, `effect`, `work` and a binding's
   `lookup` are spelt, and whether `@Acts` stays a marker or becomes
   `action fun` (`doc/gates.md`, "A function that acts says so"). Each
   design here was written to hold either way. One constraint on it,
   agreed 17 Nov: the lists have at most two forms, a list of rows and
   a block of named parts (`doc/lists.md`).
-- **Where Kogo ends and Go begins.** To research. The review of 17 Nov
-  leaned on Go more as it went: each service's handle states its
-  encoding; the binding sorts a failed send by status; Go draws a PDF
-  from Kogo's marks, writes an email's EML and speaks SMTP; it holds
-  the fonts' metrics, the secret a webhook is checked against, and the
-  runner with its lanes. Greg, 17 Nov: "maybe that is not a bad
-  thing." The line drawn so far (`doc/work.md`, "Hand-written Go"):
-  Go holds what another application of this shape would need
-  unchanged, and Kogo what knows what a booking is. Test that line
-  against each of these, and ask whether more belongs in Go (the
-  runner's lanes in parallel, there "To research") or less. Settled
-  on 17 Nov, after this was written: an application has no bindings
-  with an effect and may add pure functions as extensions, and a
-  binding passes four tests to enter the prelude (`decisions.md`,
-  "An application has no bindings with an effect"); and the lanes
-  are gone, each queue served on its own (`doc/work.md`, "Each queue
-  is served on its own").
+- **Where Kogo ends and Go begins.** Settled 17 Nov 2026
+  (`decisions.md`, "Where Kogo ends and Go begins"): Kogo for what
+  touches the database, acts outside or decides who may do what; Go
+  for pure code at the edge where it is clearly simpler, as an
+  extension Kogo calls or in `main`, which calls Kogo; and an
+  application's Go reaches the database and outside services only by
+  calling an operation. The review of 17 Nov had leaned on Go more as
+  it went (each service's handle states its encoding, the binding
+  sorts a failed send by status, Go draws a PDF from Kogo's marks and
+  holds the fonts' metrics), and "maybe that is not a bad thing".
+  Also settled that day: an application has no bindings with an
+  effect (`decisions.md`, "An application has no bindings with an
+  effect"); the lanes are gone (`doc/work.md`, "Each queue is served
+  on its own"); routes are Go (`doc/gates.md`, "Routes that are not
+  operations").
 - **The test form.** How a test makes a call time out, so that the
   rare path runs every day, waits on it; so does moving cusoon2's
   tests (DEV-893), and the record of Google's answers they replay

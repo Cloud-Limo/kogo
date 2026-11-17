@@ -897,8 +897,8 @@ Each entry: what was decided, why, and what would reopen it.
     at the edge, which the seam's rule below lets be Go.
   - **Lost:** a route's path in the printed file, and the checker's sight of each route's
     translation. What a route writes stays on its operation's lines.
-  - Open: how Go calls one operation of a table that is not mounted: by wire name with
-    JSON, or by the emitted types. `doc/main.md` (DEV-903) writes both out, Q1.
+  - **How Go calls the operation** was left open here and is settled: by the emitted
+    types, through a handler `main` does not mount (18 Nov, below).
   - Not taken: the `routes` list.
   - Reopen at five routes.
 - **The printed table names an operation's outside step on its first line, beside the
@@ -1115,6 +1115,176 @@ Each entry: what was decided, why, and what would reopen it.
     its construct is checked.
   - Reopen if a rule cannot be written over the type checker's result without reaching
     into it.
+- **A route calls its operation through a handler `main` does not mount, by the emitted
+  types** (18 Nov 2026, Greg; `doc/main.md`, Q1; `doc/gates.md`, "Routes that are not
+  operations"). The call goes through a handler of the route's list, so it has a request
+  id, a `served` line, the limit and reruns as a browser's call has; and it hands the
+  operation its input as the emitted type, so a renamed property or a removed operation
+  is a compile error in `main`. The emitter writes a typed value for each operation beside
+  its table (`routes.Logout_op`, an `rpc.Op[Env, I, A]`), and
+  `rpc.Call(h, r, op, input) (A, error)` runs it; `rpc.SetCookies` writes a `Reply`'s
+  cookies. The handler of a list with no check is made by a constructor of its own
+  (`rpc.NewCalls`, the session's name) and is no `http.Handler` (the list's check, below).
+  About 10 emitter / 25 `rpc` / 50 tests. The spec does not change: a route is not the
+  language's.
+  - **Why, against the seam.** It is the only option where what Go fills is checked at
+    compile time. Its one break, that a property added later is Go's zero, the chain below
+    closes.
+  - **With it, the lead's:** `rpc.Call` checks an input's enums against their entries, as
+    the strict reader does (about 5 / 10 of the above), and `rpc.Request` stays impossible
+    to make outside `rpc`, with a line saying so where it is declared.
+  - Not taken: by wire name with JSON (`h.Call(r, name, body)`), where the keys and the
+    operation's name are strings Go does not check, so a rename shows at the first bounce;
+    the route running the emitted function in its own transaction, which copies the
+    handler's rules into each route and has `main` open a transaction on the pool,
+    against the seam's third rule of 17 Nov.
+  - No reopen condition was given.
+- **Hand-written Go builds a data class Kogo declares by a chain of named steps** (18 Nov
+  2026, Greg; `doc/main.md`, Q13; `doc/design.md`, "The emitter"). The emitter writes the
+  chain: one step for each property, named for it, in the class's order, each returning a
+  type that has only the next step, and the last returning the class
+  (`routes.DeliveryFailure_().MessageId(id).Rcpt(rcpt)...`). A property left out,
+  misplaced or misnamed is a compile error in `main`, so the value is fully formed,
+  filled by name and checked at compile time, as the seam of 18 Nov asks. Each step's
+  type is named for the property it needs (`DeliveryFailure_needsRcpt`, the session's
+  name), so Go's error names what is missing. The emitter writes a chain for each list's
+  environment and each data class an input reaches; its own Go keeps the keyed literal.
+  A guess: 20 emitter / 20 tests, two emitted lines for each property. The spec does not
+  change.
+  - **In cusoon2** it is used twice: the webhook's input (`DeliveryFailure`, five
+    properties) and `Env`, built once in `environment` (six, since settings are one
+    property, below). Logout's input is `Unit` and needs none.
+  - **Accepted cost.** More to read in `main` than a constructor call (Greg: "My worry
+    with c is the verbosity, but it is clearly safer"), and a rename or reorder of a
+    property in Kogo needs an edit of `main`, which the build announces. `app.Env{}` still
+    compiles: a reviewer holds `main` to the chain, and no check does.
+  - **A comment says so at the routes in `main`**, as Greg asked: that the chain is fine
+    for two routes and is revisited, with routes in Go, if routes multiply.
+  - Not taken: a positional constructor, fully formed and not filled by name, so two
+    neighbours of one type exchanged compile (four `String`s in `DeliveryFailure`; a flag
+    exchanged with the one that hands out login codes); the keyed literal, filled by name,
+    where a property left out is Go's zero.
+  - Reopen (Greg): "if there is an explosion of these hand written Go handlers we will
+    need to revisit". He gave no number; the session read it as the five routes that
+    reopen "Routes are Go in the application's `main`".
+- **Origin and CSRF: the list names its check, and a list with none cannot be mounted**
+  (18 Nov 2026, Greg; `doc/main.md`, Q4). They get an issue of their own, on paper first,
+  that designs this and nothing wider:
+  1. **The list names its check** (`api booker checkedBy sameSite { ... }`): one Kogo
+     function that holds cusoon2's `verifyOrigin` (Sec-Fetch-Site, then Origin against the
+     configured extras, the ops origin and the tenant table). The handler runs it before
+     every operation of the list, ungated ones and `gatedBy anyone` included. `main` has
+     no line for it.
+  2. **A list that names no check cannot be served to a browser.** The emitter writes it
+     as a Go type the handler cannot mount and only `rpc.Call` accepts, so mounting it is
+     a compile error in `main`. In cusoon2 that is `api routes` alone; `booker`, `ops` and
+     `storefront` each name the check.
+  3. **The token is the session reader's.** The one Kogo function that turns a cookie into
+     a session compares `X-CSRF-Token` with the row's token, so every gate and login that
+     reads a session has the check and none writes a line for it.
+  cusoon2's `main` serves no browser until it lands. A guess, built: checker 20, emitter
+  10, `rpc` 25, tests 40, and spec 15.1 and 15.2, whose "Nothing runs before an
+  operation" it amends.
+  - **Why.** Each check is written once, in Kogo; no operation, gate or login repeats a
+    line or can forget one; and "has the check" is the same set as "served to a browser",
+    so the guarantee is by construction and no reviewer holds it.
+  - **Accepted cost.** A word on the list; one more issue and PR before code; the token
+    check holds only while every read of a session goes through the one function, which a
+    reviewer of the gates' file holds and the checker does not.
+  - **Left to the issue:** whether the check takes a `Tx` or a `Db` and runs in its own
+    transaction, as the Kotlin's does; the status of a refusal (the Kotlin answers 400);
+    how the printed table shows it; Origin `null`.
+  - Not taken: Sec-Fetch-Site in Go in `main` with Origin and the token in the session
+    gates, which do not run for a login or a public read, and the login is the case
+    `verifyOrigin` was written for (cusoon2 PR 1473); a handler option in `main` that
+    calls a Kogo function, which `main`'s author sets for each list; one declaration of
+    the check for the whole program, a new top-level form to save two words.
+  - No reopen condition was given.
+- **The ops site names the storefront it administers in a header, which a shared gate
+  reads** (18 Nov 2026, Greg; `doc/main.md`, Q5). The header (`X-Storefront`, the
+  session's name) is read with `request.header` by one shared gate of `api storefront`,
+  which checks the grant and binds the tenant, as cusoon2's `requireStorefront` does with
+  the path's value. The storefront is where a request happens, as the tenant is, which a
+  gate already reads from `Host` or `X-Dev-Tenant`; it is no part of an operation's
+  input. `Request`, the inputs, the handler and `main` stay as they are, and the list is
+  mounted at one fixed path. 0 / 0 in Kogo.
+  - **Why.** The Kotlin's route runs the whole tenant schema as an admin (36 queries and
+    37 mutations), so the name is stated once and not in each operation.
+  - **Accepted cost.** The header's name is a string in the ops site's fetch wrapper and
+    in the gate, checked by nobody at compile time: a mismatch refuses every call at the
+    first try. The storefront no longer shows in nginx's access log. cusoon2's path
+    `/backend/ops/s/{storefront}/graphql` goes; only two service tests call it.
+  - Not taken: the storefront in each input, up to 73 inputs and a gate for each, and the
+    tenant site's inputs carrying a storefront that means nothing there; `Request`
+    gaining the path, a member of `Request`, the spec and a wrapper in `main` for what a
+    header already carries.
+  - No reopen condition was given.
+- **Kogo declares an application's settings and the runtime fills them** (18 Nov 2026,
+  Greg; `doc/main.md`, Q7 and Q11; `doc/design.md`, "The server"). A setting is a value
+  of the configuration file that Kogo code reads. The application declares its settings
+  as a data class (`Settings`), the file holds them in one object (`"settings"`), a key
+  for each property, and `main` hands that object to Kogo's strict reader, the one an
+  operation's input is read by, in one line that never changes
+  (`rpc.ReadSettings[app.Settings](raw)`, the session's name); `Env` holds the result as
+  one property. Adding a setting is a property in Kogo and a key in the file, and no Go.
+  1. **Every setting is stated in every file**: nothing defaults, as nothing does in an
+     input. A missing or misspelt key, or a value of the wrong type, stops the start and
+     fails `check-config`, naming the key (`settings.opsOrigin is missing`).
+  2. **A key the class does not have is reported, at start and by `check-config`, and
+     ignored**: one file must serve two versions of the program across a deploy and a
+     rollback, and with every key required, refusing extras would leave no file both
+     accept.
+  3. **Kogo's keys and Go's keys do not share an object.** Go's keys are what makes a
+     handle or opens the server (the database, SMTP, each service's address and secret,
+     the port), read by `main`'s own struct, which refuses a key it does not know; it
+     grows with a service and not with a setting. Inside `settings` the application nests
+     as it likes.
+  A guess: 20 code in the handler's package, 30 tests, nothing in the checker or the
+  emitter, after an issue that writes it into `doc/main.md` and the spec.
+  - **Why.** It is the seam of 18 Nov applied to the one data class the runtime hands
+    Kogo that hand-written Go was filling, and Greg's test (day-to-day work needs no Go)
+    passes for a setting. On paper a setting cost a field of `Config`, an entry of
+    `load`'s list and a step of `environment`, and a missing key was a silent zero where
+    the Kotlin refuses to start. One object each: were both readers to read one object,
+    each would see the other's keys as unknown, so either Go names every setting to skip
+    it or neither refuses an unknown key. It also keeps secrets out of what Kogo's reader
+    is handed.
+  - **Accepted cost.** cusoon2's file changes shape: ten keys move from `deployment`,
+    `stripeConfig` and `authConfig` into `settings`, with the Kotlin's reader, the deploy
+    script's `jq` and each file moving first. It differs from the Kotlin twice: no
+    defaults, and an unknown key is reported where the Kotlin refuses it. Nothing stops a
+    secret being put in `Settings`: a reviewer's rule. A setting of a type the reader
+    cannot read fails at start, not when Kogo compiles.
+  - **Left to the issue:** the reader's Go name and package; enums in settings, left out
+    until one is needed; how a prelude class such as `kogo.mail`'s `Address` is read
+    (`doc/work.md`, Open); the identity service's public address, wanted by Go for a
+    handle and by Kogo as a setting; where the spec states it.
+  - Not taken: every key read by Go in `main`, as `doc/main.md` had it; Kogo's classes
+    mirroring the file's present sections, which mix the two owners; defaults for a
+    setting left out, as the Kotlin has for five.
+  - No reopen condition was given.
+- **The rest of cusoon2's `main`, answered by the lead** (18 Nov 2026, the lead, not
+  Greg; `doc/main.md`, Q2, Q3 and Q6 to Q12).
+  - **A handle states its query fields beside its headers** (Q2), so Google's key is
+    given to the handle in `main` and no Kogo code holds it; `khttp.New` requires
+    `MaxAnswer`. It amends the handle agreed on 17 Nov by the query fields alone. Not
+    taken: Google's client adding the key, a secret in Kogo.
+  - **`Stripe-Version` is a `val` in `stripe.kg`** that `main` reads from the emitted Go
+    (Q3), so the version and the keys read under it change in one file. Not taken: the
+    version in `main`.
+  - **A queue's lease is a constant of the runner** (Q6). Not taken: the effect's form; a
+    map passed to `work.Run`. Reopen when a queue needs a lease of its own.
+  - **Go's own keys are read by `main`'s struct, with a list in `main` of those that must
+    be present** (Q7). Not taken: the strict reader for them too, since some are optional
+    and nothing is optional there.
+  - **The clock goes in twice**, in `Env` and to the handler and runner (Q8).
+  - **The handler and the runner read Postgres's idle limit from the pool** (Q9).
+  - **For Google's answers in CI, `main` points the handle at a local server that
+    replays** (Q10). Nothing in Kogo.
+  - **cusoon2 moves its keys into `settings` in the issue that writes its `main`**, and
+    not before (Q11): the Kotlin's reader, the deploy script's `jq` and each file first.
+  - **Waiting for a connection is left at the request's limit** (Q12). Reopen if a full
+    pool is ever seen to hold requests.
 
 ## Taken in the v0 spec, not yet discussed
 

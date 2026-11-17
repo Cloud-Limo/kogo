@@ -406,13 +406,19 @@ login (`doc/gates.md`, "Routes that are not operations"), so
   `/backend/ops/s/{storefront}/graphql` becoming `/backend/ops/admin`:
   the ops site names the storefront in `X-Storefront` (Q5).
 - The file gains a `settings` object, and ten keys move into it:
-  from `deployment`, `operators`, `opsOrigin`, `extraAllowedOrigins`,
+  from `deployment`: `operators`, `opsOrigin`, `extraAllowedOrigins`,
   `googleMapsBrowserKey` and the four flags; `stripeConfig.publicKey`;
   `authConfig.faUrl`. None has a default, `dev`, the old name of
   `operators`, is no longer read, and a key `Settings` does not have
   is reported where the Kotlin refuses it. cusoon2 moves its reader,
   the deploy script's `jq` and each file first, in the issue that
-  writes this `main` (Q11).
+  writes this `main` (Q11). `googleAddress`, CI's key for the replay
+  server (Q10), is one the Kotlin's reader refuses, so CI's file
+  carries it only once cusoon2's reader knows it, in that same move.
+- The identity service's public address reaches Kogo as the file has
+  it: only the handle's copy is trimmed of its trailing `/`, where the
+  paper of 17 Nov trimmed it in `load` for `Env` too. The trim's owner
+  is the settings issue.
 - `upstreamTimeouts` is read and dropped: `doc/work.md` sets nothing
   for Stripe, Google or mail, one deadline at the outer edge.
 - `--config f` before the mode replaces `-Dcusoon.configurationFile`,
@@ -473,7 +479,7 @@ settings reaching Q7 and Q11. `decisions.md` has each rule, what was
 not taken and what reopens it. What Q4 and the settings leave to
 their own issues is in their entries.
 
-- **Q1 (Greg). How a route reaches its operation: a, by the emitted
+- **Q1 (Greg). How a route reaches its operation: a, then the emitted
   types.** Through a handler of its list that `main` does not mount,
   with `rpc.Call` and the operation's `_op` value.
 - **Q2 (lead; Greg is told). The handle's Go form, and Google's key:

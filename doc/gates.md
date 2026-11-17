@@ -439,13 +439,9 @@ mux.HandleFunc("POST /backend/smtp2go-webhook", func(w http.ResponseWriter, r *h
 - **A route touches the database only through its operation**, as
   `decisions.md` has the seam (17 Nov 2026). `main` opens the pool,
   so nothing enforces it: a reviewer holds `main` to it.
-- **Go calls the operation by its emitted types**, through a handler
-  of the list that `main` does not mount, so the call has a request
-  id, a `served` line, the limit and reruns, and a renamed property or
-  a removed operation is a compile error in `main`. Go builds the
-  input by a chain the emitter writes, a step for each property, so
-  one left out does not compile either (`decisions.md`, 18 Nov 2026;
-  `doc/main.md` has both routes whole).
+- **Go calls the operation by its emitted value**, through a handler
+  of the list that `main` does not mount, and builds the input by the
+  emitter's chain (`decisions.md`, 18 Nov 2026; `doc/main.md`).
 
 So the language has no `routes` list, no `Response` or `Secret`, no
 `status` or `redirect`, and `Request` gains no `query` or `body`. The

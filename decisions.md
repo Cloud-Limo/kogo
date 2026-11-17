@@ -1161,8 +1161,8 @@ Each entry: what was decided, why, and what would reopen it.
   - **A comment says so at the routes in `main`**, as Greg asked: that the chain is fine
     for two routes and is revisited, with routes in Go, if routes multiply.
   - Not taken: a positional constructor, fully formed and not filled by name, so two
-    neighbours of one type exchanged compile (four `String`s in `DeliveryFailure`; a flag
-    exchanged with the one that hands out login codes); the keyed literal, filled by name,
+    neighbours of one type exchanged compile (four `String`s in `DeliveryFailure`; three
+    `Http` handles in a row in `Env`); the keyed literal, filled by name,
     where a property left out is Go's zero.
   - Reopen (Greg): "if there is an explosion of these hand written Go handlers we will
     need to revisit". He gave no number; the session read it as the five routes that
@@ -1170,18 +1170,20 @@ Each entry: what was decided, why, and what would reopen it.
 - **Origin and CSRF: the list names its check, and a list with none cannot be mounted**
   (18 Nov 2026, Greg; `doc/main.md`, Q4). They get an issue of their own, on paper first,
   that designs this and nothing wider:
-  1. **The list names its check** (`api booker checkedBy sameSite { ... }`): one Kogo
-     function that holds cusoon2's `verifyOrigin` (Sec-Fetch-Site, then Origin against the
-     configured extras, the ops origin and the tenant table). The handler runs it before
+  1. **The list names its check** (`api booker checkedBy sameSite { ... }`).
+     `sameSite(tx, env, request): Either<String, Unit>` is one Kogo function that holds
+     cusoon2's `verifyOrigin` (Sec-Fetch-Site, then Origin against the configured extras,
+     the ops origin and the tenant table). The handler runs it before
      every operation of the list, ungated ones and `gatedBy anyone` included. `main` has
      no line for it.
   2. **A list that names no check cannot be served to a browser.** The emitter writes it
      as a Go type the handler cannot mount and only `rpc.Call` accepts, so mounting it is
-     a compile error in `main`. In cusoon2 that is `api routes` alone; `booker`, `ops` and
-     `storefront` each name the check.
+     a compile error in `main`. In cusoon2 that is `api routes` alone (logout and the
+     webhook's operation, which have no Origin check in the Kotlin either); `booker`, `ops`
+     and `storefront` each name `sameSite`.
   3. **The token is the session reader's.** The one Kogo function that turns a cookie into
-     a session compares `X-CSRF-Token` with the row's token, so every gate and login that
-     reads a session has the check and none writes a line for it.
+     a session (`liveSession`) compares `X-CSRF-Token` with the row's token, so every gate
+     and login that reads a session has the check and none writes a line for it.
   cusoon2's `main` serves no browser until it lands. A guess, built: checker 20, emitter
   10, `rpc` 25, tests 40, and spec 15.1 and 15.2, whose "Nothing runs before an
   operation" it amends.
@@ -1225,7 +1227,7 @@ Each entry: what was decided, why, and what would reopen it.
   as a data class (`Settings`), the file holds them in one object (`"settings"`), a key
   for each property, and `main` hands that object to Kogo's strict reader, the one an
   operation's input is read by, in one line that never changes
-  (`rpc.ReadSettings[app.Settings](raw)`, the session's name); `Env` holds the result as
+  (`rpc.ReadSettings`, the session's name); `Env` holds the result as
   one property. Adding a setting is a property in Kogo and a key in the file, and no Go.
   1. **Every setting is stated in every file**: nothing defaults, as nothing does in an
      input. A missing or misspelt key, or a value of the wrong type, stops the start and

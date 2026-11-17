@@ -233,11 +233,12 @@ Go name.
 data class that Kogo declares, the environment or a route's input, by
 a chain the emitter writes: one step for each property, named for it,
 in the class's order, each returning a type that has only the next
-step (`DeliveryFailure_needsRcpt`, by the naming rule), the last
-returning the class. A property left out, misplaced or misnamed does
-not compile. It is written for each list's environment and each data
-class an input reaches; the emitter's own Go keeps the keyed literal
-(`decisions.md`, 18 Nov 2026).
+step (`DeliveryFailure_needsRcpt`: new emitted names, which the
+naming rule takes in), the last returning the class. A property left
+out, misplaced or misnamed does not compile. It is written for each
+list's environment and each data class an input reaches; the
+emitter's own Go keeps the keyed literal (`decisions.md`, 18 Nov
+2026).
 
 **The request's context** is held by the `Tx` and `Db` handles. Section
 7 of the spec puts a handle wherever the database is touched, so no
@@ -300,7 +301,8 @@ services, its own keys and its routes (`doc/main.md`). Ports, paths
 and other routes, a webhook say, stay out of the language: a route is
 Go in `main` that calls an ungated operation of a list `main` does
 not serve to the browser (`doc/gates.md`, "Routes that are not
-operations").
+operations"). There is no `fun main` and no `kogo serve`. A Go test
+calls a table without HTTP.
 
 **Settings.** The configuration file has two owners. What makes a
 handle or opens the server (the database, each service's address and
@@ -310,8 +312,7 @@ as a data class, the file holds them in one object, and `main` hands
 that object to the strict reader an operation's input is read by, in
 one line; the environment holds the result as one property. Every
 setting is stated, a key the class lacks is reported and ignored, and
-a new setting needs no Go (`decisions.md`, 18 Nov 2026). There is no `fun main` and no `kogo serve`. A Go test
-calls a table without HTTP.
+a new setting needs no Go (`decisions.md`, 18 Nov 2026).
 
 **Logging.** One id for each HTTP request, given before any rerun and
 written on every line about it: an id for each attempt makes a rerun
@@ -335,9 +336,10 @@ its UI framework.
 their own. Its three rules are agreed: a list names its check, which
 the handler runs before every operation; a list that names none
 cannot be mounted; and the token is checked by the one function that
-reads a session (`decisions.md`, 18 Nov 2026; `doc/main.md`, Q4). Cookies are designed in `doc/gates.md`
-("Ungated: logins and logout"), and workers and the time limits of
-outbound calls in `doc/work.md`.
+reads a session (`decisions.md`, 18 Nov 2026; `doc/main.md`, Q4).
+Cookies are designed in `doc/gates.md` ("Ungated: logins and
+logout"), and workers and the time limits of outbound calls in
+`doc/work.md`.
 
 ## MVP steps
 

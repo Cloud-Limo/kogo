@@ -2,12 +2,12 @@
 
 Asked for by Greg on 17 Nov 2026 (`doc/lists.md`, "Asked for: a deep
 dive"; DEV-901). It decides nothing: each choice is named at the end
-and is Greg's. All four were made on 17 Nov 2026 and are recorded in
-`decisions.md` (DEV-902). Sizes are estimates of Kogo's own Go, code / tests,
-and none was measured. Kotlin was run with kotlinc 2.4.21, the
-version `.mise.toml` pins (the designs say 2.4.0), on files in
-`/tmp/lists` (way 1 in its reference form, in `/tmp/w1`); a claim not
-run says "unchecked".
+and is Greg's. All four were made on 17 Nov 2026 and are recorded
+in `decisions.md` (DEV-902). Sizes are estimates of Kogo's own Go,
+code / tests, and none was measured. Kotlin was run with kotlinc
+2.4.21, the version `.mise.toml` pins (the designs say 2.4.0), on
+files in `/tmp/lists` (way 1 in its reference form, in `/tmp/w1`); a
+claim not run says "unchecked".
 
 ## What is built, and what is on paper
 

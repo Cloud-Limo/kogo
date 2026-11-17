@@ -878,7 +878,6 @@ Each entry: what was decided, why, and what would reopen it.
     it; a gate's rules would start at an argument of a prelude call, against "A restriction
     is carried by a form that looks special" above; and an effect written without the
     helper can charge twice.
-  - Reopen if DEV-894 finds no spelling of the lists that a reader takes for Kogo's own.
 - **Routes are Go in the application's `main`** (17 Nov 2026, Greg; `doc/lists-assessment.md`,
   choice B; `doc/gates.md`, "Routes that are not operations"). Each route calls an ungated
   operation of an `api` list that `main` does not serve to the browser. This reverses the
@@ -912,7 +911,7 @@ Each entry: what was decided, why, and what would reopen it.
   - Not taken: allowed and never run, as the designs had left it, where its rows pile up
     and nobody is told.
   - Reopen if a queue needs to be declared and not served, for a deploy that switches one
-    off: then it is stated as off, not left out.
+    off.
 - **Where Kogo ends and Go begins** (17 Nov 2026, Greg). The line rests on what the
   checker can see:
   1. Kogo is required for code that touches the database, acts outside, or decides who

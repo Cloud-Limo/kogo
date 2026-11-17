@@ -409,7 +409,10 @@ mux.HandleFunc("POST /backend/smtp2go-webhook", func(w http.ResponseWriter, r *h
     if !hook.Matches(r.Header.Get("Authorization")) { w.WriteHeader(401); return }
     event, ok := readEvent(r.Body)                  // message-id, rcpt, event
     if !ok { w.WriteHeader(400); return }
-    hooks.Call(r.Context(), "recordDeliveryFailure", event)   // an ungated operation, in a table not mounted
+    // an ungated operation, in a table not mounted (its form is DEV-903's)
+    if err := hooks.Call(r.Context(), "recordDeliveryFailure", event); err != nil {
+        w.WriteHeader(500); return
+    }
     w.WriteHeader(200)
 })
 ```
@@ -474,10 +477,10 @@ ABN checked: acme
   Either<String, String>`: no `Request` and no gate, since whoever
   runs the binary on the server is trusted, as now. It holds a `Db`,
   so it may act between its transactions.
-- **Its name is a literal string**, as an operation's is. **A flag is
-  a property's name as written**, as an operation's JSON key is (spec
-  15.4), and its value is read as JSON's are: `true`, an ISO date, a
-  number, text. The reader is strict: an unknown, missing or
+- **Its name is a literal string**. **A flag is a property's name
+  as written**, as an operation's JSON key is (spec 15.4), and its
+  value is read as JSON's are: `true`, an ISO date, a number, text.
+  The reader is strict: an unknown, missing or
   unreadable flag is refused before the command runs, with its flags
   listed, so a renamed property breaks a deploy script at its next
   run and never in silence.

@@ -179,7 +179,9 @@ Agreed subject to this review:
 ## What the spec and the design doc would say
 
 Nothing has changed in the language, so `spec.md` is as it was, and
-`decisions.md` gained one entry: an application has no bindings.
+`decisions.md` gained entries of 17 Nov, among them that an
+application has no bindings and where Kogo ends and Go begins
+(DEV-902).
 When any of this is built, the sections it changes
 are listed at the end of `doc/gates.md` and of `doc/work.md`; the
 largest are 15.2 ("Nothing runs before an operation", reversed for a

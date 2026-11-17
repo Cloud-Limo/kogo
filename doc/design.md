@@ -275,8 +275,8 @@ handles, mount the handler at a path, listen. Configuration, ports,
 paths and other routes, a webhook say, stay out of the language: a
 route is Go in `main` that calls an ungated operation of a list `main`
 does not serve to the browser (`doc/gates.md`, "Routes that are not
-operations"). There is no `fun main` and no `kogo serve`. A Go test calls a table without
-HTTP.
+operations"). There is no `fun main` and no `kogo serve`. A Go test
+calls a table without HTTP.
 
 **Logging.** One id for each HTTP request, given before any rerun and
 written on every line about it: an id for each attempt makes a rerun

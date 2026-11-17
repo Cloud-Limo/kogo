@@ -97,15 +97,17 @@ Agreed subject to this review:
   about the Kotlin's 500; the tables of the printed table, about 90
   lines beside that walk, 10 more for the queues' and 10 for marking
   a write made under `AtTenant`; `failed` and
-  `recovery`, 25 of checker; `find`, 20; `fair`, 30; `soonest`, 15.
+  `recovery`, 25 of checker; `find`, 20; `fair`, 30; `soonest`, 15;
+  `@Acts`, 40.
 
 ## Choices that sit above these
 
 - **How SQL's parameters are spelt, and whether Kogo source is valid
   Kotlin** (DEV-894). It decides how `gatedBy`, `ungated`, `outside`,
   `routes`, `commands`, `job`, `effect`, `work` and a binding's
-  `lookup` and `action` are spelt. Each design here was written to
-  hold either way.
+  `lookup` are spelt, and whether `@Acts` stays a marker or becomes
+  `action fun` (`doc/gates.md`, "A function that acts says so"). Each
+  design here was written to hold either way.
 - **Where Kogo ends and Go begins.** To research. The review of 17 Nov
   leaned on Go more as it went: each service's handle states its
   encoding; the binding sorts a failed send by status; Go draws a PDF

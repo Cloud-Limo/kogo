@@ -72,7 +72,7 @@ external fun eml(mail: Mail): ByteArray              // headers, parts, Message-
 external fun subjectOf(eml: ByteArray): String?      // for the bounce handler
 
 external class Smtp                                  // a handle, made in main with server, port and login
-external action fun Smtp.send(eml: ByteArray): Either<SendFailure, Unit>
+@Acts external fun Smtp.send(eml: ByteArray): Either<SendFailure, Unit>
 ```
 
 ```kotlin
@@ -160,6 +160,9 @@ external class KeyedAction                  // an action that needs a key
 external class Field                        // one name and its value
 external class Json                         // an answer
 
+@RequiresOptIn
+annotation class Acts                       // on a function that changes something outside
+
 external fun lookup(method: String, path: String): Lookup
 external fun lookup(method: String, before: String, id: String): Lookup
 external fun lookup(method: String, before: String, id: String, after: String): Lookup
@@ -170,8 +173,8 @@ external fun group(name: String, fields: List<Field>): Field
 external fun field(name: String, values: List<String>): Field   // Stripe's expand[]=a&expand[]=b, or a JSON array
 
 external lookup fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpError, Json>
-external action fun Http.send(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
-external action fun Http.sendOnce(key: EffectKey, endpoint: KeyedAction, fields: List<Field>): Either<SendFailure, Json>
+@Acts external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
+@Acts external fun Http.performOnce(key: EffectKey, endpoint: KeyedAction, fields: List<Field>): Either<SendFailure, Json>
 
 external fun Http.withHeader(name: String, value: String): Http   // a new handle with one more header
 
@@ -225,15 +228,15 @@ fun chargeFields(charge: ChargeFields): List<Field> =
     else
         listOf(group("payment_method_data", listOf(field("type", "card"), group("card", listOf(field("token", charge.paymentMethod))))))
 
-fun charge(stripe: Http, key: EffectKey, fields: ChargeFields): Either<SendFailure, PaymentIntent> = either {
-    val intent = stripe.sendOnce(key, CHARGE, chargeFields(fields)).bind()
+@Acts fun charge(stripe: Http, key: EffectKey, fields: ChargeFields): Either<SendFailure, PaymentIntent> = either {
+    val intent = stripe.performOnce(key, CHARGE, chargeFields(fields)).bind()
     PaymentIntent(
         intent.string("id") ?: raise(unreadable("id")),
         intent.string("status") ?: raise(unreadable("status")))
 }
 
-fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<SendFailure, Unit> = either {
-    stripe.send(customerEmail(id), listOf(field("email", email))).bind()
+@Acts fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<SendFailure, Unit> = either {
+    stripe.perform(customerEmail(id), listOf(field("email", email))).bind()
 }
 ```
 
@@ -281,12 +284,18 @@ fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<SendFai
   names. A mistyped key reads as `null` on every call; a test that
   makes the call finds it.
 - **The kind is said once, with the path.** `ask` takes only a
-  `Lookup`, `send` only an `Action`, `sendOnce` only a `KeyedAction`,
-  so `stripe.ask(CHARGE, ...)` does not compile.
-- **The checker needs no new rule.** A function that calls only `ask`
-  is a lookup and may run in a transaction; one that calls `send` or
-  `sendOnce` is an action and may not (`doc/gates.md`, "Outside
-  calls").
+  `Lookup`, `perform` only an `Action`, `performOnce` only a
+  `KeyedAction`, so `stripe.ask(CHARGE, ...)` does not compile.
+- **The call that changes something is `perform`**, since a weaker
+  word would not carry it. It is not the method: an endpoint states
+  its own, a `DELETE` is an action, and a lookup may be a `POST`, as
+  a search is. `Smtp.send` keeps its name. Agreed with Greg on 17 Nov
+  2026; first written `send`.
+- **A function that acts says so.** `perform`, `performOnce` and
+  `Smtp.send` carry the marker `Acts`, and so does every function
+  that calls one: `charge` and `updateCustomerEmail` above. One that
+  only calls `ask` carries nothing and may run in a transaction
+  (`doc/gates.md`, "A function that acts says so").
 
 Whether a call changes anything is still someone's word: the author of
 a service's list of endpoints, about 30 lines in Kogo, where it is read
@@ -304,15 +313,15 @@ Weighed and not taken:
   every call.
 - **A placeholder in the path**, `{id}`, filled from the request's
   property of that name: a match by name. And a hole filled by an
-  argument of `send` (`sendAt(endpoint, id, fields)`), which doubles
-  the three kinds of endpoint and their calls; and a string template,
-  which escapes nothing.
+  argument of `perform` (`performAt(endpoint, id, fields)`), which
+  doubles the three kinds of endpoint and their calls; and a string
+  template, which escapes nothing.
 - **The walk that reads an operation's input**, loosened to read an
   answer into a data class.
 - **A handle for each tenant, made in `main`**, which would read the
   tenants at start and miss one added later; and **headers as an
-  argument of every `ask` and `send`**, which grows every call for the
-  few that need one.
+  argument of every `ask` and `perform`**, which grows every call
+  for the few that need one.
 
 ## Workers
 
@@ -357,7 +366,7 @@ effect:   prepare  (transaction)  ──►  act      (none)  ──►  record 
 fun prepareCharge(tx: Tx, env: Env, row: StripeChargeJob): Either<String, ChargeFields> = ...
 fun recordCharge(tx: Tx, env: Env, row: StripeChargeJob, result: PaymentIntent) { ... }
 
-fun charge(env: Env, key: EffectKey, fields: ChargeFields): Act<PaymentIntent> =
+@Acts fun charge(env: Env, key: EffectKey, fields: ChargeFields): Act<PaymentIntent> =
     charge(stripeFor(env.stripe, fields.accountId), key, fields).fold(
         { failure ->
             when (failure) {
@@ -411,7 +420,7 @@ A `KeyedAction` is sent with an `EffectKey`, which the runner makes
 from the effect's table and the row's id and hands to `act`.
 
 - A keyed call is reached only from an effect's `act`. A login or an
-  outside step may `send`; neither can charge a card. Three of
+  outside step may `perform`; neither can charge a card. Three of
   Stripe's four calls are keyed in the Kotlin: the charge, and both of
   the card job's (`cusoon2-card-<id>` on making a customer and on
   attaching a card), so a replay makes no second customer.
@@ -897,8 +906,9 @@ send hangs.
 
 ## What it would change in the spec
 
-- **13:** an outbound binding says `lookup` or `action`. Application
-  code holds no `external`, as now.
+- **13:** an outbound binding says whether it is a lookup or an
+  action, the second with `@Acts`. Application code holds no
+  `external`, as now.
 - **12, the prelude:** `kogo.http`, and `Act`, `EffectKey` and
   `SendFailure` with the runner's package; `kogo.pdf`.
 - **10.4 and 3:** `bytea` maps to `ByteArray`, which has no
@@ -918,5 +928,7 @@ send hangs.
 - Whether `job`, `effect` and `work` are Kogo's own forms or calls
   that are valid Kotlin (DEV-894).
 - A Go library for PDF: the built-in fonts' widths, PNGs and links.
+- Which package holds `Acts`: `kogo.mail` uses it as `kogo.http`
+  does.
 - A hash in the prelude. The run sheet's job keeps a SHA-1 of what it
   last sent, to see a change (`daemon.kt`, `sha1Hex`); Kogo has none.

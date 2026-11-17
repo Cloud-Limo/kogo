@@ -736,6 +736,27 @@ Each entry: what was decided, why, and what would reopen it.
   - A choice the runner makes for every queue is recorded here by name. Not yet looked at:
     its two lanes, and where an alert goes.
   - Reopen if a queue needs an order that one column of times cannot give.
+- **A function that acts says so, with the marker `Acts`, and the call that changes
+  something outside is `perform`** (17 Nov 2026, Greg; `doc/gates.md`, "A function that
+  acts says so"; `doc/work.md`, "An endpoint is declared once").
+  - **Why written.** A function's type and its failures are in its signature; whether it
+    changes something outside was the one thing a caller relied on that was worked out
+    through what it calls. A line added to a helper changed what its callers were with no
+    word of theirs changed, the error came up files away, and a lambda kept in a value, a
+    `::` reference and an interface's `fun` carried an action past the walk.
+  - **Why a marker.** It adds no syntax, and it is Kotlin's own rule: a function that uses
+    a marked declaration carries the mark and demands it of its callers (run on Kotlin
+    2.4.0). Kogo only restricts it: no file opts in, the mark must be true, a marked
+    function keeps out of a transaction, and an action is not kept in a value.
+  - **Accepted cost.** `Acts` is the one marker held by the function and never by the
+    file, against spec 11's rule for every other, and spec 11 says so. It is also a marker
+    the checker knows by name, which comes near the annotation magic principle 2 refuses.
+  - **Why `perform`.** `send` was too weak a word for a call that changes something, and
+    the method does not say it: a `DELETE` is an action and a lookup may be a `POST`.
+  - Not taken: the kind left worked out; `action fun`, a word of Kogo's own, which is
+    plainer and keeps spec 11 to one rule; two environments, one that can act.
+  - Reopen with DEV-894: if Kogo's additions are to stay unlike Kotlin, respell it
+    `action fun`, with the binding's words.
 
 ## Taken in the v0 spec, not yet discussed
 

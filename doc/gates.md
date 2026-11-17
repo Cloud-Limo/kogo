@@ -414,10 +414,11 @@ is answered with a status alone. They are Go, in the application's
 ```go
 mux.HandleFunc("POST /backend/smtp2go-webhook", func(w http.ResponseWriter, r *http.Request) {
     if !hook.Matches(r.Header.Get("Authorization")) { w.WriteHeader(401); return }
-    event, ok := readEvent(r.Body)                  // message-id, rcpt, event
+    event, ok := readEvent(r.Body)                  // a hooks.DeliveryFailure, built by the emitter's chain
     if !ok { w.WriteHeader(400); return }
-    // an ungated operation, in a table not mounted (doc/main.md has both forms)
-    if err := hooks.Call(r.Context(), "recordDeliveryFailure", event); err != nil {
+    // an ungated operation, by its emitted value; calls is rpc.NewCalls(hooks.Hooks, ...),
+    // the handler of a list that is not mounted
+    if _, err := rpc.Call(calls, r, hooks.RecordDeliveryFailure_op, event); err != nil {
         w.WriteHeader(500); return
     }
     w.WriteHeader(200)
@@ -438,9 +439,9 @@ mux.HandleFunc("POST /backend/smtp2go-webhook", func(w http.ResponseWriter, r *h
 - **A route touches the database only through its operation**, as
   `decisions.md` has the seam (17 Nov 2026). `main` opens the pool,
   so nothing enforces it: a reviewer holds `main` to it.
-- **Open:** how Go calls one operation of a table that is not
-  mounted: by wire name with JSON, or by the emitted types.
-  `doc/main.md` writes both out (Q1).
+- **Go calls the operation by its emitted value**, through a handler
+  of the list that `main` does not mount, and builds the input by the
+  emitter's chain (`decisions.md`, 18 Nov 2026; `doc/main.md`).
 
 So the language has no `routes` list, no `Response` or `Secret`, no
 `status` or `redirect`, and `Request` gains no `query` or `body`. The

@@ -229,6 +229,17 @@ runtime walk of `==`, so no key type is refused. Go has no overloading;
 one naming rule gives each overload, the prelude's and a program's, its
 Go name.
 
+**A chain for hand-written Go.** The application's `main` builds a
+data class that Kogo declares, the environment or a route's input, by
+a chain the emitter writes: one step for each property, named for it,
+in the class's order, each returning a type that has only the next
+step (`DeliveryFailure_needsRcpt`: new emitted names, which the
+naming rule takes in), the last returning the class. A property left
+out, misplaced or misnamed does not compile. It is written for each
+list's environment and each data class an input reaches; the
+emitter's own Go keeps the keyed literal (`decisions.md`, 18 Nov
+2026).
+
 **The request's context** is held by the `Tx` and `Db` handles. Section
 7 of the spec puts a handle wherever the database is touched, so no
 function takes a hidden context, and a program with no requests carries
@@ -262,8 +273,10 @@ operations, and whether each takes a `Tx` or a `Db`.
 
 **The table.** For each list the emitter writes one Go value in the
 list's package: each operation's name on the wire, its kind, and its
-fun. Nothing outside calls an operation by its Go name, so the naming
-rule's neighbours never reach the wire.
+fun. Beside it stands a typed value for each operation
+(`Logout_op`), by which a route in `main` calls its operation with
+the emitted input type; a browser's call never names an operation's
+Go, so the naming rule's neighbours never reach the wire.
 
 **The library** is hand-written Go in this repo, the Go of package
 `kogo.rpc`, beside its `Request`. Given a table, a connection pool and
@@ -283,13 +296,23 @@ means a bug.
 configuration, open the pool, build the environment's handles, mount
 each list's handler at its path, write its routes, listen, and drain
 on a stop; or start the runner, or run a command. For cusoon2 it is
-about 310 lines, 240 of them code, of which about 105 grow with its
-services, keys and routes (`doc/main.md`). Configuration, ports,
-paths and other routes, a webhook say, stay out of the language: a
-route is Go in `main` that calls an ungated operation of a list `main`
-does not serve to the browser (`doc/gates.md`, "Routes that are not
+about 315 lines, 230 of them code, of which about 95 grow with its
+services, its own keys and its routes (`doc/main.md`). Ports, paths
+and other routes, a webhook say, stay out of the language: a route is
+Go in `main` that calls an ungated operation of a list `main` does
+not serve to the browser (`doc/gates.md`, "Routes that are not
 operations"). There is no `fun main` and no `kogo serve`. A Go test
 calls a table without HTTP.
+
+**Settings.** The configuration file has two owners. What makes a
+handle or opens the server (the database, each service's address and
+secret, the port) is Go's, read by a struct in `main`. A value that
+Kogo code reads is a setting: the application declares its settings
+as a data class, the file holds them in one object, and `main` hands
+that object to the strict reader an operation's input is read by, in
+one line; the environment holds the result as one property. Every
+setting is stated, a key the class lacks is reported and ignored, and
+a new setting needs no Go (`decisions.md`, 18 Nov 2026).
 
 **Logging.** One id for each HTTP request, given before any rerun and
 written on every line about it: an id for each attempt makes a rerun
@@ -309,11 +332,14 @@ shows a change, so Kogo needs no flag for a stale file. The client
 that calls `fetch` is the application's: it depends on its cookies and
 its UI framework.
 
-**Not designed yet:** Origin and CSRF checks. cusoon2's read
-the tenant table and the session row, so they cannot be Go in `main`
-(`doc/main.md`, Q4). Cookies are designed in `doc/gates.md`
-("Ungated: logins and logout"), and workers and the time limits of
-outbound calls in `doc/work.md`.
+**Not designed yet:** Origin and CSRF checks, which get an issue of
+their own. Its three rules are agreed: a list names its check, which
+the handler runs before every operation; a list that names none
+cannot be mounted; and the token is checked by the one function that
+reads a session (`decisions.md`, 18 Nov 2026; `doc/main.md`, Q4).
+Cookies are designed in `doc/gates.md` ("Ungated: logins and
+logout"), and workers and the time limits of outbound calls in
+`doc/work.md`.
 
 ## MVP steps
 

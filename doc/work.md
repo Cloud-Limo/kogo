@@ -438,24 +438,71 @@ not_after     -- null, or the time after which the write is not made; set by wha
 - **Owed**, for every queue: `done_at is null and (not_after is null
   or not_after > now)`, with the runner's own rules for a lease, a
   back-off and a failed row.
-- **The order**, for every queue: rows with a `not_after` first, the
-  soonest first, then by `next_attempt_at`. A watched request stamps
-  its row ("An effect someone is watching" below), so a waiting
-  payer's row goes before an invoice run's, as the charge's own order
-  has it.
+- **The order is not the runner's**: the oldest `next_attempt_at`
+  first, unless the queue says otherwise ("Soonest is each queue's
+  stated choice" below).
 - **A queue's own result stays**: `record` writes `stripe_charge_id`
   as before, and the runner no longer reads it.
 
 In the Kotlin's runner (`runEffectQueue`) it is small: `done_at` is
 one line beside `attempts = 0` where a done act is recorded, in the
 one `update` that carries the queue's own columns; `not_after` is
-only read, in the claim; three `owed` and one `order` go; mail's
+only read, in the claim; three `owed` go, and the charge's `order`
+goes by `not_after` where it went by the customer's id; mail's
 `sent_at` becomes `done_at`. That runner is not yet live, so no
 finished row needs its `done_at` filled. Made in the Kotlin first,
 under its tests. Weighed and not taken: a view for each effect that
 holds its condition, one more object of the schema for each queue;
 and a claiming statement of the queue's own, as a job's `next` is,
 which has each author write the lease and the back-off again.
+
+### Soonest is each queue's stated choice
+
+Whether a row is done is a fact, and the runner holds it. Which row
+goes first is a choice, and the Kotlin's queues make two: mail and
+the card job take the oldest `next_attempt_at`, and the charge puts a
+payer on the hosted page before an invoice run (`StripeQueues.kt`,
+`order`). So, as with retries, the queue says:
+
+```kotlin
+effect chargeCard on stripe_charge_job {
+    soonest   not_after       // optional: rows with a time here go first, the soonest first
+    attempts  1
+    ...
+}
+
+effect sendMail on outbound_message {
+    // no soonest: the oldest next_attempt_at first, as the Kotlin has it
+    ...
+}
+```
+
+- **With `soonest`** the runner orders by that column, rows with no
+  value last, then by `next_attempt_at`. With none it orders by
+  `next_attempt_at` alone.
+- **A watched request stamps its row** ("An effect someone is
+  watching" below), so a waiting payer's row goes before an invoice
+  run's, as the charge's own order has it.
+- **`not_after` means one thing for every queue**: the time after
+  which the write is not made.
+- **The checker holds**, by Postgres's answer, that the column is one
+  of what the runner claims from, the `find` view where there is one
+  and the table where not, and that it is a `timestamptz`.
+
+Perhaps 10 lines of checker, 5 of runner and 20 of tests. Weighed and
+not taken:
+
+- **One order for every queue**, rows with a `not_after` first, as
+  this section first had it. It was drawn from the charge alone. In
+  mail a `not_after` marks a reminder, no use once its pickup has
+  passed (`Outbox.kt`), so every reminder of a tenant would go before
+  its other mail, a confirmation queued earlier included: a change to
+  mail's order that nobody chose.
+- **The name `first`**, which reads as a step the runner calls, as
+  `enter` is, and does not say which end goes first; and **`order`**,
+  which invites a fragment.
+
+Agreed with Greg on 17 Nov 2026.
 
 ### The list of work
 
@@ -466,6 +513,7 @@ worker runs and in what order.
 // charge.kg
 effect chargeCard on stripe_charge_job {
     enter    bindTenantOf
+    soonest  not_after
     attempts 1
     prepare  prepareCharge
     act      charge
@@ -496,6 +544,8 @@ The checker holds that:
 - the effect's table has the runner's columns, by Postgres's answer
   (the Kotlin's `EffectFields`, written by hand for each table);
 - `attempts` is stated;
+- a column named by `soonest` is a `timestamptz`, by Postgres's
+  answer;
 - no step of a job acts;
 - every job states `failed`.
 
@@ -687,7 +737,7 @@ select id, tenant_id from outbound_message_queue
 where <owed>
 order by tenant_id <= $last,                      -- values past the last one first, then the rest
          tenant_id,
-         not_after nulls last, next_attempt_at    -- within one value, the order every queue has
+         next_attempt_at                          -- within one value, the queue's own order
 limit 1 for update skip locked
 ```
 

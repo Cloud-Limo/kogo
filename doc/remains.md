@@ -23,8 +23,10 @@ the design to work from, not built, not in `spec.md`, no example run.
   tenant"). `driverJobs` stays open until the loops over tenants are
   replaced. Made in the Kotlin first.
 - **cusoon2's runner.** Agreed: `done_at` and `not_after` among its
-  columns, and no condition or order of a queue's own (`doc/work.md`,
-  "Owed is the runner's rule"). Made in the Kotlin first, with
+  columns, and no condition of a queue's own (`doc/work.md`, "Owed is
+  the runner's rule"). The order stays the queue's: the charge's
+  goes by `not_after`, and mail's is unchanged ("Soonest is each
+  queue's stated choice"). Made in the Kotlin first, with
   `hasOpenStripeChargeJob` not counting a row never tried and past
   its `not_after` (`doc/work.md`, "An effect someone is watching").
 - **cusoon2's schema.** Agreed, subject to the review below: a view
@@ -95,7 +97,7 @@ Agreed subject to this review:
   about the Kotlin's 500; the tables of the printed table, about 90
   lines beside that walk, 10 more for the queues' and 10 for marking
   a write made under `AtTenant`; `failed` and
-  `recovery`, 25 of checker; `find`, 20; `fair`, 30.
+  `recovery`, 25 of checker; `find`, 20; `fair`, 30; `soonest`, 15.
 
 ## Choices that sit above these
 

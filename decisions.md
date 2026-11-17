@@ -720,6 +720,22 @@ Each entry: what was decided, why, and what would reopen it.
     it included: mail and PDF so far, with a hash open.
   - Reopen when an application needs something that fails the tests: it cannot be declared
     without that application's names, or it needs a dependency Kogo should not carry.
+- **The runner holds what is a fact for every queue, and a queue states what is a choice**
+  (17 Nov 2026, Greg; `doc/work.md`, "Workers"). The line for hand-written Go is what
+  another application would need unchanged, and cusoon2's own queues are its first test:
+  where two of them differ, the matter is a choice, and the queue states it as a number or
+  as a name that Postgres checks.
+  - **The runner's.** Whether a row is done (`done_at`), what is owed, the lease and the
+    back-off: no queue of cusoon2's varies them.
+  - **The queue's.** `attempts`, `soonest`, `fair` and `find`.
+  - **First applied to the order.** `doc/work.md` had one order for every queue, rows with
+    a `not_after` first. It was drawn from the charge alone, and under it every reminder
+    in the outbox went before a tenant's other mail. `soonest` replaced it: a queue may
+    name the column of times its rows go first by, and mail names none.
+  - Not taken: the one order, with the change to mail recorded as a change of behaviour.
+  - A choice the runner makes for every queue is recorded here by name. Not yet looked at:
+    its two lanes, and where an alert goes.
+  - Reopen if a queue needs an order that one column of times cannot give.
 
 ## Taken in the v0 spec, not yet discussed
 

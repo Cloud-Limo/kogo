@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Look for secrets in the working tree and in this branch's commits"
+# The lead runs this before every merge (doc/lead.md, Merging): Kogo is
+# public and has no CI. gitleaks is pinned in .mise.toml.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+gitleaks dir --no-banner --redact .
+gitleaks git --no-banner --redact --log-opts="origin/main..HEAD" .

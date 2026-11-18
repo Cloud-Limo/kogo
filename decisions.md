@@ -2665,6 +2665,18 @@ Each entry: what was decided, why, and what would reopen it.
   SMTP2GO keeps form-encoded events for 48 hours rather than dropping them. Not taken:
   `doc/gates.md`'s sketch, 400 for both.
 
+## Going public (DEV-941), not yet discussed
+
+- **Apache-2.0, the license text verbatim in `LICENSE`, and the copyright line in
+  `README.md`.** Not taken: editing the license's text to carry the name, or a `NOTICE`
+  file, which Apache-2.0 asks for only when there are notices to pass on.
+- **`mise run leaks` is gitleaks with its default rules, over the working tree (`gitleaks
+  dir`) and `origin/main..HEAD`.** It needs `origin/main` fetched, as the merge step's
+  worktree has. Not taken: a `.gitleaks.toml` of our own, which nothing found so far
+  needs; a git hook, which a fresh worktree or an async clone would not have.
+- **The light rule extends rule 1 rather than becoming a rule of its own,** so the rules
+  keep their numbers, which reviews cite.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

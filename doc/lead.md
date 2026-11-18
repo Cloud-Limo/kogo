@@ -32,9 +32,13 @@ tell Greg.
    open issue of both projects with its state and the first line of
    its newest comment.
 3. Remove each worktree whose PR has merged (`gh pr list --state
-   merged --head <branch>`), in Kogo and cusoon2 alike: check
-   `git status` there is clean, then `git worktree remove`,
-   `git branch -d` and `git push origin --delete <branch>`.
+   merged --head <branch>`): check `git status` there is clean, then
+   `git worktree remove`, `git branch -d` and `git push origin
+   --delete <branch>`. Do the same for cusoon2, with three
+   differences: list the worktrees of both clones, `~/Dev/cusoon2` and
+   `~/Dev/cusoon2-b`; pass `-R Cloud-Limo/cusoon2` to `gh pr list`;
+   and skip `git push origin --delete`, since GitHub deletes a merged
+   branch there, as well as `git branch -d` for a detached worktree.
 4. Tell Greg, briefly and as "Talking to Greg" says. Open with what
    waits on him, in bold; end with the two boxes, You can do now and
    Not yet, then the line on what is running and what you will merge.
@@ -157,7 +161,11 @@ Suggest one and say why in a line; Greg agrees or picks another.
   issue's Linear project, Kogo for Kogo and cusoon2 for any other.
   Such an issue carries a `Lead:` comment saying so, naming the step
   and, for cusoon2, the clone; the steps themselves are in both
-  repositories' `AGENTS.md`, so it does not restate them.
+  repositories' `AGENTS.md`, so it does not restate them. For a
+  cusoon2 step whose folder's `AGENTS.md` lacks the `Workflow, shared`
+  markers, the `Lead:` comment opens with "Read the Workflow in `git
+  show origin/renew:AGENTS.md` first: it overrides this branch's."
+  Delete this line when no open cusoon2 branch predates DEV-917.
 
 A step's place does not bind the next: a PR coded in Zed can be
 reviewed by a run, and the reverse.
@@ -242,9 +250,12 @@ with any differing cases, and ask for another Fix. Go to Greg only
 when what is Open is a choice of his kind.
 
 A cusoon2 PR is Greg's to merge. On the same comments, in a worktree
-on its branch, `~/Dev/cusoon2-dev-NNN` (made when missing with `git -C
-~/Dev/cusoon2-b fetch origin` and `git -C ~/Dev/cusoon2-b worktree add
-~/Dev/cusoon2-dev-NNN <branch>`, which switches no clone's branch), read
+at its pushed head, `~/Dev/cusoon2-dev-NNN`: made when missing with
+`git -C ~/Dev/cusoon2-b fetch origin` and `git -C ~/Dev/cusoon2-b
+worktree add --detach ~/Dev/cusoon2-dev-NNN origin/<branch>`, which
+works whichever clone has the branch checked out; otherwise moved to
+it, with `git pull --ff-only` on a branch or `git fetch origin` and
+`git checkout --detach origin/<branch>` when detached. There, read
 any fix commits against the Review and its Rulings, and
 check that Cloud CI passed on its head, `mise run ci-status <PR>`
 there: CI runs `mise run check-all` and the tests. Where the PR

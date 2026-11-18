@@ -552,7 +552,9 @@ Each entry: what was decided, why, and what would reopen it.
   requires `--project`, since its docstring called Triage the rule and an issue in no
   project shows on no board; cusoon2's `launch` keyword goes, as launching is the lead's
   (`doc/lead.md`); cusoon2 work with no stack to run, docs and scripts, may take a worktree.
-  Not taken: one file both repositories link, which a session on either would have to
+  A session loads the `AGENTS.md` of the branch its folder is on, so until no open cusoon2
+  branch predates this, a `Lead:` comment for one sends the session to `renew`'s Workflow
+  first (the lead's ruling on the review, 18 Nov 2026). Not taken: one file both repositories link, which a session on either would have to
   find outside its own repository; Triage as the default, which files a forgotten
   `--state` where only Greg looks. Reopen if the two repositories' steps need to differ
   in more than the two rows.

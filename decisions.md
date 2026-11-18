@@ -2627,14 +2627,21 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken recording DEV-894 (DEV-931), not yet discussed
 
-- **A deviation's file names the words kotlinc refuses it with**, on its first line, and
-  `mise run kotlin` fails unless kotlinc refuses it with them. Not taken: any refusal,
-  which passes a file that kotlinc refuses for a typo.
-- **The binding's file is an `external class`**: kotlinc on the JVM accepts `external fun`
-  alone, as a native (JNI) function, and refuses `external` on a class, which is not a
-  syntax error. So principle 3's "each is a syntax error to kotlinc" holds for three of
-  the four, and every binding file declares a class or calls one. Not taken: rewording
-  the principle, which is Greg's.
+- **A deviation's file names the line kotlinc must refuse**, `// kotlinc refuses line N`
+  on its first line, and `mise run kotlin` fails unless kotlinc reports an error on that
+  line. That ties the refusal to the deviation's own line, so a typo elsewhere does not
+  pass, and survives a reworded message. Not taken: any refusal, which passes a typo;
+  kotlinc's message text, which passes any syntax error and which Kotlin does not promise
+  to keep; a valid twin of each file that kotlinc must accept, stronger but twice the
+  files.
+- **The binding's file is an `external class`**: kotlinc on the JVM (2.4.21) accepts a
+  bare `external fun` as a native (JNI) function, and refuses `external` on a class or an
+  object, though not as a syntax error. So a binding file of bare `external fun`s, such as
+  `prelude/text.kg`, passes kotlinc. The Ruling on PR 75 (Question 8, (a)) has principle
+  3 and spec 1 say "kotlinc refuses each" and name that exception, which meets no author,
+  since spec 13 keeps `external` out of application code. Not taken: `@go` on every
+  binding declaration, a language change for no reader; keeping "a syntax error" and
+  recording the gap here alone.
 - **The printed table writes `action` beside the gate** of an operation that runs wholly
   outside, where it wrote `outside`, to match the list's loss of the bare word. Not
   taken: keeping `outside` in the table alone.

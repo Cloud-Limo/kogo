@@ -1,4 +1,4 @@
-// kotlinc: syntax error
+// kotlinc refuses line 5
 // A list (spec 15): kotlinc must refuse it.
 fun me(): String = "me"
 

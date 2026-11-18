@@ -27,10 +27,12 @@ constraints) is worth typing.
      (`Uuid.parseOrNull`). The rare corners listed in spec 12, which
      `mise run kotlin` holds, stay allowed.
    - Kogo's own forms are its deliberate deviations: the `sql` literal,
-     bindings, the lists and `action fun`. Spec 1 lists them, and each
-     is a syntax error to kotlinc, so no Kotlin habit applies to one
-     unnoticed. Within that rule each is spelt to read as well as we
-     can make it.
+     bindings, the lists and `action fun`. Spec 1 lists them, and
+     kotlinc refuses each, so no Kotlin habit applies to one unnoticed.
+     (A binding file of bare `external fun`s passes kotlinc, as JNI
+     functions; that matters to no author, since spec 13 keeps
+     `external` out of application code.) Within that rule each is
+     spelt to read as well as we can make it.
 
    Kogo source need not compile under kotlinc, and nothing runs it on
    the JVM (`decisions.md`, DEV-894).

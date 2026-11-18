@@ -13,7 +13,9 @@ Source files end in `.kg`.
 Where a construct is valid in both Kotlin and Kogo it means the same thing.
 A Kogo file need not compile as Kotlin. Kogo has four kinds of
 deliberate deviation from Kotlin, its own forms, and kotlinc refuses
-each (`mise run kotlin` holds this):
+each (`mise run kotlin` holds this). The one exception is a binding
+file of bare `external fun`s, which kotlinc takes for JNI functions;
+only bindings write `external` (section 13), so no author meets it:
 
 - the `sql"""..."""` literal (section 10);
 - the `external` binding declarations (section 13);

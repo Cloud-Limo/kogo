@@ -18,9 +18,10 @@ and is not part of `go test ./...`.
   rewrite of both results, which must then agree.
 
 - `deviations/*.kg` are Kogo's deliberate deviations (spec 1), one
-  file each. kotlinc must refuse every one, with the words its first
-  line gives after `// kotlinc:`, so no Kotlin habit applies to one
-  unnoticed (principle 3). A new deviation adds a file.
+  file each. kotlinc must refuse every one with an error on the line
+  its first line names, `// kotlinc refuses line N`, so no Kotlin
+  habit applies to one unnoticed (principle 3). A new deviation adds
+  a file.
 
 To cover a function, add a branch: the generator reads the names from
 the source. Everything written is under `kotlin/_work`.

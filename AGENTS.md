@@ -70,16 +70,17 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
 - **Lead.** "Lead", said in `~/Dev/kogo`, starts the session Greg
   talks to: read Kogo's `doc/lead.md` and follow it. No other session
   needs that file.
-- **File.** `lin file --project <project> --state Todo "Title" <
-  desc.md`, into the project of the repository the work lands in. The
-  description has four headings: What (one or two sentences, verb
-  first), Why (one or two sentences in plain words; for product work
-  it may end "Without it: <what an op or customer does instead>, about
-  N times a year"), Scope (ending with a Budget in code and test lines
-  and a "Done when" a reviewer can check in one look), Links. Write a
-  file name as a repo path in backticks: Linear turns a bare `audit.sh`
-  into a link. File what you find worth doing; nobody screens issues
-  first.
+- **File.** `lin file --project <project> --state <state> "Title" <
+  desc.md`, into the project of the repository the work lands in, and
+  in Todo if it is ready to start, in Backlog if it waits on something
+  (its Scope says on what). The description has four headings: What
+  (one or two sentences, verb first), Why (one or two sentences in
+  plain words; for product work it may end "Without it: <what an op or
+  customer does instead>, about N times a year"), Scope (ending with a
+  Budget in code and test lines and a "Done when" a reviewer can check
+  in one look), Links. Write a file name as a repo path in backticks:
+  Linear turns a bare `audit.sh` into a link. File what you find worth
+  doing; nobody screens issues first.
 - **Pickup.** "Pickup DEV-NNN" is `lin pickup DEV-NNN <where>`, with
   `<where>` as Where a step works says: read its output and start
   there, on the branch that output gives.
@@ -128,15 +129,18 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   names and merges. Greg does not review Kogo's PRs on GitHub: review
   is the Code review step, and the lead answers for the quality of
   what merges.
-- **Async runs.** A run has no Linear access and its clone is its
-  worktree. It clones the repository of its issue's project: Kogo for
-  Kogo, cusoon2 for any other. Work that lands in another repository
-  than its issue's project's runs in Zed. Post the step's comment on the
-  PR yourself and write the same, in full, as the run's `answer.md`,
-  which the wrapper posts on the issue whole: the one place a full
-  comment lands on the issue, and what an interrupted run leaves behind.
-  A review or fix run leaves its tree clean: whatever is left is pushed
-  to the PR's branch. No run merges.
+- **Async runs.** The lead starts one with `lin launch DEV-NNN <
+  brief.md`, which posts the launch comment and then adds the `agent`
+  label; Greg may add or remove the label too. A run has no Linear
+  access and its clone is its worktree. It clones the repository of its
+  issue's project: Kogo for Kogo, cusoon2 for any other. Work that
+  lands in another repository than its issue's project's runs in Zed.
+  Post the step's comment on the PR yourself, under the marker line the
+  run's prompt gives, and write the same, in full, as the run's
+  `answer.md`. The wrapper posts on the issue the first line when the
+  PR has that text, and `answer.md` whole when not: what an interrupted
+  run leaves behind. A review or fix run leaves its tree clean: whatever
+  is left is pushed to the PR's branch. No run merges.
 - A comment with no PR to hold it stays on the issue in full: a
   launch comment, a `Lead:` comment, an answer of Greg's given before
   a PR exists.

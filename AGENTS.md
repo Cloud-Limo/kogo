@@ -31,7 +31,9 @@ is building it because he wants to; do not argue whether it is practical.
    say what to change.
 5. A change to the language changes `spec.md` in the same commit.
 6. Test what the language promises. Check each new test fails without
-   its fix.
+   its fix. A change does not loosen a test or a check in order to pass
+   (an assertion, a lint, a CI step, the comparison of a port with its
+   Kotlin), unless the handoff's Decided says so and why.
 
 ## Workflow
 

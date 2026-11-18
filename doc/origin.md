@@ -38,7 +38,9 @@ but `sameSite` and `liveSession`.
    (`:548`) or `ensureOpsSession` (`:565`) keeps or replaces it.
 5. Both refusals are 400, `text/plain`, "Invalid origin" and "Invalid
    CSRF token" (`:41`, `:61`). The client throws on any status but 2xx
-   (`frontend/src/rpc.ts:33`): neither is shown as an operation's words.
+   (`frontend/src/rpc.ts:33` for ops, Apollo's `HttpLink` at
+   `frontend/src/App.tsx:72` for the booker): neither is shown as an
+   operation's words.
 6. Two reads of the cookie check no token: the login callback locks the
    row (`liveSession(..., forUpdate = true)`, `:243`), and logout
    deletes by the cookie's id and reads no row (`:95`). A cookie that
@@ -71,7 +73,7 @@ api routes { logout ungated, recordDeliveryFailure ungated }   // no check: neve
 fun sameSite(tx: Tx, env: Env, request: Request): Either<String, Unit> = either {
     val site = request.header("Sec-Fetch-Site")
     ensure(site == null || site == "same-origin" || site == "none") { "Invalid origin" }
-    val origin = request.header("Origin")?.let { if (it.endsWith("/")) it.dropLast(1) else it }
+    val origin = request.header("Origin")?.let { if (it.endsWith("/")) it.substring(0, it.length - 1) else it }
     if (origin == "null") ensure(site != null) { "Invalid origin" }
     else if (origin != null) ensure(isOurOrigin(tx, env.settings, origin)) { "Invalid origin" }
 }
@@ -185,20 +187,23 @@ check` or Go's compiler), at **start**, at **use**, or **never**.
 | The lists | `checkedBy` left off a list `main` mounts | build: `NewHandler` takes no `Unserved` |
 | | a check of another shape or `Env` | build: `check-shape` |
 | | a login listed in `api routes` and called by a route | never: no Origin check, the hole of PR 1473; the printed table is the only trace (Q4) |
-| `sameSite` | `same-site` let through | never: a sibling host's page posts as the visitor |
+| `sameSite` | `same-site` let through | never: a page on another of our own hosts in the site, another tenant's or the ops site's, posts as the visitor; Origin still refuses a host not ours |
 | | `null` passed with no `Sec-Fetch-Site` | never: PR 1473's hole, on a Safari before 16.4 |
 | | a request with no Origin refused | use: curl and every test that is no browser get the refusal |
 | | Origin not looked at when the site is `same-origin` | never |
 | | the table left out, or `opsOrigin` | use: every tenant's page, or the ops site, is refused |
-| | a statement that writes | use: Postgres refuses it, a 500 on every request (Q2, a) |
+| | a statement that writes | use: Postgres refuses it, a 500 on every request that the extras and `opsOrigin` miss (Q2, a) |
 | `liveSession` | a missing header taken as a match | never: a forged request sends none, so the token checks nothing |
 | | the cookie's token compared, not the header's | never: a forged request carries the cookie |
 | | a mismatch given as no session | use, quietly: `whoAmI` makes a new session and the person is logged out |
 | | the refusal dropped by a caller's `getOrNull()` | never: `maybeBooker` answers a forged request as a stranger (Q7) |
-| | a gate or login that selects a session itself | build, if `session` and `sessionId` stay `private` to one file (Q10); else never |
-| The Go | a `Table` built by hand from `Routes`' operations, no `Check` | start: `NewHandler` panics |
-| | one built with a check that always passes | never: a reviewer holds `main` to the emitted tables |
-| | the check run for gated rows only, or after the body | never: a login has no Origin check |
+| | `session` or `sessionId` called from another file | build, if they stay `private` to one file (Q10); else never |
+| | a gate or login that selects a session or reads the cookie itself | never: a reviewer's (Q10) |
+| The Go | a `Table` built by hand from `Routes`' operations, no `Check` | start: `NewHandler` panics, in (a) of Q13; build in (b) |
+| | one built from `Routes`' operations with a check that always passes | never in (a) of Q13, a reviewer holds `main`; build in (b) |
+| | a `Table` of operations `main` writes itself, with such a check | never in either: a reviewer's (Q13) |
+| | the check run for gated rows only | never: a login and a public read have no Origin check |
+| | the check run after the body | use, harmlessly: a stranger's bad body gets the body's 400 before "Invalid origin" |
 | | the check's `Left` answered as the JSON of a refusal | use: the page shows "Invalid origin" as an operation's words (Q3) |
 
 ## Open
@@ -243,11 +248,11 @@ Q1 to Q5 are what Greg's answer left to this issue.
   page of our own stops working. Lean a.
 - **Q6 (Greg). The token covers less than in the Kotlin.** There every
   request with a session is compared (4); here only one that reads its
-  session, so about 16 public reads and the four bearer links (an
-  invoice, a charge, a payment link, a new booker's secret) have the
-  Origin check alone. (a)
-  Accept: it is what rule 3 says, and the bearer's secret is the
-  credential. (b) `anyone` and the bearer gates call `liveSession` and
+  session, so the public reads gated by `anyone` (13 of the Query's
+  34 fetchers in `fetchers.kt`) and the four bearer links (an invoice,
+  a charge, a payment link, a new booker's secret) have the Origin
+  check alone. (a) Accept: it is what rule 3 says, and the bearer's
+  secret is the credential. (b) `anyone` and the bearer gates call `liveSession` and
   drop the session: `liveSession(tx, env, request).bind()`. Lean a.
 - **Q7 (Greg). A mismatch where no session is needed.** (a) A refusal,
   as sketched: `liveSession` gives `Either<String, Session?>`,
@@ -284,6 +289,18 @@ Q1 to Q5 are what Greg's answer left to this issue.
   operation is listed in `routes` too (spec 15.1 lets a fun stand in
   two lists). (b) `NewCalls` takes a `Table` as well and skips its
   check. Lean a: cusoon2 has no such route.
+- **Q13 (lead; Greg is told). Can `main` lift a list's operations out
+  of an `Unserved`.** The Q4 entry's rule 2 asks for a compile error,
+  "by construction, and no reviewer holds it"; with `Unserved`'s
+  fields exported, `main` can write `rpc.Table[app.Env]{Check: ...,
+  Operations: routes.Routes.Operations, Enums: routes.Routes.Enums}`
+  and mount `routes`. Go has no non-nil func type, so neither form
+  makes a nil `Check` a compile error. (a) Exported fields, as
+  sketched, and `NewHandler` panics on a nil `Check`. (b) `Unserved`'s
+  fields unexported, built by an emitted `rpc.NewUnserved(ops, enums)`:
+  `main` cannot take `routes`' operations out of it; a `Table` of
+  operations it writes itself, or a check that always passes, stays a
+  reviewer's. Lean b: about 4 lines of `rpc`.
 
 Not asked, since it is wider than this issue: the request's
 `Content-Type`, which `decisions.md` left "with the CSRF checks". The
@@ -313,6 +330,7 @@ Kotlin reads none, and the sketch reads none.
   prelude" names `rpc.Unserved`; Q4's line under "Open" points here.
 - **`decisions.md`**: an entry for each answer; the Q4 entry's "Left
   to the issue" closes, and its accepted cost changes with Q10.
-- **cusoon2's Kotlin**, first and under its tests, only if Q5 b or Q6
-  b is taken. Nothing else here changes how it behaves but the
-  statuses of Q3.
+- **cusoon2's Kotlin**, first and under its tests, if any of Q3 b or
+  c, Q5 b, Q6 a, Q7 b, Q9 a or Q11 a is taken: Q6 a drops the token
+  from reads that read no session, Q9 a answers a stranger's unknown
+  ops name 404, and Q11 a reads a cookie that is no UUID as none.

@@ -45,6 +45,12 @@ forgives until that issue closes. A port passes at zero differences
 beyond those accepted and owed, and a module does not replace its Kotlin
 without such a run, nor with a difference owed.
 
+For each newly ported area, plant one bug in the port (a cent off, a
+dropped `where`, a swapped share), see the comparison exit 1 and name
+the right case, and say so in the handoff: rule 6 applied to the
+comparison itself, since nobody has measured what its pairing of ids
+and times forgives.
+
 **Add what the spec lists.** A name the port needs that the spec lists
 and the prelude lacks is added to the prelude (DEV-875), not written
 around. A name the spec does not list is one of two kinds. One Kotlin

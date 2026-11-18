@@ -99,6 +99,12 @@ signal: those that follow from work that is running or a question asked
 of him, and choices of his that are parked. A debt on the board that
 waits on no one is not a row.
 
+An issue has one row across the two boxes: its next step. That step is
+in You can do now if Greg can do it, and in Not yet if he cannot; what
+follows it is not a row. A step running in one of Greg's own Zed
+sessions is a row in You can do now, since its signal is his to give:
+"Tell me when DEV-904's review has posted: say `904 back`".
+
 After the boxes, one line: what is running and what you will merge.
 Open every reply with what waits on Greg, in bold, in one of three
 forms: "**I suggest: `1`, say "Fix DEV-901" in its Zed session.**"
@@ -118,6 +124,7 @@ number. Anything else he types is plain words.
 | --- | --- | --- |
 | 1 | Fix DEV-901 (the parser's spans) in its Zed session | say "Fix DEV-901" there |
 | 2 | Launch DEV-902's review (the emitter's line directives) | add `agent` to DEV-902 |
+| 3 | Tell me when DEV-905's review (the checker's spans) has posted in its Zed session | say `905 back` |
 
 **Not yet**
 

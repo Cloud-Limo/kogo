@@ -540,6 +540,24 @@ Each entry: what was decided, why, and what would reopen it.
   a `Lead:` comment, so a new lead needs only the board. Not taken: a handover note or
   document, which is a second copy of the board. Reopen if an agreed step has no issue to
   go on.
+- **cusoon2 and Kogo follow one set of steps** (18 Nov 2026, Greg; DEV-917). The Workflow
+  of each repository's `AGENTS.md` is one text between markers, the same in both but for
+  where a step works (a worktree per issue here, a clone with its stack in cusoon2) and who
+  merges (the lead here; in cusoon2 Greg, after the lead says it is ready). Every step's
+  comment goes in full on the PR and its first line on the issue, and an agent files into
+  Todo in the project of the repository the work lands in, cusoon2's in Cloud Limo
+  Relaunch. A Zed session on cusoon2 had loaded cusoon2's steps, which posted a handoff on
+  the issue alone and had no Code review or Fix, whatever a `Lead:` comment said. Taken by
+  the lead where Greg's table was silent: cusoon2's `linear-file` now defaults to Todo and
+  requires `--project`, since its docstring called Triage the rule and an issue in no
+  project shows on no board; cusoon2's `launch` keyword goes, as launching is the lead's
+  (`doc/lead.md`); cusoon2 work with no stack to run, docs and scripts, may take a worktree.
+  A session loads the `AGENTS.md` of the branch its folder is on, so until no open cusoon2
+  branch predates this, a `Lead:` comment for one sends the session to `renew`'s Workflow
+  first (the lead's ruling on the review, 18 Nov 2026). Not taken: one file both repositories link, which a session on either would have to
+  find outside its own repository; Triage as the default, which files a forgotten
+  `--state` where only Greg looks. Reopen if the two repositories' steps need to differ
+  in more than the two rows.
 - **The emitted Go names its source inline, by a relative path** (15 Nov 2026). Each line of
   Go begins with its own position, `/*line ../../src/a.kg:26*/`, padded so that a file's
   code starts at one column, then indented a tab for each block or closure it is in. Nobody

@@ -1,8 +1,10 @@
 # The lead
 
 "Lead", said in `~/Dev/kogo`, starts this session. Greg talks to the
-lead; other sessions do the work. `AGENTS.md` has the steps they
-follow and the `lin` shorthand used here.
+lead; other sessions do the work. The lead directs the work of both
+repositories, Kogo and cusoon2: `AGENTS.md` has the steps every
+session follows, the same in cusoon2's, and the `lin` shorthand used
+here.
 
 ## What you own
 
@@ -26,12 +28,17 @@ tell Greg.
 
 1. `git -C ~/Dev/kogo pull --ff-only` and
    `git -C ~/Dev/cusoon2-tasks pull --ff-only`.
-2. `LINEAR_PROJECT=Kogo lin list board`: every open issue with its
-   state and the first line of its newest comment.
+2. `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list board`: every
+   open issue of both projects with its state and the first line of
+   its newest comment.
 3. Remove each worktree whose PR has merged (`gh pr list --state
    merged --head <branch>`): check `git status` there is clean, then
-   `git worktree remove`, `git branch -d` and
-   `git push origin --delete <branch>`.
+   `git worktree remove`, `git branch -d` and `git push origin
+   --delete <branch>`. Do the same for cusoon2, with three
+   differences: list the worktrees of both clones, `~/Dev/cusoon2` and
+   `~/Dev/cusoon2-b`; pass `-R Cloud-Limo/cusoon2` to `gh pr list`;
+   and skip `git push origin --delete`, since GitHub deletes a merged
+   branch there, as well as `git branch -d` for a detached worktree.
 4. Tell Greg, briefly and as "Talking to Greg" says. Open with what
    waits on him, in bold; end with the two boxes, You can do now and
    Not yet, then the line on what is running and what you will merge.
@@ -149,10 +156,16 @@ Suggest one and say why in a line; Greg agrees or picks another.
   conversation, or when it needs this VM (a read of `cusoon_b`, the
   stage-1 ports). Give Greg the phrase: "Pickup DEV-NNN", "Code review
   DEV-NNN" or "Fix DEV-NNN".
-- **Zed** too, for every step, when the work lands in another
-  repository, cusoon2 for one: a run clones the repository of the
-  issue's Linear project, so it would clone Kogo. Such an issue
-  carries a `Lead:` comment saying so.
+- **Zed** too, for every step, when the work lands in a repository
+  other than its issue's project's: a run clones the repository of the
+  issue's Linear project, Kogo for Kogo and cusoon2 for any other.
+  Such an issue carries a `Lead:` comment saying so, naming the step
+  and, for cusoon2, the clone; the steps themselves are in both
+  repositories' `AGENTS.md`, so it does not restate them. For a
+  cusoon2 step whose folder's `AGENTS.md` lacks the `Workflow, shared`
+  markers, the `Lead:` comment opens with "Read the Workflow in `git
+  show origin/renew:AGENTS.md` first: it overrides this branch's."
+  Delete this line when no open cusoon2 branch predates DEV-917.
 
 A step's place does not bind the next: a PR coded in Zed can be
 reviewed by a run, and the reverse.
@@ -235,6 +248,24 @@ its first line on the issue, remove the worktree and both branches
 as in Starting step 3, and pull `main`. Otherwise post a `Ruling:`,
 with any differing cases, and ask for another Fix. Go to Greg only
 when what is Open is a choice of his kind.
+
+A cusoon2 PR is Greg's to merge. On the same comments, in a worktree
+at its pushed head, `~/Dev/cusoon2-dev-NNN`: made when missing with
+`git -C ~/Dev/cusoon2-b fetch origin` and `git -C ~/Dev/cusoon2-b
+worktree add --detach ~/Dev/cusoon2-dev-NNN origin/<branch>`, which
+works whichever clone has the branch checked out; otherwise moved to
+it, with `git pull --ff-only` on a branch or `git fetch origin` and
+`git checkout --detach origin/<branch>` when detached. There, read
+any fix commits against the Review and its Rulings, and
+check that Cloud CI passed on its head, `mise run ci-status <PR>`
+there: CI runs `mise run check-all` and the tests. Where the PR
+changes Kotlin that a Kogo port was taken from, also run that
+checkout's own `kogo/run.sh`, which compares its Kotlin, with
+`KOGO=~/Dev/kogo`, and read its last three lines as above.
+If all pass and nothing is Open, post a `Lead:` comment that it is
+ready for Greg, in full on the PR and its first line on the issue,
+and tell Greg; he eyeballs it and merges. Otherwise post a `Ruling:`
+and ask for another Fix.
 
 After a merge, look at what the issue was for. File the next issue if
 the work exposed one.

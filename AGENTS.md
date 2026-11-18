@@ -37,85 +37,110 @@ is building it because he wants to; do not argue whether it is practical.
 
 ## Workflow
 
-Linear holds the state of every piece of work and GitHub holds its
-code. The PR holds each step's comment in full, and the issue the
-first line of each, which is all the board shows. An issue goes Todo,
-In Progress, In Review, Done, and the first line of its newest comment
-says what happens next. Each step below can
-run in Zed or as an async run, in any mix. So whatever a later step
-needs is on the issue, the PR or the pushed branch, never only in a
-session or a worktree.
+Kept the same as cusoon2's `AGENTS.md` between the markers below, but
+for Where a step works and Who merges; change both in the same day's
+PRs.
 
 `lin X` below is short for `mise -C ~/Dev/cusoon2-tasks run linear-X`,
 a cusoon2 checkout kept on `renew` for these tasks alone: other
 sessions switch branches in `~/Dev/cusoon2`, and the tasks go missing
 with them. `$LINEAR_API_KEY` is already in the shell.
 
-- **Lead.** "Lead" starts the session Greg talks to: read
-  `doc/lead.md` and follow it. No other session needs that file.
-- **File.** `lin file --project Kogo --state Todo "Title" < desc.md`.
-  The description has four headings: What, Why, Scope (ending with a
-  Budget in code and test lines and a "Done when"), Links. File what
-  you find worth doing; nobody screens issues first.
-- **Pickup.** "Pickup DEV-NNN" is `lin pickup DEV-NNN kogo-dev-NNN`:
-  read its output and start. Use your own worktree, on the branch name
-  that output gives: `git -C ~/Dev/kogo fetch origin`, then
-  `git worktree add -b <branch> ~/Dev/kogo-dev-NNN origin/main`.
-  `~/Dev/kogo` stays on `main` for Greg and the lead: never edit,
-  commit or switch branch there, and never work in another issue's
-  worktree.
-- **Decide.** Make the calls the issue and the spec left open and
-  record each in `decisions.md` and under Decided in the handoff. A
-  choice that changes what the language is, or how its parts fit, is
-  not yours: leave it open and name it in the handoff's Next step.
-- **Handoff.** Commit, push with `git push -u origin HEAD` and open a
-  PR into `main` with `gh pr create`. Write one comment: the first
-  line `Handoff: <PR url> · <branch> · <worktree>`, then Landed /
-  Verified / Decided / Next step / Gotcha. Post it on the PR with `gh
-  pr comment` and its first line alone on the issue with
+<!-- Workflow, shared: begin -->
+Linear holds the state of every piece of work and GitHub holds its
+code. The PR holds each step's comment in full, and the issue the
+first line of each, which is all the board shows. An issue goes Todo,
+In Progress, In Review, Done, and the first line of its newest comment
+says what happens next. Each step below can run in Zed or as an async
+run, in any mix. So whatever a later step needs is on the issue, the
+PR or the pushed branch, never only in a session or a worktree.
+
+One lead, started in `~/Dev/kogo`, directs the work of both
+repositories. Kogo's issues are in the Linear project Kogo and its PRs
+go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
+`renew`. Both are in team DEV.
+
+- **Where a step works.** Kogo: a worktree per issue,
+  `~/Dev/kogo-dev-NNN`, with `<where>` `kogo-dev-NNN`. Pickup makes it:
+  `git -C ~/Dev/kogo fetch origin`, then `git worktree add -b <branch>
+  ~/Dev/kogo-dev-NNN origin/main`; a later step that finds it missing
+  fetches and makes it from `origin/<branch>`. `~/Dev/kogo` stays on
+  `main` for Greg and the lead: never edit, commit or switch branch
+  there, and never work in another issue's worktree.
+- **Lead.** "Lead", said in `~/Dev/kogo`, starts the session Greg
+  talks to: read Kogo's `doc/lead.md` and follow it. No other session
+  needs that file.
+- **File.** `lin file --project <project> --state Todo "Title" <
+  desc.md`, into the project of the repository the work lands in. The
+  description has four headings: What (one or two sentences, verb
+  first), Why (one or two sentences in plain words; for product work
+  it may end "Without it: <what an op or customer does instead>, about
+  N times a year"), Scope (ending with a Budget in code and test lines
+  and a "Done when" a reviewer can check in one look), Links. Write a
+  file name as a repo path in backticks: Linear turns a bare `audit.sh`
+  into a link. File what you find worth doing; nobody screens issues
+  first.
+- **Pickup.** "Pickup DEV-NNN" is `lin pickup DEV-NNN <where>`, with
+  `<where>` as Where a step works says: read its output and start
+  there, on the branch that output gives.
+- **Decide.** Make the calls the issue and the plan or spec left open
+  and record each, with the alternative not taken, under Decided in
+  the handoff and where the repository keeps them (Kogo's
+  `decisions.md`, the plan a cusoon2 issue links): Decided is what
+  Greg reads first. A choice that changes what the product or the
+  language is, or how its parts fit, is not yours: leave it open and
+  name it in the handoff's Next step.
+- **Handoff.** Commit, push with `git push -u origin HEAD` and open
+  a PR into the repository's main line with `gh pr create --base
+  <main or renew>`. Write one comment: the first line `Handoff: <PR
+  url> · <branch> · <where>`, then Landed / Verified / Decided / Next
+  step / Gotcha. Post it on the PR
+  with `gh pr comment` and its first line alone on the issue with
   `head -1 handoff.md | lin comment DEV-NNN --state "In Review"`,
-  print it, and stop.
+  print it, and stop. A PR that outgrows its Budget, or adds what the
+  Scope did not name, says so in the handoff.
 - **Code review.** "Code review DEV-NNN": `lin show DEV-NNN` and take
   the PR and branch from the newest Handoff; its text is on the PR.
-  Work in `~/Dev/kogo-dev-NNN`: when it is missing, `git -C ~/Dev/kogo
-  fetch origin` and create it from `origin/<branch>`; otherwise
-  `git pull --ff-only` there. Read the whole diff
-  against the issue, `spec.md` and the rules above, and run the tests.
-  Change no code. Write one comment: the first line
-  `Review: <PR url> at <sha> · N fix, N won't fix, N question`, then
-  a numbered list. Each item is a **Fix** (what is wrong, the change,
-  its size as code / tests), a **Won't fix** (the finding and why it
-  stays) or a **Question** (a choice that is Greg's or the lead's: the
-  options and which you lean to). Post it on the PR, and its first
-  line alone on the issue with `head -1 review.md | lin comment
-  DEV-NNN`, print it, and stop.
-- **Fix.** "Fix DEV-NNN": in the same worktree, fast-forwarded or
-  made as in Code review when missing, make every Fix of the newest
-  Review, read on the PR, as further commits. A `Ruling:` comment
-  after it, on the PR too, answers its Questions and overrides the
-  Review where they differ, a Fix included. Rewrite the PR description
-  if the work moved. Push.
-  Write one comment: the first line
-  `Fixed: <PR url> at <sha>`, then what was done for each numbered
-  item, and under **Open** any Question without a Ruling and any
-  choice the fixes raised. Post it on the PR, and its first line
-  alone on the issue with `head -1 fixed.md | lin comment DEV-NNN`
-  (no `--state`: it stays In Review), print it, and stop. Do not
-  merge: the lead reads the fixes and merges.
+  Work as Where a step works says, on the branch fast-forwarded with
+  `git pull --ff-only`, or made from `origin/<branch>` when missing.
+  Read the whole diff against the issue and this file (in Kogo,
+  `spec.md` too), and run the tests. Change no code. Write one
+  comment: the first line `Review: <PR url> at <sha> · N fix, N won't
+  fix, N question`, then a numbered list. Each item is a **Fix** (what
+  is wrong, the change, its size as code / tests), a **Won't fix** (the
+  finding and why it stays) or a **Question** (a choice that is Greg's
+  or the lead's: the options and which you lean to). Post it on the
+  PR, and its first line alone on the issue with `head -1 review.md |
+  lin comment DEV-NNN`, print it, and stop.
+- **Fix.** "Fix DEV-NNN": in the same place, fast-forwarded or made as
+  in Code review when missing, make every Fix of the newest Review,
+  read on the PR, as further commits. A `Ruling:` comment after it, on
+  the PR too, answers its Questions and overrides the Review where
+  they differ, a Fix included. Rewrite the PR description if the work
+  moved. Push. Write one comment: the first line `Fixed: <PR url> at
+  <sha>`, then what was done for each numbered item, and under
+  **Open** any Question without a Ruling and any choice the fixes
+  raised. Post it on the PR, and its first line alone on the issue
+  with `head -1 fixed.md | lin comment DEV-NNN` (no `--state`: it
+  stays In Review), print it, and stop. Do not merge: see Who merges.
+- **Who merges.** Kogo: the lead, and no other session. After Code
+  review and Fix it reads the fixes, runs the checks `doc/lead.md`
+  names and merges. Greg does not review Kogo's PRs on GitHub: review
+  is the Code review step, and the lead answers for the quality of
+  what merges.
 - **Async runs.** A run has no Linear access and its clone is its
-  worktree. Post the step's comment on the PR yourself and write the
-  same, in full, as the run's `answer.md`, which the wrapper posts on
-  the issue whole: the one place a full comment lands on the issue,
-  and what an interrupted run leaves behind. A review or fix run
-  leaves its tree clean: whatever is left is pushed to the PR's
-  branch. No run merges.
+  worktree. It clones the repository of its issue's project: Kogo for
+  Kogo, cusoon2 for any other. Work that lands in another repository
+  than its issue's project's runs in Zed. Post the step's comment on the
+  PR yourself and write the same, in full, as the run's `answer.md`,
+  which the wrapper posts on the issue whole: the one place a full
+  comment lands on the issue, and what an interrupted run leaves behind.
+  A review or fix run leaves its tree clean: whatever is left is pushed
+  to the PR's branch. No run merges.
 - A comment with no PR to hold it stays on the issue in full: a
   launch comment, a `Lead:` comment, an answer of Greg's given before
   a PR exists.
-- Greg does not review Kogo's PRs on GitHub. Review is the Code
-  review step, and the lead answers for the quality of what merges
-  and is the only one that merges.
-  Never rebase or force-push a pushed branch: reviews hold its shas.
+- Never rebase or force-push a pushed branch: reviews hold its shas.
 - A PR description is three parts and nothing else: one or two
   sentences of what it does, verb first, carrying "Fixes DEV-NNN"; one
   or two of why, in plain words; bullets for the major pieces only.
@@ -127,7 +152,10 @@ with them. `$LINEAR_API_KEY` is already in the shell.
 - No AI attribution anywhere: no AI Co-Authored-By trailers, no
   "generated with" lines in commits, PR bodies, PR comments, issues or
   Linear comments.
-  `.claude/settings.json` turns off the harness's own attribution.
+<!-- Workflow, shared: end -->
+
+`.claude/settings.json` turns off the harness's own attribution.
+
 - Go is pinned in `.mise.toml`; run it as `mise exec -- go ...`. Prefer
   a dependency release at least seven days old.
 - Postgres 18 runs in this VM; `sudo -n -u postgres psql` is the

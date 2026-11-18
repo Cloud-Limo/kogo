@@ -751,7 +751,7 @@ Each entry: what was decided, why, and what would reopen it.
     premature and overkill; and other languages let a program wrap a library. Only
     effects needed closing.
   - **An extension**: its functions take values and give a value, with no handle and no
-    `@Acts`; each carries a marker of the application's, so a file that calls one opts
+    `action fun`; each carries a marker of the application's, so a file that calls one opts
     in at its top; its binding file, its Go and that Go's dependencies live with the
     application. Kogo's own Go stays with no new dependency (15 Nov).
   - **What the entry of 15 Nov feared.** It refused clients written in Kogo over a general
@@ -808,8 +808,9 @@ Each entry: what was decided, why, and what would reopen it.
     the method does not say it: a `DELETE` is an action and a lookup may be a `POST`.
   - Not taken: the kind left worked out; `action fun`, a word of Kogo's own, which is
     plainer and keeps spec 11 to one rule; two environments, one that can act.
-  - Reopen with DEV-894: if Kogo's additions are to stay unlike Kotlin, respell it
-    `action fun`, with the binding's words.
+  - Respelt `action fun` on 18 Nov 2026 (DEV-894, below), which reopened it. The rest of
+    this entry stands for the word as for the marker, and the cost above goes: no marker
+    is held by the function alone.
 - **A transaction's kind is its handle's type: `Tx` is any, and `SerializableTx` is one
   that is rerun on a conflict** (17 Nov 2026, Greg; `doc/gates.md`, "Two kinds of
   transaction"). Kogo is to support explicit locking as naturally as cusoon2's way.
@@ -882,7 +883,7 @@ Each entry: what was decided, why, and what would reopen it.
 - **The runner says when to alert, and a function of the application's sends it**
   (17 Nov 2026, Greg; `doc/work.md`, "An alert is the application's to send"). Every
   `work` list names one, with no default: it takes the environment and an `Alert` of what
-  the runner knows, holds no transaction and is marked `@Acts`. It is called after the
+  the runner knows, holds no transaction and is an `action fun`. It is called after the
   commit that failed the row and is best effort, as the Kotlin's is, so nothing goes into
   the Kotlin first.
   - Not taken: each queue's `failed` queuing the alert, a habit of 16 queues and a row
@@ -893,7 +894,7 @@ Each entry: what was decided, why, and what would reopen it.
   roles** (17 Nov 2026, Greg; `doc/lists.md`). Six lists and fifteen roles had each been
   designed alone, against principle 6. A function the runtime calls takes the handle it
   runs in, the environment, what it is about and what it works on, in that order; the
-  checker fits stages from the table; spec 1 keeps three additions, the third being lists.
+  checker fits stages from the table; spec 1 keeps three additions, the third being lists (four since DEV-894, with `action fun`).
   `enter` gains the environment, the one shape that broke the rule. The spelling has at
   most two forms, which DEV-894 inherits.
   - Asked for by Greg on agreeing: a deep dive into what the lists are for, how they do it,
@@ -909,14 +910,14 @@ Each entry: what was decided, why, and what would reopen it.
     tests need Postgres.
 - **That Greg does not read Go is no hard rule** (17 Nov 2026, Greg). Agents write and
   review it, and he will glance at it. The line between Kogo and Go rests on what the
-  checker can see, not on who reads: what moves into Go has no `@Acts`, no proofs and no
+  checker can see, not on who reads: what moves into Go has no `action fun`, no proofs and no
   printed table. So no decision of 17 Nov changes. One earlier reason leaned on it, for
   declaring routes in Kogo (`doc/gates.md`, "Weighed and not taken"): left for the deep
   dive on the lists. Settled below: routes are Go.
 - **The lists stay: the runtime calls Kogo through a table, and a list is the one place a
   function gets its role** (17 Nov 2026, Greg; `doc/lists-assessment.md`, choice A). This
   closes the deep dive that `doc/lists.md` and `doc/remains.md` held the mechanism open
-  for, and leaves DEV-894 free to spell the lists as valid Kotlin.
+  for, and leaves DEV-894 free to spell the lists as valid Kotlin (it kept them Kogo's own: below).
   - Not taken: the application writing the pipeline over prelude helpers (`db.gated`,
     `db.effect`). The list would not go away, since the wire names and the TypeScript need
     it; a gate's rules would start at an argument of a prelude call, against "A restriction
@@ -1137,7 +1138,7 @@ Each entry: what was decided, why, and what would reopen it.
   - No reopen condition was given.
 - **The checker's own rules each live in a file of their own in `check/`** (18 Nov 2026,
   Greg; the Ruling on PR 69; `doc/design.md`, "The checker"). The checker stays one
-  package. Kogo's own rules, those on proofs, gates, `@Acts` and the lists with their
+  package. Kogo's own rules, those on proofs, gates, `action fun` and the lists with their
   roles, each live in a file of their own in `check/`, run after type checking over its
   result, and each has its own error code. The files that check types (`expr.go`,
   `call.go`, `stmt.go`, `types.go`, `decls.go`) hold none of them. The spec states each
@@ -1386,7 +1387,7 @@ Each entry: what was decided, why, and what would reopen it.
     `ensureOpsSession`, no lock, in the request's one SERIALIZABLE transaction,
     `CusoonAppState.kt:252`, `:277`, `:299`; the one locked read is the Google callback's,
     `CusoonApp.kt:243`, which goes with the Google login), so a port sends the Kotlin's
-    statements. A rerun is safe: nothing marked `@Acts` runs in a transaction. It was
+    statements. A rerun is safe: no `action fun` runs in a transaction. It was
     first also that the token's compare stays in one function; **after Q6 c** (Greg was
     told) that reason weakens, since the compare is no longer in the reader. What remains
     is one reader, the Kotlin's statements, and no reader without a caller.
@@ -2526,6 +2527,103 @@ Each entry: what was decided, why, and what would reopen it.
   so principle 3 holds it to Kotlin's; `plain` is Kogo's own and keeps its difference.
 - **`trim(char)` trims by UTF-16 units**, as Kotlin's does and section 3 says, so a half
   of a pair trims and leaves U+FFFD.
+
+## Kotlin compatibility (DEV-894), agreed with Greg 18 Nov 2026
+
+- **Kogo source does not have to compile under kotlinc, and nothing runs it on the JVM:
+  choice (c)** (18 Nov 2026, Greg, in a Zed session over DEV-894's report). When a Kotlin
+  original is deleted, its comparison is kept by recorded answers (below). Strict Kotlin
+  syntax was there so that an agent who just wrote Kotlin would not find Kogo doing
+  something else; but the lists and a way to mark bindings and actions are needed, and some
+  were already unlike Kotlin. A Kogo file is 99% Kotlin and is copied as it is read, so
+  Kogo's few deviations should look as good as they can. Greg: "The sqlx style literal SQL
+  is great and using templating is indeed better than params because it cuts out the
+  'getting the order wrong' problem."
+  - Not taken: **(a)**, every file valid Kotlin and run on the JVM. Once an original is
+    deleted, the JVM run compares Kogo with itself, so it checks the emitter and not the
+    port; and it costs a second prelude kept for good (about 800 code / 400 test lines
+    now, growing), SQL parameters passed apart (22 of the ports' 67 lose their name
+    check), and the lists as ordinary-looking calls.
+  - Not taken: **(b)**, tests valid Kotlin, run against the original through shims. Greg:
+    "No, we do not want 1k LOC shims."
+  - Reopen if a second backend is wanted for its own sake, or if agents are found writing
+    a Kotlin habit that Kogo accepts with another meaning.
+- **Principle 3 is reworded: Kotlin where it overlaps; Kogo's own forms where it doesn't**
+  (18 Nov 2026, Greg; `doc/design.md`). Text valid in both means the same in both; a name
+  from Kotlin's standard library, `java.time` or Arrow means what it means there, and
+  where Kogo wants another behaviour it takes another name, Kotlin's own where Kotlin has
+  one; the corners of spec 12 stay allowed. Taken as proposed, over a spelt-out version.
+  - **kotlinc pins down the deviations.** Greg: "I like the idea we use kotlinc to be clear
+    on our 'deliberate deviations' from Kotlin." `mise run kotlin` compiles a file for each
+    and fails if kotlinc accepts one (DEV-931).
+  - **Spec 1 lists the four kinds of deviation**: the `sql` literal, bindings, the lists
+    and `action fun`, replacing "three things, each unlike Kotlin".
+  - **`java.time` is in scope** because Kotlin has no dates of its own: Kotlin programs call
+    it directly, as cusoon2 does in about 30 imports.
+- **Decided on the way** (18 Nov 2026, Greg). What changes code is filed (DEV-932,
+  DEV-933, DEV-912); these lines are the record.
+  - **`@Acts` becomes `action fun`.** Greg: "action fun is good." It closes the entry's
+    "Reopen with DEV-894" above, and kotlinc refuses it (run on 2.4.21). Respelt in the
+    designs (DEV-931); it is not built, so the spec and the checker take it when it is.
+  - **`Uuid.parse` becomes `Uuid.parseOrNull`**: Kotlin's `Uuid.parse` throws on bad
+    text, and Kogo's gives null. Spec 12 lists one corner: Kotlin's also reads 32 hex
+    digits, and Kogo's does not. `kogo check` already refuses most misuse, the result
+    being `Uuid?`; it passes unnoticed only where a null is welcome, as in a template or
+    after `?.let`. About 5 / 5.
+  - **`LocalDate.atStartOfDay(zone)` returns a `ZonedDateTime`**, as Java's does, and the
+    caller adds `.toInstant()`. Both give the end of a skipped midnight (Java run over
+    São Paulo, 4 Nov 2018). About 5 / 10. Not taken: a name of Kogo's own,
+    `startOfDay`.
+  - **`mise run kotlin` extends to `kogo.time` and `Either`**, which it does not cover
+    today. About 40 / 40.
+  - **Recorded answers in cusoon2.** Before an original is deleted, `run.sh` saves its
+    cases, the Kotlin's answers and rows, and compares the port against them from then on;
+    a deliberate change regenerates them under Greg's ruling. About 80 / 20, built before
+    the first original is deleted (DEV-893 holds the order). Not taken: dropping
+    a piece's cases when its original goes.
+  - **The cheat-sheet for agents is the examples.** Greg: "we do not want duplication in 3
+    places." Each list form gets one example in `examples/`, compiled by the tests; a
+    short page points at them and names Kogo's own words. A misfit's error prints the
+    signature the role wants, from the checker's table. A role's shape stays in the spec
+    and in the checker's table: "It's fine to have it both specced, and then in the
+    checker." Not taken: shapes printed from the checker into a sheet (about 30 / 20).
+- **The lists keep bare words, with no `::` or colons** (18 Nov 2026, Greg: "pretty happy
+  with the bare syntax"; `doc/gates.md`, `doc/work.md`, `doc/lists.md`). A gate of its
+  own, a shared gate and `ungated` are kept. These change:
+  - **The outside step is spelt `after`**: `updateBooker gatedBy updateBookerGate after
+    renameLogins`. Greg: "after helps make clear the order." The step must be an `action
+    fun`, so the function says it runs with no transaction (about 5 / 5). It is used once
+    in cusoon2 and kept, over a queued effect (loses the at-once refusal), two operations
+    (the order sits in the browser) and an `action fun` that writes. Not taken: the chain
+    as the list (`gate -> step -> work`): the words carry the checker's rules, and a chain
+    of one would be an unmarked ungated row.
+  - **The bare `outside` goes.** A gated operation that is an `action fun` runs with no
+    transaction, and its gate runs once: `deletePasskey gatedBy person`. It follows spec
+    15.3, where a `Db` means no transaction. Greg: "the list is just ... a list labelling
+    the gates. I like that."
+  - **A list with no check says `unchecked`**: `api hooks unchecked { ... }`, as a row says
+    `ungated`. Its Go type cannot be mounted for a browser. Greg: "checkedBy is called for
+    each and every listed op. But that is NOT the case for unserved." Not taken:
+    `unserved`, `goOnly` (says what it is not), `calledByMain`, `forRoutes` and
+    `serverSide` (all name the caller, not what runs); `private` and `internal`, Kotlin
+    words with meanings of their own.
+  - **A command's name is its function's name**: `commands admin { recordAbn ... }`, run
+    as `cusoon2 recordAbn --gstRegistered true`. The string column goes. camelCase is
+    kept over CLI convention, so a search for a property finds its flag; cusoon2's scripts
+    rename about ten commands, roughly 6 lines. The list's name stays: `main` calls it by
+    it.
+  - **No commas in any list; one entry per line.** The work list repeats `queue` on each
+    line, and spec 15.1's `api ops { me, updateJob }` goes to one per line.
+  - **An effect's and a job's lines are in a fixed order, the order they run**, and the
+    checker refuses any other (about 10 / 10): settings `find`, `fair`, `soonest`,
+    `attempts`; steps `enter`, `prepare`, `act`, `record`; on failure `failed`,
+    `recovery`; a job `next`, `run`, `failed`, `recovery`.
+  - **Job, effect and the work list are kept.** A job's example includes a test that
+    `failed` stops `next` finding the row; an effect's shows the runner's table of `Act`
+    outcomes as a comment above `act`. The work list keeps its `queue` lines and choice D's
+    error, so the copy is checked. Not taken: the alert alone with every queue run, the one
+    place something would run without being named; the alert passed in Go, which the
+    checker could not see.
 
 ## Taken writing cusoon2's `main` on paper (DEV-903), not yet discussed
 

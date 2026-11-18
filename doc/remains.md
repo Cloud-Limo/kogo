@@ -131,7 +131,7 @@ Agreed subject to this review:
   lines beside that walk, 10 more for the queues' and 10 for marking
   a write made under `AtTenant`; `failed` and
   `recovery`, 25 of checker; `find`, 20; `fair`, 30; `soonest`, 15;
-  `@Acts`, 40; the two kinds of
+  `action fun`, 40; the two kinds of
   transaction, 40 of checker and 30 of Go; the five places where
   `kogo.http` states what Go would decide, 25 of Go; the table's
   `asks` and `acts` lines, 25; the `alert` function, 15 of checker
@@ -140,13 +140,13 @@ Agreed subject to this review:
 ## Choices that sit above these
 
 - **How SQL's parameters are spelt, and whether Kogo source is valid
-  Kotlin** (DEV-894). It decides how `gatedBy`, `ungated`, `outside`,
-  `commands`, `job`, `effect`, `work` and a binding's
-  `lookup` are spelt, and whether `@Acts` stays a marker or becomes
-  `action fun` (`doc/gates.md`, "A function that acts says so"). Each
-  design here was written to hold either way. One constraint on it,
-  agreed 17 Nov: the lists have at most two forms, a list of rows and
-  a block of named parts (`doc/lists.md`).
+  Kotlin** (DEV-894). Settled 18 Nov 2026 (`decisions.md`): Kogo
+  source need not compile under kotlinc, SQL keeps its templated
+  parameters, a function that acts is an `action fun`, and the lists
+  keep bare words, with `after` for the outside step, `unchecked` for
+  a list with no check, a command named by its function, no commas
+  and a fixed order of lines (`doc/gates.md`, `doc/work.md`,
+  `doc/lists.md`).
 - **Where Kogo ends and Go begins.** Settled 17 Nov 2026
   (`decisions.md`, "Where Kogo ends and Go begins"): Kogo for what
   touches the database, acts outside or decides who may do what; Go

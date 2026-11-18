@@ -11,9 +11,15 @@ Source files end in `.kg`.
 ## 1. The one rule
 
 Where a construct is valid in both Kotlin and Kogo it means the same thing.
-Kogo adds exactly three things that Kotlin lacks, and each looks unlike
-Kotlin: the `sql"""..."""` literal (section 10), the `external` binding
-declarations (section 13) and the `api` list (section 15).
+A Kogo file need not compile as Kotlin. Kogo has four kinds of
+deliberate deviation from Kotlin, its own forms, and kotlinc refuses
+each (`mise run kotlin` holds this):
+
+- the `sql"""..."""` literal (section 10);
+- the `external` binding declarations (section 13);
+- the lists, such as `api` (section 15);
+- `action fun`, a function that changes something outside (not yet
+  in this spec: `doc/gates.md`).
 
 ## 2. Files, packages, visibility
 

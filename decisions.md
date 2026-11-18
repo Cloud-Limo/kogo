@@ -1419,52 +1419,54 @@ Each entry: what was decided, why, and what would reopen it.
     which also closes the hole and keeps a line that must be right for a form cusoon2 does
     not have.
   - No reopen condition was given.
-- **The rest of the Origin check, answered by the lead** (18 Nov 2026, the lead, not
-  Greg; `doc/origin.md`, Q2, Q4 and Q9 to Q13). Q2 and Q13 were told to Greg.
-  - **The check runs in its own transaction** (Q2 a): once for a request, before the
-    request's, read only and rolled back. Why: a `Db` operation and one run wholly outside
-    have no transaction of the server's for it to join, so (b) needs (a) anyway; and under
-    (b) the check reruns with the operation and its reads join a SERIALIZABLE read set.
-    Q6 c makes it safe for the token too: a row's token is set when the row is made and
-    never updated (`database.kt:1848` is its only write), and a login deletes the row and
-    makes another, so a compare made before the request's transaction cannot go stale.
-    Accepted cost: a second transaction for each request with a check, one after the
-    other; the token is compared once and not on each rerun, where the Kotlin compares it
-    on each. Not taken: (b) the request's transaction, in the gate's savepoint.
-  - **The printed table has one line at the head of each list, and a list with none says
-    so** (Q4 c): `api booker   checked by fromOurPage   check reads session, tenant`;
-    `api routes   no check: not served to a browser`. Why: the absence is what a reviewer
-    looks for. Not taken: (a) without the line for a list that has none; (b) a `check
-    reads` line on every operation.
-  - **The check runs first in `serve`, as the Kotlin** (Q9 b): before the name's 404 and
-    the method's 405, so a stranger's request to an unknown name is refused, not a 404.
-    Why: (a) differs from the Kotlin, so cusoon2 would change first, or the comparison
-    record a difference, to save an empty read-only transaction on a path that is not
-    there. Not taken: (a) after the name and the method. Reopen: a check whose cost on a
-    404 shows in the `served` lines.
-  - **`sessionId` and the cookie's name are `private` to `session.kg`** (Q10 b), which
-    exports `tokenMatches`, `liveSession` and `endSession`. After Q6 c the token no longer
-    rests on "every read goes through the one function", so this is cheap tidiness. A
-    second `select ... from session` elsewhere is a reviewer's. Not taken: (a) a reviewer
-    alone.
-  - **A cookie that is no UUID is no session** (Q11 a). It is met first in the check:
-    `tokenMatches` passes it and `liveSession` gives null, so the browser is given a new
-    session. Why: under the Kotlin's 400 a browser holding such a cookie is refused on
-    every request until the cookie is cleared, `whoAmI` included. Accepted cost: it differs
-    from the Kotlin, which changes first, in the same cusoon2 PR as Q3 and Q5 (a guess,
-    2 / 1). Not taken: (b) a refusal.
-  - **`NewCalls` takes an `Unserved` alone** (Q12 a); an operation a route calls is listed
-    in `routes` too (spec 15.1 lets a fun stand in two lists). cusoon2 has no such route.
-    Not taken: (b) `NewCalls` taking a `Table` and skipping its check. Reopen: the first
-    route that must call an operation of a mounted list and cannot be listed in `routes`.
-  - **`Unserved`'s fields are unexported** (Q13 b). The emitter writes
-    `rpc.NewUnserved(ops, enums)`, so `main` cannot lift `routes`' operations into a
-    `Table` it mounts; a `Table` of operations `main` writes itself, or a check that always
-    passes, stays a reviewer's. `NewHandler` still panics on a nil `Check`. Why: rule 2 of
-    the Q4 entry asks for "by construction", and this is the most Go gives for about 4
-    lines of `rpc`. Not taken: (a) exported fields.
-  - **Not asked, and still not:** the request's `Content-Type`, left "with the CSRF
-    checks"; open in `doc/origin.md`.
+- **The check runs in its own transaction** (18 Nov 2026, the lead, not Greg;
+  `doc/origin.md`, Q2 a; told to Greg): once for a request, before the request's, read
+  only and rolled back. Why: a `Db` operation and one run wholly outside have no
+  transaction of the server's for it to join, so (b) needs (a) anyway; and under (b) the
+  check reruns with the operation and its reads join a SERIALIZABLE read set. Q6 c makes
+  it safe for the token too: a row's token is set when the row is made and never updated
+  (`database.kt:1848` is its only write), and a login deletes the row and makes another,
+  so a compare made before the request's transaction cannot go stale. Accepted cost: a
+  second transaction for each request with a check, one after the other; the token is
+  compared once and not on each rerun, where the Kotlin compares it on each. Not taken:
+  (b) the request's transaction, in the gate's savepoint.
+- **The printed table has one line at the head of each list, and a list with none says
+  so** (18 Nov 2026, the lead, not Greg; `doc/origin.md`, Q4 c):
+  `api booker   checked by fromOurPage   check reads session, tenant`;
+  `api routes   no check: not served to a browser`.
+  Why: the absence is what a reviewer looks for. Not taken: (a) without the line for a
+  list that has none; (b) a `check reads` line on every operation.
+- **The check runs first in `serve`, as the Kotlin** (18 Nov 2026, the lead, not Greg;
+  `doc/origin.md`, Q9 b): before the name's 404 and the method's 405, so a stranger's
+  request to an unknown name is refused, not a 404. Why: (a) differs from the Kotlin, so
+  cusoon2 would change first, or the comparison record a difference, to save an empty
+  read-only transaction on a path that is not there. Not taken: (a) after the name and the
+  method. Reopen: a check whose cost on a 404 shows in the `served` lines.
+- **`sessionId` and the cookie's name are `private` to `session.kg`** (18 Nov 2026, the
+  lead, not Greg; `doc/origin.md`, Q10 b), which exports `tokenMatches`, `liveSession` and
+  `endSession`. After Q6 c the token no longer rests on "every read goes through the one
+  function", so this is cheap tidiness. A second `select ... from session` elsewhere is a
+  reviewer's. Not taken: (a) a reviewer alone.
+- **A cookie that is no UUID is no session** (18 Nov 2026, the lead, not Greg;
+  `doc/origin.md`, Q11 a). It is met first in the check: `tokenMatches` passes it and
+  `liveSession` gives null, so the browser is given a new session. Why: under the Kotlin's
+  400 a browser holding such a cookie is refused on every request until the cookie is
+  cleared, `whoAmI` included. Accepted cost: it differs from the Kotlin, which changes
+  first, in the same cusoon2 PR as Q3 and Q5 (a guess, 2 / 1). Not taken: (b) a refusal.
+- **`NewCalls` takes an `Unserved` alone** (18 Nov 2026, the lead, not Greg;
+  `doc/origin.md`, Q12 a); an operation a route calls is listed in `routes` too (spec 15.1
+  lets a fun stand in two lists). cusoon2 has no such route. Not taken: (b) `NewCalls`
+  taking a `Table` and skipping its check. Reopen: the first route that must call an
+  operation of a mounted list and cannot be listed in `routes`.
+- **`Unserved`'s fields are unexported** (18 Nov 2026, the lead, not Greg;
+  `doc/origin.md`, Q13 b; told to Greg). The emitter writes `rpc.NewUnserved(ops, enums)`,
+  so `main` cannot lift `routes`' operations into a `Table` it mounts; a `Table` of
+  operations `main` writes itself, or a check that always passes, stays a reviewer's.
+  `NewHandler` still panics on a nil `Check`. Why: rule 2 of the Q4 entry asks for "by
+  construction", and this is the most Go gives for about 4 lines of `rpc`. Not taken: (a)
+  exported fields.
+- **Not asked, and still not** (the lead, 18 Nov 2026): the request's `Content-Type`, left
+  "with the CSRF checks"; open in `doc/origin.md`.
 
 ## Taken in the v0 spec, not yet discussed
 

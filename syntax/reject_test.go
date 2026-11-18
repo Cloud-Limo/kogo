@@ -129,3 +129,15 @@ func TestFaults(t *testing.T) {
 		t.Errorf("no package line: %v", err)
 	}
 }
+
+// A tests list names its environment's type (spec.md 16.1).
+func TestTestsList(t *testing.T) {
+	if f, err := Parse("t_test.kg", []byte("package t\ntests ts<List<Env>> { a, b, }\nval tests: Int = 1")); err != nil ||
+		len(f.Tests) != 1 || f.Tests[0].Name != "ts" || len(f.Tests[0].Vals) != 2 || len(f.Decls) != 1 || !f.IsTest() {
+		t.Errorf("got %+v, %v: want one tests list of two names, and a val named tests", f, err)
+	}
+	e, line, column := fault(t, "tests ts ‸{ a }")
+	if e.Line != line || e.Column != column || e.Code != "syntax" || !strings.Contains(e.Message, "tests ts<Env> { ... }") {
+		t.Errorf("got %v, want a syntax error at %d:%d naming tests ts<Env> { ... }", e, line, column)
+	}
+}

@@ -212,3 +212,19 @@ func (e *emitter) table(d *syntax.API) {
 	e.w("var %s = %s[%s]{Operations: []%s[%s]{%s}, Enums: []any{%s}}",
 		e.names[d], rpc("Table"), env, rpc("Operation"), env, strings.Join(ops, ", "), strings.Join(enums, ", "))
 }
+
+// tests writes a tests list's test.List: each test with the file,
+// line and column of its val, which kogo test prints when it fails.
+// The file is named as kogo was given it.
+func (e *emitter) tests(d *syntax.Tests) {
+	defer e.enter(d)()
+	l := e.info.Tests[d]
+	var tests []string
+	for _, v := range l.Tests {
+		at := v.Decl.At()
+		tests = append(tests, fmt.Sprintf("%s(%s, %q, %d, %d)", e.qualify("kogo.test", "At"), e.names[v], e.file.Name, at.Line, at.Column))
+	}
+	env := e.typ(l.Env)
+	e.w("var %s = %s[%s]{Name: %q, Tests: []%s[%s]{%s}}",
+		e.names[d], e.qualify("kogo.test", "List"), env, d.Name, e.qualify("kogo.test", "Placed"), env, strings.Join(tests, ", "))
+}

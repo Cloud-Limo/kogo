@@ -122,6 +122,45 @@ func Tx_Atomically[A any](this Tx, block func() A) A {
 	return a
 }
 
+// RolledBack runs block in a transaction that is rolled back when
+// block ends, however it ends: kogo test's, one for each test.
+func RolledBack(db Db, block func(Tx)) {
+	tx := must(db.pool.Begin(db.ctx))
+	decimals(tx.Conn().TypeMap())
+	defer tx.Rollback(db.ctx)
+	block(Tx{db.ctx, tx})
+}
+
+// A Refusal is what Postgres said of a statement it refused: Kogo's
+// kogo.test.Refusal, here since Tx_Refusal gives one.
+type Refusal struct {
+	SqlState   string
+	Constraint *string // null where the refusal names none
+	Message    string
+}
+
+// Tx_Refusal is tx.refusal(sql"..."), a test file's (spec.md 10.8):
+// the statement runs in a savepoint, which a refusal rolls back to, so
+// that the transaction goes on. It gives null when Postgres accepted
+// the statement. A failure that is not Postgres's word on the
+// statement, as a lost connection, is a panic.
+func Tx_Refusal(this Tx, sql string, args ...any) *Refusal {
+	savepoint := must(this.tx.Begin(this.ctx))
+	_, err := savepoint.Exec(this.ctx, sql, bound(args)...)
+	var refused *pgconn.PgError
+	if !errors.As(err, &refused) {
+		must(0, err)
+		must(0, savepoint.Commit(this.ctx))
+		return nil
+	}
+	must(0, savepoint.Rollback(this.ctx))
+	r := &Refusal{SqlState: refused.Code, Message: refused.Message}
+	if refused.ConstraintName != "" {
+		r.Constraint = &refused.ConstraintName
+	}
+	return r
+}
+
 // A Scan reads the row at hand into what its arguments point to, one
 // for each column.
 type Scan func(dest ...any)

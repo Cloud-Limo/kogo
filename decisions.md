@@ -2650,6 +2650,84 @@ Each entry: what was decided, why, and what would reopen it.
   record of what was weighed. Spec 15.1's commas wait for the lists to be built, since
   the parser reads them today.
 
+## The test form (DEV-929, DEV-938, DEV-940), agreed with Greg 19 Nov 2026
+
+- **A test is a value, `test("sentence") { tx, env -> ... }`, named in a `tests` list**
+  (Greg, 19 Nov 2026: S3 of DEV-938, after the trial translation of
+  `InvoiceLedgerServiceTest.kt`). The checker takes the environment's type from the list,
+  so a test writes no `: Test<Env>`. Every test breaks after `=`, the sentence on the next
+  line; ktfmt 0.58 breaks the same Kotlin the same way, and Kogo has no formatter (Greg:
+  agents are trusted), so `examples/23_test.kg` is the layout. Not taken: (b), the sentence
+  in a comment; S1, S2, S4. Reopen if the layout drifts across the translated tests.
+- **`tx.refusal(sql"...")` in place of `assertFails`** (Greg, 19 Nov 2026). A test sees a
+  statement Postgres refuses as a value, `Refusal?` with SQLSTATE, constraint and message,
+  run in a savepoint, in test files only. Panics stay bugs and are never caught, tests
+  included; a refusal a caller can meet inside application code is expected in the
+  statement (spec 10.6) and tested as a `Left`. Not taken: `assertFails`, catching a panic
+  in tests, since panics as exceptions are not the Go way. Reopen if tests turn out to
+  need a refusal buried in application code that the statement cannot expect: Greg asked
+  whoever builds on this to watch for it.
+- **Test files are `_test.kg`, left out by `kogo emit` and `kogo ts`** (the lead), as Go
+  leaves out `_test.go`. Not taken: a test package of its own, which could not reach its
+  package's `internal` and `private` helpers.
+- **The runner, not each application's helper, gives an in-process call's refusal its
+  rollback** (the lead): an operation called from a test that returns `Left` leaves
+  nothing behind, as the server's rollback does. Not taken: every application wrapping each
+  call in `tx.atomically`. Not built in DEV-940: a test cannot call an operation until
+  `kogo.test.request` exists, and that issue builds this with it.
+
+## Taken building the test form (DEV-940), not yet discussed
+
+- **The list names its environment: `tests name<Env> { a, b }`.** Greg's decision has the
+  checker infer the environment "from the list", and a list of bare names holds no type to
+  infer from: unlike an operation, a test's block states none. So the list states it, once,
+  where `Test<Env>` on every val would state it N times. Not taken: `tests name: Env { }`,
+  which reads as the list's own type; the type on the first test's lambda (`{ tx, env: Env
+  -> }`), which makes one test unlike the rest; one environment type for a whole program,
+  found from the `api` lists, which a program with two lists of two environments breaks.
+  **This spells new syntax and is Greg's to confirm.** Reopen: if he chose another spelling
+  in DEV-938, it is one parser function and the example.
+- **A list names vals of its own file, each in one list.** A cusoon2 test file is one
+  class of tests, and a failure is reported with the file the list is in. Not taken: any
+  val in scope, as `api` names funs, which needs each val's file carried to the emitter and
+  lets one test run twice.
+- **A test that no list names is a compile error**, whether it states `Test<Env>` or no
+  type: left out of its list it would silently never run, the one failure a list of names
+  invites. Not taken: running every `Test` val of a test file whatever the list says, which
+  makes the list decoration.
+- **`kogo test <dir> <out> <main>` builds and runs the application's Go test main.** The
+  environment holds handles only Go can make (a clock, the stand-in servers), so a Go main
+  must exist, as the server's does; it calls `test.Run(ctx, pool, env, out, lists...)` and
+  exits 1 on a failure. `kogo test` checks, emits with the tests, builds that main and
+  runs it. Not taken: `kogo test` writing a main itself, which could build no environment
+  but `Unit`; `kogo test` only emitting, leaving the run to the user, which the issue's
+  "runs each test" rules out.
+- **`kogo check` reads test files; `emit` and `ts` do not.** The checker refuses a use of
+  a test file's declaration from another file (`not-visible`) and an import of `kogo.test`
+  or `kotlin.test` there (`test-import`), so `check` and `emit` agree about the program.
+  Not taken: `check` leaving test files to `kogo test`, which would make the one gate two.
+- **A failure's position is the test's val, and `at` is the Kogo line that panicked**, read
+  from the Go stack through the emitter's line directives: a test of five assertions
+  otherwise says only which sentence failed. It has no column, so it is beside
+  file/line/column, not in place of them. Not taken: the position of the panic alone, which
+  for a bug deep in application code names no test.
+- **`Refusal` is an external class with three vals** (`sqlState`, `constraint`,
+  `message`), not a data class: a prelude file holds bindings only. So two refusals are not
+  compared with `==`; a test compares the fields it means. Reopen if tests want
+  `assertEquals(Refusal(...), ...)`.
+- **A binding's parameter with a default is a pointer in Go, null when left out**, as an
+  emitted fun's is: `message: String? = null` is `**string`. No binding had a default
+  before the assertions; `TestPrelude` now expects what the emitter's call passes. Not
+  taken: two overloads of each assertion, with and without a message, 14 bindings for 7.
+- **`assertNull` is `<T> assertNull(actual: T?)`** where Kotlin's takes `Any?`, since Kogo
+  has no `Any`; and `assertContains` is two overloads, a `List` and a `String`, without
+  Kotlin's `ignoreCase`. Each is added to when a test needs more.
+- **`tx.refusal` does not see a deferred constraint.** It releases its savepoint, and
+  Postgres checks a `deferrable initially deferred` constraint at commit, which a test's
+  transaction never reaches. Not taken: `set constraints all immediate` in the savepoint,
+  which stays in force for the rest of the test when the statement is accepted. Reopen
+  when a schema under test has a deferred constraint.
+
 ## Taken writing cusoon2's `main` on paper (DEV-903), not yet discussed
 
 - **`check-config` reads the file and builds every handle, and opens nothing**, as the

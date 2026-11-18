@@ -29,7 +29,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 		info: &Info{
 			Types: map[syntax.Node]Type{}, Uses: map[syntax.Node]Object{}, Calls: map[syntax.Node]*Call{},
 			Narrowed: map[*syntax.Ident]Type{}, Vars: map[syntax.Node][]*Var{}, Funcs: map[syntax.Node]*Func{},
-			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{}, SQL: map[*syntax.SQL]*Query{}, APIs: map[*syntax.API]*API{}, Core: core,
+			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{}, SQL: map[*syntax.SQL]*Query{}, APIs: map[*syntax.API]*API{}, Tests: map[*syntax.Tests]*TestList{}, Core: core,
 		},
 		pkgs: map[string]*pkg{}, members: map[string][]*Func{}, imports: map[*syntax.File]map[string]*pkg{},
 		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{}, reads: map[Object][]Object{},
@@ -51,6 +51,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 		c.optIn(f)
 	}
 	c.cycles(program)
+	c.testLists(program)
 	for i := 0; i < len(c.sigs); i++ {
 		c.sigs[i]()
 	}
@@ -78,6 +79,7 @@ type checker struct {
 	signer  Signatures
 	optIns  map[*syntax.File]map[*TypeDecl]bool // the markers each file opts in to
 	reads   map[Object][]Object                 // the top-level vals and the funs each val's value and each fun refers to
+	tested  map[*syntax.ValDecl]Type            // the Test<E> of each val a tests list names
 
 	// Where the checker is.
 	owner      Object // the val whose value, or the fun whose body, is being read
@@ -193,6 +195,9 @@ func (c *checker) missing(at syntax.Node, name string) Type {
 
 // visible reports whether the file at hand may name a declaration.
 func (c *checker) visible(v vis) bool {
+	if v.file != nil && v.file.IsTest() && !c.file.IsTest() {
+		return false
+	}
 	return v.visibility == "" || v.visibility == "private" && v.file == c.file || v.visibility == "internal" && v.Pkg == c.pkg.name
 }
 
@@ -200,6 +205,8 @@ func (c *checker) visible(v vis) bool {
 func (c *checker) see(at syntax.Node, name string, v vis) {
 	switch {
 	case c.visible(v):
+	case v.file != nil && v.file.IsTest() && !c.file.IsTest():
+		c.errorf(at, "not-visible", "%s is declared in the test file %s, which kogo emit leaves out of the program: move it out of there, or this use into a _test.kg file (spec.md 16)", name, v.file.Name)
 	case v.visibility == "private":
 		c.errorf(at, "not-visible", "%s is private to %s: remove private there, or move this use into that file", name, v.file.Name)
 	default:
@@ -230,6 +237,8 @@ func (c *checker) importAll(f *syntax.File) {
 		}
 		from, name := c.pkgs[imp.Name[:i]], imp.Name[i+1:]
 		switch {
+		case from != nil && testOnly[from.name] && !f.IsTest():
+			c.errorf(imp, "test-import", "package %s is for test files, those named _test.kg: move what uses %s into one (spec.md 16)", from.name, name)
 		case from == nil:
 			c.errorf(imp, "unknown-import", "there is no package %s", imp.Name[:i])
 		case from.named(name) == nil && slices.ContainsFunc(c.members[name], func(f *Func) bool { return f.Pkg == from.name }):
@@ -246,6 +255,9 @@ func (c *checker) importAll(f *syntax.File) {
 		}
 	}
 }
+
+// testOnly holds the prelude's packages that only a test file imports.
+var testOnly = map[string]bool{"kogo.test": true, "kotlin.test": true}
 
 func typeParams(ps []*syntax.TypeParam) []*TypeParam {
 	var out []*TypeParam
@@ -488,6 +500,12 @@ func (c *checker) addFunc(f *Func, receiver bool) {
 // declared gives the type a top-level val states, which it must
 // (spec.md section 5: inference works inside a function body only).
 func (c *checker) declared(d *syntax.ValDecl) Type {
+	if t := c.tested[d]; d.Type == nil && t != nil {
+		return t // a test, whose type its list gives (spec.md 16.1)
+	}
+	if d.Type == nil && c.file.IsTest() {
+		return c.errorf(d, "val-type", "the val %s states no type, and no tests list of this file names it: add it to the list, as tests name<Env> { %s }, or state its type (spec.md 16.1)", d.Name, d.Name)
+	}
 	if d.Type == nil {
 		return c.errorf(d, "val-type", "a top-level val states its type: val %s: Type", d.Name)
 	}

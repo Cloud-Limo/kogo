@@ -21,8 +21,10 @@ func kogo(t *testing.T, files map[string]string, out ...string) (code int, stdou
 		}
 	}
 	args := []string{"check", dir}
-	if out != nil {
+	if len(out) == 1 {
 		args = []string{"emit", dir, out[0]}
+	} else if len(out) == 2 { // out and the test main
+		args = []string{"test", dir, out[0], out[1]}
 	}
 	var stdoutText, fatal bytes.Buffer
 	code = run(args, &stdoutText, &fatal)
@@ -63,8 +65,8 @@ func examples(t *testing.T, patterns ...string) map[string]string {
 func TestExamples(t *testing.T) {
 	testDB(t)
 	files := examples(t, "*.kg")
-	if len(files) != 23 {
-		t.Fatalf("%d examples, want 23", len(files))
+	if len(files) != 24 {
+		t.Fatalf("%d examples, want 24", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)
@@ -287,6 +289,80 @@ func TestEmitPassesUnreadable(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if code := run([]string{"emit", src, dir}, &stdout, &stderr); code != 0 || stdout.Len() > 0 || stderr.Len() > 0 {
 		t.Errorf("exit %d, want 0\n%s%s", code, stdout.String(), stderr.String())
+	}
+}
+
+// failing is a test file of three tests: an assertion that fails
+// after a row is written, a statement Postgres refuses outside
+// tx.refusal, which is a bug, and one that passes only if both were
+// rolled back.
+const failing = `package example.ops
+
+import kogo.test.test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+
+tests failing<OpsEnv> { wrongSum, bug, clean }
+
+val wrongSum =
+    test("adds one and one") { tx, env ->
+        draft(tx, "F-1", null)
+        assertEquals(3L, 1L + 1L, "the sum")
+    }
+
+val bug =
+    test("writes one number twice") { tx, env ->
+        draft(tx, "F-2", null)
+        draft(tx, "F-2", null)
+    }
+
+val clean =
+    test("sees no row of a test that failed") { tx, env ->
+        assertNull(tx.queryOne<String>(sql"select number from invoice where number like 'F-%' limit 1"))
+    }
+`
+
+// kogo test runs the tests of examples/23_test.kg, which pass: among
+// them one that sees no row of the test before it, and one that a
+// refused statement gives a Refusal and leaves its transaction open.
+// A test that fails is printed with its sentence, where it is
+// declared and the line that failed, and the tests after it run; and
+// kogo emit leaves the test files out.
+func TestKogoTest(t *testing.T) {
+	testDB(t)
+	dir, err := os.MkdirTemp(".", "emitted") // inside the module, as in TestEmittedGoRuns
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	main, err := os.ReadFile("testdata/testmain.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	test := func(lists string, files map[string]string) (int, string) {
+		text := strings.NewReplacer("ROOT", "kogo/cmd/kogo/"+filepath.Base(dir), "LISTS", lists).Replace(string(main))
+		if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return kogo(t, files, dir, dir)
+	}
+	files := examples(t, "22_api.kg", "23_test.kg")
+	if code, out := test("ops.InvoiceTests", files); code != 0 || out != "" {
+		t.Errorf("exit %d, want 0 and no output\n%s", code, out)
+	}
+	files["failing_test.kg"] = failing
+	code, out := test("ops.Failing, ops.InvoiceTests", files)
+	want := `{"file":"failing_test.kg","line":9,"column":1,"code":"test-failed","test":"adds one and one","message":"the sum. Expected <3>, actual <2>.","at":"failing_test.kg:12"}
+{"file":"failing_test.kg","line":15,"column":1,"code":"test-failed","test":"writes one number twice","message":"ERROR: duplicate key value violates unique constraint \"invoice_number_key\" (SQLSTATE 23505)","at":"23_test.kg:16"}
+`
+	if code != 1 || out != want {
+		t.Errorf("exit %d, want 1\n got %s\nwant %s", code, out, want)
+	}
+	if code, out := kogo(t, files, dir); code != 0 || out != "" {
+		t.Fatalf("exit %d, want 0\n%s", code, out)
+	}
+	if text, err := os.ReadFile(filepath.Join(dir, "example/ops/kogo.go")); err != nil || bytes.Contains(text, []byte("InvoiceTests")) {
+		t.Errorf("kogo emit wrote the tests of a _test.kg file, or nothing: %v", err)
 	}
 }
 

@@ -19,7 +19,7 @@ only bindings write `external` (section 13), so no author meets it:
 
 - the `sql"""..."""` literal (section 10);
 - the `external` binding declarations (section 13);
-- the lists, such as `api` (section 15);
+- the lists, `api` (section 15) and `tests` (section 16);
 - `action fun`, a function that changes something outside (not yet
   in this spec: `doc/gates.md`).
 
@@ -40,13 +40,16 @@ import kogo.time.Instant
   Kotlin allows it.
 - A file holds any number of top-level declarations: functions, `val`
   constants, types, typealiases, marker annotations, `api` lists
-  (section 15).
+  (section 15) and, in a test file, `tests` lists (section 16).
 - `private` means this file. `internal` means this package. No modifier
   means public. There is no `protected`.
 - Comments: `//`, `/* */` and `/** */`. KDoc is kept as a comment.
 - The declarations of package `kogo` (section 12, and the functions of
   sections 8 and 9) are in scope in every file. The prelude's other
   packages, as `kogo.time`, are imported by name.
+- A file named `_test.kg` is a test file (section 16). It is in its
+  package as any file is, but only a test file may name what one
+  declares, or import from `kogo.test` or `kotlin.test`.
 
 ## 3. Types
 
@@ -231,7 +234,8 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
   take the value as a parameter.
 - Every top-level function states its parameter types and its return type.
   The return type may be omitted only for `Unit`. Inference works inside a
-  function body only, so a top-level `val` states its type too.
+  function body only, so a top-level `val` states its type too, but
+  for a test, whose list states it (16.1).
 - Default arguments and named arguments as in Kotlin. No `vararg`.
 - Generic functions take plain type parameters: no bounds, no `where`, no
   `reified`, no `inline`.
@@ -570,7 +574,7 @@ fun suppliersOf(tx: Tx, operatorId: ID): List<SupplierRow> =
 - A statement that fits on one line may be written `sql"..."`. Neither
   form has escapes.
 - A `sql"""` literal may only appear as the argument of one of the five
-  calls below. It is not a `String`, cannot be stored, concatenated or
+  calls below or, in a test file, of `tx.refusal` (10.8). It is not a `String`, cannot be stored, concatenated or
   built at run time. There are no SQL fragments in v0.
 - One statement per literal.
 
@@ -737,6 +741,35 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
   back to it on a failure. The block is in the raise scope around it,
   as any lambda is.
 
+### 10.8 A refused statement, in a test
+
+A statement Postgres refuses is a bug (section 8), and where a caller
+can meet the refusal the statement says so (10.6). A test of the
+schema itself, of a constraint or of what one tenant may not touch,
+wants to see the refusal. In a test file, and nowhere else:
+
+```kotlin
+val refusal = tx.refusal(sql"insert into invoice (id, number) values (${newId()}, 'INV-1')")
+assertEquals("23505", refusal?.sqlState)
+assertEquals("invoice_number_key", refusal?.constraint)
+```
+
+- `tx.refusal(sql"...")` runs one statement and gives a
+  `kogo.test.Refusal?`: `null` when Postgres accepted the statement,
+  and otherwise what it said, `sqlState: String` (the SQLSTATE, as
+  `23505`), `constraint: String?` (the constraint's name, `null` where
+  the refusal names none, as a `not null` does not) and
+  `message: String`.
+- The statement runs in a savepoint. A refusal rolls back to it, so
+  the transaction goes on and holds nothing of the statement; an
+  accepted statement's changes stay.
+- The literal is checked when the test is compiled, as `execute`'s is
+  and with its columns discarded: a statement that does not parse or
+  type is a compile error, not a `Refusal`.
+- It is a value, and nothing is caught: a refused statement anywhere
+  else in a test is the panic it is in the program, and fails the
+  test.
+
 ## 11. Markers
 
 A marker is a named permission that a declaration demands of the file
@@ -879,6 +912,22 @@ HTTP request, passed to an operation (section 15):
 `request.header(name): String?`, `request.cookie(name): String?` and
 `request.clientAddress: String`. A header's name is matched whatever
 its case. Kogo code does not build or change one.
+
+**Tests** (`kogo.test`, `kotlin.test`; test files only, section 16).
+`kogo.test` has `Test<E>`, `test(sentence) { tx, env -> ... }` and
+`Refusal` (10.8). `kotlin.test` has Kotlin's assertions, each imported
+by name: `assertEquals(expected, actual)`, `assertNotEquals(illegal,
+actual)`, `assertTrue(actual)`, `assertFalse(actual)`,
+`assertNull(actual)`, `assertContains(list, element)`,
+`assertContains(string, other)` and `fail(message)`. Each takes a last
+`message: String?`, which may be left out. One that fails panics
+(section 8) with Kotlin's message, and so fails its test:
+`assertEquals(3L, 2L)` with `Expected <3>, actual <2>.`, and with a
+message, `the sum. Expected <3>, actual <2>.`; `assertTrue` and
+`assertFalse` with the message alone where there is one. Values are
+compared as `==` compares them and written as `toString()` writes
+them. Another of Kotlin's assertions is added when a test first needs
+it. There is no `assertFails`: nothing catches a panic.
 
 ## 13. Bindings
 
@@ -1145,3 +1194,78 @@ export interface Ops {
 
 The code that calls `fetch` is the application's own, typed by this
 file.
+
+## 16. Tests
+
+A test is a value: a sentence that says what it shows, and a block
+that shows it. A test file names its tests in a `tests` list, and
+`kogo test` runs each in a transaction of its own.
+
+```kotlin
+package cusoon.invoice
+
+import kogo.test.test
+import kotlin.test.assertEquals
+
+tests ledgerTests<Env> { cardDiscount, noDiscountOnAccount }
+
+val cardDiscount =
+    test("applies the 5% card discount and makes a card invoice due at once") { tx, env ->
+        val invoice = issue(tx, env.clock, cardBooking(tx))
+        assertEquals(9975L, invoice.totalCents)
+    }
+```
+
+### 16.1 The list
+
+- A test file is one named `_test.kg`. `kogo check` and `kogo test`
+  read it with the rest of its package; `kogo emit` and `kogo ts`
+  leave it out, as Go leaves out a `_test.go`, so the program holds
+  nothing of its tests (section 2).
+- `tests name<Env> { a, b, c }` is a top-level declaration of a test
+  file, a list as `api` is (15.1). It names top-level vals of its own
+  file, each once and in one list, and at least one. The list may end
+  with a comma.
+- `Env` is the environment every test of the list takes: the
+  application's, as an operation's is (15.2), or `Unit` for none.
+- Each val a list names is a `Test<Env>`, and need not say so: this
+  is the one top-level val that states no type (section 5), since its
+  list states it. So `env` in the block has the list's type.
+- A test that no list names would never run, so it is a compile
+  error: a top-level val of a test file that states no type, or that
+  states `Test<...>`, stands in a list of its file.
+- `test(sentence) { tx, env -> ... }` makes a test. The sentence says
+  what the test shows, in the words a failure is reported with. The
+  block takes the `Tx` of the test's transaction and the environment,
+  and gives nothing.
+
+### 16.2 The run
+
+- `kogo test <dir> <out> <main>` checks the program with its test
+  files and, when it passes, writes its Go under `<out>` as `kogo
+  emit` does, tests included, then builds and runs the Go main
+  package in `<main>`. That main is the application's: it makes the
+  pool and the environment, as the server's main does, and hands the
+  lists to the runner. Each list is a Go value named as the list is.
+- Each test runs in a transaction of its own, which is rolled back
+  when the test ends, however it ends. A test sees the rows the
+  database began with and those it wrote, never another test's.
+- A test passes when its block returns. A panic fails it: a failed
+  assertion (section 12), a bug in the code it calls, a statement
+  Postgres refuses. Nothing catches a panic (section 8) but the
+  runner, once, when the test is over. The tests after it run.
+- An expected failure is tested as the value it is: call the fun and
+  compare its `Left` (section 9). A statement that Postgres must
+  refuse is seen with `tx.refusal` (10.8).
+- Each test that failed is printed as one JSON object a line: `file`,
+  `line` and `column` of the test's val, `code` (`test-failed`),
+  `test` (its sentence), `message` (the panic's) and `at`, the file
+  and line the panic came from. The exit status is 0 when every test
+  passed, 1 when one failed, 2 when the tests could not be run.
+
+### 16.3 The layout
+
+Every test is laid out one way: a break after `=`, `test("…") { tx,
+env ->` on the next line, one level in, and the body one level
+further. It is what ktfmt makes of the same Kotlin. Kogo has no
+formatter, so `examples/23_test.kg` is the rule.

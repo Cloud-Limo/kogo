@@ -55,7 +55,8 @@ type Query struct {
 // kogo's, the builtins among them.
 var timeTypes = map[string]bool{"Instant": true, "LocalDate": true, "LocalTime": true, "Duration": true}
 
-// sql checks one of the five calls of spec.md 10.2 and its literal:
+// sql checks one of the five calls of spec.md 10.2, or a test's
+// tx.refusal (10.8), and its literal:
 // the receiver is a Tx, each parameter's type maps to the type
 // Postgres infers for it, and the columns fill R.
 func (c *checker) sql(e *syntax.Call, lit *syntax.SQL) Type {
@@ -72,6 +73,13 @@ func (c *checker) sql(e *syntax.Call, lit *syntax.SQL) Type {
 		result = tBoolean
 	case "execute":
 		result = tInt
+	case "refusal":
+		if p := c.pkgs["kogo.test"]; p != nil && p.types["Refusal"] != nil {
+			result = nullable(&Named{Decl: p.types["Refusal"]})
+		}
+		if !c.file.IsTest() || result == nil {
+			result = c.errorf(sel, "test-only", "tx.refusal is a test file's, one named _test.kg: here a statement Postgres refuses is a bug, so say an expected conflict in the statement, as on conflict do nothing (spec.md 10.6)")
+		}
 	default:
 		q.Row = c.typ(e.TypeArgs[0])
 		result = map[string]Type{"query": &Named{c.prelude("List"), []Type{q.Row}}, "queryOne": nullable(q.Row), "querySingle": q.Row}[sel.Name]

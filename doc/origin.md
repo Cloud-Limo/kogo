@@ -4,11 +4,11 @@ DEV-909, 18 Nov 2026. The check Greg agreed that day in three rules
 (`decisions.md`, "Origin and CSRF"; `doc/main.md`, Q4), written out as
 cusoon2 would have it and read against the Kotlin at `691aa93cf`
 (`CusoonApp.kt`, `CusoonAppState.kt`, `model/database.kt`,
-`OriginCheckTest.kt`, cusoon2 PR 1473). It is not built. Its thirteen questions were answered on 18 Nov
-2026, Q1, Q3 and Q5 to Q8 by Greg and the rest by the lead, and
-DEV-915 wrote the answers into this document, the designs and
-`decisions.md`: "What changes" lists what is left, which is code,
-`spec.md` and cusoon2's Kotlin. Invented here: `rpc.Unserved`,
+`OriginCheckTest.kt`, cusoon2 PR 1473). It is not built. Its thirteen
+questions were answered on 18 Nov 2026, Q1, Q3 and Q5 to Q8 by Greg
+and the rest by the lead, and DEV-915 wrote the answers into this
+document, the designs and `decisions.md`: "What changes" lists what
+is left, which is code, `spec.md` and cusoon2's Kotlin. Invented here: `rpc.Unserved`,
 `rpc.NewUnserved`, `Table.Check`, `kogo.ReadOnlyTx`, the code
 `check-shape`, `toUuidOrNull`, and the name of every Kogo function
 but `sameSite` and `liveSession`. `fromOurPage` and `tokenMatches` are
@@ -229,8 +229,9 @@ two it was is in the response alone.
 
 **`main`.** No line of `doc/main.md`'s file changes: `handler` takes
 an `rpc.Table[app.Env]` and `NewCalls` takes `routes.Routes` as
-written there, `routes.Routes` now made by `rpc.NewUnserved`, and `opsOrigin` and `extraAllowedOrigins` are already
-properties of `Settings`.
+written there, `routes.Routes` now made by `rpc.NewUnserved`, and
+`opsOrigin` and `extraAllowedOrigins` are already properties of
+`Settings`.
 
 ## Part by part
 
@@ -265,59 +266,30 @@ check` or Go's compiler), at **start**, at **use**, or **never**.
 
 ## Answered
 
-Each was settled on 18 Nov 2026: Q1, Q3 and Q5 to Q8 by Greg, the rest
-by the lead, Q2 and Q13 told to Greg. `decisions.md` has each rule,
-why, what was not taken and what reopens it. Greg's were put in the
-order Q7, Q8, Q6, Q1, Q3, Q5, and Q6 c, an option of the session's
-that this document did not offer, reshaped Q7 and Q8.
+Each was settled on 18 Nov 2026, Greg's in the order Q7, Q8, Q6, Q1,
+Q3, Q5; `decisions.md` holds each one's why, what was not taken and
+what reopens it.
 
-- **Q1 (Greg). The check's handle: a, a `Tx`.** The server opens that
-  transaction for every request of the list, holds it to reading and
-  rolls it back; a check that takes a `Db` is `check-shape`.
-- **Q2 (lead; Greg is told). Which transaction: a, its own.** Once for
-  a request, before the request's, read only and rolled back. Q6 c
-  makes it safe for the token too (8).
-- **Q3 (Greg). The status of a refusal: b, 403.** `text/plain`, the
-  check's words, logged by its status. Asked after Q6 c, as one
-  question: both refusals are the check's, so the token's half (d, e)
-  is gone. cusoon2's Kotlin states 403 first.
-- **Q4 (lead). The printed table: c.** One line at the head of each
-  list, and a list with none says so:
-  `api booker   checked by fromOurPage   check reads session, tenant`;
-  `api routes   no check: not served to a browser`.
-- **Q5 (Greg). Origin `null`: b, refused always.** Passing it on
-  `same-origin` or `none` has a hole on Safari 16.4 to about 17.x,
-  which sent `none` for any request with no referrer (WebKit bug
-  256472). cusoon2's Kotlin drops its `null` branch first.
-- **Q6 (Greg). The token's cover: c, the check compares it.** Neither
-  of this document's options: the list's check makes the Origin's
-  check, then the token's, so the token covers what the Kotlin's does
-  (4), and `liveSession` compares nothing. It replaces rule 3 of the Q4
-  entry, "the token is the session reader's". The count this document
-  gave, "13 of the Query's 34", is 13 of 36 top-level fetchers at
-  `691aa93cf` by the session's count; the other 19 read the caller,
-  the session's nonce or a `require*`.
-- **Q7 (Greg). A mismatch where no session is needed: a, a refusal.**
-  Changed in form by Q6 c: the refusal is the check's, `liveSession`
-  gives `Session?`, and `whoAmI` and `maybeBooker` bind nothing for
-  the token.
-- **Q8 (Greg). One reader: b.** Every login reads its session in
-  `db.tx(serializable = true) { }`, as the Kotlin's do (7). Two readers
-  (a) at the first login that cannot; none is known.
-- **Q9 (lead). Where the check runs in `serve`: b, first,** as the
-  Kotlin (1). Reopen: a check whose cost on a 404 shows in the
-  `served` lines.
-- **Q10 (lead). Who holds "every read goes through the one
-  function": b, `private` in `session.kg`.** After Q6 c the token no
-  longer rests on it.
-- **Q11 (lead). A cookie that is no UUID: a, no session.** cusoon2's
-  Kotlin changes first.
-- **Q12 (lead). A route that calls an operation of a mounted list: a.**
-  `NewCalls` takes an `Unserved` alone; such an operation is listed in
-  `routes` too. Reopen: the first route that must call an operation
-  of a mounted list and cannot be listed in `routes`.
-- **Q13 (lead; Greg is told). `Unserved`'s fields: b, unexported,**
-  built by an emitted `rpc.NewUnserved(ops, enums)`.
+- **Q1** (Greg): a, the check takes a `Tx`, which the server opens.
+- **Q2** (the lead): a, the check's own transaction, read only.
+- **Q3** (Greg): b, a refused check is a 403, logged by its status
+  alone (the lead's, on PR 72).
+- **Q4** (the lead): c, one line at the head of each list, a list
+  with none included.
+- **Q5** (Greg): b, an Origin of `null` is refused always.
+- **Q6** (Greg): c, an option of the session's: the list's check
+  compares the token and `liveSession` nothing. "13 of the Query's
+  34" read 13 of its 36 top-level fetchers at `691aa93cf` (47
+  `override fun`, 11 nested in two answers).
+- **Q7** (Greg): a, a wrong token is a refusal everywhere; by Q6 c,
+  the check's.
+- **Q8** (Greg): b, one reader, each login's in a serializable
+  transaction.
+- **Q9** (the lead): b, the check first in `serve`, as the Kotlin.
+- **Q10** (the lead): b, `sessionId` `private` in `session.kg`.
+- **Q11** (the lead): a, a cookie that is no UUID is no session.
+- **Q12** (the lead): a, `NewCalls` takes an `Unserved` alone.
+- **Q13** (the lead): b, `Unserved`'s fields unexported.
 
 ## Open
 

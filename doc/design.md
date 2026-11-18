@@ -334,16 +334,16 @@ its UI framework.
 
 **Origin and CSRF** are designed in `doc/origin.md` and not built. A
 list names its check, which the handler runs first for every request
-of the list, before the name's 404 and the body, in a read-only
-transaction of its own that it rolls back; the check compares the
-Origin, then the CSRF token. A list that names none is a type of its
-own (`rpc.Unserved`, its fields unexported) that only `rpc.NewCalls`
-takes, so mounting it is a compile error. A refused check is answered
-403, `text/plain`, with the check's words, and logged by its status,
-so the `served` line tells it from a body that could not be read
-(`decisions.md`, 18 Nov 2026). Cookies are designed in `doc/gates.md` ("Ungated: logins and
-logout"), and workers and the time limits of outbound calls in
-`doc/work.md`.
+of the list, before the name's 404, the method's 405 and the body,
+in a read-only transaction of its own that it rolls back; the check
+compares the Origin, then the CSRF token. A list that names none is a
+type of its own (`rpc.Unserved`, its fields unexported) that only
+`rpc.NewCalls` takes, so mounting it is a compile error. A refused
+check is answered 403, `text/plain`, with the check's words, and
+logged by its status alone, so the `served` line tells it from a body
+that could not be read (`decisions.md`, 18 Nov 2026). Cookies are
+designed in `doc/gates.md` ("Ungated: logins and logout"), and
+workers and the time limits of outbound calls in `doc/work.md`.
 
 ## MVP steps
 

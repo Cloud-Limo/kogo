@@ -1170,7 +1170,8 @@ Each entry: what was decided, why, and what would reopen it.
 - **Origin and CSRF: the list names its check, and a list with none cannot be mounted**
   (18 Nov 2026, Greg; `doc/main.md`, Q4). They get an issue of their own, on paper first,
   that designs this and nothing wider:
-  1. **The list names its check** (`api booker checkedBy sameSite { ... }`).
+  1. **The list names its check** (`api booker checkedBy sameSite { ... }`; after Q6 c,
+     the check that makes both compares, `fromOurPage` in the session's names).
      `sameSite(tx, env, request): Either<String, Unit>` is one Kogo function that holds
      cusoon2's `verifyOrigin` (Sec-Fetch-Site, then Origin against the configured extras,
      the ops origin and the tenant table); after Q6 c the check the list names makes the
@@ -1181,7 +1182,8 @@ Each entry: what was decided, why, and what would reopen it.
      as a Go type the handler cannot mount and only `rpc.Call` accepts, so mounting it is
      a compile error in `main`. In cusoon2 that is `api routes` alone (logout and the
      webhook's operation, which have no Origin check in the Kotlin either); `booker`, `ops`
-     and `storefront` each name `sameSite`.
+     and `storefront` each name `sameSite` (after Q6 c, the check that makes both
+     compares, `fromOurPage` in the session's names).
   3. **Replaced by Q6 c (18 Nov 2026, Greg; the entry "The list's check makes the token's
      compare too").** It read: "The token is the session reader's. The one Kogo function
      that turns a cookie into a session (`liveSession`) compares `X-CSRF-Token` with the
@@ -1388,14 +1390,18 @@ Each entry: what was decided, why, and what would reopen it.
     read, which is a 400. No client reads the number.
   - **Accepted cost.** It differs from the Kotlin by the number, so cusoon2's Kotlin
     changes first, under its tests: the two throws of `HttpClientException`
-    (`CusoonApp.kt:368`, `:407`) state 403. A guess, 2 / 2. The log line is 403 for either
-    refusal and the handler logs no refusal's words, so which of the two it was is in the
-    response alone (the session's reading, not decided; the lead may log the check's
-    words, being the application's constants and no input).
+    (`CusoonApp.kt:368`, `:407`) state 403. A guess, 2 / 2.
   - Not taken: (a) 400, as the Kotlin, which the log cannot tell from a bad body; (c) 200
     and `{"type":"refused",...}`, which the page shows as an operation's words, and which
     changes both clients.
   - No reopen condition was given.
+  - **The `served` line logs a check's status alone** (18 Nov 2026, the lead; the Ruling
+    on PR 72, item 11 of its Review). The log line is 403 for either refusal and the
+    handler logs no refusal's words; which of the two it was is in the response. Why:
+    Kogo cannot hold a check's `Left` to constants, so logging it would let a check that
+    writes `"Invalid origin $origin"` put input in the log. Not taken: (b) logging the
+    `Left`, about 1 line of `rpc`. Reopen: a refused check that cannot be diagnosed from
+    its status and the response.
 - **An Origin of `null` is refused always** (18 Nov 2026, Greg; `doc/origin.md`, Q5 b).
   The check refuses a request whose `Origin` is `null`, whatever `Sec-Fetch-Site` says.
   `sameSite` has no line for `null`: it falls to the last test, where it is no setting's

@@ -362,7 +362,8 @@ days after a deploy). **Never** means no test sees it.
 | [4] the lists at their paths | 10 | a list: ⅓ | a path that does not match nginx's or the TypeScript client's | use: 404 |
 | | | | a list left out | use: 404; nothing else, since a list's TypeScript still compiles |
 | [4] Origin and CSRF | 0 | nothing: the check is the list's, in Kogo | a list that names no check mounted | build (Q4) |
-| | | | the check not designed yet | this `main` serves no browser until the issue that designs it lands |
+| | | | a `Table` built from `routes`' operations | build: `Unserved`'s fields are unexported (`doc/origin.md`, Q13) |
+| | | | the check not built yet | this `main` serves no browser until its code lands (DEV-914); designed in `doc/origin.md` |
 | [4] the client's address | 8 | nothing | X-Forwarded-For, or the server not on loopback | never: a client picks its own address |
 | | | | `behindProxy` left out | use: every request is 127.0.0.1, and everyone shares one per-address login limit |
 | [4] the limit, the body's limit, the drain | 17 | nothing | no `ReadHeaderTimeout`, `MaxBytesHandler` or drain | use, under load or at a deploy: a stop cuts requests mid-way |
@@ -391,8 +392,8 @@ or logout sets is Kogo's (`Reply`); a route's Go writes them only
 because it answers with a redirect. The tenant from the host or
 `X-Dev-Tenant`, `isSecure`, the session from its cookie, the
 storefront an ops admin's call is for (`X-Storefront`, Q5): each is a
-gate's reading of the `Request`. Origin and CSRF are the list's check
-and the session reader's (Q4). The ten settings are properties of
+gate's reading of the `Request`. Origin and CSRF are both the list's
+check (Q4; `doc/origin.md`, Q6). The ten settings are properties of
 `Settings`, which Kogo declares. The login callback goes with Google's
 login (`doc/gates.md`, "Routes that are not operations"), so
 `clientSecret` and `backendServer`, which it reads, are ignored here.
@@ -463,7 +464,8 @@ of them:
 - **Rules a reviewer holds**, since nothing checks them: `main` builds
   `Env` by the chain and never as `app.Env{}`; no secret is a setting.
 - **Added to the prelude**: `NewHandler` gains the clock ("How it is
-  tested"); `rpc.Call`, `rpc.NewCalls` and `rpc.SetCookies` (Q1, Q4);
+  tested"); `rpc.Call`, `rpc.NewCalls`, `rpc.Unserved` with
+  `rpc.NewUnserved`, and `rpc.SetCookies` (Q1, Q4);
   `rpc.ReadSettings` (settings); `khttp.New`, with a handle's query
   fields (Q2). `rpc.Request` stays impossible to make outside `rpc`.
 - **Added to the emitter**: an `_op` value for each operation (Q1),
@@ -487,10 +489,12 @@ their own issues is in their entries.
   `khttp.New` requires `MaxAnswer`.
 - **Q3 (lead). Where `Stripe-Version` is stated: b.** A `val` in
   `stripe.kg`, read by `main` from the emitted Go.
-- **Q4 (Greg). Origin and CSRF: c, an issue of its own.** It starts
+- **Q4 (Greg). Origin and CSRF: c, an issue of its own.** It started
   from three rules: the list names its check; a list that names none
-  cannot be mounted; the token is the session reader's. This `main`
-  serves no browser until that issue's design lands.
+  cannot be mounted; the token is the session reader's, which Q6 c of
+  `doc/origin.md` replaced: the list's check compares the token too.
+  The design is `doc/origin.md`, its thirteen questions answered on 18
+  Nov 2026; this `main` serves no browser until its code lands.
 - **Q5 (Greg). The storefront of an ops admin's call: a header.**
   Neither of the two options: one shared gate of `api storefront`
   reads `X-Storefront`, and the list is mounted at one fixed path.

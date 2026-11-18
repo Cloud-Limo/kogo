@@ -1173,7 +1173,8 @@ Each entry: what was decided, why, and what would reopen it.
   1. **The list names its check** (`api booker checkedBy sameSite { ... }`).
      `sameSite(tx, env, request): Either<String, Unit>` is one Kogo function that holds
      cusoon2's `verifyOrigin` (Sec-Fetch-Site, then Origin against the configured extras,
-     the ops origin and the tenant table). The handler runs it before
+     the ops origin and the tenant table); after Q6 c the check the list names makes the
+     token's compare too (`fromOurPage`, the session's name). The handler runs it before
      every operation of the list, ungated ones and `gatedBy anyone` included. `main` has
      no line for it.
   2. **A list that names no check cannot be served to a browser.** The emitter writes it
@@ -1181,21 +1182,26 @@ Each entry: what was decided, why, and what would reopen it.
      a compile error in `main`. In cusoon2 that is `api routes` alone (logout and the
      webhook's operation, which have no Origin check in the Kotlin either); `booker`, `ops`
      and `storefront` each name `sameSite`.
-  3. **The token is the session reader's.** The one Kogo function that turns a cookie into
-     a session (`liveSession`) compares `X-CSRF-Token` with the row's token, so every gate
-     and login that reads a session has the check and none writes a line for it.
+  3. **Replaced by Q6 c (18 Nov 2026, Greg; the entry "The list's check makes the token's
+     compare too").** It read: "The token is the session reader's. The one Kogo function
+     that turns a cookie into a session (`liveSession`) compares `X-CSRF-Token` with the
+     row's token, so every gate and login that reads a session has the check and none
+     writes a line for it." The token is now compared by the list's check, before every
+     operation of the list, and `liveSession` compares nothing.
   cusoon2's `main` serves no browser until it lands. A guess, built: checker 20, emitter
   10, `rpc` 25, tests 40, and spec 15.1 and 15.2, whose "Nothing runs before an
   operation" it amends.
   - **Why.** Each check is written once, in Kogo; no operation, gate or login repeats a
     line or can forget one; and "has the check" is the same set as "served to a browser",
     so the guarantee is by construction and no reviewer holds it.
-  - **Accepted cost.** A word on the list; one more issue and PR before code; the token
-    check holds only while every read of a session goes through the one function, which a
-    reviewer of the gates' file holds and the checker does not.
-  - **Left to the issue:** whether the check takes a `Tx` or a `Db` and runs in its own
-    transaction, as the Kotlin's does; the status of a refusal (the Kotlin answers 400);
-    how the printed table shows it; Origin `null`.
+  - **Accepted cost.** A word on the list; one more issue and PR before code. (It also
+    read: "the token check holds only while every read of a session goes through the one
+    function, which a reviewer of the gates' file holds and the checker does not"; gone
+    with rule 3 under Q6 c, and Q10 b makes the reader `private` to `session.kg`.)
+  - **Left to the issue, and answered there** (`doc/origin.md`, DEV-909; recorded by
+    DEV-915): the check takes a `Tx` (Q1 a) and runs in its own transaction (Q2 a); a
+    refusal is a 403 (Q3 b); the printed table has a line for each list (Q4 c); Origin
+    `null` is refused always (Q5 b). Each has its entry below.
   - Not taken: Sec-Fetch-Site in Go in `main` with Origin and the token in the session
     gates, which do not run for a login or a public read, and the login is the case
     `verifyOrigin` was written for (cusoon2 PR 1473); a handler option in `main` that
@@ -1287,6 +1293,178 @@ Each entry: what was decided, why, and what would reopen it.
     not before (Q11): the Kotlin's reader, the deploy script's `jq` and each file first.
   - **Waiting for a connection is left at the request's limit** (Q12). Reopen if a full
     pool is ever seen to hold requests.
+- **The list's check makes the token's compare too; the session reader compares nothing**
+  (18 Nov 2026, Greg; `doc/origin.md`, Q6 c). The function a list names with `checkedBy`
+  makes both checks: the Origin's, then the token's. The token's compare reads the
+  session's row by the cookie's id and compares its `csrf_token` with `X-CSRF-Token`, a
+  missing header reading as `""`; no cookie, or no row, passes. So every operation of a
+  mounted list has it, one that reads no session included. `liveSession` compares nothing
+  and gives `Session?`. It replaces rule 3 of the Q4 entry ("the token is the session
+  reader's"). As shown to Greg, with the session's names `fromOurPage` and `tokenMatches`,
+  not decided: `fromOurPage` binds `sameSite`, then `tokenMatches`, and
+  `api booker checkedBy fromOurPage`.
+  - **Why.** It covers exactly what the Kotlin covers (every request of the three routes
+    that carries a session, the 13 public reads and the four bearer links included, an
+    expired session and another tenant's included), so cusoon2 does not change for it.
+    "Has both checks" is the same set as "served to a browser", by construction: the
+    reason given on 18 Nov for the Origin's rule. No gate, login or operation writes a line
+    for it or can drop it.
+  - **Accepted cost.** One more `select` of the session for each request that carries one,
+    which the Kotlin also makes (`checkCsrfToken`, then `ensureSession`). A new list must
+    name the right check: a reviewer holds it, on the list's first line. The compare is not
+    written in any operation or gate.
+  - Not taken: (a) accept that the 17 keep the Origin check alone, sound since they read no
+    session, but the port then differs from the Kotlin, which would change first (a guess,
+    10 / 3) or the difference be recorded; (b) one line in `anyone` and in each of the four
+    bearer gates, five places to forget and one more `select` on each public read. Option c
+    was the session's, not among those weighed on 18 Nov.
+  - No reopen condition was given.
+- **A wrong token is a refusal, where no session is needed too** (18 Nov 2026, Greg;
+  `doc/origin.md`, Q7 a). A session whose token does not match the request's
+  `X-CSRF-Token` is a refusal wherever it is read, `whoAmI` and the `maybeBooker` reads
+  included. **Changed in form by Q6 c, and Greg was told so before he chose it:** the
+  refusal is the list's check's, `liveSession` gives `Session?` as `doc/gates.md` wrote it,
+  and `whoAmI` and `maybeBooker` bind nothing for the token. The answer as first given,
+  `liveSession` giving `Either<String, Session?>` that `whoAmI` and `maybeBooker` bind, is
+  replaced by Q6 c, and its accepted cost (a caller's `.getOrNull()` where `.bind()`
+  belongs answering a forged request as a stranger) is gone with it.
+  - **Why.** It is what the Kotlin does (`checkCsrfToken`, a 400 whatever the operation),
+    so nothing in cusoon2 changes first; and a forged request, or a bug of the page that
+    drops the header, shows as an error and not as the person being logged out by
+    `whoAmI`.
+  - Not taken: (b) `liveSession` gives `Session?` and folds a wrong token into "no
+    session". A gate that needs a person would answer "not logged in", `whoAmI` would make
+    a new session and log the person out, and cusoon2's Kotlin would change first.
+  - No reopen condition was given.
+- **One reader of a session; every login reads its session in a serializable
+  transaction** (18 Nov 2026, Greg; `doc/origin.md`, Q8 b; `doc/gates.md`, "Two kinds of
+  transaction"). `liveSession` takes a `SerializableTx` and is the only reader of a
+  session. A login, which opens its own transactions, reads its session in
+  `db.tx(serializable = true) { }`; one that holds a plain `Tx` there is refused by
+  `needs-serializable`.
+  - **Why.** It is what the Kotlin does for every login that stays (`ensureSession` and
+    `ensureOpsSession`, no lock, in the request's one SERIALIZABLE transaction,
+    `CusoonAppState.kt:252`, `:277`, `:299`; the one locked read is the Google callback's,
+    `CusoonApp.kt:243`, which goes with the Google login), so a port sends the Kotlin's
+    statements. A rerun is safe: nothing marked `@Acts` runs in a transaction. It was
+    first also that the token's compare stays in one function; **after Q6 c** (Greg was
+    told) that reason weakens, since the compare is no longer in the reader. What remains
+    is one reader, the Kotlin's statements, and no reader without a caller.
+  - Not taken: (a) two readers, `liveSession` and `lockedSession(tx: Tx, ...)` with `for
+    update`, over one private function: about 6 lines of cusoon2's port for a reader with
+    no caller today.
+  - Reopen (put to Greg with the recommendation, and not objected to): (a) is taken at the
+    first login that cannot read its session in a serializable transaction. None is known.
+- **A list's check takes a `Tx`, which the server opens** (18 Nov 2026, Greg;
+  `doc/origin.md`, Q1 a). A list's check takes a `Tx` as its first parameter. The server
+  opens that transaction for every request of the list, holds it to reading, and rolls it
+  back. A check that takes a `Db` is `check-shape`. Code: a read-only transaction in the
+  prelude (`kogo.ReadOnlyTx` in the sketch), a guess of 10 / 10 inside the 18 Nov
+  estimate.
+  - **Why.** It is the gate's rule one step earlier: code the server runs in front of an
+    operation reads and decides, and Postgres holds it to that (principle 1). The opening
+    is stated by the `Tx` in the signature, as an operation's and a gate's is. After Q6 c
+    most requests read (the token for any that carries a session, the tenant's table for
+    any tenant's page), so little is opened for nothing. Greg asked whether this was the
+    Kogo / Go seam or splitting hairs; the session's answer, which he took: not the seam,
+    which is the same in both, mostly splitting hairs and cheap to change later.
+  - **Accepted cost.** An empty transaction for a request the check reads nothing for: no
+    session, and an Origin absent or matched by a setting (curl, a test, the ops page's
+    first call). "Read only, rolled back" is the spec's to say and is not written in the
+    check.
+  - Not taken: (b) a `Db`, the check opening a transaction where it reads, as the Kotlin's
+    Origin read does. Nothing would hold the check to reading, a tenant's page with a
+    session would open two transactions unless the author threads one through, and each
+    would commit.
+  - No reopen condition was given.
+- **A refused check is a 403** (18 Nov 2026, Greg; `doc/origin.md`, Q3 b). A check's
+  refusal is answered 403, `text/plain`, with the check's words ("Invalid origin",
+  "Invalid CSRF token"), and logged by its status. It is not an operation's refusal: the
+  page gets a failure, not words to show. Asked after Q6 c as one question, so the token's
+  half (d, e) was not asked and is gone.
+  - **Why.** A refused check is a forged request or a bug of ours, never the person's
+    mistake, so the page treats it as a failure, as cusoon2's clients do today (`rpc.ts:33`,
+    Apollo's `HttpLink`). And the `served` line tells it from a body that could not be
+    read, which is a 400. No client reads the number.
+  - **Accepted cost.** It differs from the Kotlin by the number, so cusoon2's Kotlin
+    changes first, under its tests: the two throws of `HttpClientException`
+    (`CusoonApp.kt:368`, `:407`) state 403. A guess, 2 / 2. The log line is 403 for either
+    refusal and the handler logs no refusal's words, so which of the two it was is in the
+    response alone (the session's reading, not decided; the lead may log the check's
+    words, being the application's constants and no input).
+  - Not taken: (a) 400, as the Kotlin, which the log cannot tell from a bad body; (c) 200
+    and `{"type":"refused",...}`, which the page shows as an operation's words, and which
+    changes both clients.
+  - No reopen condition was given.
+- **An Origin of `null` is refused always** (18 Nov 2026, Greg; `doc/origin.md`, Q5 b).
+  The check refuses a request whose `Origin` is `null`, whatever `Sec-Fetch-Site` says.
+  `sameSite` has no line for `null`: it falls to the last test, where it is no setting's
+  origin and no tenant's domain.
+  - **Why.** Passing `null` on the browser's `same-origin` or `none` has a hole on Safari
+    16.4 to about 17.x, which sent `none` for any request with no referrer (WebKit bug
+    256472): another site's `no-referrer` frame posts as `null` with `none`, the request
+    PR 1473 was written to refuse. Refusing `null` always closes it, is one line fewer with
+    no line to get wrong, and breaks nothing cusoon2 ships: its calls are `fetch()` in the
+    default mode, which sends the real Origin, and no page of it sets a referrer policy.
+    Answered after research Greg ran, which moved the session's recommendation from a to b.
+  - **Accepted cost.** A form post, or a `no-cors` fetch, from a page of our own that sets
+    `Referrer-Policy: no-referrer` would get the 403. It differs from the Kotlin, so
+    cusoon2's Kotlin changes first, under its tests: `verifyOrigin` loses its `null` branch
+    (`CusoonApp.kt:411` to `:416`) and `OriginCheckTest`'s `verify("null", "same-origin")`
+    becomes a refusal. About 4 lines fewer, 1 test changed. When cusoon2 makes that fix is
+    not decided: it is a hole in production today if the research is right, and need not
+    wait for Kogo.
+  - Not taken: (a) as the Kotlin, `null` passes when `Sec-Fetch-Site` is there, and the
+    hole stays; (c, the session's) `null` passes only with `same-origin`, never `none`,
+    which also closes the hole and keeps a line that must be right for a form cusoon2 does
+    not have.
+  - No reopen condition was given.
+- **The rest of the Origin check, answered by the lead** (18 Nov 2026, the lead, not
+  Greg; `doc/origin.md`, Q2, Q4 and Q9 to Q13). Q2 and Q13 were told to Greg.
+  - **The check runs in its own transaction** (Q2 a): once for a request, before the
+    request's, read only and rolled back. Why: a `Db` operation and one run wholly outside
+    have no transaction of the server's for it to join, so (b) needs (a) anyway; and under
+    (b) the check reruns with the operation and its reads join a SERIALIZABLE read set.
+    Q6 c makes it safe for the token too: a row's token is set when the row is made and
+    never updated (`database.kt:1848` is its only write), and a login deletes the row and
+    makes another, so a compare made before the request's transaction cannot go stale.
+    Accepted cost: a second transaction for each request with a check, one after the
+    other; the token is compared once and not on each rerun, where the Kotlin compares it
+    on each. Not taken: (b) the request's transaction, in the gate's savepoint.
+  - **The printed table has one line at the head of each list, and a list with none says
+    so** (Q4 c): `api booker   checked by fromOurPage   check reads session, tenant`;
+    `api routes   no check: not served to a browser`. Why: the absence is what a reviewer
+    looks for. Not taken: (a) without the line for a list that has none; (b) a `check
+    reads` line on every operation.
+  - **The check runs first in `serve`, as the Kotlin** (Q9 b): before the name's 404 and
+    the method's 405, so a stranger's request to an unknown name is refused, not a 404.
+    Why: (a) differs from the Kotlin, so cusoon2 would change first, or the comparison
+    record a difference, to save an empty read-only transaction on a path that is not
+    there. Not taken: (a) after the name and the method. Reopen: a check whose cost on a
+    404 shows in the `served` lines.
+  - **`sessionId` and the cookie's name are `private` to `session.kg`** (Q10 b), which
+    exports `tokenMatches`, `liveSession` and `endSession`. After Q6 c the token no longer
+    rests on "every read goes through the one function", so this is cheap tidiness. A
+    second `select ... from session` elsewhere is a reviewer's. Not taken: (a) a reviewer
+    alone.
+  - **A cookie that is no UUID is no session** (Q11 a). It is met first in the check:
+    `tokenMatches` passes it and `liveSession` gives null, so the browser is given a new
+    session. Why: under the Kotlin's 400 a browser holding such a cookie is refused on
+    every request until the cookie is cleared, `whoAmI` included. Accepted cost: it differs
+    from the Kotlin, which changes first, in the same cusoon2 PR as Q3 and Q5 (a guess,
+    2 / 1). Not taken: (b) a refusal.
+  - **`NewCalls` takes an `Unserved` alone** (Q12 a); an operation a route calls is listed
+    in `routes` too (spec 15.1 lets a fun stand in two lists). cusoon2 has no such route.
+    Not taken: (b) `NewCalls` taking a `Table` and skipping its check. Reopen: the first
+    route that must call an operation of a mounted list and cannot be listed in `routes`.
+  - **`Unserved`'s fields are unexported** (Q13 b). The emitter writes
+    `rpc.NewUnserved(ops, enums)`, so `main` cannot lift `routes`' operations into a
+    `Table` it mounts; a `Table` of operations `main` writes itself, or a check that always
+    passes, stays a reviewer's. `NewHandler` still panics on a nil `Check`. Why: rule 2 of
+    the Q4 entry asks for "by construction", and this is the most Go gives for about 4
+    lines of `rpc`. Not taken: (a) exported fields.
+  - **Not asked, and still not:** the request's `Content-Type`, left "with the CSRF
+    checks"; open in `doc/origin.md`.
 
 ## Taken in the v0 spec, not yet discussed
 

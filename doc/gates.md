@@ -59,13 +59,18 @@ A row of an `api` list is an operation and its gate, or an operation
 marked `ungated`:
 
 ```kotlin
-api booker {
+api booker checkedBy fromOurPage {
     setBookingNotes     gatedBy setBookingNotesGate
     drivers             gatedBy admin
     areas               gatedBy anyone
     completeEmailLogin  ungated
 }
 ```
+
+`checkedBy` names the list's check, which the server runs before
+every row, ungated ones included: the Origin's check, then the CSRF
+token's (`doc/origin.md`; `decisions.md`, 18 Nov 2026). A list that
+names none is served to no browser.
 
 ### A gate and its work are two functions
 
@@ -114,6 +119,9 @@ fun setNotes(booking: HeldBooking, notes: String) {
 
 For one request the server:
 
+0. runs the list's check first, in a read-only transaction of its own
+   that it rolls back, and on a refusal answers 403 with its words
+   (`doc/origin.md`);
 1. reads the body into the work's input type, or answers 400;
 2. opens the transaction and calls the gate with it, the environment,
    the request and the input;
@@ -300,7 +308,7 @@ two dialects and put the safety outside the source.
 What cusoon2 leaves without a gate is three things, and two of them
 have one.
 
-- **A tenant's public reads** (about 16: areas, branding, place
+- **A tenant's public reads** (13 gated by `anyone`: areas, branding, place
   suggestions). Nobody logs in, but the read is of one tenant:
   `gatedBy anyone`, whose proof is `AtTenant`.
 - **Bearer links** (4: an invoice, a charge, a payment link, a new
@@ -537,9 +545,13 @@ areas               anyone
 completeEmailLogin  ungated
                     reads        booker, session
                     writes       login_attempt, session
-                    locks        session
                     acts         idp.redeemEmailCode
 ```
+
+Each list's own line heads its rows: `api booker   checked by
+fromOurPage   check reads session, tenant`, and for a list with none
+`api routes   no check: not served to a browser`, since the absence
+is what a reviewer looks for (`doc/origin.md`, Q4).
 
 The file enforces nothing: it is what a reviewer reads.
 
@@ -689,7 +701,10 @@ class may implement an interface's `val` with a type that fits it.
 
 **For a port of cusoon2.** The gates and proofs of its requests say
 `SerializableTx`, as the examples above do, and the daemon's
-functions say `Tx`. Each read of the daemon's writes its lock in its
+functions say `Tx`. A session has one reader, `liveSession`, on a
+`SerializableTx`: a login reads its session in
+`db.tx(serializable = true) { }`, as each login of the Kotlin does,
+and none locks it (`doc/origin.md`, Q8). Each read of the daemon's writes its lock in its
 statement, where the Kotlin's flag added it out of sight. A read used
 both ways becomes two functions, so that a request sends the
 statement the Kotlin sends. About 30 reads of `database.kt` go

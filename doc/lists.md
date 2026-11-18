@@ -37,6 +37,7 @@ A function the runtime calls takes, in this order:
 
 | Role | List | Runs in | After the environment it takes | Gives |
 | --- | --- | --- | --- | --- |
+| check | `api` | a `Tx`, reading only, rolled back | the request | nothing, or a refusal |
 | gate | `api` | a `SerializableTx` or `Tx`, reading only | the request; the input, if it reads one | a proof, or a refusal |
 | work | `api` | the proof's transaction | the proof; the input | the answer |
 | outside | `api` | nothing (`@Acts`) | the proof; the input | nothing, or the answer where there is no work |
@@ -64,7 +65,7 @@ is owed.
 - **The spec states lists once**: one section with the rule and the
   table, and in each list's section only what is its own.
 - **The checker is driven by the table**: one piece of code that fits
-  stages, with the fourteen rows as data, and no rule written by hand
+  stages, with the fifteen rows as data, and no rule written by hand
   for each list.
 - **The next list is a row**, or a few, and not a section.
 - **The spelling has at most two forms** (DEV-894 decides it): a list

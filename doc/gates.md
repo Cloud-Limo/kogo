@@ -59,13 +59,18 @@ A row of an `api` list is an operation and its gate, or an operation
 marked `ungated`:
 
 ```kotlin
-api booker {
+api booker checkedBy fromOurPage {
     setBookingNotes     gatedBy setBookingNotesGate
     drivers             gatedBy admin
     areas               gatedBy anyone
     completeEmailLogin  ungated
 }
 ```
+
+`checkedBy` names the list's check, which the server runs before
+every row, ungated ones included: the Origin's check, then the CSRF
+token's (`doc/origin.md`; `decisions.md`, 18 Nov 2026). A list that
+names none is served to no browser.
 
 ### A gate and its work are two functions
 
@@ -114,6 +119,9 @@ fun setNotes(booking: HeldBooking, notes: String) {
 
 For one request the server:
 
+0. runs the list's check first, in a read-only transaction of its own
+   that it rolls back, and on a refusal answers 403 with its words
+   (`doc/origin.md`);
 1. reads the body into the work's input type, or answers 400;
 2. opens the transaction and calls the gate with it, the environment,
    the request and the input;
@@ -300,9 +308,9 @@ two dialects and put the safety outside the source.
 What cusoon2 leaves without a gate is three things, and two of them
 have one.
 
-- **A tenant's public reads** (about 16: areas, branding, place
-  suggestions). Nobody logs in, but the read is of one tenant:
-  `gatedBy anyone`, whose proof is `AtTenant`.
+- **A tenant's public reads** (13 gated by `anyone`: areas,
+  branding, the default area). Nobody logs in, but the read is of one
+  tenant: `gatedBy anyone`, whose proof is `AtTenant`.
 - **Bearer links** (4: an invoice, a charge, a payment link, a new
   booker's secret). The secret in the input is the credential, and its
   gate gives the proof of that one thing.
@@ -536,10 +544,14 @@ areas               anyone
                     reads        area
 completeEmailLogin  ungated
                     reads        booker, session
-                    writes       login_attempt, session
-                    locks        session
+                    writes       booker, session
                     acts         idp.redeemEmailCode
 ```
+
+Each list's own line heads its rows: `api booker   checked by
+fromOurPage   check reads session, tenant`, and for a list with none
+`api routes   no check: not served to a browser`, since the absence
+is what a reviewer looks for (`doc/origin.md`, Q4).
 
 The file enforces nothing: it is what a reviewer reads.
 
@@ -575,8 +587,8 @@ The file enforces nothing: it is what a reviewer reads.
 - **`locks` is a row lock, of any strength**, printed where there is
   one. Postgres reports a `select ... for update` as needing update on
   the table, as an `update` does, and marks the lock apart, which is
-  how the two are told. cusoon2's requests take no locks; its logins
-  and its daemon do.
+  how the two are told. cusoon2's requests take no locks; its daemon
+  and the Google login's callback do.
 - **`asks` and `acts` are the calls to outside services**, each by
   the name of the application's function that makes it: one that
   calls `ask` itself, or a binding marked `@Acts` itself. It is
@@ -614,8 +626,9 @@ run: a cascade, a trigger and `for no key update`.
 ## Two kinds of transaction
 
 cusoon2 runs its requests at SERIALIZABLE with no locks, and reruns
-one on a conflict; its daemon, logins and logout run at READ
-COMMITTED and lock what they read. Most programs work the second way
+one on a conflict; its daemon and the Google login's callback run at
+READ COMMITTED and lock what they read; logout deletes by the cookie's
+id. Most programs work the second way
 throughout. In the Kotlin a flag on `Model`, read as a statement is
 built (`withLocking`), decides whether a read locks, so one call
 sends three statements:
@@ -689,11 +702,15 @@ class may implement an interface's `val` with a type that fits it.
 
 **For a port of cusoon2.** The gates and proofs of its requests say
 `SerializableTx`, as the examples above do, and the daemon's
-functions say `Tx`. Each read of the daemon's writes its lock in its
-statement, where the Kotlin's flag added it out of sight. A read used
-both ways becomes two functions, so that a request sends the
-statement the Kotlin sends. About 30 reads of `database.kt` go
-through the flag; how many are used both ways was not counted.
+functions say `Tx`. A session has one reader, `liveSession`, on a
+`SerializableTx`: a login reads its session in
+`db.tx(serializable = true) { }`, as each login of the Kotlin does,
+and none locks it (`doc/origin.md`, Q8). Each read of the daemon's
+writes its lock in its statement, where the Kotlin's flag added it
+out of sight. A read used both ways becomes two functions, so that a
+request sends the statement the Kotlin sends. About 30 reads of
+`database.kt` go through the flag; how many are used both ways was not
+counted.
 
 **What a gate on a `Tx` loses.** The server cannot put it in
 Postgres's read-only mode, which refuses a lock as it refuses a

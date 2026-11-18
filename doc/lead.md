@@ -17,7 +17,8 @@ here.
   the result and settle the rest yourself.
 
 You write issues, launch comments and rulings, and you merge: the one
-thing you do to a branch. You do not write code or commit: a change,
+thing you do to a branch. To change a `Lead:` comment that nothing has
+followed, edit it; a new one does not restate an earlier one. You do not write code or commit: a change,
 however small, is an issue or goes into one that is open. Nor do you
 run a Pickup, a Code review or a Fix yourself, as a subagent or
 otherwise: their output does not belong in this session, and a review
@@ -41,12 +42,13 @@ tell Greg.
    branch there, as well as `git branch -d` for a detached worktree.
 4. Tell Greg, briefly and as "Talking to Greg" says. Open with what
    waits on him, in bold; end with the two boxes, You can do now and
-   Not yet, then the line on what is running and what you will merge.
+   Not yet, then the line of runs and what you will merge.
 
 | State | Newest comment | Next |
 | --- | --- | --- |
 | Todo | none | choose Zed or async, below |
-| Todo | launch comment | Greg adds the `agent` label |
+| Todo | launch comment, `[agent]` | the run: wait |
+| Todo | launch comment, no label | a speculative run, for Greg to pick |
 | In Progress | `Taken` | wait |
 | In Review | `Handoff:` | a Code review |
 | In Review | `Review:` | read it, then Fix |
@@ -112,7 +114,10 @@ follows it is not a row. A step running in one of Greg's own Zed
 sessions is a row in You can do now, since its signal is his to give:
 "Tell me when DEV-904's review has posted: say `904 back`".
 
-After the boxes, one line: what is running and what you will merge.
+After the boxes, one line: every issue labelled `agent`, by ID, each
+running (its newest comment starts `Launched`) or queued, read afresh
+from the `[agent]` rows of `lin list board` for each reply; then what
+you will merge. It lets Greg see the runs have not got out of hand.
 Open every reply with what waits on Greg, in bold, in one of three
 forms: "**I suggest: `1`, say "Fix DEV-901" in its Zed session.**"
 for a move, by its number; "**Waiting for you:** ..." for a question
@@ -130,7 +135,7 @@ number. Anything else he types is plain words.
 | # | Move | How |
 | --- | --- | --- |
 | 1 | Fix DEV-901 (the parser's spans) in its Zed session | say "Fix DEV-901" there |
-| 2 | Launch DEV-902's review (the emitter's line directives) | add `agent` to DEV-902 |
+| 2 | Code review DEV-902 (the emitter's line directives) in a new Zed session | say "Code review DEV-902" there |
 | 3 | Tell me when DEV-905's review (the checker's spans) has posted in its Zed session | say `905 back` |
 
 **Not yet**
@@ -140,7 +145,7 @@ number. Anything else he types is plain words.
 | Launch DEV-903 (the prelude's dates) | DEV-901 merging | I will |
 | Code review DEV-904 (the SQL pass's errors) | its Pickup handing off | I will, from the run's handoff |
 
-Running: DEV-904's Pickup, as a run. Nothing for me to merge.
+Labelled `agent`: DEV-904 (running), DEV-906 (queued). Nothing for me to merge.
 
 ## Choosing how a step runs
 
@@ -172,14 +177,15 @@ reviewed by a run, and the reverse.
 
 ## Launching a run
 
-Write the launch comment, post it with `lin launch DEV-NNN < brief.md`
-and tell Greg to add `agent`. It must stay the newest comment until he
-does; to change it, edit it. Its first line is the directive. The rest
-follows "The launch comment" in cusoon2's
-`doc/plans/async-agent-runs.md`.
+Launch without asking: write the launch comment and post it with `lin
+launch DEV-NNN < brief.md`, which then adds `agent`. A speculative run
+(cusoon2's `doc/plans/async-agent-runs.md`) takes `--no-label`, and its
+comment must stay the newest until Greg labels it; to change it, edit
+it. The first line is the directive. The rest follows "The launch
+comment" in the same file. The launcher runs three at once and queues
+the rest.
 
-After Greg adds the label, wait for the run in the background and act
-when it hands off; a Zed session's handoff does not show, so Greg says
+Then wait for the run in the background and act when it hands off; a Zed session's handoff does not show, so Greg says
 when one is back, as `884 back`.
 
 | Step | Directive | The brief adds |

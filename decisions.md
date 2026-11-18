@@ -558,6 +558,19 @@ Each entry: what was decided, why, and what would reopen it.
   find outside its own repository; Triage as the default, which files a forgotten
   `--state` where only Greg looks. Reopen if the two repositories' steps need to differ
   in more than the two rows.
+- **The lead labels runs, and a run's comment lands in full once** (18 Nov 2026, Greg;
+  DEV-919). `lin launch` posts the launch comment, then adds `agent`; the lead lists every
+  labelled issue, running or queued, after the boxes of each reply. Greg still picks the
+  speculative runs, so their comments go up with `--no-label`. The wrapper posts on the
+  issue only the first line of a run's comment when the PR it names has a comment, since
+  the run started, with the same text, the marker line aside; otherwise `answer.md`
+  whole. Not taken: matching the first line alone, as DEV-919 first said, since a run
+  adds to `answer.md` after posting (DEV-915's review added its Decided list), and that
+  text would then be on neither the PR nor the issue. A preempted run's comment stays
+  whole: the retry reads it from the issue. The run VM's missing `cusoon` FusionAuth
+  tenant is a prompt step, not wrapper setup: `--op ensure-fusionauth-tenants` reads the
+  tenants from the schema the run migrates itself. Reopen if runs often post a PR comment
+  that differs from `answer.md`, or the labelled list grows past what Greg can check.
 - **The emitted Go names its source inline, by a relative path** (15 Nov 2026). Each line of
   Go begins with its own position, `/*line ../../src/a.kg:26*/`, padded so that a file's
   code starts at one column, then indented a tab for each block or closure it is in. Nobody

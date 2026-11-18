@@ -68,7 +68,7 @@ annotation class Extension
 ```
 
 - **Pure only.** An extension's function takes values and gives a
-  value. It takes no handle and cannot carry `@Acts`. What reaches a
+  value. It takes no handle and cannot be an `action fun`. What reaches a
   database, a network or a clock stays in the prelude, which this
   repo tests.
 - **Marked.** Each carries a marker the application declares, so a
@@ -118,7 +118,7 @@ external fun eml(mail: Mail): ByteArray              // headers, parts, Message-
 external fun subjectOf(eml: ByteArray): String?      // for the bounce handler
 
 external class Smtp                                  // a handle, made in main with server, port and login
-@Acts external fun Smtp.send(eml: ByteArray): Either<SendFailure, Unit>
+action external fun Smtp.send(eml: ByteArray): Either<SendFailure, Unit>
 ```
 
 ```kotlin
@@ -223,9 +223,6 @@ external class KeyedAction                  // an action that needs a key
 external class Field                        // one name and its value
 external class Json                         // an answer
 
-@RequiresOptIn
-annotation class Acts                       // on a function that changes something outside
-
 external fun lookup(method: String, path: String): Lookup
 external fun lookup(method: String, before: String, id: String): Lookup
 external fun lookup(method: String, before: String, id: String, after: String): Lookup
@@ -236,8 +233,8 @@ external fun group(name: String, fields: List<Field>): Field
 external fun field(name: String, values: List<String>): Field   // Stripe's expand[]=a&expand[]=b, or a JSON array
 
 external lookup fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpError, Json>
-@Acts external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
-@Acts external fun Http.performOnce(key: EffectKey, endpoint: KeyedAction, fields: List<Field>): Either<SendFailure, Json>
+action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
+action external fun Http.performOnce(key: EffectKey, endpoint: KeyedAction, fields: List<Field>): Either<SendFailure, Json>
 
 external fun Http.withHeader(name: String, value: String): Http   // a new handle with one more header
 
@@ -291,14 +288,14 @@ fun chargeFields(charge: ChargeFields): List<Field> =
     else
         listOf(group("payment_method_data", listOf(field("type", "card"), group("card", listOf(field("token", charge.paymentMethod))))))
 
-@Acts fun charge(stripe: Http, key: EffectKey, fields: ChargeFields): Either<SendFailure, PaymentIntent> = either {
+action fun charge(stripe: Http, key: EffectKey, fields: ChargeFields): Either<SendFailure, PaymentIntent> = either {
     val intent = stripe.performOnce(key, CHARGE, chargeFields(fields)).bind()
     PaymentIntent(
         intent.string("id") ?: raise(unreadable("id")),
         intent.string("status") ?: raise(unreadable("status")))
 }
 
-@Acts fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<SendFailure, Unit> = either {
+action fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<SendFailure, Unit> = either {
     stripe.perform(customerEmail(id), listOf(field("email", email))).bind()
 }
 ```
@@ -355,7 +352,7 @@ fun chargeFields(charge: ChargeFields): List<Field> =
   a search is. `Smtp.send` keeps its name. Agreed with Greg on 17 Nov
   2026; first written `send`.
 - **A function that acts says so.** `perform`, `performOnce` and
-  `Smtp.send` carry the marker `Acts`, and so does every function
+  `Smtp.send` are each an `action fun`, and so is every function
   that calls one: `charge` and `updateCustomerEmail` above. One that
   only calls `ask` carries nothing and may run in a transaction
   (`doc/gates.md`, "A function that acts says so").
@@ -498,7 +495,7 @@ effect:   prepare  (transaction)  ──►  act      (none)  ──►  record 
 fun prepareCharge(tx: Tx, env: Env, row: StripeChargeJob): Either<String, ChargeFields> = ...
 fun recordCharge(tx: Tx, env: Env, row: StripeChargeJob, result: PaymentIntent): Either<String, Unit> = ...
 
-@Acts fun charge(env: Env, key: EffectKey, fields: ChargeFields): Act<PaymentIntent> =
+action fun charge(env: Env, key: EffectKey, fields: ChargeFields): Act<PaymentIntent> =
     charge(stripeFor(env.stripe, fields.accountId), key, fields).fold(
         { failure ->
             when (failure) {
@@ -671,28 +668,50 @@ worker runs.
 ```kotlin
 // charge.kg
 effect chargeCard on stripe_charge_job {
-    enter    bindTenantOf
-    soonest  payer_waiting_since
-    attempts 1
-    prepare  prepareCharge
-    act      charge
-    record   recordCharge
+    soonest   payer_waiting_since
+    attempts  1
+    enter     bindTenantOf
+    prepare   prepareCharge
+    act       charge
+    record    recordCharge
 }
 
 // notices.kg
 job notifyBooker {
-    next  nextBookerNotice      // claims one owed row, or none
-    run   sendBookerNotice
+    next    nextBookerNotice      // claims one owed row, or none
+    run     sendBookerNotice
+    failed  bookerNoticeFailed
 }
 
 // daemon.kg
 work daemon {
-    alert   opsAlert            // "An alert is the application's to send" below
-    queues  saveCard, chargeCard, sendRunSheet, frequently, platformDaily, tenantDaily,
-            runBatchJob, notifyBooker, remindBooker, notifyDriver, remindDriver, warnAdmin,
-            chargeAndSendInvoice, resendInvoice, sendPaymentInvite, sendMail
+    alert  opsAlert               // "An alert is the application's to send" below
+    queue  saveCard
+    queue  chargeCard
+    queue  sendRunSheet
+    queue  frequently
+    queue  platformDaily
+    queue  tenantDaily
+    queue  runBatchJob
+    queue  notifyBooker
+    queue  remindBooker
+    queue  notifyDriver
+    queue  remindDriver
+    queue  warnAdmin
+    queue  chargeAndSendInvoice
+    queue  resendInvoice
+    queue  sendPaymentInvite
+    queue  sendMail
 }
 ```
+
+A list has one entry a line and no commas, so the work list repeats
+`queue` on each. An effect's and a job's lines come in the order they
+run, and the checker refuses any other: the settings `find`, `fair`,
+`soonest`, `attempts`; the steps `enter`, `prepare`, `act`, `record`;
+on failure `failed`, `recovery`. A job's are `next`, `run`, `failed`,
+`recovery`. Agreed with Greg on 18 Nov 2026 (DEV-894). Perhaps
+10 / 10.
 
 The checker holds that:
 
@@ -709,11 +728,12 @@ The checker holds that:
   effect's table, by Postgres's answer ("Discover, then enter");
 - no step of a job acts;
 - every job states `failed`;
-- every `work` list names an `alert`, a function marked `@Acts` that
+- an effect's and a job's lines are in the order they run;
+- every `work` list names an `alert`, an `action fun` that
   takes the environment and an `Alert`;
-- every `job` and `effect` is in some `work` list's `queues`. One
-  that is not is refused, with a message that says to add it to a
-  list's queues, so no queue's rows pile up unserved and unseen. A
+- every `job` and `effect` is named on a `queue` line of some `work`
+  list. One that is not is refused, with a message that says to add
+  it to a list, so no queue's rows pile up unserved and unseen. A
   declared queue cannot be parked switched off. Perhaps 10 / 10.
   Agreed with Greg on 17 Nov 2026 (`doc/lists-assessment.md`, choice
   D), over allowing it and never running it.
@@ -773,8 +793,8 @@ is told "Timed out" when the charge comes late, so the wait is felt.
 
 So the runner gives every queue a loop of its own: claim one row, do
 it, and again, waiting a little when there is none. No queue waits
-for another, and the `queues` of the `work` list above are a list
-whose order means nothing. There are no lanes, no sweep and no pass.
+for another, and the `queue` lines of the `work` list above are a
+list whose order means nothing. There are no lanes, no sweep and no pass.
 
 - **What the Kotlin needs of one thing at a time still holds**, since
   both of its notes are about one queue. The lease "is safe only
@@ -833,8 +853,8 @@ The forms take the same two:
 
 ```kotlin
 effect chargeCard on stripe_charge_job {
-    enter     bindTenantOf
     attempts  1
+    enter     bindTenantOf
     prepare   prepareCharge
     act       charge
     record    recordCharge
@@ -912,10 +932,10 @@ the application's says where it goes and how it reads:
 ```kotlin
 // daemon.kg
 work daemon {
-    alert   opsAlert
-    queues  saveCard, chargeCard, sendRunSheet, frequently, platformDaily, tenantDaily,
-            runBatchJob, notifyBooker, remindBooker, notifyDriver, remindDriver, warnAdmin,
-            chargeAndSendInvoice, resendInvoice, sendPaymentInvite, sendMail
+    alert  opsAlert
+    queue  saveCard
+    queue  chargeCard
+    ...                           // one queue a line, as in "The list of work"
 }
 
 // The runner's package. A sketch: the fields are to be settled.
@@ -923,7 +943,7 @@ data class Alert(val queue: String, val table: String?, val id: Uuid?,
                  val cause: String, val recovery: String?, val reset: String?)
 
 // The application's.
-@Acts fun opsAlert(env: Env, alert: Alert): Either<SendFailure, Unit> =
+action fun opsAlert(env: Env, alert: Alert): Either<SendFailure, Unit> =
     env.smtp.send(eml(opsMail(env.operators, alert)))
 ```
 
@@ -931,7 +951,7 @@ data class Alert(val queue: String, val table: String?, val id: Uuid?,
   that failed the row, for a failure that is not a refusal, and after
   a job's `failed` has committed.
 - **The function takes the environment and the alert, and no
-  transaction**, so it may send at once, and it carries `@Acts`.
+  transaction**, so it may send at once, and it is an `action fun`.
 - **It is best effort.** Where it answers a failure or panics the
   runner logs that and carries on: the record of the failure never
   rests on it.
@@ -1181,7 +1201,7 @@ Earlier drafts called it "code Greg does not read". Greg, 17 Nov
 2026: that is no hard rule. Agents write it and review it, and he
 will glance at it. The line between Kogo and Go does not rest on who
 reads: what moves into Go leaves the checker's sight, so it has no
-`@Acts`, no proofs and no printed table, whoever reads it.
+`action fun`, no proofs and no printed table, whoever reads it.
 
 ### How it is tested
 
@@ -1233,7 +1253,7 @@ clock, server and steps, which are built once. Agreed with Greg on
 ## What it would change in the spec
 
 - **13:** an outbound binding says whether it is a lookup or an
-  action, the second with `@Acts`. Application code holds no
+  action, the second an `action fun`. Application code holds no
   `external`, as now.
 - **12, the prelude:** `kogo.http`, and `Act`, `EffectKey` and
   `SendFailure` with the runner's package.
@@ -1260,12 +1280,8 @@ clock, server and steps, which are built once. Agreed with Greg on
 - How an application's own test makes a call time out, so that the
   rare path runs every day: it waits on the test form. Kogo's own Go
   does it by the clock it is handed ("How it is tested").
-- Whether `job`, `effect` and `work` are Kogo's own forms or calls
-  that are valid Kotlin (DEV-894).
 - What sits behind cusoon2's PDF extension: a small writer of its
   own, or a wrapped library.
 - How a data class that a binding file declares reaches its Go.
-- Which package holds `Acts`: `kogo.mail` uses it as `kogo.http`
-  does.
 - A hash in the prelude. The run sheet's job keeps a SHA-1 of what it
   last sent, to see a change (`daemon.kt`, `sha1Hex`); Kogo has none.

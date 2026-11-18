@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Compare the prelude's built-ins with Kotlin's: one source, both compilers, the same cases"
+#MISE description="Compare the prelude's built-ins with Kotlin's, and check kotlinc refuses each deviation"
 # kotlin/README.md says what this checks. Everything it writes is under
 # kotlin/_work, which Go's ./... skips and git ignores.
 set -euo pipefail
@@ -18,3 +18,22 @@ kotlinc -nowarn _work/*.kt main.kt -d _work/kotlin.jar
 kotlin -cp _work/kotlin.jar MainKt _work/cases > _work/kotlin
 
 go run ./cases diff _work/cases _work/kogo _work/kotlin
+
+# Each deliberate deviation is refused by kotlinc on the line its
+# file's first line names, so no Kotlin habit applies to one unnoticed.
+mkdir _work/deviations
+for f in deviations/*.kg; do
+    line=$(head -1 "$f" | sed -n 's|^// kotlinc refuses line \([0-9][0-9]*\)$|\1|p')
+    kt="_work/deviations/$(basename "$f" .kg).kt"
+    cp "$f" "$kt"
+    if out=$(kotlinc -nowarn "$kt" -d _work/deviations 2>&1); then
+        echo "$f: kotlinc accepts it, and a deviation must be refused" >&2
+        exit 1
+    fi
+    if [[ -z $line ]] || ! grep -qE "^$kt:$line:[0-9]+: error:" <<<"$out"; then
+        echo "$f: kotlinc did not refuse line ${line:-?} (first line: // kotlinc refuses line N):" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+done
+echo "deviations: kotlinc refuses all $(ls deviations/*.kg | wc -l)"

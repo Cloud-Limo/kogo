@@ -69,8 +69,10 @@ api booker checkedBy fromOurPage {
 
 `checkedBy` names the list's check, which the server runs before
 every row, ungated ones included: the Origin's check, then the CSRF
-token's (`doc/origin.md`; `decisions.md`, 18 Nov 2026). A list that
-names none is served to no browser.
+token's (`doc/origin.md`; `decisions.md`, 18 Nov 2026). A list with
+no check says so, `api hooks unchecked { ... }`, as a row says
+`ungated`, and its Go type cannot be mounted for a browser. A list
+has one entry a line and no commas.
 
 ### A gate and its work are two functions
 
@@ -359,7 +361,7 @@ data class Reply<A>(val answer: A, val cookies: List<Cookie>)
 ```
 
 ```kotlin
-@Acts fun completeEmailLogin(db: Db, env: Env, request: Request, input: CodeInput): Either<String, Reply<BookerView>> = either {
+action fun completeEmailLogin(db: Db, env: Env, request: Request, input: CodeInput): Either<String, Reply<BookerView>> = either {
     val user = redeemEmailCode(db, env, request, input.oneTimeCode).bind()
     val session = db.tx(serializable = true) { tx -> completeLogin(tx, env, request, user) }.bind()
     Reply(bookerView(session), sessionCookies(session, env.clock.now(), isSecure(request)))
@@ -471,9 +473,9 @@ what it did. They are declared and written in Kogo:
 
 ```kotlin
 commands admin {
-    "record-abn"  recordAbn
-    "set-payid"   setPayid
-    "mail-test"   mailTest
+    recordAbn
+    setPayid
+    mailTest
 }
 
 data class AbnInput(val business: String, val abn: String, val gstRegistered: Boolean)
@@ -485,7 +487,7 @@ fun recordAbn(db: Db, env: Env, input: AbnInput): Either<String, String> = eithe
 ```
 
 ```
-$ cusoon2 record-abn --business acme --abn "51 824 753 556" --gstRegistered true
+$ cusoon2 recordAbn --business acme --abn "51 824 753 556" --gstRegistered true
 ABN checked: acme
 ```
 
@@ -493,9 +495,12 @@ ABN checked: acme
   Either<String, String>`: no `Request` and no gate, since whoever
   runs the binary on the server is trusted, as now. It holds a `Db`,
   so it may act between its transactions.
-- **Its name is a literal string**. **A flag is a property's name
-  as written**, as an operation's JSON key is (spec 15.4), and its
-  value is read as JSON's are: `true`, an ISO date, a number, text.
+- **Its name is its function's name**, camelCase as written, over
+  the CLI's habit of `--dry-run`, so a search for a property finds
+  its flag; the list's own name (`admin`) is what `main` calls it by.
+  **A flag is a property's name as written**, as an operation's
+  JSON key is (spec 15.4), and its value is read as JSON's are:
+  `true`, an ISO date, a number, text.
   The reader is strict: an unknown, missing or
   unreadable flag is refused before the command runs, with its flags
   listed, so a renamed property breaks a deploy script at its next
@@ -550,7 +555,7 @@ completeEmailLogin  ungated
 
 Each list's own line heads its rows: `api booker   checked by
 fromOurPage   check reads session, tenant`, and for a list with none
-`api routes   no check: not served to a browser`, since the absence
+`api hooks   unchecked: not served to a browser`, since the absence
 is what a reviewer looks for (`doc/origin.md`, Q4).
 
 The file enforces nothing: it is what a reviewer reads.
@@ -560,10 +565,10 @@ The file enforces nothing: it is what a reviewer reads.
   when `git diff` shows a change, so Kogo has no rule for a stale
   file. The command needs a database, as `kogo check` does.
 - **The outside step is on the first line, beside the gate**:
-  `updateBooker  updateBookerGate  outside renameLogins`, and
-  `outside` alone for an operation that runs wholly outside. A row's
-  order of calls is then read where its gate is: a line with no
-  `outside` is gate, then work. That the gate runs a second time
+  `updateBooker  updateBookerGate  after renameLogins`, and `action`
+  for an operation that runs wholly outside. A row's order of calls
+  is then read where its gate is: a line with neither is gate, then
+  work. That the gate runs a second time
   after an outside step is left to the spec. Perhaps 5 / 5. Agreed
   with Greg on 17 Nov 2026 (`doc/lists-assessment.md`, choice C), over
   a line of order on every entry, which prints `gate, work` on most.
@@ -591,7 +596,7 @@ The file enforces nothing: it is what a reviewer reads.
   and the Google login's callback do.
 - **`asks` and `acts` are the calls to outside services**, each by
   the name of the application's function that makes it: one that
-  calls `ask` itself, or a binding marked `@Acts` itself. It is
+  calls `ask` itself, or an `action` binding itself. It is
   printed as its package's last name and its own, `stripe.charge`. A
   gate's lookups are on a `gate asks` line. So a change to what an
   operation reaches outside is a diff, a lookup added to a helper
@@ -674,7 +679,7 @@ invoices.kg:40:19 needs-serializable: invoice takes a SerializableTx and sendInv
   nothing is rerun on a conflict the gate is where the lock belongs:
   without it, what the gate found can change before the work writes.
   A gate on a `SerializableTx` is as above: a lock is refused.
-- **A rerun is safe at either level**, since nothing marked `@Acts`
+- **A rerun is safe at either level**, since no `action fun`
   runs in a transaction. A `Tx` the server or the runner opened is
   rerun on a deadlock.
 - **The printed table says which**, on a line of its own: `runs
@@ -772,43 +777,36 @@ comments argue, call by call, what a rerun would do.
 
 ### A function that acts says so
 
-A function that calls an action carries the prelude's marker `Acts`,
-as the binding it calls does:
+A function that calls an action is an `action fun`, as the binding it
+calls is:
 
 ```kotlin
 // kogo.http
-@RequiresOptIn
-annotation class Acts
-
-@Acts external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
+action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
 
 // The application.
-@Acts fun placeDetails(google: Http, placeId: String): Json { ... }     // calls perform
-@Acts fun pickupOf(google: Http, placeId: String): Place = ...          // calls placeDetails
+action fun placeDetails(google: Http, placeId: String): Json { ... }     // calls perform
+action fun pickupOf(google: Http, placeId: String): Place = ...          // calls placeDetails
 ```
 
-It is Kotlin's own rule for a marker, which Kogo's markers otherwise
-leave out (spec 11): a function that uses a marked declaration
-carries the mark, and so demands it of its own callers. Run on Kotlin
-2.4.0 on 17 Nov 2026: a marked function that calls a marked one
-compiles, and an unmarked caller is refused, as are a `::` reference,
-a lambda and an unmarked `override` whose body acts. Kogo is stricter
-in four ways:
+The word is carried up as Kotlin carries a marker: a function that
+calls an `action fun` is one, and so it is to its own callers. kotlinc
+refuses `action fun` (run on 2.4.21), so no Kotlin habit applies to
+it (`doc/design.md`, principle 3). No file opts in to it, as there
+is nothing to opt in to, and the checker holds three rules:
 
-- **No file opts in to it.** `@file:OptIn(Acts::class)` is refused,
-  since a whole file could then act and say nothing.
-- **The mark stays true.** A function that carries it and calls no
-  action is an error.
-- **It keeps out of a transaction.** A function that carries it takes
-  no `Tx`, takes a proof only as an outside step or an operation that
-  runs wholly outside, and is not called in a `db.tx { }` block.
+- **The word stays true.** An `action fun` that calls no action is an
+  error, and a function that calls one and is not one is refused.
+- **It keeps out of a transaction.** An `action fun` takes no `Tx`,
+  takes a proof only as an outside step or as a gated operation that
+  runs with no transaction, and is not called in a `db.tx { }` block.
 - **It is not kept in a value.** There is no `::` reference to one,
   an interface's `fun` is not one, and a lambda that acts is passed
   straight to a prelude function that runs it, as a lambda that fails
   is (spec 9).
 
 ```
-places.kg:3:5 unmarked-action: placeDetails calls perform, an action: mark placeDetails with @Acts, or move the call
+places.kg:3:5 unmarked-action: placeDetails calls perform, an action: make placeDetails an action fun, or move the call
 ```
 
 As first written, whether a function acts was worked out through what
@@ -820,33 +818,32 @@ interface's `fun` each carried an action past that walk. Only an
 action is marked: no rule rests on whether a function looks something
 up.
 
-`Acts` is the one marker held by the function and never by the file,
-and spec 11 says so as the exception it is. Perhaps 40 lines of
-checker and 45 of tests; in a port of cusoon2 perhaps 40 to 50
-functions carry it, by a guess. Weighed and not taken:
+Perhaps 40 lines of checker and 45 of tests; in a port of cusoon2
+perhaps 40 to 50 functions are one, by a guess. Weighed and not taken:
 
 - **The kind left worked out**, with the hole closed and the error
   naming the chain of calls. Cheaper, and a reader still opens what a
   function calls to learn what it is.
-- **A word of Kogo's own, `action fun`.** Plainer, and spec 11 keeps
-  one rule; but it adds syntax, and is respelt if Kogo source is to
-  be valid Kotlin (DEV-894). If that choice keeps Kogo's additions
-  unlike Kotlin, `@Acts` is respelt this way, with the binding's
-  words.
+- **A marker, `Acts`**, Kotlin's own rule for a marker, which held
+  this until 18 Nov 2026. It added no syntax, but was the one marker
+  held by the function and never by the file, against spec 11, and a
+  marker the checker knows by name. Respelt `action fun` when Kogo
+  source was freed from compiling as Kotlin (DEV-894).
 - **Two environments**, one that can act and one that cannot. Spec 7
   at its purest, and two environments in every list with a handle
   that only asks.
 
-Agreed with Greg on 17 Nov 2026.
+Agreed with Greg on 17 Nov 2026; respelt `action fun` on 18 Nov 2026.
 
 ### The outside step
 
-An operation may name a step that runs between its gate and its work
-with no transaction open:
+An operation may name, after `after`, a step that runs between its
+gate and its work with no transaction open. The step is an `action
+fun`, so the function says it runs with none:
 
 ```kotlin
 api booker {
-    updateBooker gatedBy updateBookerGate outside renameLogins
+    updateBooker gatedBy updateBookerGate after renameLogins
 }
 
 // In a transaction that then ends. Our own refusals belong here.
@@ -860,7 +857,7 @@ fun updateBookerGate(tx: SerializableTx, env: Env, request: Request, input: Book
 }
 
 // No transaction is open. The service may refuse, and nothing is written.
-@Acts fun renameLogins(env: Env, booker: HeldBooker, input: BookerInput): Either<String, Unit> = either {
+action fun renameLogins(env: Env, booker: HeldBooker, input: BookerInput): Either<String, Unit> = either {
     if (input.email != booker.email) {
         booker.idpUserId?.let { ensure(setUserEmail(env.idp, it, input.email)) { EMAIL_HAS_LOGIN_MESSAGE } }
         booker.stripeCustomerId?.let { updateCustomerEmail(env.stripe, it, input.email) }
@@ -899,17 +896,20 @@ saving again finishes the change. Only a row and a worker close that.
 Six of cusoon2's seven write nothing of ours after the gate: the
 three passkey operations, on both sites, change the identity service
 and are done, and starting a registration answers with what the
-service said. So a gated operation may have no work in a transaction:
+service said. So a gated operation may have no work in a transaction.
+Its row is an ordinary one: the operation being an `action fun` is
+what says it runs with none, as a `Db` does for an ungated one (spec
+15.3), and the list only labels the gates:
 
 ```kotlin
 api booker {
-    setBookingNotes           gatedBy setBookingNotesGate                      // gate, then work, in one transaction
-    updateBooker              gatedBy updateBookerGate   outside renameLogins  // gate; outside step; gate again and work
-    startPasskeyRegistration  gatedBy booker             outside               // gate; then the operation itself, outside
+    setBookingNotes           gatedBy setBookingNotesGate                    // gate, then work, in one transaction
+    updateBooker              gatedBy updateBookerGate   after renameLogins  // gate; outside step; gate again and work
+    startPasskeyRegistration  gatedBy booker                                 // an action fun: gate; then it, outside
 }
 
 // No transaction is open.
-@Acts fun startPasskeyRegistration(env: Env, booker: HeldBooker, input: Unit): Either<String, PasskeyCeremony> = either {
+action fun startPasskeyRegistration(env: Env, booker: HeldBooker, input: Unit): Either<String, PasskeyCeremony> = either {
     if (booker.isAdmin && !booker.isPasskeySession) {
         ensure(!hasPasskey(env.idp, booker.idpUserId).bind()) { ADD_PASSKEY_MESSAGE }      // a lookup
     }
@@ -942,16 +942,18 @@ binding says `lookup` or `action` and nothing more.
 - A gate reaches no statement that writes, by Postgres's answer, nor
   one that locks where its transaction is a `SerializableTx`.
 - A function that takes a `SerializableTx` is not handed a `Tx`.
-- A function that calls an action carries `@Acts`, and one that
-  carries it calls one.
-- A function that carries `@Acts` takes no `Tx`, and a proof only as
-  an outside step or an operation that runs wholly outside; none is
-  called in a `db.tx { }` block.
+- A function that calls an action is an `action fun`, and an `action
+  fun` calls one.
+- An `action fun` takes no `Tx`, and a proof only as an outside step
+  or a gated operation that runs wholly outside; none is called in a
+  `db.tx { }` block.
 - An action is not kept in a value: no `::` reference, no interface's
   `fun`, and a lambda that acts goes straight to a prelude function
   that runs it.
 - An outside step, or an operation that runs wholly outside, passes
   no proof to a call.
+- The step named after `after` is an `action fun`.
+- Every `api` list says `checkedBy` a function or `unchecked`.
 - Every row is `gatedBy` a function or `ungated`.
 - The gate's result is `Either<String, P>`, and `P` is the type of the
   work's second parameter.
@@ -1017,9 +1019,9 @@ it: a habit of the application's code, not a rule.
   operation says which the server opens, where 15.3 has it always
   SERIALIZABLE.
 - **13:** a binding with an effect says `lookup` or `action`.
-- **11 and 13:** a binding that acts carries the prelude's marker
-  `Acts`, and so does every function that calls one: the one marker
-  held by the function and never by the file.
+- **11 and 13:** a binding that acts is an `action fun`, and so is
+  every function that calls one; spec 1 lists `action fun` among the
+  deviations.
 - **12 and 15.2:** `Cookie` and `Reply` in `kogo.rpc`; an ungated
   operation may answer `Either<String, Reply<A>>`.
 - `doc/design.md`, "The server": the handler calls the gate, in a
@@ -1122,9 +1124,8 @@ it: a habit of the application's code, not a rule.
 
 ## Open
 
-- Whether `gatedBy`, `ungated`, `outside` and `commands`
-  are spelt as valid Kotlin (DEV-894), and how a binding spells
-  `lookup`; an action is `@Acts`.
+- How a binding spells `lookup`; an action is an `action fun`. The
+  lists' words were settled on 18 Nov 2026 (DEV-894, `decisions.md`).
 - The printed table's command has no name.
 - **`driverJobs` has no shape here.** It binds each of a driver's
   operators in turn and reads its jobs, gate and work in one loop

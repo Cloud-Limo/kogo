@@ -1,0 +1,7 @@
+// kotlinc refuses line 5
+// A binding (spec 13). An `external fun` alone is Kotlin/JVM's native
+// function, so the external class it is declared on is what kotlinc
+// refuses.
+external class Http
+
+external fun Http.get(url: String): String

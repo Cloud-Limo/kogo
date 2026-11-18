@@ -18,17 +18,24 @@ constraints) is worth typing.
 2. **Locality.** Meaning comes from what is visible in the code and the
    signatures it calls. No macros, reflection, annotation magic or
    ambient state.
-3. **A strict subset where it overlaps Kotlin.** Valid in both means the
-   same in both. Additions look unlike Kotlin. In the core (syntax,
-   numbers, `null`, `when`, equality, data classes, failures) this is
-   strict. In the prelude a Kotlin name means Kotlin's behaviour in
-   ordinary use; a difference is allowed only in corners, when matching
-   would mean reimplementing a JVM algorithm or table and no ported
-   module's side-by-side run depends on it, and each is stated in
-   `spec.md` section 12. A function that would differ in ordinary use
-   is Kogo's own. Kogo adds no member to a type Kotlin has: what is
-   Kogo's own is a function or a type of a `kogo.` package, imported by
-   name, so a file's imports show what in it is not Kotlin's.
+3. **Kotlin where it overlaps; Kogo's own forms where it doesn't.**
+   - Text valid in both means the same in both.
+   - A name an author knows from Kotlin's standard library, `java.time`
+     or Arrow means what it means there, whether or not the file would
+     compile as Kotlin. Where Kogo wants another behaviour it takes
+     another name: Kotlin's own, where Kotlin has one
+     (`Uuid.parseOrNull`). The rare corners listed in spec 12, which
+     `mise run kotlin` holds, stay allowed.
+   - Kogo's own forms are its deliberate deviations: the `sql` literal,
+     bindings, the lists and `action fun`. Spec 1 lists them, and
+     kotlinc refuses each, so no Kotlin habit applies to one unnoticed.
+     (A binding file of bare `external fun`s passes kotlinc, as JNI
+     functions; that matters to no author, since spec 13 keeps
+     `external` out of application code.) Within that rule each is
+     spelt to read as well as we can make it.
+
+   Kogo source need not compile under kotlinc, and nothing runs it on
+   the JVM (`decisions.md`, DEV-894).
 4. **Postgres is the type checker for SQL.** Never re-implement SQL
    typing; ask the database.
 5. **Go is a backend, not a source language.** Nobody reads the emitted
@@ -140,7 +147,7 @@ the Go to be emitted. The emitter therefore handles every surface form.
 A simplifying step can be added between the two later, reading the same
 facts.
 
-Kogo's own rules, those on proofs, gates, `@Acts` and the lists with
+Kogo's own rules, those on proofs, gates, `action fun` and the lists with
 their roles, are kept apart from the type checking. The checker stays
 one package, but each such rule lives in a file of its own in `check/`,
 runs after type checking over its result, and has its own error code;

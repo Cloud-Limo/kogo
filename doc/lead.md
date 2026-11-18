@@ -31,7 +31,8 @@ tell Greg.
    `git -C ~/Dev/cusoon2-tasks pull --ff-only`.
 2. `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list board`: every
    open issue of both projects with its state and the first line of
-   its newest comment.
+   its newest comment. `lin list backlog`, with the same projects, is
+   the parked work, each with what brings it back.
 3. Remove each worktree whose PR has merged (`gh pr list --state
    merged --head <branch>`): check `git status` there is clean, then
    `git worktree remove`, `git branch -d` and `git push origin
@@ -55,7 +56,13 @@ tell Greg.
 | In Review | `Ruling:` | Fix |
 | In Review | `Review:` or `Ruling:`, nothing to change | Merging, below |
 | In Review | `Fixed:` | Merging, below |
+| Backlog | `Lead:`, what brings it back | Todo, when that happens or Greg says so |
 | any | `Lead:` | as the comment says |
+
+Todo holds only what we mean to start within days. Everything else
+goes to Backlog, with a `Lead:` comment whose first line says what
+brings it back, and you move it to Todo when that happens or when Greg
+says so. You can do now draws only from Todo and work that is running.
 
 ## What goes to Greg
 
@@ -103,10 +110,10 @@ restates them in full. A box with nothing in it keeps its heading and
 says so. "Unchanged", or a sentence, never stands in for the rows. A
 move changes box only when you tell him so.
 
-Not yet holds Greg's own moves, and moves of yours that wait on his
-signal: those that follow from work that is running or a question asked
-of him, and choices of his that are parked. A debt on the board that
-waits on no one is not a row.
+Not yet holds at most three rows: Greg's own moves, and moves of yours
+that wait on his signal, that follow from work running now or a
+question just asked of him. Parked work, a choice of his included, is
+in Backlog, not in the box.
 
 An issue has one row across the two boxes: its next step. That step is
 in You can do now if Greg can do it, and in Not yet if he cannot; what

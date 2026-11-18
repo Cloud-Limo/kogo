@@ -70,9 +70,10 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
 - **Lead.** "Lead", said in `~/Dev/kogo`, starts the session Greg
   talks to: read Kogo's `doc/lead.md` and follow it. No other session
   needs that file.
-- **File.** `lin file --project <project> --state Todo "Title" <
-  desc.md`, into the project of the repository the work lands in. The
-  description has four headings: What (one or two sentences, verb
+- **File.** `lin file --project <project> --state <state> "Title" <
+  desc.md`, into the project of the repository the work lands in, and
+  in Todo if it is ready to start, in Backlog if it waits on something
+  (its Scope says on what). The description has four headings: What (one or two sentences, verb
   first), Why (one or two sentences in plain words; for product work
   it may end "Without it: <what an op or customer does instead>, about
   N times a year"), Scope (ending with a Budget in code and test lines

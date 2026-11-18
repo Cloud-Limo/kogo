@@ -560,28 +560,24 @@ Each entry: what was decided, why, and what would reopen it.
   in more than the two rows.
 - **The lead labels runs, and a run's comment lands in full once** (18 Nov 2026, Greg;
   DEV-919). `lin launch` posts the launch comment, then adds `agent`; the lead lists every
-  labelled issue, running or queued, after the boxes of each reply. Greg still picks the
-  speculative runs, so their comments go up with `--no-label`. The wrapper posts on the
-  issue only the first line of a run's comment when the PR it names has a comment, since
-  the run started, with the same text, the marker line aside; otherwise `answer.md`
-  whole. Not taken: matching the first line alone, as DEV-919 first said, since a run
-  adds to `answer.md` after posting (DEV-915's review added its Decided list), and that
-  text would then be on neither the PR nor the issue. A preempted run's comment stays
-  whole: the retry reads it from the issue. The run VM's missing `cusoon` FusionAuth
-  tenant is a prompt step, not wrapper setup: `--op ensure-fusionauth-tenants` reads the
-  tenants from the schema the run migrates itself. The run VM applies the checked-out
-  branch's `setup-database-dev.sql` at boot, since the image is baked daily and DEV-856's
-  run booted one older than the rights DEV-899's test reset needs. Reopen if runs often
-  post a PR comment that differs from `answer.md`, or the labelled list grows past what
-  Greg can check.
+  labelled issue, running or queued, after the boxes of each reply. The lead labels the
+  speculative runs too, up to three a night (Ruling on DEV-919's Review); `--no-label`
+  is for a brief posted before it is ready. Not taken: Greg picking them, a manual gate
+  he dropped. A run's comment goes whole on its PR and its first line on the issue; the
+  wrapper's rule and the run VM's setup are recorded in cusoon2's
+  `doc/plans/async-agent-runs.md`. A `Lead:` comment that nothing has followed is changed
+  with `commentUpdate`, not restated. Not taken: a `lin comment --edit`, until a lead
+  still reposts. Reopen if the labelled list grows past what Greg can check.
 - **Todo is soon, Backlog is parked** (18 Nov 2026, Greg; DEV-919). Todo holds only what
   is meant to start within days; anything else is in Backlog, with a `Lead:` comment whose
   first line says what brings it back, and the lead moves it when that happens or Greg
   says so. An agent files to Todo what is ready and to Backlog what waits. Not yet holds
-  at most three rows, moves that wait on running work or a question just asked. `lin list
-  backlog` prints the parked issues as the board prints the open ones, which the lead
-  took so that what brings each back is read, not remembered. Not taken: due dates, a
-  milestone per day.
+  at most three rows, moves that wait on running work or a question just asked; a step
+  of the lead's own after a run is not a row, since the labelled line already says the
+  run is out (Ruling on DEV-919's Review). Not taken: letting the cap give way to running
+  work, or showing three of more rows. `lin list backlog` prints the parked issues as the
+  board prints the open ones, which the lead took so that what brings each back is read,
+  not remembered. Not taken: due dates, a milestone per day.
 - **The emitted Go names its source inline, by a relative path** (15 Nov 2026). Each line of
   Go begins with its own position, `/*line ../../src/a.kg:26*/`, padded so that a file's
   code starts at one column, then indented a tab for each block or closure it is in. Nobody

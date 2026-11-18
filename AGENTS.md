@@ -73,14 +73,14 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
 - **File.** `lin file --project <project> --state <state> "Title" <
   desc.md`, into the project of the repository the work lands in, and
   in Todo if it is ready to start, in Backlog if it waits on something
-  (its Scope says on what). The description has four headings: What (one or two sentences, verb
-  first), Why (one or two sentences in plain words; for product work
-  it may end "Without it: <what an op or customer does instead>, about
-  N times a year"), Scope (ending with a Budget in code and test lines
-  and a "Done when" a reviewer can check in one look), Links. Write a
-  file name as a repo path in backticks: Linear turns a bare `audit.sh`
-  into a link. File what you find worth doing; nobody screens issues
-  first.
+  (its Scope says on what). The description has four headings: What
+  (one or two sentences, verb first), Why (one or two sentences in
+  plain words; for product work it may end "Without it: <what an op or
+  customer does instead>, about N times a year"), Scope (ending with a
+  Budget in code and test lines and a "Done when" a reviewer can check
+  in one look), Links. Write a file name as a repo path in backticks:
+  Linear turns a bare `audit.sh` into a link. File what you find worth
+  doing; nobody screens issues first.
 - **Pickup.** "Pickup DEV-NNN" is `lin pickup DEV-NNN <where>`, with
   `<where>` as Where a step works says: read its output and start
   there, on the branch that output gives.

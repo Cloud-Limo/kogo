@@ -2630,7 +2630,7 @@ Each entry: what was decided, why, and what would reopen it.
 - **`check-config` reads the file and builds every handle, and opens nothing**, as the
   Kotlin's parses only. So a handle's constructor checks its values (an address, an
   encoding, SMTP's security) without the network, and a bad one fails the deploy's check.
-- **`main`'s own flag comes before the mode or command**: `cusoon2 --config f record-abn
+- **`main`'s own flag comes before the mode or command**: `cusoon2 --config f recordAbn
   --business acme`. Go's `flag` stops at the first word that is not one, so the command's
   reader is handed only its own flags. Not taken: the Kotlin's `--op <name>`, which mixes
   the two.

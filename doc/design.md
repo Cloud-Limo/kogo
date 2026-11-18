@@ -145,7 +145,7 @@ the Go to be emitted. The emitter therefore handles every surface form.
 A simplifying step can be added between the two later, reading the same
 facts.
 
-Kogo's own rules, those on proofs, gates, `@Acts` and the lists with
+Kogo's own rules, those on proofs, gates, `action fun` and the lists with
 their roles, are kept apart from the type checking. The checker stays
 one package, but each such rule lives in a file of its own in `check/`,
 runs after type checking over its result, and has its own error code;

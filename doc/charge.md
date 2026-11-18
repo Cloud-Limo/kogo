@@ -78,7 +78,7 @@ fun insertChargeJob(invoice: PayableInvoice, id: ID, receiptEmail: String, token
   the effect's `soonest` serves a waiting payer first. The column and
   its name are cusoon2's to choose; the name is the sketches'.
 - **The work** takes the environment, the proof and the input, and no
-  `@Acts`: it hands the charge out by a row. Each statement binds
+  `action fun`: it hands the charge out by a row. Each statement binds
   `invoice.id` or `invoice.bookerId` of the proof, and each use of
   `invoice.tx` is before the dot. The insert is on the invoice's proof,
   not `AtTenant`, so it prints with no `(tenant-wide)`.
@@ -91,9 +91,9 @@ fun insertChargeJob(invoice: PayableInvoice, id: ID, receiptEmail: String, token
 // charge.kg: the daemon's file; opts in to UnscopedRead and BindsTenant.
 effect chargeCard on stripe_charge_job {
     find      stripe_charge_queue     // a view: id, tenant_id, payer_waiting_since and the runner's columns
-    enter     bindTenantOf            // before each of the row's transactions (Q7)
     soonest   payer_waiting_since     // a waiting payer first, across tenants; no fair (Q12)
     attempts  1
+    enter     bindTenantOf            // before each of the row's transactions (Q7)
     prepare   prepareCharge
     act       chargeInvoice
     record    recordCharge
@@ -126,7 +126,7 @@ fun prepareCharge(tx: Tx, env: Env, row: ChargeRow): Either<String, ChargeFields
                  row.receiptEmail, row.stripeCustomerId, row.stripeSource)
 }
 
-@Acts fun chargeInvoice(env: Env, key: EffectKey, fields: ChargeFields): Act<Charged> =    // key: stripe_charge_job-<id> (Q8)
+action fun chargeInvoice(env: Env, key: EffectKey, fields: ChargeFields): Act<Charged> =    // key: stripe_charge_job-<id> (Q8)
     stripe.charge(env.stripe.withHeader("Stripe-Account", fields.accountId), key, fields).fold(     // the client's package
         { failure ->
             when (failure) {
@@ -175,7 +175,11 @@ fun chargeRecovery(tx: Tx, env: Env, row: ChargeRow, why: Failure): String? =
     }
 
 // daemon.kg: the alert is doc/work.md's opsAlert, unchanged.
-work daemon { alert opsAlert   queues chargeCard, ... }
+work daemon {
+    alert  opsAlert
+    queue  chargeCard
+    ...
+}
 ```
 
 - **Every step with a transaction takes a `Tx`**: the runner opens
@@ -201,7 +205,7 @@ work daemon { alert opsAlert   queues chargeCard, ... }
   `chargeFailed`, as the Kotlin's `Refusal` does. A missing invoice or
   a tenant with no Stripe account is a broken invariant and panics,
   which fails the row as not made, with the alert (Q6).
-- **`act` alone carries `@Acts`**; it takes the environment, the key
+- **`act` alone is an `action fun`**; it takes the environment, the key
   and the prepared value, and no transaction. `stripe.charge` is
   `doc/work.md`'s client, in its own package, so the act's name does
   not clash with it; the client must also send `receipt_email` and

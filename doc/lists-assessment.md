@@ -1,5 +1,11 @@
 # The lists, assessed
 
+Written for DEV-901 on 17 Nov 2026 and kept as it was weighed: it
+spells a function that acts `@Acts` and the lists as they then were.
+DEV-894 (18 Nov 2026, `decisions.md`) respelt the first `action fun`
+and settled the lists' words (`doc/lists.md`, "How a list is
+written").
+
 Asked for by Greg on 17 Nov 2026 (`doc/lists.md`, "Asked for: a deep
 dive"; DEV-901). It decides nothing: each choice is named at the end
 and is Greg's. All four were made on 17 Nov 2026 and are recorded

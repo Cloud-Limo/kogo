@@ -2625,6 +2625,23 @@ Each entry: what was decided, why, and what would reopen it.
     place something would run without being named; the alert passed in Go, which the
     checker could not see.
 
+## Taken recording DEV-894 (DEV-931), not yet discussed
+
+- **A deviation's file names the words kotlinc refuses it with**, on its first line, and
+  `mise run kotlin` fails unless kotlinc refuses it with them. Not taken: any refusal,
+  which passes a file that kotlinc refuses for a typo.
+- **The binding's file is an `external class`**: kotlinc on the JVM accepts `external fun`
+  alone, as a native (JNI) function, and refuses `external` on a class, which is not a
+  syntax error. So principle 3's "each is a syntax error to kotlinc" holds for three of
+  the four, and every binding file declares a class or calls one. Not taken: rewording
+  the principle, which is Greg's.
+- **The printed table writes `action` beside the gate** of an operation that runs wholly
+  outside, where it wrote `outside`, to match the list's loss of the bare word. Not
+  taken: keeping `outside` in the table alone.
+- **`doc/lists-assessment.md` keeps `@Acts` and the old forms**, under a note: it is the
+  record of what was weighed. Spec 15.1's commas wait for the lists to be built, since
+  the parser reads them today.
+
 ## Taken writing cusoon2's `main` on paper (DEV-903), not yet discussed
 
 - **`check-config` reads the file and builds every handle, and opens nothing**, as the

@@ -74,7 +74,10 @@ api booker checkedBy fromOurPage {
 }
 api ops        checkedBy fromOurPage { ... }
 api storefront checkedBy fromOurPage { ... }
-api routes { logout ungated, recordDeliveryFailure ungated }   // no check: never mounted
+api routes unchecked {                // no check: never mounted
+    logout                 ungated
+    recordDeliveryFailure  ungated
+}
 ```
 
 - `checkedBy f` names one top-level fun in scope, of the shape `(Tx,
@@ -83,7 +86,8 @@ api routes { logout ungated, recordDeliveryFailure ungated }   // no check: neve
   `check-shape` (Q1). One fun serves the three lists, as one
   `verifyOrigin` serves the three routes (1).
 - The server runs it before every row of the list, `ungated` and
-  `gatedBy anyone` included. A list with no `checkedBy` is legal Kogo.
+  `gatedBy anyone` included. A list with no `checkedBy` says
+  `unchecked` in its place (DEV-894).
 
 ## The check
 

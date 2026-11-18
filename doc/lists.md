@@ -1,7 +1,8 @@
 # Lists: one mechanism
 
 Agreed with Greg in discussion on 17 Nov 2026, beside `doc/gates.md`
-and `doc/work.md`, which hold each list's own design. It is not built
+and `doc/work.md`, which hold each list's own design, and spelt on
+18 Nov 2026 (DEV-894, "How a list is written" below). It is not built
 and not in `spec.md`: until it is, the spec stands as written.
 
 ## What the lists share
@@ -18,8 +19,8 @@ are one idea:
 - a command prints the list for a reviewer.
 
 Kogo code never calls the runtime: the runtime calls Kogo, through a
-table. So spec 1 keeps its count of three things Kogo adds to Kotlin,
-with one word changed: the `sql` literal, bindings, and lists.
+table. So the lists are one of spec 1's four deliberate deviations
+from Kotlin: the `sql` literal, bindings, the lists and `action fun`.
 
 ## One rule for every shape
 
@@ -40,18 +41,18 @@ A function the runtime calls takes, in this order:
 | check | `api` | a `Tx`, reading only, rolled back | the request | nothing, or a refusal |
 | gate | `api` | a `SerializableTx` or `Tx`, reading only | the request; the input, if it reads one | a proof, or a refusal |
 | work | `api` | the proof's transaction | the proof; the input | the answer |
-| outside | `api` | nothing (`@Acts`) | the proof; the input | nothing, or the answer where there is no work |
+| outside | `api` | nothing (an `action fun`) | the proof; the input | nothing, or the answer where there is no work |
 | ungated | `api` | a `SerializableTx`, `Tx` or `Db` | the request; the input | the answer, or a `Reply` |
 | command | `commands` | a `Db` | the input | words |
 | next | `job` | a `Tx` | | a row, or none |
 | run | `job` | that `Tx` | the row | |
 | enter | `effect` | a `Tx` | the claim | |
 | prepare | `effect` | that `Tx` | the row | a prepared value, or a refusal |
-| act | `effect` | nothing (`@Acts`) | the key; the prepared value | an `Act` of the result |
+| act | `effect` | nothing (an `action fun`) | the key; the prepared value | an `Act` of the result |
 | record | `effect` | a `Tx` | the row; the result | nothing, or a reason it could not record |
 | failed | `job`, `effect` | a `Tx` | the row; why | |
 | recovery | `job`, `effect` | that `Tx` | the row; why | words, or none |
-| alert | `work` | nothing (`@Acts`) | the alert | |
+| alert | `work` | nothing (an `action fun`) | the alert | |
 
 A row here is the whole of a role's shape. What is a list's own stays
 in its own design: that a gate only reads, the runner's columns, what
@@ -68,14 +69,73 @@ is owed.
   stages, with the fifteen rows as data, and no rule written by hand
   for each list.
 - **The next list is a row**, or a few, and not a section.
-- **The spelling has at most two forms** (DEV-894 decides it): a list
-  of rows, for many small entries (`api`, `commands`), and
-  a block of named parts, for one entry (`job`, `effect`, `work`).
+- **The spelling has at most two forms**: a list of rows, for many
+  small entries (`api`, `commands`), and a block of named parts, for
+  one entry (`job`, `effect`, `work`).
 
 No role, shape or rule of the two designs changes but `enter`. The
 checker is no larger than the separate rules would have been; the
 spec is smaller, by perhaps one section of 60 lines where five would
 each have explained shapes.
+
+## How a list is written
+
+Agreed with Greg on 18 Nov 2026 (DEV-894; `decisions.md`). A list is
+bare words, with no `::` or colons, and kotlinc refuses it, so no
+Kotlin habit applies to one (`doc/design.md`, principle 3).
+
+```kotlin
+api booker checkedBy fromOurPage {
+    setBookingNotes           gatedBy setBookingNotesGate              // a gate of its own
+    drivers                   gatedBy admin                            // a shared gate
+    updateBooker              gatedBy updateBookerGate after renameLogins
+    startPasskeyRegistration  gatedBy booker                           // an action fun: no transaction
+    whoAmI                    ungated
+}
+
+api hooks unchecked {
+    recordDeliveryFailure  ungated
+}
+
+commands admin {
+    recordAbn
+    setPayid
+}
+
+job notifyBooker {
+    next    nextBookerNotice
+    run     sendBookerNotice
+    failed  bookerNoticeFailed
+}
+
+work daemon {
+    alert  opsAlert
+    queue  chargeCard
+    queue  notifyBooker
+}
+```
+
+- **The outside step is spelt `after`**, which says the order, and
+  is an `action fun`. Not taken: the chain as the list (`gate -> step
+  -> work`), since the words carry the checker's rules and a chain of
+  one would be an unmarked ungated row.
+- **There is no bare `outside`.** A gated operation that is an
+  `action fun` runs with no transaction and its gate once, as a `Db`
+  means no transaction in spec 15.3: the list only labels the gates.
+- **A list with no check says `unchecked`**, as a row says `ungated`.
+  Its Go type cannot be mounted for a browser.
+- **A command's name is its function's name**, run as `cusoon2
+  recordAbn --gstRegistered true`. The list's name is what `main`
+  calls it by.
+- **No commas; one entry a line.** The work list repeats `queue`.
+- **An effect's and a job's lines are in the order they run**, and
+  the checker refuses any other: settings `find`, `fair`, `soonest`,
+  `attempts`; steps `enter`, `prepare`, `act`, `record`; on failure
+  `failed`, `recovery`; a job `next`, `run`, `failed`, `recovery`.
+- **Each form gets one example in `examples/`**, compiled by the
+  tests, when the lists are built: the examples are the agents'
+  cheat-sheet, and a role's shape stays in the spec and the
+  checker's table.
 
 ## Asked for: a deep dive
 

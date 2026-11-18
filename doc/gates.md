@@ -498,8 +498,9 @@ ABN checked: acme
 - **Its name is its function's name**, camelCase as written, over
   the CLI's habit of `--dry-run`, so a search for a property finds
   its flag; the list's own name (`admin`) is what `main` calls it by.
-  **A flag is a property's name as written**, as an operation's JSON key is (spec 15.4), and its
-  value is read as JSON's are: `true`, an ISO date, a number, text.
+  **A flag is a property's name as written**, as an operation's
+  JSON key is (spec 15.4), and its value is read as JSON's are:
+  `true`, an ISO date, a number, text.
   The reader is strict: an unknown, missing or
   unreadable flag is refused before the command runs, with its flags
   listed, so a renamed property breaks a deploy script at its next
@@ -791,7 +792,8 @@ action fun pickupOf(google: Http, placeId: String): Place = ...          // call
 The word is carried up as Kotlin carries a marker: a function that
 calls an `action fun` is one, and so it is to its own callers. kotlinc
 refuses `action fun` (run on 2.4.21), so no Kotlin habit applies to
-it (`doc/design.md`, principle 3). The checker holds four rules:
+it (`doc/design.md`, principle 3). No file opts in to it, as there
+is nothing to opt in to, and the checker holds three rules:
 
 - **The word stays true.** An `action fun` that calls no action is an
   error, and a function that calls one and is not one is refused.
@@ -802,7 +804,6 @@ it (`doc/design.md`, principle 3). The checker holds four rules:
   an interface's `fun` is not one, and a lambda that acts is passed
   straight to a prelude function that runs it, as a lambda that fails
   is (spec 9).
-- **No file opts in to it**: there is nothing to opt in to.
 
 ```
 places.kg:3:5 unmarked-action: placeDetails calls perform, an action: make placeDetails an action fun, or move the call
@@ -951,6 +952,8 @@ binding says `lookup` or `action` and nothing more.
   that runs it.
 - An outside step, or an operation that runs wholly outside, passes
   no proof to a call.
+- The step named after `after` is an `action fun`.
+- Every `api` list says `checkedBy` a function or `unchecked`.
 - Every row is `gatedBy` a function or `ungated`.
 - The gate's result is `Either<String, P>`, and `P` is the type of the
   work's second parameter.

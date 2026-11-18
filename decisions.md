@@ -790,8 +790,9 @@ Each entry: what was decided, why, and what would reopen it.
     gone, and where an alert goes is the application's (both below).
   - Reopen if a queue needs an order that one column of times cannot give.
 - **A function that acts says so, with the marker `Acts`, and the call that changes
-  something outside is `perform`** (17 Nov 2026, Greg; `doc/gates.md`, "A function that
-  acts says so"; `doc/work.md`, "An endpoint is declared once").
+  something outside is `perform`** (17 Nov 2026, Greg; respelt `action fun` on 18 Nov
+  2026, below; `doc/gates.md`, "A function that acts says so"; `doc/work.md`, "An
+  endpoint is declared once").
   - **Why written.** A function's type and its failures are in its signature; whether it
     changes something outside was the one thing a caller relied on that was worked out
     through what it calls. A line added to a helper changed what its callers were with no
@@ -808,9 +809,7 @@ Each entry: what was decided, why, and what would reopen it.
     the method does not say it: a `DELETE` is an action and a lookup may be a `POST`.
   - Not taken: the kind left worked out; `action fun`, a word of Kogo's own, which is
     plainer and keeps spec 11 to one rule; two environments, one that can act.
-  - Respelt `action fun` on 18 Nov 2026 (DEV-894, below), which reopened it. The rest of
-    this entry stands for the word as for the marker, and the cost above goes: no marker
-    is held by the function alone.
+  - Respelt `action fun` on 18 Nov 2026 (DEV-894, below), which reopened it.
 - **A transaction's kind is its handle's type: `Tx` is any, and `SerializableTx` is one
   that is rerun on a conflict** (17 Nov 2026, Greg; `doc/gates.md`, "Two kinds of
   transaction"). Kogo is to support explicit locking as naturally as cusoon2's way.
@@ -894,7 +893,8 @@ Each entry: what was decided, why, and what would reopen it.
   roles** (17 Nov 2026, Greg; `doc/lists.md`). Six lists and fifteen roles had each been
   designed alone, against principle 6. A function the runtime calls takes the handle it
   runs in, the environment, what it is about and what it works on, in that order; the
-  checker fits stages from the table; spec 1 keeps three additions, the third being lists (four since DEV-894, with `action fun`).
+  checker fits stages from the table; spec 1 keeps three additions, the third being lists
+  (four since DEV-894, with `action fun`).
   `enter` gains the environment, the one shape that broke the rule. The spelling has at
   most two forms, which DEV-894 inherits.
   - Asked for by Greg on agreeing: a deep dive into what the lists are for, how they do it,
@@ -917,7 +917,8 @@ Each entry: what was decided, why, and what would reopen it.
 - **The lists stay: the runtime calls Kogo through a table, and a list is the one place a
   function gets its role** (17 Nov 2026, Greg; `doc/lists-assessment.md`, choice A). This
   closes the deep dive that `doc/lists.md` and `doc/remains.md` held the mechanism open
-  for, and leaves DEV-894 free to spell the lists as valid Kotlin (it kept them Kogo's own: below).
+  for, and leaves DEV-894 free to spell the lists as valid Kotlin (it kept them Kogo's
+  own: below).
   - Not taken: the application writing the pipeline over prelude helpers (`db.gated`,
     `db.effect`). The list would not go away, since the wire names and the TypeScript need
     it; a gate's rules would start at an argument of a prelude call, against "A restriction

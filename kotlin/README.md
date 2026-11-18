@@ -1,7 +1,8 @@
 # The check against Kotlin
 
-`mise run kotlin` tests one sentence of `doc/design.md`, principle 3: a
-program valid in both languages means the same in both. It needs a JVM
+`mise run kotlin` tests two sentences of `doc/design.md`, principle 3:
+text valid in both languages means the same in both, and each of
+Kogo's own forms is refused by kotlinc. It needs a JVM
 and is not part of `go test ./...`.
 
 - `builtins/*.kg` is the shared source: Kogo, and Kotlin unchanged
@@ -15,6 +16,11 @@ and is not part of `go test ./...`.
 - A difference is fixed in the prelude, or listed in `cases/main.go`'s
   `kept` with where `spec.md` states it: the cases it applies to and a
   rewrite of both results, which must then agree.
+
+- `deviations/*.kg` are Kogo's deliberate deviations (spec 1), one
+  file each. kotlinc must refuse every one, with the words its first
+  line gives after `// kotlinc:`, so no Kotlin habit applies to one
+  unnoticed (principle 3). A new deviation adds a file.
 
 To cover a function, add a branch: the generator reads the names from
 the source. Everything written is under `kotlin/_work`.

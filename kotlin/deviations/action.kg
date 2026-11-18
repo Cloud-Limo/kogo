@@ -1,0 +1,4 @@
+// kotlinc: syntax error
+// An `action fun` (doc/gates.md, "A function that acts says so"):
+// kotlinc must refuse it.
+action fun ping(): String = "pong"

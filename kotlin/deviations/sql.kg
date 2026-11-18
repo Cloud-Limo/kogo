@@ -1,0 +1,5 @@
+// kotlinc: syntax error
+// The `sql` literal (spec 10): kotlinc must refuse it.
+class Tx
+
+fun names(tx: Tx): String = sql"""select name from business"""

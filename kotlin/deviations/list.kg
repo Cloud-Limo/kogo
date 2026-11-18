@@ -1,0 +1,7 @@
+// kotlinc: syntax error
+// A list (spec 15): kotlinc must refuse it.
+fun me(): String = "me"
+
+api ops unchecked {
+    me ungated
+}

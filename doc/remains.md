@@ -30,8 +30,9 @@ the design to work from, not built, not in `spec.md`, no example run.
 - **The ops site's tenant.** Agreed: the gates of sending an invite,
   accepting one and the suppliers page bind the storefront, and the
   model stops switching tenant (`doc/gates.md`, "The gate binds the
-  tenant"). `driverJobs` stays open until the loops over tenants are
-  replaced. Made in the Kotlin first.
+  tenant"). `driverJobs` becomes `operatorJobs`, one call per
+  operator under `driverJob`'s gate (19 Nov 2026, `doc/roadmap.md`,
+  "Settled for the ops site"). Made in the Kotlin first.
 - **cusoon2's runner.** Agreed: `done_at` and `not_after` among its
   columns, and no condition of a queue's own (`doc/work.md`, "Owed is
   the runner's rule"). The order stays the queue's: the charge's
@@ -162,20 +163,22 @@ Agreed subject to this review:
   effect"); the lanes are gone (`doc/work.md`, "Each queue is served
   on its own"); routes are Go (`doc/gates.md`, "Routes that are not
   operations").
-- **The test form.** How a test makes a call time out, so that the
+- **The test form.** Its shape is settled (`doc/roadmap.md`, "The
+  test form"; DEV-940); how a test makes a call time out, so that the
   rare path runs every day, waits on it; so does moving cusoon2's
   tests (DEV-893), and the record of Google's answers they replay
   (`GoogleMapsFileCache`, a test's files kept beside the code), which
   `kogo.http` would need a mode for.
-- **The order of the migration** (DEV-893): GraphQL to Kotlin RPC and
-  then to Kogo, or straight to Kogo; all at once or piece by piece.
-  Not discussed on 17 Nov. The gate and its work are the shape a
-  booker's operation would be written in either way, and adopting it
-  is mostly work in the model: each of some 150 functions of `Model`
-  says which proof it demands.
-- **What is built first.** Agreed only this far: the request side
-  before the list of work, since the rules that protect (no action in
-  a transaction, a key only from the runner) do not need the list.
+- **The order of the migration.** Settled 19 Nov 2026
+  (`doc/roadmap.md`, "How it moves"): two steps per area, GraphQL to
+  Kotlin RPC and then to Kogo (DEV-893); piece by piece, Go serving
+  each ported list beside the JVM on one database (DEV-930); an area's
+  Kotlin deleted once its Go has proven itself.
+- **What is built first.** Settled 19 Nov 2026 (`doc/roadmap.md`, "The
+  work, in order"; DEV-914): Kogo is built by the first port, the ops
+  site's 20 operations end to end, building only what they need; the
+  list of work and the runner come with the rest of cusoon2. This
+  keeps the request side before the list of work, as agreed earlier.
 
 ## What the spec and the design doc would say
 

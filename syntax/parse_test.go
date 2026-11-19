@@ -67,8 +67,8 @@ func write(b *strings.Builder, v reflect.Value) {
 // line a declaration, then one an api or a tests list.
 func TestExamples(t *testing.T) {
 	files, _ := filepath.Glob("../examples/*.kg")
-	if len(files) != 27 {
-		t.Fatalf("%d examples, want 27", len(files))
+	if len(files) != 29 {
+		t.Fatalf("%d examples, want 29", len(files))
 	}
 	var got strings.Builder
 	for _, file := range files {

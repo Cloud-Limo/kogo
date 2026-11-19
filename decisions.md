@@ -1481,11 +1481,16 @@ Each entry: what was decided, why, and what would reopen it.
     16.4 to about 17.x, which sent `none` for any request with no referrer (WebKit bug
     256472): another site's `no-referrer` frame posts as `null` with `none`, the request
     PR 1473 was written to refuse. Refusing `null` always closes it, is one line fewer with
-    no line to get wrong, and breaks nothing cusoon2 ships: its calls are `fetch()` in the
-    default mode, which sends the real Origin, and no page of it sets a referrer policy.
+    no line to get wrong, and breaks nothing cusoon2 ships: its calls are `fetch()` POSTs
+    in the default mode, and such a POST sends the real Origin whatever the referrer
+    policy. (Corrected in place, DEV-964, from DEV-914's Lead comment of 18 Nov 2026 and
+    DEV-916: this read "and no page of it sets a referrer policy", which is wrong, since
+    nginx sets `Referrer-Policy: no-referrer` on every page. The answer stands, for the
+    reason now given.)
     Answered after research Greg ran, which moved the session's recommendation from a to b.
-  - **Accepted cost.** A form post, or a `no-cors` fetch, from a page of our own that sets
-    `Referrer-Policy: no-referrer` would get the 403. It differs from the Kotlin, so
+  - **Accepted cost.** A form post, or a `no-cors` fetch, from a page of our own would
+    get the 403, since each is served with `Referrer-Policy: no-referrer`; cusoon2 has
+    neither. It differs from the Kotlin, so
     cusoon2's Kotlin changes first, under its tests: `verifyOrigin` loses its `null` branch
     (`CusoonApp.kt:411` to `:416`) and `OriginCheckTest`'s `verify("null", "same-origin")`
     becomes a refusal. About 4 lines fewer, 1 test changed. When cusoon2 makes that fix is
@@ -3095,6 +3100,32 @@ Each entry: what was decided, why, and what would reopen it.
   `Console`.
 - **Open: a `kogo test` cannot call an `action fun` today**: a test is a `val`, and its
   block is handed a `Tx`. Decided in row 9 with the fake `Http`, and brought to Greg then.
+
+## Taken serving a list's Origin and CSRF check (DEV-964), not yet discussed
+
+- **The check is an example, served, and no code of the prelude's.** `doc/origin.md`'s
+  check and session reader are Kogo an application writes, so they are written as
+  `examples/27_origin.kg` and `examples/28_session.kg` in names of their own (a shop's
+  domain, an admin's origin) and served by `TestEmittedGoRuns`, one case for each row of
+  "Part by part" that shows at use or never. `rpc.go` does not change: `request.header`
+  and `request.cookie` already read the four things a check reads, and PR 91 built the
+  rest. Not taken: `sameSite` or `tokenMatches` in `kogo.rpc`, which would put one
+  application's settings, table and cookie into the prelude. Reopen: a second
+  application that writes the same check.
+- **The prelude gains `String.endsWith` and `List.contains`**, which `sameSite` and
+  `isOurOrigin` call (`origin in settings.extraAllowedOrigins`). Both were in `spec.md`
+  section 12 and not yet built; `contains` compares as `==` does. 7 / 6.
+- **A cookie's text is read with `Uuid.parseOrNull`, not `toUuidOrNull`.**
+  `doc/origin.md` invented `toUuidOrNull` on 18 Nov 2026, before `Uuid.parse` became
+  `Uuid.parseOrNull` (DEV-932) and before Kogo was held to a subset of Kotlin (DEV-957):
+  Kotlin has the second and not the first. Not taken: adding `toUuidOrNull`, a second
+  name for one function.
+- **`liveSession` takes a `Tx` here**, where `doc/origin.md` has `SerializableTx`: that
+  type is DEV-965's, which runs beside this. The example's two readers change their
+  parameter's type when it lands. Not taken: leaving the reader out until then, which
+  leaves "the token is the check's and `liveSession` compares nothing" unserved.
+- **The example's cookie has one name, `SID`.** The design's `isSecure(request)` and
+  the `__Host-` prefix are the application's and read nothing of the check's.
 
 ## Spec gaps found by the leakage ports, unresolved
 

@@ -1,0 +1,50 @@
+// A list's check (spec.md 15.1, 15.3; doc/origin.md): it refuses a
+// request that another site's page made, by what the browser says of
+// the request, and one that carries a session without its token. The
+// server runs it first, in a read-only transaction of its own, and
+// answers its refusal as a 403.
+package example.origin
+
+import kogo.rpc.Request
+import kogo.time.Clock
+
+api counter checkedBy fromOurPage {
+    whoAmI   ungated
+    signOut  ungated
+}
+
+data class Settings(val adminOrigin: String, val extraAllowedOrigins: List<String>)
+
+data class CounterEnv(val settings: Settings, val clock: Clock)
+
+// Both checks: the Origin's, then the token's.
+fun fromOurPage(tx: Tx, env: CounterEnv, request: Request): Either<String, Unit> = either {
+    sameSite(tx, env, request).bind()
+    tokenMatches(tx, request).bind()
+}
+
+// A browser says where a request is from in Sec-Fetch-Site, and in
+// Origin on every POST a page makes. A request with neither is no
+// browser's. An Origin of "null" has no line: it is no setting's
+// origin and no shop's domain, so it is refused whatever
+// Sec-Fetch-Site says.
+fun sameSite(tx: Tx, env: CounterEnv, request: Request): Either<String, Unit> = either {
+    val site = request.header("Sec-Fetch-Site")
+    ensure(site == null || site == "same-origin" || site == "none") { "Invalid origin" }
+    val origin = request.header("Origin")?.let { if (it.endsWith("/")) it.substring(0, it.length - 1) else it }
+    ensure(origin == null || isOurOrigin(tx, env.settings, origin)) { "Invalid origin" }
+}
+
+fun isOurOrigin(tx: Tx, settings: Settings, origin: String): Boolean =
+    origin in settings.extraAllowedOrigins || origin == settings.adminOrigin ||
+        tx.exists(sql"select 1 from shop where domain = $origin")
+
+// The check has passed, so a session's token matched: this compares
+// nothing.
+fun whoAmI(tx: Tx, env: CounterEnv, request: Request, input: Unit): Either<String, String> = either {
+    liveSession(tx, env, request)?.let { "session ${it.id}" } ?: "nobody"
+}
+
+fun signOut(tx: Tx, env: CounterEnv, request: Request, input: Unit): Either<String, Unit> = either {
+    endSession(tx, request)
+}

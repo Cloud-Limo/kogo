@@ -881,11 +881,11 @@ func TestMarkedConstructor(t *testing.T) {
 		{"fun g(h: H): H = h.‸copy(n = 2)", "opt-in", opt, ""},
 		{"fun g(tx: Tx): List<H> = tx.query<H>(‸sql\" -> n: Int\")", "opt-in", opt, ""},
 		// The wire stays shut with the opt-in: a request is not trusted.
-		{"api ops { ‸f }\n" + op("H", "Unit"), "wire", "f's input is a H, " + wire, wire},
-		{"data class In(val h: H?)\napi ops { ‸f }\n" + op("In", "Unit"), "wire", "f's input holds In.h: H?, " + wire, wire},
-		{"api ops { ‸f }\n" + op("List<H>", "Unit"), "wire", "f's input holds a H, " + wire, wire},
+		{"api ops unchecked { ‸f ungated }\n" + op("H", "Unit"), "wire", "f's input is a H, " + wire, wire},
+		{"data class In(val h: H?)\napi ops unchecked { ‸f ungated }\n" + op("In", "Unit"), "wire", "f's input holds In.h: H?, " + wire, wire},
+		{"api ops unchecked { ‸f ungated }\n" + op("List<H>", "Unit"), "wire", "f's input holds a H, " + wire, wire},
 		// An answer reaches In first; the input is walked still.
-		{"data class In(val h: H)\napi ops { g, ‸f }\n" + op("In", "Unit") + strings.ReplaceAll(op("Unit", "In"), "fun f", "fun g"), "wire", "f's input holds In.h: H, " + wire, wire},
+		{"data class In(val h: H)\napi ops unchecked { g ungated, ‸f ungated }\n" + op("In", "Unit") + strings.ReplaceAll(op("Unit", "In"), "fun f", "fun g"), "wire", "f's input holds In.h: H, " + wire, wire},
 	} {
 		refused(t, [][3]string{{head + body + c.src, c.code, c.fix}})
 		if src := head + "@file:OptIn(M::class)\n" + body + c.src; c.withOptIn == "" {
@@ -895,7 +895,7 @@ func TestMarkedConstructor(t *testing.T) {
 		}
 	}
 	// Answering with one makes none.
-	passes(t, head+body+"api ops { f }\n"+op("Unit", "H"))
+	passes(t, head+body+"api ops unchecked { f ungated }\n"+op("Unit", "H"))
 }
 
 // For each literal, what each parameter binds and the property each

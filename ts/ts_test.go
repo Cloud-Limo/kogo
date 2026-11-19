@@ -44,7 +44,7 @@ fun ping(tx: Tx, env: Env, request: Request, input: Unit): Either<String, Unit> 
 // that holds itself, and the types in the order of their names, not
 // the order reached.
 func TestFile(t *testing.T) {
-	got := files(t, head+`api ops { ping, tree, job }
+	got := files(t, head+`api ops unchecked { ping ungated, tree ungated, job ungated }
 fun job(db: Db, env: Env, request: Request, input: Ask): Either<String, Job?> = either { raise("no") }
 fun tree(tx: Tx, env: Env, request: Request, input: Unit): Either<String, List<Tree>> = either { raise("no") }
 data class Ask(val id: Uuid, val n: Int, val big: Long, val x: Double, val ok: Boolean)
@@ -93,9 +93,9 @@ export interface Ops {
 // Two lists, in two packages, write a file each, with only the types
 // each reaches.
 func TestTwoLists(t *testing.T) {
-	got := files(t, head+"api ops { ping, f }\n"+
+	got := files(t, head+"api ops unchecked { ping ungated, f ungated }\n"+
 		"fun f(tx: Tx, env: Env, request: Request, input: Unit): Either<String, State> = either { State.On }\nenum class State { On }",
-		"package b\nimport a.ping\napi admin { ping }")
+		"package b\nimport a.ping\napi admin unchecked { ping ungated }")
 	want := map[string]string{
 		"ops.ts": "export type State = \"On\"\n\nexport interface Ops {\n" +
 			"  ping: {input: {[k: string]: never}; value: {[k: string]: never}}\n  f: {input: {[k: string]: never}; value: State}\n}\n",

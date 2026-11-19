@@ -2903,6 +2903,47 @@ Each entry: what was decided, why, and what would reopen it.
   Ruling's "each new case fails with item 1's fix taken out" holds for `offsetOf` (64
   differ). Reopen if a case gets a wider index than `n`.
 
+## Taken parsing and checking the `api` list's forms (DEV-950), not yet discussed
+
+- **The old shape is refused, with no grace**: a row with neither `gatedBy` nor `ungated`
+  is a syntax error that gives both forms, and a head with neither `checkedBy` nor
+  `unchecked` is the checker's `no-check`. Every list of the repo's examples and tests
+  moved to `unchecked` and `ungated`. Not taken: reading a bare row as ungated, which
+  guesses at what the list must say.
+- **The row's forms are the parser's and the missing head the checker's**, as DEV-950's
+  scope has them: the tree holds a row only in one of its three forms, and a head with
+  neither word. Not taken: both in the parser, which stops at the first list and gives
+  the checker's other errors no chance.
+- **A list's words are not reserved, an operation's name included.** A line that begins
+  with `gatedBy`, `after` or `ungated` goes on the row above and is refused ("a row stays
+  on one line: move gatedBy onto a's line"), unless its next word, on that line, is
+  `gatedBy` or `ungated`: then it is the row of an operation of that name. A gate's or a
+  step's name on a later line is refused with the same message. Not taken: refusing the
+  three words as an operation's name, which makes Kogo's lists keep words from Kotlin
+  names. Reopen if a list gains a word that may follow `after` on its line.
+- **The check's shape is checked here**, `(Tx, Env, Request): Either<String, Unit>` under
+  the code `check-shape`, as `doc/origin.md` names it, since a list that names a check
+  must name something. Not taken: leaving the shape to the Origin check's issue (roadmap
+  row 4), which would let any fun stand there until then. That it only reads is not
+  checked.
+- **A gate takes a `Tx`** until `SerializableTx` is built (roadmap row 5), and a `Db` is
+  refused. **A proof is any type** until a proof's rules are (row 6), and gated work and
+  a step take the very type the gate gives, not one it fits.
+- **A step returns `Either<String, Unit>`** as well as taking the gate's proof and the
+  operation's input, since `doc/gates.md` hands its answer to nothing. Not taken: the
+  proof and the input alone, which the issue named. That it is an `action fun` is row 7's.
+- **A gate that reads an input stands in one row of a list**: the second row to name it
+  is refused. Counted for each list, since a fun may stand in more than one. Not taken:
+  allowing it where the rows' inputs are one type, which the design does not have.
+- **One table of roles drives the shapes** (`check/api.go`, `role`), as `doc/lists.md`
+  asks, with one error code a role: `operation`, `gate`, `check-shape`, `step`. An
+  ungated operation's messages now say "an ungated operation".
+- **`kogo emit` refuses a check and a gated row** (`not-yet-emitted`) until the server
+  runs them (row 3), and `kogo ts` writes a gated operation's types as any other's. So
+  `examples/24_gates.kg` is parsed and checked by the tests and left out of the emitted
+  program, whose test asserts the refusal. Not taken: emitting the table without the
+  check or the gate, which would serve the work with nothing before it.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

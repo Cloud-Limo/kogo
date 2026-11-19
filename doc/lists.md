@@ -2,8 +2,10 @@
 
 Agreed with Greg in discussion on 17 Nov 2026, beside `doc/gates.md`
 and `doc/work.md`, which hold each list's own design, and spelt on
-18 Nov 2026 (DEV-894, "How a list is written" below). It is not built
-and not in `spec.md`: until it is, the spec stands as written.
+18 Nov 2026 (DEV-894, "How a list is written" below). The `api`
+list's head and rows are parsed and checked, and in spec 15.1 and
+15.2 (DEV-950); serving them is not built, and neither are the other
+lists, for which the spec stands as written.
 
 ## What the lists share
 

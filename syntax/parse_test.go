@@ -67,8 +67,8 @@ func write(b *strings.Builder, v reflect.Value) {
 // line a declaration, then one an api or a tests list.
 func TestExamples(t *testing.T) {
 	files, _ := filepath.Glob("../examples/*.kg")
-	if len(files) != 24 {
-		t.Fatalf("%d examples, want 24", len(files))
+	if len(files) != 25 {
+		t.Fatalf("%d examples, want 25", len(files))
 	}
 	var got strings.Builder
 	for _, file := range files {
@@ -167,32 +167,40 @@ func TestDeclarations(t *testing.T) {
 		t.Errorf("file head: %s %v", got, err)
 	}
 
-	// An api list may end with a comma, and api is a name elsewhere.
-	f = parse(t, "api ops { me, updateJob, }\napi other {\n    me\n}\nfun api(api: Int): Int = api")
-	if got := show(f.APIs); got != `[(API ops [(Ident me) (Ident updateJob)]) (API other [(Ident me)])]` || len(f.Decls) != 1 {
+	// An api list's head says checkedBy a fun or unchecked, and a row
+	// is one of three forms (spec.md 15.1). A list may end with a
+	// comma, and api and a list's words are names elsewhere, an
+	// operation's among them.
+	f = parse(t, "api ops checkedBy ours { a gatedBy g, b gatedBy g after s, c ungated, }\napi other unchecked {\n    after ungated\n    ungated gatedBy gatedBy\n    after gatedBy unchecked after after\n}\nfun api(api: Int, ungated: Int): Int = api + ungated")
+	if got := show(f.APIs); got != `[(API ops (Ident ours) [(Row (Ident a) (Ident g)) (Row (Ident b) (Ident g) (Ident s)) (Row (Ident c))])`+
+		` (API other Unchecked [(Row (Ident after)) (Row (Ident ungated) (Ident gatedBy)) (Row (Ident after) (Ident unchecked) (Ident after))])]` || len(f.Decls) != 1 {
 		t.Errorf("api lists: %s, %d declarations", got, len(f.Decls))
+	}
+	// A head with neither word parses, for the checker to refuse.
+	if got := show(parse(t, "api l { a ungated }").APIs); got != `[(API l [(Row (Ident a))])]` {
+		t.Errorf("an api list with no check: %s", got)
 	}
 
 	// An api or a tests list separates its entries by a comma, a new
 	// line or both, as Kotlin does a collection (spec.md 15.1).
 	for _, sep := range []string{", ", "\n", ",\n", "\n,"} {
-		for _, list := range []string{"api l", "tests l<Unit>"} {
-			src := list + " {\n    a" + sep + "b" + sep + "c\n}"
+		for _, list := range [][3]string{{"api l unchecked", " ungated", "[(Row (Ident a)) (Row (Ident b)) (Row (Ident c))]"}, {"tests l<Unit>", "", "[(Ident a) (Ident b) (Ident c)]"}} {
+			src := list[0] + " {\n    a" + list[1] + sep + "b" + list[1] + sep + "c" + list[1] + "\n}"
 			f := parse(t, src)
 			got := show(f.APIs) + show(f.Tests)
-			if !strings.Contains(got, "[(Ident a) (Ident b) (Ident c)]") {
+			if !strings.Contains(got, list[2]) {
 				t.Errorf("%q: got %s, want the entries a, b and c", src, got)
 			}
 		}
 	}
-	f = parse(t, "api l { a, b\n    c,\n    d, }")
-	if got := show(f.APIs); got != `[(API l [(Ident a) (Ident b) (Ident c) (Ident d)])]` {
+	f = parse(t, "api l unchecked { a gatedBy g, b ungated\n    c gatedBy g after s,\n    d ungated, }")
+	if got := show(f.APIs); got != `[(API l Unchecked [(Row (Ident a) (Ident g)) (Row (Ident b)) (Row (Ident c) (Ident g) (Ident s)) (Row (Ident d))])]` {
 		t.Errorf("an api list of commas and new lines mixed: %s", got)
 	}
 	// A blank line or a comment between entries still separates them,
 	// and a list may be empty.
-	f = parse(t, "api l {\n\n    a // c\n\n    b /* x */, c,\n}\napi e { }")
-	if got := show(f.APIs); got != `[(API l [(Ident a) (Ident b) (Ident c)]) (API e)]` {
+	f = parse(t, "api l unchecked {\n\n    a ungated // c\n\n    b /* x */ ungated, c ungated,\n}\napi e unchecked { }")
+	if got := show(f.APIs); got != `[(API l Unchecked [(Row (Ident a)) (Row (Ident b)) (Row (Ident c))]) (API e Unchecked)]` {
 		t.Errorf("blank lines, comments and an empty list: %s", got)
 	}
 }

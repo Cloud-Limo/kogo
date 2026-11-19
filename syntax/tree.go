@@ -51,12 +51,22 @@ type File struct {
 	Lines   int      // the line the source ends on
 }
 
-// An API is an api list, api name { f, g }: the funs it names as
-// operations (spec.md 15.1).
+// An API is an api list, api name checkedBy check { rows }: its check
+// and its operations, each with its gate (spec.md 15.1).
 type API struct {
 	Pos
-	Name string
-	Funs []*Ident
+	Name      string
+	Check     *Ident // the fun after checkedBy; nil where there is none
+	Unchecked bool   // the head says unchecked
+	Rows      []*Row
+}
+
+// A Row is one operation of an api list: op gatedBy gate, op gatedBy
+// gate after step, or op ungated.
+type Row struct {
+	Op    *Ident
+	Gate  *Ident // nil in an ungated row
+	After *Ident // the step that runs outside; nil where there is none
 }
 
 // A Tests is a tests list, tests name<Env> { a, b }: the top-level

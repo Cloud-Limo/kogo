@@ -194,6 +194,17 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 func (e *emitter) table(d *syntax.API) {
 	defer e.enter(d)()
 	a := e.info.APIs[d]
+	// Serving a check, a gate and a step is the server's next piece
+	// (doc/roadmap.md, row 3): until then a list that names one is
+	// refused, not served without it.
+	if d.Check != nil {
+		e.notYet(d.Check, "a list's check", "emit a list that is unchecked and whose rows are ungated")
+	}
+	for _, row := range d.Rows {
+		if row.Gate != nil {
+			e.notYet(row.Gate, "a gated row", "emit a list that is unchecked and whose rows are ungated")
+		}
+	}
 	rpc := func(name string) string { return e.qualify("kogo.rpc", name) }
 	var ops, enums []string
 	for _, op := range a.Ops {

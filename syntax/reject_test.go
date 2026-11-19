@@ -123,7 +123,24 @@ func TestFaults(t *testing.T) {
 		{"external ‸data class D(val x: Int)", "syntax", "external goes before class, object, fun or val"},
 		{"fun f(‸external x: Int) {}", "syntax", "a parameter takes no modifier"},
 		// A list's entries are separated by a comma or a line end.
-		{"api ops { a ‸b }", "syntax", "expected , or a new line between a list's entries"},
+		{"api ops unchecked { a ungated ‸b ungated }", "syntax", "expected , or a new line between a list's entries"},
+		// A row of an api list names its gate or says ungated, on one
+		// line (spec.md 15.1).
+		{"api ops unchecked { ‸a }", "syntax", "a names no gate: a row is a gatedBy <gate>, or a ungated"},
+		{"api ops unchecked { ‸a, b ungated }", "syntax", "a names no gate"},
+		{"api ops unchecked { ‸a after s }", "syntax", "a names no gate"},
+		{"api ops unchecked { a ungated ‸after s }", "syntax", "a is ungated, and after names a step between a gate and its work: remove after and its step, or give a a gate"},
+		{"api ops unchecked { a gatedBy ‸}", "syntax", "expected a name"},
+		{"api ops unchecked { a gatedBy g after ‸}", "syntax", "expected a name"},
+		{"api ops unchecked { a gatedBy g ‸gatedBy h }", "syntax", "expected , or a new line between a list's entries"},
+		{"api ops unchecked {\n    a\n    ‸gatedBy g\n}", "syntax", "a row stays on one line: move gatedBy onto a's line"},
+		{"api ops unchecked {\n    a\n    ‸ungated\n}", "syntax", "a row stays on one line: move ungated onto a's line"},
+		{"api ops unchecked {\n    a gatedBy g\n    ‸after s\n}", "syntax", "a row stays on one line: move after onto a's line"},
+		{"api ops unchecked {\n    a ungated\n    ‸after s\n}", "syntax", "a row stays on one line: move after onto a's line"},
+		{"api ops unchecked {\n    a gatedBy\n    ‸g\n}", "syntax", "a row stays on one line: move g onto a's line"},
+		{"api ops unchecked {\n    a gatedBy g after\n    ‸s\n}", "syntax", "a row stays on one line: move s onto a's line"},
+		{"api ops checkedBy ‸{ a ungated }", "syntax", "expected a name"},
+		{"api ops ‸checked { a ungated }", "syntax", "expected {"},
 		{"tests ts<Unit> { a ‸b }", "syntax", "expected , or a new line between a list's entries"},
 	} {
 		e, line, column := fault(t, c.src)

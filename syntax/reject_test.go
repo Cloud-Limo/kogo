@@ -126,6 +126,7 @@ func TestFaults(t *testing.T) {
 		{"external fun f(): Int ‸= 1", "syntax", "a binding has no body"},
 		{"external ‸data class D(val x: Int)", "syntax", "external goes before class, object, fun or val"},
 		{"fun f(‸external x: Int) {}", "syntax", "a parameter takes no modifier"},
+		{"fun f(‸@M x: Int) {}", "syntax", "a parameter takes no modifier"},
 		// A list's entries are separated by a comma or a line end.
 		{"api ops unchecked { a ungated ‸b ungated }", "syntax", "expected , or a new line between a list's entries"},
 		// A row of an api list names its gate or says ungated, on one

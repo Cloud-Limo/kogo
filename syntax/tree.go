@@ -122,6 +122,7 @@ type Param struct {
 	Override bool
 	Val      bool
 	Vararg   bool
+	Marks    []*Annotation // of a data class's property (spec.md 11)
 	Name     string
 	Type     Type
 	Default  Expr

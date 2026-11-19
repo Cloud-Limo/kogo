@@ -554,10 +554,10 @@ func (p *parser) params(ctor, external bool) []*Param {
 			pos := p.tok.pos
 			vararg := external && p.modifier() && p.got("vararg")
 			m := p.modifiers()
-			if m.Annotations != nil || m.Visibility != "" || m.Const || m.External || m.Calls != "" {
+			if m.Annotations != nil && !ctor || m.Visibility != "" || m.Const || m.External || m.Calls != "" {
 				p.fail(pos, "syntax", "a parameter takes no modifier")
 			}
-			par := &Param{Pos: pos, Override: m.Override, Val: p.got("val"), Vararg: vararg}
+			par := &Param{Pos: pos, Override: m.Override, Val: p.got("val"), Vararg: vararg, Marks: m.Annotations}
 			if ctor && (!par.Val || p.at("var")) {
 				p.fail(pos, "syntax", "each property of a data class is a val: val name: Type")
 			}

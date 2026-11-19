@@ -3188,6 +3188,40 @@ Each entry: what was decided, why, and what would reopen it.
   something at another service, so written as `fun` it was `unmarked-action` by 7.1 (the
   lead's Ruling on PR 94). Not taken: a docs issue of its own for one word.
 
+## Taken holding a proof's rules (DEV-976), not yet discussed
+
+- **The checker knows a proof by its shape**: a data class whose constructor is marked and
+  which has a marked property that is a `Tx` or a `SerializableTx`, or an interface that
+  declares such a `val` (`doc/gates.md`'s `OnBooking`). Not taken: by role, whatever type a
+  gate gives, which misses the proofs no gate gives (`AtTenant`, a new row's, an interface)
+  and the model's files, where the two rules on the transaction are read; a marked `Tx`
+  alone, which the design does not call a proof.
+- **A gate is not yet held to give a proof.** A `P` of any other shape still passes 15.2
+  and is held to none of the three rules, which spec 15.7 says. Holding it changes what
+  every gated program looks like (a marker, a file that opts in), so it is left to Greg.
+  `examples/24_gates.kg` is such a program and is unchanged: no rule refuses it.
+- **A marked property is built here** (spec 11): `@M val` in a data class's constructor
+  was a syntax error, and an interface's marked `val` was read and not held. Both are now
+  marked, and read only in a file that opts in, by name or by destructuring. The proof
+  rules rest on it. Not taken: a proof's transaction known by its name, `tx`.
+- **The codes** are the design's `proof-tx-escapes` and `outside-passes-proof`, and two it
+  did not name: `unbound-statement` and `action-proof`.
+- **"Written directly" is `proof.fact` or a property under it**, `${held.business.id}`,
+  spelt on the same name as the receiver. Not taken: `proof.fact` alone, which refuses a
+  proof that keeps its row as a data class, as spec 11's `HeldBusiness` does.
+- **A statement on a proof's transaction in a fun that runs outside is refused too**, under
+  `outside-passes-proof`: the design says SQL in a step is the checker's error, and in a
+  file that opts in nothing else refused it. Not taken: leaving it to the marker, which
+  holds only the operations' files.
+- **Passing counts a receiver, and a proof of any type**, `booking.tenant` included. Only
+  an `action fun` that takes a proof is held to it, as the issue says. Not taken: every
+  `action fun` outside a `db.tx` block, which no case needs.
+- **`copy` fills a proof's transaction as its constructor does** (spec 11 holds a copy to
+  the constructor's marker), and destructuring a proof down to its transaction is
+  `proof-tx-escapes`.
+- **The rules are 15.7, after TypeScript**, so that no section is renumbered under the
+  messages that cite them.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

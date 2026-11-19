@@ -173,7 +173,11 @@ func (c *checker) assign(s *syntax.Assign) {
 func (c *checker) destructure(at syntax.Node, names []string, t Type) {
 	var parts []Type
 	if n, ok := t.(*Named); ok && n.Decl.Kind == "data class" {
-		for _, p := range n.Decl.Props {
+		for i, p := range n.Decl.Props {
+			if i < len(names) {
+				c.demand(at, p.Name, p.vis)
+				c.apart(at, n, p)
+			}
 			parts = append(parts, subst(p.Type, bind(n.Decl.Params, n.Args)))
 		}
 	} else if ok && n.Decl == c.prelude("Pair") {

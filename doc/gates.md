@@ -6,7 +6,9 @@ services and time limits; `doc/measured.md` has the counts both rest
 on. Of it, the list's head and rows are parsed and checked, and in
 spec 15.1 and 15.2 (DEV-950, `examples/24_gates.kg`), and the server
 runs a check, a gate, a step and the work, with no transaction open
-where the work is an `action fun`, spec 15.3 and 15.5 (DEV-961). The
+where the work is an `action fun`, spec 15.3 and 15.5 (DEV-961). A
+proof's rules are checked, all but that a gate only reads, spec 15.7
+(DEV-976). The
 rest is not built and not in `spec.md`: until it is,
 the spec stands as written.
 No example here has been through `kogo check`, the

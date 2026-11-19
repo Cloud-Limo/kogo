@@ -251,3 +251,26 @@ fun zero(db: Db): Decimal = db.tx { tx -> tx.querySingle<Decimal>(sql"""select 0
 fun zeros(db: Db): List<Decimal> = db.tx { tx -> tx.querySingle<List<Decimal>>(sql"""select array[0.00, 0, 1.50] as "z!" """) }
 `)
 }
+
+// A ByteArray is read from a bytea and sent to one as it was, a zero
+// byte and none at all included; a ByteArray? is NULL, and a NULL is
+// refused where a ByteArray is read (spec.md 10.4).
+func TestBytes(t *testing.T) {
+	expectWith(t, withDB, "defer drop()\n", [][2]string{
+		{`t.Keep(db, kogo.NewId(), kogo.ByteArray("a\x00\xff"), nil)`, "1"},
+		{`t.Keep(db, kogo.NewId(), kogo.ByteArray(nil), rt.Ptr(kogo.ByteArray("d")))`, "1"}, // as a binding may give none
+		{`func() string { var s string; for _, l := range t.Kept(db) { s += fmt.Sprintf("%q %v;", l.Eml, l.Draft) }; return s }()`, `"" &[100];"a\x00\xff" <nil>;`},
+		{`t.Drafts(db)`, "panics: can't scan into dest[0] (col: draft!): null is not a ByteArray"},
+	}, `package t
+
+data class Letter(val eml: ByteArray, val draft: ByteArray?)
+
+fun keep(db: Db, id: Uuid, eml: ByteArray, draft: ByteArray?): Int = db.tx { tx ->
+    tx.execute(sql"insert into letter (id, eml, draft) values ($id, $eml, $draft)")
+}
+
+fun kept(db: Db): List<Letter> = db.tx { tx -> tx.query<Letter>(sql"select eml, draft from letter order by eml") }
+
+fun drafts(db: Db): List<ByteArray> = db.tx { tx -> tx.query<ByteArray>(sql"""select draft as "draft!" from letter""") }
+`)
+}

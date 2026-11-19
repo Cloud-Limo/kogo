@@ -393,6 +393,8 @@ func (c *checker) wire(id *syntax.Ident, what string, whole Type, w *reach) {
 		case is(n, tBoolean), number(n), is(n, tString), d == c.prelude("Uuid"):
 		case d == c.prelude("List"):
 			walk(n.Args[0], path)
+		case d == c.prelude("ByteArray"):
+			bad(t, path, "and bytes do not cross the wire: keep them in a row, and answer what the page shows of them")
 		case d.Kind == "sealed interface" || slices.ContainsFunc(d.Supers, func(s *Named) bool { return s.Decl.Kind == "sealed interface" }):
 			bad(t, path, "and no sealed interface or variant of one crosses the wire: send a data class, with an enum that says which case it is")
 		case d.Kind == "data object":

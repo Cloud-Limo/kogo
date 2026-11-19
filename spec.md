@@ -68,6 +68,7 @@ import kogo.time.Instant
 | `Nothing` | no value; the type of `raise`, `error` and `return` |
 | `Uuid`, `Instant`, `LocalDate`, `LocalTime`, `ZoneId`, `ZonedDateTime`, `Duration`, `Decimal` | prelude types, section 12 |
 | `List<T>`, `Set<T>`, `Map<K, V>`, `Pair<A, B>` | immutable collections, section 12 |
+| `ByteArray` | bytes that are carried and never read: below |
 | `T?` | `T` or `null` |
 | `(A, B) -> R` | function type |
 | `Either<E, A>` | a failure `E` or a value `A`, section 9 |
@@ -106,6 +107,18 @@ type does not show the function, behind a type parameter or an
 interface, the comparison panics once it reaches the function, and
 answers `false` where a part before it differs, `contains`, `distinct`
 and a `Set`'s or `Map`'s keys included.
+
+A `ByteArray` is bytes, as a `bytea` column holds them (10.4) and a
+binding makes or takes them. Kogo code names the type, reads a value
+from a row, binds it into a statement, passes it, holds it in a data
+class and hands it to a binding, and nothing else: it has no index, no
+`size`, no `set` and no constructor, so it is the one array Kogo has
+and it cannot change. `==` and `!=` are an error (`bytes-equality`)
+where either side's type is or holds one, as for a function above and
+through the same types, since Kotlin compares a `ByteArray` by identity
+and a data class by its properties': compare the other properties, or
+what the bytes were made from. Comparing with `null` is allowed. It is
+in no operation's input or answer (15.4).
 
 A `String` counts as Kotlin's does: `length`, `substring`, `padStart`
 and reading it as `Char`s count UTF-16 units, so `"😀".length` is 2. It
@@ -680,6 +693,7 @@ column.
 | `date` | `LocalDate` |
 | `time` | `LocalTime` |
 | `interval` | `Duration` |
+| `bytea` | `ByteArray` |
 | an enum type | the enum of the same constants in `schema.kg` |
 | `T[]` | `List<T>`, or `List<T?>` |
 | a domain | its base type's mapping |
@@ -715,7 +729,8 @@ it is read (section 8): `infinity` in a `timestamptz` or a `date`,
 length. A `Duration` too long for an `interval`'s microseconds is a
 panic when it is sent. A `Decimal` holds `NaN` and `Infinity` as well
 as numbers, and a zero keeps its scale: `0.00`. An empty `List` is sent as an
-empty array, never as `NULL`.
+empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
+`bytea`.
 
 ### 10.5 Nullability
 
@@ -882,7 +897,8 @@ type of its own in a package `kogo.<name>`, imported by name as
 `kogo.time` is, and so for input and output, where Kotlin's are
 global functions and Kogo's an effect (section 7). So a file's imports
 show what in it is not Kotlin's.
-`Uuid`, `newId` and `Decimal` are Kogo's own and need no import.
+`Uuid`, `newId` and `Decimal` are Kogo's own and need no import;
+`ByteArray` (section 3) is Kotlin's name and needs none either.
 
 **Collections** (immutable; "changing" one returns a new one).
 `listOf`, `emptyList`, `setOf`, `mapOf`, `size`, `isEmpty`, `isNotEmpty`,
@@ -1164,6 +1180,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `return` inside a lambda, as `xs.forEach { if (it < 0) return false }` | end the lambda with its value; return after the call |
 | `suspend`, coroutines, `Flow`, threads | plain blocking code |
 | `Sequence`, `generateSequence`, `MutableList`, arrays | a `while` loop with a local `var`, or the list functions |
+| `bytes[i]`, `bytes.size`, `byteArrayOf(...)`, `a == b` on a `ByteArray` | none: a `ByteArray` is carried, and a binding reads it (section 3) |
 | `java.time.*`, `java.util.UUID`, `BigDecimal` | `kogo.time.*`, `Uuid`, `Decimal` |
 | `kotlin.test.*` | `kogo.test.*` |
 | `BigDecimal.valueOf(x).stripTrailingZeros().toPlainString()` | `plain(x)`, from `kogo.text`, not `Decimal` |
@@ -1443,7 +1460,9 @@ Inputs and answers are JSON.
 
 - Any other type in an input or an answer is a compile error: a `Map`,
   a `Set`, a `Pair`, a `Decimal`, a type of `kogo.time`, a function, an
-  external class. Send text that the server has formatted.
+  external class. Send text that the server has formatted. A
+  `ByteArray` is one too: bytes stay in a row, and an operation answers
+  what the page shows of them.
 - A sealed interface, or a variant of one, is a compile error too: send
   a data class, with an enum that says which case it is.
 - `Unit` stands only as the whole input or the whole answer.

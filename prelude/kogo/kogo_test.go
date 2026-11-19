@@ -430,16 +430,7 @@ func TestNullableAndOverloads(t *testing.T) {
 // A plain db.tx is run once: a deadlock in it is a panic, not a rerun
 // (spec.md 10.7).
 func TestPlainTxRunsOnce(t *testing.T) {
-	url := os.Getenv("KOGO_TEST_DATABASE_URL")
-	if url == "" {
-		url = "postgres://kogo:kogo@127.0.0.1/kogo_test"
-	}
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, url)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer pool.Close()
+	ctx, pool := testPool(t)
 	runs := 0
 	defer func() {
 		if p, _ := recover().(*pgconn.PgError); p == nil || p.Code != "40P01" || runs != 1 {
@@ -454,9 +445,21 @@ func TestPlainTxRunsOnce(t *testing.T) {
 	})
 }
 
-// A test's transaction is SERIALIZABLE, as RolledBack states it, and
-// is rolled back (spec.md 16.2).
+// A test's transaction is SERIALIZABLE, as RolledBack states it
+// (spec.md 16.2).
 func TestRolledBackIsSerializable(t *testing.T) {
+	ctx, pool := testPool(t)
+	var level string
+	RolledBack(NewDb(ctx, pool), func(tx Tx) {
+		must(0, tx.tx.QueryRow(ctx, "show transaction_isolation").Scan(&level))
+	})
+	if level != "serializable" {
+		t.Errorf("a test's transaction is at %q, want serializable", level)
+	}
+}
+
+// testPool connects to the test database, closing it when t ends.
+func testPool(t *testing.T) (context.Context, *pgxpool.Pool) {
 	url := os.Getenv("KOGO_TEST_DATABASE_URL")
 	if url == "" {
 		url = "postgres://kogo:kogo@127.0.0.1/kogo_test"
@@ -466,12 +469,6 @@ func TestRolledBackIsSerializable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Close()
-	var level string
-	RolledBack(NewDb(ctx, pool), func(tx Tx) {
-		must(0, tx.tx.QueryRow(ctx, "show transaction_isolation").Scan(&level))
-	})
-	if level != "serializable" {
-		t.Errorf("a test's transaction is at %q, want serializable", level)
-	}
+	t.Cleanup(pool.Close)
+	return ctx, pool
 }

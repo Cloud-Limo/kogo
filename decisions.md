@@ -1629,7 +1629,9 @@ Each entry: what was decided, why, and what would reopen it.
   (`test("...", serializable = true)`), the program's own words and the level the code
   runs at in production, at the cost of the word on nearly every test of a program that
   reads without locks; it can be added later, as a way to state READ COMMITTED, without
-  changing a test already written. (c) such functions tested only through a served row.
+  changing a test already written. (c) such functions tested only through a served row,
+  at the cost of a server and a row for each such test, and no test of a gate or reader
+  alone.
   Reopen: a test that must see what another connection commits meanwhile, which shows
   where the test's `env` holds a `Db`.
 

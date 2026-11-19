@@ -137,8 +137,15 @@ func gate(tx kogo.Tx, e env, _ Request, p Person) kogo.Either[string, Held] {
 	return kogo.Either_Right[Held]{Value: Held{p.Name, tx}}
 }
 
+// ended reports whether tx has ended: a statement on it panics.
+func ended(tx kogo.Tx) (ended bool) {
+	defer func() { ended = recover() != nil }()
+	count(tx)
+	return
+}
+
 func step(_ env, h Held, p Person) kogo.Either[string, rt.Unit] {
-	if h.name != p.Name || strings.HasPrefix(p.Name, "unsent") {
+	if !ended(h.tx) || h.name != p.Name || strings.HasPrefix(p.Name, "unsent") {
 		return kogo.Either_Left[string]{Value: "secret step"}
 	}
 	return kogo.Either_Right[rt.Unit]{}
@@ -148,9 +155,19 @@ func work(e env, h Held, p Person) kogo.Either[string, string] {
 	return add(h.tx, e, Request{}, p)
 }
 
+// raceGate counts its runs and gives its Tx, on which the work races.
+func raceGate(tx kogo.Tx, e env, _ Request, _ rt.Unit) kogo.Either[string, kogo.Tx] {
+	e.gates.Add(1)
+	return kogo.Either_Right[kogo.Tx]{Value: tx}
+}
+
+func raceWork(e env, tx kogo.Tx, u rt.Unit) kogo.Either[string, int32] {
+	return race(tx, e, Request{}, u)
+}
+
 var table = Table[env]{Check: ours, Operations: []Operation[env]{
 	Tx("add", add), Tx("race", race), Tx("deadlocked", deadlocked), Db("login", login), Db("who", who), Tx("signIn", signIn),
-	Gated("held", gate, nil, work), Gated("sent", gate, step, work),
+	Gated("held", gate, nil, work), Gated("sent", gate, step, work), Gated("heldRace", raceGate, nil, raceWork),
 }}
 
 func TestHandler(t *testing.T) {
@@ -198,9 +215,11 @@ func TestHandler(t *testing.T) {
 		{"POST", "who", `not read`, `200 {"type":"ok","value":{"header":"me","cookie":"crumb","missing":null,"host":"example.com","address":"192.0.2.1"}}`},
 		{"POST", "nothing", `{}`, `404 `},
 		{"GET", "add", ``, `405 `},
-		// The check runs first, before the name is looked up, and
-		// only reads; then the gate, the step and the work.
+		// The check runs first, before the name is looked up or the
+		// method read, and only reads; then the gate, the step and
+		// the work.
 		{"POST", "add", `check forged`, `403 secret check`},
+		{"GET", "add", `check forged`, `403 secret check`},
 		{"POST", "nothing", `check forged`, `403 secret check`},
 		{"POST", "add", `check writes`, `500 request `},
 		{"POST", "held", `{"name":"held"}`, `200 {"type":"ok","value":"secret answer"}`},
@@ -236,7 +255,7 @@ func TestHandler(t *testing.T) {
 			t.Errorf("%d rows of %q, want %d: a gated row keeps what it wrote, or a refusal does not roll back", rows(name), name, want)
 		}
 	}
-	if n := h.env.gates.Load(); n != 9 {
+	if n := h.env.gates.Swap(0); n != 9 {
 		t.Errorf("the gate ran %d times, want 9", n)
 	}
 	h.Limit = 50 * time.Millisecond
@@ -254,6 +273,18 @@ func TestHandler(t *testing.T) {
 	if h.env.attempts.Load() < 3 || !strings.Contains(answers[0]+answers[1], `{"type":"ok","value":0}`) ||
 		!strings.Contains(answers[0]+answers[1], `{"type":"ok","value":1}`) {
 		t.Errorf("two requests in conflict answer %v after %d attempts", answers, h.env.attempts.Load())
+	}
+	// A gated row races as a Tx operation does: its transaction is
+	// SERIALIZABLE, and each rerun runs the gate again.
+	h.env.attempts.Store(0)
+	h.env.ready.Add(2)
+	for i := range answers {
+		wg.Go(func() { _, answers[i] = post("POST", "heldRace", "") })
+	}
+	wg.Wait()
+	if n := h.env.attempts.Load(); n < 3 || h.env.gates.Load() != n || !strings.Contains(answers[0]+answers[1], `{"type":"ok","value":2}`) ||
+		!strings.Contains(answers[0]+answers[1], `{"type":"ok","value":3}`) {
+		t.Errorf("two gated requests in conflict answer %v after %d attempts and %d runs of the gate", answers, n, h.env.gates.Load())
 	}
 
 	// The log: a line for each request, with its id; reruns and a
@@ -281,7 +312,7 @@ func TestHandler(t *testing.T) {
 	if !checkWrote {
 		t.Error("a check that writes is not refused by Postgres")
 	}
-	if len(ids) != 27 || strings.Contains(log.String(), "secret") {
+	if len(ids) != 30 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
 	causes := map[string]bool{}

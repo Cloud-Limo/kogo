@@ -256,3 +256,45 @@ func TestErrors(t *testing.T) {
 		}
 	}
 }
+
+// The twelve statements of doc/gates.md, "A gate reads and decides":
+// what Postgres's tree says each needs of each table, which refuses
+// the first seven in a gate and passes the rest. The last two write
+// and are not caught: a function's body is not in the tree. Then a
+// lock through a view, merge and upsert, and two utility statements,
+// whose tree lists no table and gives Postgres's tag instead.
+func TestTables(t *testing.T) {
+	c := connect(t)
+	for literal, want := range map[string]string{
+		`update person set name = $name where id = $id`:                                             "person update",
+		`insert into session (id, csrf_token, expires_at) values ($id, $token, now()) returning id`: "session insert",
+		`update people set name = $name`:                                                            "people update",
+		`with gone as (delete from session returning id) select count(*) from gone, person`:         "person, session delete",
+		`select name from person where id = $id for update`:                                         "person lock",
+		`select name from person where id = $id for share`:                                          "person lock",
+		`select p.name from person p, session s for key share of s`:                                 "person, session lock",
+		`select name from person where id in (select id from session)`:                              "person, session",
+		`select name from people`:                                                                   "people",
+		`select set_config('app.tenant', $tenant, true)`:                                            "",
+		`select rename_all()::text`:                                                                 "",
+		`select nextval('ticket')`:                                                                  "",
+		`select name from people for update`:                                                        "people lock",
+		`merge into person p using session s on p.id = s.id when matched then delete`:               "person delete, session",
+		`insert into session (id, csrf_token, expires_at) values ($id, $token, now()) on conflict (id) do update set expires_at = now()`: "session insert update",
+		`truncate person`:                 "TRUNCATESTMT",
+		`lock table person in share mode`: "LOCKSTMT",
+	} {
+		st, err := check(c, literal)
+		if err != nil {
+			t.Errorf("%s: %v", literal, err)
+			continue
+		}
+		got := []string{st.Utility}[:min(len(st.Utility), 1)]
+		for _, table := range st.Tables {
+			got = append(got, strings.Join(append([]string{table.Name}, table.Needs...), " "))
+		}
+		if strings.Join(got, ", ") != want {
+			t.Errorf("%s touches %q, want %q", literal, strings.Join(got, ", "), want)
+		}
+	}
+}

@@ -67,6 +67,7 @@ func (c *checker) sql(e *syntax.Call, lit *syntax.SQL) Type {
 	}
 	q := &Query{}
 	c.info.SQL[lit] = q
+	c.stmts[c.owner] = append(c.stmts[c.owner], reached{lit, c.file})
 	var result Type
 	switch sel.Name {
 	case "exists":

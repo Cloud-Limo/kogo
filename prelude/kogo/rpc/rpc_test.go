@@ -28,6 +28,7 @@ type env struct {
 	ready    *sync.WaitGroup // the two first attempts of race, each having read
 	attempts *atomic.Int32
 	gates    *atomic.Int32 // the runs of gate
+	xids     *sync.Map     // the transaction of each gate run, by name, as pg_current_xact_id gives it
 }
 
 type Person struct {
@@ -125,12 +126,11 @@ type Held struct {
 	tx   kogo.Tx
 }
 
-// gate, step and work each refuse a name of their own. The gate and
-// the work insert first, which a gate would not: a refusal of either,
-// or of the step after the gate, leaves no row.
+// gate, step and work each refuse a name of their own. The work
+// inserts first: its refusal leaves no row.
 func gate(tx kogo.Tx, e env, _ Request, p Person) kogo.Either[string, Held] {
 	e.gates.Add(1)
-	insert(tx, "gate "+p.Name)
+	e.xids.Store(p.Name, kogo.Tx_QuerySingle(tx, "select pg_current_xact_id()::text", func(s kogo.Scan) (x string) { s(&x); return }))
 	if strings.HasPrefix(p.Name, "nobody") {
 		return kogo.Either_Left[string]{Value: "secret gate"}
 	}
@@ -163,6 +163,20 @@ func act(_ env, h Held, p Person) kogo.Either[string, string] {
 	return kogo.Either_Right[string]{Value: "secret answer"}
 }
 
+// strays is a gate that does what its input names: three things a
+// gate must not, and binding a setting, which it may.
+func strays(tx kogo.Tx, _ env, _ Request, p Person) kogo.Either[string, Held] {
+	kogo.Tx_Exists(tx, map[string]string{"updates": "update person set name = name returning 1", "locks": "select 1 from person for share",
+		"counts": "select nextval('ticket')", "binds": "select set_config('kogo.who', 'me', true)"}[p.Name])
+	return kogo.Either_Right[Held]{Value: Held{p.Name, tx}}
+}
+
+// bound is work that writes, and answers the setting its gate bound.
+func bound(_ env, h Held, _ Person) kogo.Either[string, string] {
+	insert(h.tx, "bound "+h.name)
+	return kogo.Either_Right[string]{Value: kogo.Tx_QuerySingle(h.tx, "select coalesce(current_setting('kogo.who', true), 'unset')", func(s kogo.Scan) (v string) { s(&v); return })}
+}
+
 // raceGate counts its runs and gives its Tx, on which the work races.
 func raceGate(tx kogo.Tx, e env, _ Request, _ rt.Unit) kogo.Either[string, kogo.Tx] {
 	e.gates.Add(1)
@@ -190,6 +204,8 @@ var table = Table[env]{Check: ours, Operations: []Operation[env]{
 	Tx("plain", false, level), Tx("serializable", true, level), Gated("plainGated", false, level, nil, levelWork),
 	Gated("serializableGated", true, level, nil, levelWork), Outside("plainOutside", false, level, levelWork),
 	Outside("serializableOutside", true, level, levelWork),
+	Gated("strays", true, strays, nil, bound), Gated("straysSent", true, strays, step, bound), Outside("straysOutside", true, strays, act),
+	Gated("straysPlain", false, strays, nil, bound),
 }}
 
 func TestHandler(t *testing.T) {
@@ -202,7 +218,7 @@ func TestHandler(t *testing.T) {
 	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
 	defer drop()
 	var log bytes.Buffer
-	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}}, slog.New(slog.NewJSONHandler(&log, nil)))
+	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}, &sync.Map{}}, slog.New(slog.NewJSONHandler(&log, nil)))
 	var cookies []string
 	post := func(method, name, body string) (int, string) {
 		w := httptest.NewRecorder()
@@ -261,6 +277,18 @@ func TestHandler(t *testing.T) {
 		{"POST", "serializableGated", ``, `200 {"type":"ok","value":"serializable"}`},
 		{"POST", "plainOutside", ``, `200 {"type":"ok","value":"read committed"}`},
 		{"POST", "serializableOutside", ``, `200 {"type":"ok","value":"serializable"}`},
+		// A gate on a SerializableTx is held to reading by Postgres: a
+		// write, a row lock and nextval are each a bug of ours, before
+		// a step and before an action fun too. A setting it binds is
+		// still set in the work, which writes. A gate on a Tx may lock,
+		// and its work writes: the one row of "bound locks".
+		{"POST", "strays", `{"name":"updates"}`, `500 request `},
+		{"POST", "strays", `{"name":"locks"}`, `500 request `},
+		{"POST", "strays", `{"name":"counts"}`, `500 request `},
+		{"POST", "straysSent", `{"name":"updates"}`, `500 request `},
+		{"POST", "straysOutside", `{"name":"updates"}`, `500 request `},
+		{"POST", "strays", `{"name":"binds"}`, `200 {"type":"ok","value":"me"}`},
+		{"POST", "straysPlain", `{"name":"locks"}`, `200 {"type":"ok","value":"`},
 	} {
 		if status, body := post(c.method, c.name, c.body); !strings.HasPrefix(fmt.Sprint(status, " ", body), c.want) {
 			t.Errorf("%s %s %s answers %d %s, want %s", c.method, c.name, c.body, status, body, c.want)
@@ -282,12 +310,20 @@ func TestHandler(t *testing.T) {
 	// gate runs twice where the step passes and once where it or the
 	// gate refuses: 3 runs for held, and 1, 1, 2 and 2 for sent. The
 	// gate of work that is an action fun runs once, in a transaction
-	// that commits unless the gate refuses: 3 runs for rung.
-	for name, want := range map[string]int{"held": 1, "gate held": 1, "gate nobody held": 0, "refused held": 0, "gate refused held": 0,
-		"gate nobody sent": 0, "gate unsent": 0, "refused sent": 0, "gate refused sent": 0, "sent": 1, "gate sent": 1, "checked": 0,
-		"gate rung": 1, "gate nobody rung": 0, "gate refused rung": 1} {
+	// that commits unless the gate refuses: 3 runs for rung, and their
+	// transactions, by id, commit for rung and refused rung.
+	for name, want := range map[string]int{"held": 1, "refused held": 0, "refused sent": 0, "sent": 1, "checked": 0,
+		"bound updates": 0, "bound counts": 0, "bound binds": 1, "bound locks": 1} {
 		if rows(name) != want {
 			t.Errorf("%d rows of %q, want %d: a gated row keeps what it wrote, or a refusal does not roll back", rows(name), name, want)
+		}
+	}
+	for name, want := range map[string]string{"rung": "committed", "refused rung": "committed", "nobody rung": "aborted"} {
+		x, _ := h.env.xids.Load(name)
+		var got string
+		pool.QueryRow(ctx, "select pg_xact_status($1::text::xid8)", x).Scan(&got)
+		if got != want {
+			t.Errorf("the gate's transaction of %q is %q, want %q: the gate of an action fun commits before the work", name, got, want)
 		}
 	}
 	if n := h.env.gates.Swap(0); n != 12 {
@@ -326,7 +362,7 @@ func TestHandler(t *testing.T) {
 
 	// The log: a line for each request, with its id; reruns and a
 	// panic under the request's id; no input, answer or refusal.
-	ids, reruns, checkWrote := map[any]string{}, map[any]string{}, false
+	ids, reruns, readOnly := map[any]string{}, map[any]string{}, map[string]bool{}
 	for _, l := range lines() {
 		switch l["msg"] {
 		case "served":
@@ -337,19 +373,20 @@ func TestHandler(t *testing.T) {
 		case "rerun":
 			reruns[l["request"]] = l["cause"].(string)
 		case "panic":
-			// The check that writes panics with Postgres's refusal.
-			if m := l["message"].(string); strings.Contains(m, "cannot execute INSERT in a read-only transaction") {
-				checkWrote = true
+			// The check that writes panics with Postgres's refusal,
+			// and so does a gate that strays.
+			if m := l["message"].(string); strings.Contains(m, "in a read-only transaction") {
+				readOnly[strings.Fields(m[strings.Index(m, "cannot execute"):])[2]] = true
 			} else if m != "add panics" && !strings.Contains(m, "cookie") ||
 				m == "add panics" && !strings.Contains(l["trace"].(string), "rpc.add(") {
 				t.Errorf("a panic is logged as %v", l)
 			}
 		}
 	}
-	if !checkWrote {
-		t.Error("a check that writes is not refused by Postgres")
+	if len(readOnly) != 4 || !readOnly["INSERT"] || !readOnly["UPDATE"] || !readOnly["SELECT"] || !readOnly["nextval()"] {
+		t.Errorf("a check that writes, or a gate that writes, locks or counts, is not refused by Postgres: %v", readOnly)
 	}
-	if len(ids) != 40 || strings.Contains(log.String(), "secret") {
+	if len(ids) != 47 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
 	causes := map[string]bool{}

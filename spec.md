@@ -1151,8 +1151,10 @@ one returns an `Either` whose `Left` is a refusal in words:
   have no gate of their own. A gate that reads an input stands in one
   row of a list.
 - Gated work takes no `Request`, `Tx` or `Db`: its gate has read the
-  request, and the proof is all it is handed. An ungated operation
-  takes no proof.
+  request, and the proof is all it is handed. So a proof is none of
+  the three either: a gate gives a data class of the application's
+  that holds the `Tx` and what it read. An ungated operation takes no
+  proof.
 - The parameters' names are the author's. None of these funs has type
   parameters or default values.
 - A `Left` is a refusal: words for the person using the page. Each

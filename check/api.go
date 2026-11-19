@@ -153,6 +153,9 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 	env(row.Gate, g, gateRole)
 	env(id, f, workRole)
 	op := &Op{Func: f, Gate: g, Proof: proof, Input: f.Params[2].Type, Answer: answer}
+	if d := named(proof); d != nil && (d == c.prelude("Tx") || d == c.prelude("Db") || d.Pkg == "kogo.rpc" && d.Name == "Request") {
+		c.errorf(row.Gate, "gate", "%s gives a %s: a gate gives a proof, not the handle, so give a data class that holds the Tx and what the gate read (spec.md 15.2)", g.Name, proof)
+	}
 	if t := f.Params[1].Type; !same(t, proof) {
 		c.errorf(id, "operation", "%s takes a %s second, and its gate %s gives a %s: gated work takes its gate's proof, so take a %s or name the gate that gives a %s (spec.md 15.2)", id.Name, t, g.Name, proof, proof, t)
 	}

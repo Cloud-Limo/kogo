@@ -2971,6 +2971,11 @@ Each entry: what was decided, why, and what would reopen it.
 - **A gate takes a `Tx`** until `SerializableTx` is built (roadmap row 5), and a `Db` is
   refused. **A proof is any type** until a proof's rules are (row 6), and gated work and
   a step take the very type the gate gives, not one it fits.
+- **A gate's proof is not a `Tx`, a `Db` or a `Request`** (Review 1 of PR 88): gated work
+  takes none of them, and a proof of that type would hand it one. Refused under `gate`, the
+  gate's code, since the gate gives it. This is the one proof rule before row 6. Not
+  taken: refusing it at the work's second parameter, where the same type is fine for an
+  ungated operation's first.
 - **A step returns `Either<String, Unit>`** as well as taking the gate's proof and the
   operation's input, since `doc/gates.md` hands its answer to nothing. Not taken: the
   proof and the input alone, which the issue named. That it is an `action fun` is row 7's.

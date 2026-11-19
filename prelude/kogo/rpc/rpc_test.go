@@ -221,6 +221,7 @@ func TestHandler(t *testing.T) {
 	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}, &sync.Map{}}, slog.New(slog.NewJSONHandler(&log, nil)))
 	var cookies []string
 	var header http.Header
+	var mu sync.Mutex
 	post := func(method, name, body string) (int, string) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(method, "/"+name, strings.NewReader(body))
@@ -230,6 +231,8 @@ func TestHandler(t *testing.T) {
 		}
 		r.AddCookie(&http.Cookie{Name: "c", Value: "crumb"})
 		h.ServeHTTP(w, r)
+		mu.Lock()
+		defer mu.Unlock()
 		cookies, header = w.Header().Values("Set-Cookie"), w.Header()
 		return w.Code, w.Body.String()
 	}

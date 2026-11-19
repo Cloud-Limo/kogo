@@ -65,8 +65,8 @@ func examples(t *testing.T, patterns ...string) map[string]string {
 func TestExamples(t *testing.T) {
 	testDB(t)
 	files := examples(t, "*.kg")
-	if len(files) != 25 {
-		t.Fatalf("%d examples, want 25", len(files))
+	if len(files) != 26 {
+		t.Fatalf("%d examples, want 26", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)
@@ -88,7 +88,7 @@ func TestEmittedGoRuns(t *testing.T) {
 	// 24's check and gates are checked and not served yet, so emit
 	// refuses it: the rest are emitted without it.
 	files := examples(t, "*.kg")
-	if code, out := kogo(t, files, dir); code != 1 || !strings.Contains(out, `"file":"24_gates.kg","line":10,"column":20,"code":"not-yet-emitted"`) {
+	if code, out := kogo(t, files, dir); code != 1 || !strings.Contains(out, `"file":"24_gates.kg","line":11,"column":20,"code":"not-yet-emitted"`) {
 		t.Fatalf("with 24_gates.kg: exit %d, want 1 and its check refused\n%s", code, out)
 	}
 	delete(files, "24_gates.kg")

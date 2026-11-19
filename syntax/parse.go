@@ -353,6 +353,9 @@ func (p *parser) modifiers() Modifiers {
 		case p.modifier() && p.at("external"):
 			m.External = true
 			p.next()
+		case p.modifier() && (p.at("action") || p.at("lookup")):
+			m.Calls = p.tok.text
+			p.next()
 		default:
 			return m
 		}
@@ -390,6 +393,10 @@ func (p *parser) decl(abstract bool) Decl {
 	pos := p.tok.pos
 	m := p.modifiers()
 	switch {
+	case m.Calls != "" && !p.at("fun"):
+		p.fail(pos, "syntax", "%s goes before fun, and before nothing else: %s fun", m.Calls, m.Calls)
+	case m.Calls == "lookup" && !m.External:
+		p.fail(pos, "syntax", "lookup marks a binding, lookup external fun: a fun with a body says nothing where it only asks, so leave the word out")
 	case m.External && (p.at("class") || p.at("object")):
 		kind := "external " + p.tok.text
 		p.next()
@@ -547,7 +554,7 @@ func (p *parser) params(ctor, external bool) []*Param {
 			pos := p.tok.pos
 			vararg := external && p.modifier() && p.got("vararg")
 			m := p.modifiers()
-			if m.Annotations != nil || m.Visibility != "" || m.Const || m.External {
+			if m.Annotations != nil || m.Visibility != "" || m.Const || m.External || m.Calls != "" {
 				p.fail(pos, "syntax", "a parameter takes no modifier")
 			}
 			par := &Param{Pos: pos, Override: m.Override, Val: p.got("val"), Vararg: vararg}

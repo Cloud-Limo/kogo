@@ -9,7 +9,7 @@ import (
 // rpc gives the few lines of kogo.rpc that operations need, and the
 // head of a program: its imports, an environment and an operation.
 func rpc(imports ...string) string {
-	return "package kogo.rpc\nexternal class Request\n---\nimport kogo.rpc.Request\n" + strings.Join(imports, "") +
+	return "package kogo.rpc\nexternal class Request\naction external fun ring()\n---\nimport kogo.rpc.Request\n" + strings.Join(imports, "") +
 		"data class Env(val n: Int)\nfun me(tx: Tx, env: Env, request: Request, input: Unit): Either<String, Unit> = either { }\n"
 }
 
@@ -110,7 +110,7 @@ func TestOperationFacts(t *testing.T) {
 // Sections 15.1 and 15.2: a list's check, a row's gate and its step,
 // and that what one gives is what the next takes.
 func TestGates(t *testing.T) {
-	head := rpc() + `data class P(val n: Int)
+	head := rpc("import kogo.rpc.ring\n") + `data class P(val n: Int)
 data class Q(val n: Int)
 data class In(val n: Int)
 data class E2(val n: Int)
@@ -119,7 +119,7 @@ fun g(tx: Tx, env: Env, request: Request): Either<String, P> = either { P(1) }
 fun own(tx: Tx, env: Env, request: Request, input: In): Either<String, P> = either { P(input.n) }
 fun w(env: Env, p: P, input: In): Either<String, Int> = either { p.n }
 fun v(env: Env, p: P, input: Unit): Either<String, Unit> = either { }
-fun s(env: Env, p: P, input: In): Either<String, Unit> = either { }
+action fun s(env: Env, p: P, input: In): Either<String, Unit> = either { ring() }
 `
 	info, errs := run(t, head+"api ops checkedBy ours {\n    w gatedBy own after s\n    v gatedBy g\n    me ungated\n}\napi more unchecked { w gatedBy g, v gatedBy g }")
 	if errs != nil {
@@ -171,5 +171,6 @@ fun s(env: Env, p: P, input: In): Either<String, Unit> = either { }
 		{head + "api ops unchecked { v gatedBy g after ‸s }", "step", "s takes a In third, and v's input is a Unit: a step takes its operation's input"},
 		{head + "api ops unchecked { w gatedBy g after ‸w }", "step", "w returns Either<String, Int>: a step named with after returns Either<String, Unit>"},
 		{fun("x(env: E2, p: P, input: In): Either<String, Unit>") + "api ops unchecked { w gatedBy g after ‸x }", "step", "x takes the environment E2, and g takes Env"},
+		{fun("x(env: Env, p: P, input: In): Either<String, Unit>") + "api ops unchecked { w gatedBy g after ‸x }", "step", "x is not an action fun: a step named with after runs with no transaction open, to change something outside, so write action fun x"},
 	})
 }

@@ -24,8 +24,7 @@ only bindings write `external` (section 13), so no author meets it:
 - the `sql"""..."""` literal (section 10);
 - the `external` binding declarations (section 13);
 - the lists, `api` (section 15) and `tests` (section 16);
-- `action fun`, a function that changes something outside (not yet
-  in this spec: `doc/gates.md`).
+- `action fun`, a function that changes something outside (7.1).
 
 ## 2. Files, packages, visibility
 
@@ -437,6 +436,37 @@ A function can only do what its parameters let it do.
   (section 10). A function that touches the database has one of them as a
   parameter.
 - `Clock` gives the time: `clock.now(): Instant`.
+
+### 7.1 Actions
+
+A transaction is all or nothing and may run again; a call that
+changes something outside is neither. So the call says what it is,
+and so does every fun that makes it:
+
+```kotlin
+action fun announce(console: Console, message: String) {
+    console.println(message)        // println is an action of the prelude's
+}
+```
+
+- A binding with an effect outside says its kind before `external`:
+  an `action` changes something, a `lookup` asks and changes nothing
+  (section 13). Only an action is held to the rules here: a lookup is
+  allowed anywhere.
+- A fun that calls an action, a binding or an `action fun`, is an
+  `action fun`; one that is not is a compile error
+  (`unmarked-action`), and so is the call in a val's value or getter.
+  An `action fun` that calls no action is one too (`idle-action`).
+- An `action fun` takes no `Tx`, as a parameter or a receiver
+  (`action-tx`): it takes a `Db` and acts between its transactions.
+  It calls no action in a block that is handed a `Tx`, as `db.tx`'s
+  is (`action-in-tx`).
+- An action is not kept in a value (`action-kept`): there is no `::`
+  reference to an `action fun`, no member of an interface or a data
+  class is one, and a lambda that acts is passed straight to a fun of
+  the prelude, which runs it before it returns.
+- `action` goes before a top-level `fun` only, and `lookup` on a
+  binding only.
 
 ## 8. Bugs are panics
 
@@ -997,6 +1027,9 @@ external fun List<Long>.sum(): Long
 - Three things are allowed in a binding and nowhere else: a nullable
   receiver, `out` on an external class's type parameter, and `vararg` on
   a parameter, which then takes any number of arguments.
+- `action external fun` and `lookup external fun` say the kind of a
+  binding that calls outside (7.1): `Console.println` is an action,
+  `Console.readln` and `Clock.now` are lookups.
 - `@go("package")` names the Go package of the declaration it precedes.
 
 Bindings are written by whoever maintains the prelude. Application code
@@ -1132,7 +1165,7 @@ one returns an `Either` whose `Left` is a refusal in words:
 | the check | a `Tx`, the environment, a `Request` | `Either<String, Unit>` |
 | a gate | a `Tx`, the environment, a `Request`, and the operation's input if it reads it | `Either<String, P>`, with `P` its proof |
 | gated work, the `op` of a gated row | the environment, the proof, the input | `Either<String, A>` |
-| a step | the environment, the proof, the input | `Either<String, Unit>` |
+| a step, an `action fun` (7.1) | the environment, the proof, the input | `Either<String, Unit>` |
 | an ungated operation | a `Tx` or a `Db` (15.3), the environment, a `Request`, the input | `Either<String, A>` |
 
 - The environment is one type of the application's, the same for

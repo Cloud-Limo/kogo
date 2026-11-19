@@ -97,7 +97,8 @@ type Modifiers struct {
 	Visibility  string // "", "private" or "internal"
 	Override    bool
 	Const       bool
-	External    bool // a binding: spec.md section 13
+	External    bool   // a binding: spec.md section 13
+	Calls       string // "action" or "lookup" before fun: spec.md 7.1 and 13
 }
 
 // A FunDecl is a function. A body is a block, an = expression, or in

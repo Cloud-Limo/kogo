@@ -41,10 +41,12 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   Its answers are recorded first (DEV-894), and its Kotlin, pins and
   JVM route go in one PR.
 - **cusoon2 commits its emitted Go** (19 Nov 2026, a), checked by CI
-  re-emitting it as jOOQ's code is. Kogo is public under Apache-2.0
-  (DEV-941, DEV-942), so its runtime is an ordinary Go module pinned
-  by commit and the `kogo` tool a mise install. Emitting in every
-  build is the medium-term option once the builder has a Postgres.
+  re-emitting it as jOOQ's code is. Kogo is to be public under
+  Apache-2.0, its history kept, once DEV-941 adds `LICENSE`; DEV-942
+  renames its module so that cusoon2 can fetch it. Its runtime is
+  then an ordinary Go module pinned by commit and the `kogo` tool a
+  mise install. Emitting in every build is the medium-term option
+  once the builder has a Postgres.
 
 ## Settled for the ops site (19 Nov 2026)
 

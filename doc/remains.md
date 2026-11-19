@@ -5,11 +5,12 @@ Read those two first, then `doc/measured.md` for the counts they rest
 on. All three record a discussion with Greg on 17 Nov 2026: agreed as
 the design to work from, not built, not in `spec.md`, no example run.
 
-## Not yet discussed
+## Deferred
 
 - **The name of the command that prints the table** of gates, queues
   and their tables (`doc/gates.md`, "The table is printed";
-  `doc/work.md`, "The list of work").
+  `doc/work.md`, "The list of work"): named when it is built
+  (`doc/roadmap.md`, "Settled for the ops site").
 
 ## Not yet filed
 
@@ -107,11 +108,12 @@ Agreed subject to this review:
   tested"): the handler reads the system clock for the limit on
   reruns.
 - **What sits behind cusoon2's PDF extension** (`doc/work.md`, "An
-  application's own extensions"): a small writer of its own, or a
-  wrapped Go library. A survey named `fpdf`, now kept on Codeberg;
-  that its widths cover the standard fonts was from memory. Also
-  unchecked: whether PDFBox kerns when it measures a string, and the
-  Kotlin's 32-bit floats against Kogo's `Double` in the layout.
+  application's own extensions"): the roadmap plans a small writer
+  of cusoon2's own, about 380 lines of Go and font data
+  (`doc/roadmap.md`, "2. The rest of cusoon2"), over a wrapped Go
+  library such as `fpdf`. Still unchecked: whether PDFBox kerns
+  when it measures a string, and the Kotlin's 32-bit floats against
+  Kogo's `Double` in the layout.
 - **Reading Postgres's limit on a session idle in a transaction** when
   the server starts, as cusoon2's role is set.
 - **What the printed table and the gate's check miss.** A cascade, a
@@ -122,7 +124,9 @@ Agreed subject to this review:
   services") was a subagent's and was not checked again. Not
   established: when Google stopped enabling its legacy services for
   new projects, and the endpoints of its newer APIs.
-- **Every size.** None of this is sized as a whole. Guesses given: the
+- **Every size.** None of this was sized as a whole on 17 Nov; the
+  roadmap now sizes the work as a whole, by estimate
+  (`doc/roadmap.md`, "The work, in order"). Guesses given: the
   rule that a statement binds something of its proof, 30 to 50 lines
   of checker, and that a proof's transaction is used only before the
   dot, 20 to 30; the functions a gate reaches, for the read-only check,

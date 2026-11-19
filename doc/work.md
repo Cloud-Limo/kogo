@@ -1246,9 +1246,10 @@ proposed while the Go was to go unread; and Go's own fake time for
 tests (`testing/synctest`, in the pinned Go), whose documentation
 says to keep off the network and outside processes, where the
 runner's tests need Postgres. How an application tests its own Kogo
-code (the test form, DEV-893) stays open; it will need the same
-clock, server and steps, which are built once. Agreed with Greg on
-17 Nov 2026.
+code is settled in shape (`doc/roadmap.md`, "The test form";
+DEV-940), with its timeouts left open (`doc/remains.md`, "The test
+form"); it will need the same clock, server and steps, which are
+built once. Agreed with Greg on 17 Nov 2026.
 
 ## What it would change in the spec
 

@@ -220,6 +220,7 @@ func TestHandler(t *testing.T) {
 	var log bytes.Buffer
 	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}, &sync.Map{}}, slog.New(slog.NewJSONHandler(&log, nil)))
 	var cookies []string
+	var header http.Header
 	post := func(method, name, body string) (int, string) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(method, "/"+name, strings.NewReader(body))
@@ -229,7 +230,7 @@ func TestHandler(t *testing.T) {
 		}
 		r.AddCookie(&http.Cookie{Name: "c", Value: "crumb"})
 		h.ServeHTTP(w, r)
-		cookies = w.Header().Values("Set-Cookie")
+		cookies, header = w.Header().Values("Set-Cookie"), w.Header()
 		return w.Code, w.Body.String()
 	}
 	rows := func(name string) (n int) {
@@ -292,6 +293,17 @@ func TestHandler(t *testing.T) {
 	} {
 		if status, body := post(c.method, c.name, c.body); !strings.HasPrefix(fmt.Sprint(status, " ", body), c.want) {
 			t.Errorf("%s %s %s answers %d %s, want %s", c.method, c.name, c.body, status, body, c.want)
+		}
+	}
+	// A 405 says what is allowed, and every answer its type: a
+	// refusal's is JSON, a status's text.
+	for _, c := range []struct{ method, name, body, key, want string }{
+		{"GET", "add", ``, "Allow", "POST"},
+		{"POST", "add", `{"name":"refused"}`, "Content-Type", "application/json"},
+		{"POST", "add", `check forged`, "Content-Type", "text/plain; charset=utf-8"},
+	} {
+		if post(c.method, c.name, c.body); header.Get(c.key) != c.want {
+			t.Errorf("%s %s %s has %s %q, want %q", c.method, c.name, c.body, c.key, header.Get(c.key), c.want)
 		}
 	}
 	// A cookie HTTP cannot carry or a browser refuses panics, and
@@ -386,7 +398,7 @@ func TestHandler(t *testing.T) {
 	if len(readOnly) != 4 || !readOnly["INSERT"] || !readOnly["UPDATE"] || !readOnly["SELECT"] || !readOnly["nextval()"] {
 		t.Errorf("a check that writes, or a gate that writes, locks or counts, is not refused by Postgres: %v", readOnly)
 	}
-	if len(ids) != 47 || strings.Contains(log.String(), "secret") {
+	if len(ids) != 50 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
 	causes := map[string]bool{}

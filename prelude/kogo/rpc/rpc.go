@@ -289,7 +289,11 @@ func NewUnserved[Env any](operations []Operation[Env], enums []any) Unserved[Env
 
 // A Handler serves a table at the names of its operations, POST
 // /name, under the path where main mounts it with http.StripPrefix.
-type Handler[Env any] struct {
+type Handler[Env any] struct{ *server[Env] }
+
+// A server is what a Handler and Calls share: a list, its check if
+// it has one, and what its operations run with.
+type server[Env any] struct {
 	// Limit is how long the reruns of a Tx operation go on before
 	// the answer is 503.
 	Limit time.Duration
@@ -308,11 +312,11 @@ func NewHandler[Env any](t Table[Env], pool *pgxpool.Pool, env Env, log *slog.Lo
 	if t.Check == nil {
 		panic("the table has no check: a list that a browser calls names one, api name checkedBy check")
 	}
-	return newHandler(t.Check, t.Operations, t.Enums, pool, env, log)
+	return &Handler[Env]{newServer(t.Check, t.Operations, t.Enums, pool, env, log)}
 }
 
-func newHandler[Env any](check func(kogo.Tx, Env, Request) kogo.Either[string, rt.Unit], ops []Operation[Env], enums []any, pool *pgxpool.Pool, env Env, log *slog.Logger) *Handler[Env] {
-	h := &Handler[Env]{90 * time.Second, check, map[string]Operation[Env]{}, newReader(enums), pool, env, log}
+func newServer[Env any](check func(kogo.Tx, Env, Request) kogo.Either[string, rt.Unit], ops []Operation[Env], enums []any, pool *pgxpool.Pool, env Env, log *slog.Logger) *server[Env] {
+	h := &server[Env]{90 * time.Second, check, map[string]Operation[Env]{}, newReader(enums), pool, env, log}
 	for _, op := range ops {
 		h.read.check(op.input, map[reflect.Type]bool{})
 		h.ops[op.Name] = op
@@ -369,7 +373,7 @@ type result struct {
 // run is what a browser's call and Call share: the id, the log's
 // lines, the list's check, the limit and the reruns. input gives the
 // operation's input, or how the call ends without one.
-func (h *Handler[Env]) run(r *http.Request, name string, input func(Operation[Env]) (any, result)) (res result) {
+func (h *server[Env]) run(r *http.Request, name string, input func(Operation[Env]) (any, result)) (res result) {
 	start := time.Now()
 	id := kogo.NewId().String()
 	log := h.log.With("request", id, "operation", name)
@@ -430,14 +434,18 @@ type Op[Env, I, A any] struct{ name string }
 func NewOp[Env, I, A any](name string) Op[Env, I, A] { return Op[Env, I, A]{name} }
 
 // Calls runs the operations of an unchecked list for main's routes.
-// It is a Handler with no ServeHTTP, and so no http.Handler: no
-// browser reaches the list, and only Call does. Its Limit is a
-// Handler's.
-type Calls[Env any] Handler[Env]
+// It shares a Handler's server but has no ServeHTTP, and so is no
+// http.Handler: no browser reaches the list, and only Call does. Its
+// Limit is a Handler's. Its blank field keeps it from converting to a
+// Handler outside this package.
+type Calls[Env any] struct {
+	*server[Env]
+	_ struct{}
+}
 
 // NewCalls is NewHandler for an unchecked list.
 func NewCalls[Env any](u Unserved[Env], pool *pgxpool.Pool, env Env, log *slog.Logger) *Calls[Env] {
-	return (*Calls[Env])(newHandler(nil, u.operations, u.enums, pool, env, log))
+	return &Calls[Env]{server: newServer(nil, u.operations, u.enums, pool, env, log)}
 }
 
 // Refused is the error Call gives for an operation's refusal, with
@@ -454,7 +462,7 @@ func (r Refused) Error() string { return string(r) }
 // would be answered: 400 for an enum, 404 for an operation not of the
 // list, 500 with the request's id for a panic, 503 past the limit.
 func Call[Env, I, A any](c *Calls[Env], r *http.Request, op Op[Env, I, A], input I) (A, error) {
-	res := (*Handler[Env])(c).run(r, op.name, func(Operation[Env]) (any, result) {
+	res := c.run(r, op.name, func(Operation[Env]) (any, result) {
 		if err := c.read.valid(reflect.ValueOf(&input).Elem(), "input"); err != nil {
 			return nil, result{status: http.StatusBadRequest, text: op.name + ": " + err.Error()}
 		}

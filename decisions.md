@@ -2828,6 +2828,16 @@ Each entry: what was decided, why, and what would reopen it.
   `float64` and wrote `PT-1.9999999960000001S` for Java's `PT-1.999999996S`; the check
   found it. Not taken: leaving it to an issue of its own, for a three-line fix.
 
+## Taken renaming `Uuid.parse` and retyping `atStartOfDay` (DEV-932), not yet discussed
+
+- **`ZonedDateTime.toInstant()` is bound with it**: spec 12 listed it, the prelude had
+  not bound it, and without it a caller of `atStartOfDay` could not get its instant back.
+  Not taken: leaving `atStartOfDay` with no way back to an `Instant`.
+- **The 32-digit corner is stated in spec 12 and not held by `mise run kotlin`**, which
+  does not cover `Uuid` (Kotlin 2.4's `parseOrNull` reads
+  `01934f2abcde7f0189abcdef01234567`, run on 19 Nov 2026). Not taken: a `Uuid` case in
+  the check against Kotlin here, beyond the issue's budget.
+
 ## Going public (DEV-941), not yet discussed
 
 - **Apache-2.0, the license text verbatim in `LICENSE`, and the copyright line in

@@ -909,15 +909,33 @@ fun tally(words: List<String>): Pair<Int, String> {
 `)
 }
 
-// Uuid.parse is the prelude's object fun: a good text gives its id,
+// Uuid.parseOrNull is the prelude's object fun: a good text gives its id,
 // and a bad one null.
-func TestUuidParse(t *testing.T) {
+func TestUuidParseOrNull(t *testing.T) {
 	expect(t, [][2]string{
 		{`t.Id("01934f2a-bcde-7f01-89ab-CDEF01234567")`, "01934f2a-bcde-7f01-89ab-cdef01234567"},
 		{`t.Id("01934f2a-bcde-7f01-89ab")`, "null"},
 	}, `package t
 
-fun id(text: String): Uuid? = Uuid.parse(text)
+fun id(text: String): Uuid? = Uuid.parseOrNull(text)
+`)
+}
+
+// atStartOfDay gives a zoned time, as java.time's does, and toInstant
+// its instant: here the end of a skipped midnight.
+func TestAtStartOfDay(t *testing.T) {
+	expect(t, [][2]string{
+		{`t.Start(1541340000)`, "2018-11-04T01:00-02:00[America/Sao_Paulo] 2018-11-04T03:00:00Z"},
+	}, `package t
+
+import kogo.time.Instant
+import kogo.time.ZoneId
+
+fun start(second: Long): String {
+    val zone = ZoneId.of("America/Sao_Paulo")
+    val day = Instant.ofEpochSecond(second, 0L).atZone(zone).toLocalDate().atStartOfDay(zone)
+    return "$day ${day.toInstant()}"
+}
 `)
 }
 

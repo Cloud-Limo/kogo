@@ -128,7 +128,7 @@ func (r reader) read(t reflect.Type, j any, at string) (reflect.Value, error) {
 	case (t == uuidType || t.Kind() == reflect.String) && !isString:
 		return v, bad(at, "is not a string")
 	case t == uuidType:
-		u := kogo.Uuid_Parse(s)
+		u := kogo.Uuid_ParseOrNull(s)
 		if u == nil {
 			return v, bad(at, "is not a Uuid")
 		}

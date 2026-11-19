@@ -19,6 +19,7 @@ func TestTime(t *testing.T) {
 		{rt.ToString(Instant{Seconds: 1794753000}), "2026-11-15T14:30:00Z"},
 		{rt.ToString(ZonedDateTime_ToLocalDate(sydney)), "2026-11-16"},
 		{rt.ToString(sydney), "2026-11-16T01:30:00.120+11:00[Australia/Sydney]"},
+		{rt.ToString(ZonedDateTime_ToInstant(sydney)), "2026-11-15T14:30:00.120Z"},
 		{rt.ToString(Instant_AtZone(Instant{Seconds: 1794753000}, ZoneId_Of("UTC"))), "2026-11-15T14:30Z[UTC]"},
 		{rt.ToString(LocalDate{Year: 987, Month: 1, Day: 2}), "0987-01-02"},
 		// Years past four digits, or before year 0, and an offset in
@@ -26,8 +27,8 @@ func TestTime(t *testing.T) {
 		{rt.ToString(LocalDate{Year: -1, Month: 1, Day: 2}), "-0001-01-02"},
 		{rt.ToString(LocalDate{Year: 10000, Month: 1, Day: 2}) + " " + rt.ToString(LocalDate{Year: -10000, Month: 1, Day: 2}), "+10000-01-02 -10000-01-02"},
 		{rt.ToString(Instant{Seconds: -62167219201, Nanos: 120_000_000}), "-0001-12-31T23:59:59.120Z"},
-		{rt.ToString(Instant_AtZone(LocalDate_AtStartOfDay(LocalDate{Year: -1, Month: 1, Day: 2}, sydney.Zone), sydney.Zone)), "-0001-01-02T00:00+10:04:52[Australia/Sydney]"},
-		{rt.ToString(Instant_AtZone(LocalDate_AtStartOfDay(LocalDate{Year: 10000, Month: 1, Day: 2}, sydney.Zone), sydney.Zone)), "+10000-01-02T00:00+11:00[Australia/Sydney]"},
+		{rt.ToString(LocalDate_AtStartOfDay(LocalDate{Year: -1, Month: 1, Day: 2}, sydney.Zone)), "-0001-01-02T00:00+10:04:52[Australia/Sydney]"},
+		{rt.ToString(LocalDate_AtStartOfDay(LocalDate{Year: 10000, Month: 1, Day: 2}, sydney.Zone)), "+10000-01-02T00:00+11:00[Australia/Sydney]"},
 		{rt.ToString(Instant_AtZone(Instant{Seconds: 1794753000}, ZoneId_Of("Etc/GMT+5"))), "2026-11-15T09:30-05:00[Etc/GMT+5]"},
 		{rt.ToString(LocalDate_PlusDays(LocalDate{Year: 2028, Month: 2, Day: 28}, 1)), "2028-02-29"},
 		{rt.ToString(LocalDate_PlusDays(LocalDate{Year: 2026, Month: 12, Day: 30}, 33)), "2027-02-01"},
@@ -76,20 +77,21 @@ func TestPlusDaysRange(t *testing.T) {
 	}
 }
 
-// A day starts at its earliest instant in the zone, as java.time's
-// does, also where midnight is skipped or comes twice.
+// A day starts at its earliest time in the zone, as java.time's does,
+// also where midnight is skipped or comes twice.
 func TestAtStartOfDay(t *testing.T) {
 	for _, c := range []struct {
 		zone string
 		day  LocalDate
 		want string
 	}{
-		{"Australia/Sydney", LocalDate{2026, 11, 16}, "2026-11-15T13:00:00Z"},
-		{"America/Santiago", LocalDate{2022, 9, 11}, "2022-09-11T04:00:00Z"}, // midnight skipped
-		{"America/Havana", LocalDate{2022, 3, 13}, "2022-03-13T05:00:00Z"},   // midnight skipped
-		{"America/Havana", LocalDate{2022, 11, 6}, "2022-11-06T04:00:00Z"},   // midnight twice
-		{"Africa/Tunis", LocalDate{1977, 9, 24}, "1977-09-23T22:00:00Z"},     // midnight twice, Go takes the second
-		{"UTC", LocalDate{1969, 12, 31}, "1969-12-31T00:00:00Z"},
+		{"Australia/Sydney", LocalDate{2026, 11, 16}, "2026-11-16T00:00+11:00[Australia/Sydney]"},
+		{"America/Santiago", LocalDate{2022, 9, 11}, "2022-09-11T01:00-03:00[America/Santiago]"},   // midnight skipped
+		{"America/Sao_Paulo", LocalDate{2018, 11, 4}, "2018-11-04T01:00-02:00[America/Sao_Paulo]"}, // midnight skipped
+		{"America/Havana", LocalDate{2022, 3, 13}, "2022-03-13T01:00-04:00[America/Havana]"},       // midnight skipped
+		{"America/Havana", LocalDate{2022, 11, 6}, "2022-11-06T00:00-04:00[America/Havana]"},       // midnight twice
+		{"Africa/Tunis", LocalDate{1977, 9, 24}, "1977-09-24T00:00+02:00[Africa/Tunis]"},           // midnight twice, Go takes the second
+		{"UTC", LocalDate{1969, 12, 31}, "1969-12-31T00:00Z[UTC]"},
 	} {
 		if got := rt.ToString(LocalDate_AtStartOfDay(c.day, ZoneId_Of(c.zone))); got != c.want {
 			t.Errorf("%v.atStartOfDay(%s) is %s, want %s", c.day, c.zone, got, c.want)

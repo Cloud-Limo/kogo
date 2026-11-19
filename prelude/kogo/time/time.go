@@ -360,6 +360,21 @@ func Duration_OfSeconds(seconds, nanoAdjustment int64) Duration {
 	return Duration{addExact(seconds, s), int32(n)}
 }
 
+func Duration_OfDays(days int64) Duration {
+	if days > math.MaxInt64/86400 || days < math.MinInt64/86400 {
+		panic("long overflow")
+	}
+	return Duration{days * 86400, 0}
+}
+
+// Duration_Between is end less start, exactly: an Instant's seconds
+// are too few to overflow.
+func Duration_Between(startInclusive, endExclusive Instant) Duration {
+	return Duration_OfSeconds(endExclusive.Seconds-startInclusive.Seconds, int64(endExclusive.Nanos-startInclusive.Nanos))
+}
+
+func Duration_Seconds(this Duration) int64 { return this.Seconds }
+
 func Instant_IsBefore(this, other Instant) bool {
 	return this.Seconds < other.Seconds || this.Seconds == other.Seconds && this.Nanos < other.Nanos
 }

@@ -3,6 +3,7 @@ package emit
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/Cloud-Limo/kogo/check"
@@ -97,11 +98,14 @@ func (e *emitter) typeParams(tps []*check.TypeParam) (decl, use string) {
 // settled as Nothing is refused: a sealed value is used as one of a
 // wider type argument for free only because no value's Go type holds
 // Nothing where its declaration holds a type parameter. bind's are
-// only read, never held, and Arrow's bind takes none to write.
+// only read, never held, and Arrow's bind takes none to write; and a
+// call that never returns, and takes no function to hand a value to,
+// gives no value out at all, as orThrow(what, left) whose T is Nothing.
 func (e *emitter) instantiate(at syntax.Node, f *check.Func, args []check.Type) {
 	bind := f.Name == "bind" && e.info.Fails[at] != nil
+	never := builtin(check.Subst(f.Result, f.TypeParams, args), "Nothing") && !slices.ContainsFunc(f.Params, func(p *check.Var) bool { return e.mayHoldFunc(p.Type) })
 	for i, a := range args {
-		if builtin(a, "Nothing") && !bind {
+		if builtin(a, "Nothing") && !bind && !never {
 			e.notYet(at, fmt.Sprintf("the type argument Nothing, settled here for %s", f.TypeParams[i].Name), "write the type arguments, "+f.Name+"<...>(...)")
 		}
 		if _, ok := a.(*check.Nullable); ok {
@@ -115,6 +119,20 @@ func (e *emitter) instantiate(at syntax.Node, f *check.Func, args []check.Type) 
 			e.scan(p.Type)
 		}
 	}
+}
+
+// mayHoldFunc reports whether a value of type t may be or hold a
+// function: a declared generic type other than Either is taken to.
+func (e *emitter) mayHoldFunc(t check.Type) bool {
+	switch t := t.(type) {
+	case *check.FuncType:
+		return true
+	case *check.Nullable:
+		return e.mayHoldFunc(t.Elem)
+	case *check.Named:
+		return len(t.Args) > 0 && t.Decl != e.either && t.Decl.Kind != "external class" || slices.ContainsFunc(t.Args, e.mayHoldFunc)
+	}
+	return false
 }
 
 // scan notes each type parameter that types use as T?.

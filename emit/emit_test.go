@@ -959,6 +959,54 @@ fun over(xs: List<Long>): String = "${xs.firstOrNull { it > 2L }} ${xs.firstOrNu
 `)
 }
 
+// The names the logins' port needs (DEV-990): each one's value and
+// each panic's message, and a call whose T is settled as Nothing,
+// orThrow(what, left), which never returns.
+func TestLoginsNames(t *testing.T) {
+	expect(t, [][2]string{
+		{`t.Texts(" ", "https://a.b/c")`, "[x, a.b/c, https://a.b/c, https:, \tab, , 😀]"},
+		{`t.Take(-1)`, "panics: Requested character count -1 is less than zero."},
+		{`t.Times(2)`, "[PT48H, PT-1.5S, PT1.5S, 1]"},
+		{`t.Times(106751991167301)`, "panics: long overflow"},
+		{`t.Lists([]int64{1, 2})`, "true false"},
+		{`t.Fail(true)`, "panics: FusionAuth create failed: 404"},
+		{`t.Fail(false)`, "7"},
+	}, `package t
+
+import kogo.time.Duration
+import kogo.time.Instant
+
+fun texts(blank: String, url: String): List<String> =
+    listOf(blank.ifBlank { "x" }, url.substringAfter("://"), url.substringAfter("@"), url.take(6),
+        "\tab \n".trimEnd(), "".take(3), "😀😀".take(2))
+
+fun take(n: Int): String = "ab".take(n)
+
+fun times(days: Long): List<String> {
+    val start = Instant.ofEpochSecond(10L, 500000000L)
+    val end = Instant.ofEpochSecond(9L, 0L)
+    return listOf("${Duration.ofDays(days)}", "${Duration.between(start, end)}", "${Duration.between(end, start)}",
+        "${Duration.between(end, start).seconds}")
+}
+
+fun lists(xs: List<Long>): String = "${xs.none { it > 2L }} ${xs.none { it > 1L }}"
+
+fun <T> orThrow(what: String, answer: Either<Int, T>): T =
+    when (answer) {
+        is Either.Right -> answer.value
+        is Either.Left -> error("FusionAuth $what failed: ${answer.value}")
+    }
+
+fun fail(left: Boolean): Int {
+    val created: Either<Int, Int> = if (left) 404.left() else 7.right()
+    if (created is Either.Left) {
+        orThrow("create", created)
+    }
+    return orThrow("read", created)
+}
+`)
+}
+
 // What is not emitted yet is refused where it stands, never emitted
 // wrongly, and so are two declarations that Go cannot tell apart,
 // an enum's entries among them.

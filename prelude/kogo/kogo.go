@@ -100,6 +100,10 @@ func List_Contains[T any](this List[T], element T) bool {
 	return slices.ContainsFunc(this, func(x T) bool { return rt.Equal(x, element) })
 }
 
+func List_None[T any](this List[T], predicate func(T) bool) bool {
+	return !slices.ContainsFunc(this, predicate)
+}
+
 // ListT_FirstOrNull_fun, as every nullable result, is a copy: a
 // pointer into the list would hold all of it and could change it.
 func ListT_FirstOrNull_fun[T any](this List[T]) *T {
@@ -291,6 +295,7 @@ func isWhitespace(r rune) bool {
 }
 
 func String_Trim_fun(this string) string { return strings.TrimFunc(this, isWhitespace) }
+func String_TrimEnd(this string) string  { return strings.TrimRightFunc(this, isWhitespace) }
 
 // String_Trim_Char trims by UTF-16 units, as Kotlin does: a half of
 // a pair trims it, and the other half is left as U+FFFD (spec.md
@@ -315,6 +320,13 @@ func String_IsNullOrBlank(this *string) bool {
 
 func String_IfEmpty(this string, defaultValue func() string) string {
 	if this == "" {
+		return defaultValue()
+	}
+	return this
+}
+
+func String_IfBlank(this string, defaultValue func() string) string {
+	if String_IsBlank(this) {
 		return defaultValue()
 	}
 	return this
@@ -357,6 +369,24 @@ func String_Substring_Int_Int(this string, startIndex, endIndex int32) string {
 		panic(fmt.Sprintf("Range [%d, %d) out of bounds for length %d", startIndex, endIndex, len(u)))
 	}
 	return string(utf16.Decode(u[startIndex:endIndex]))
+}
+
+// String_SubstringAfter is the whole string when delimiter is absent,
+// as Kotlin's is; an empty delimiter is found at the start.
+func String_SubstringAfter(this, delimiter string) string {
+	if _, after, found := strings.Cut(this, delimiter); found {
+		return after
+	}
+	return this
+}
+
+// String_Take counts in UTF-16 units, as substring does, and panics
+// with Kotlin's message for a negative n.
+func String_Take(this string, n int32) string {
+	if n < 0 {
+		panic(fmt.Sprintf("Requested character count %d is less than zero.", n))
+	}
+	return String_Substring_Int_Int(this, 0, min(n, String_Length(this)))
 }
 
 func String_Map[R any](this string, transform func(rt.Char) R) List[R] {
@@ -530,6 +560,8 @@ func Check(value bool, lazyMessage func() string) rt.Unit {
 	}
 	return rt.Unit{}
 }
+
+func Error(message string) rt.Nothing { panic(message) }
 
 // A Uuid is an id's sixteen bytes.
 type Uuid [16]byte

@@ -3515,7 +3515,9 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   so either its author writes the struct by the same rule, which then has to be stated in
   the spec with the tag and the name of each property, or the emitter writes the binding
   file's data classes into the Go package it names. Reopen when extensions are built.
-- **`Mail` has `date: Instant`, after `messageId`. Awaiting Greg.** A message needs a `Date`
+- **`Mail` has `date: Instant`, after `messageId`** (Greg, 20 Nov 2026: a resend carries the
+  same date, as the application's Kotlin does by building the whole message when it queues
+  it). A message needs a `Date`
   header and `eml` reads no clock. Not taken: the sender adds the date when it sends, so
   the stored bytes have none: then what is sent is not what is stored, and a replay sends
   another date under the same Message-ID.
@@ -3616,3 +3618,27 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
     advisory-lock functions by name, which re-reads what Postgres allows. Reopen when a
     port's gate calls through an interface or takes an advisory lock.
   - Reopen if a port's gate must write, which the design gives to an ungated operation.
+
+- **The logins' names (DEV-990, 20 Nov 2026).** `error`, `List.none`,
+  `Duration.ofDays` (spec 12, not yet built) and, approved by the lead on
+  20 Nov 2026 as Kotlin's, `ifBlank`, `substringAfter`, `String.take`,
+  `trimEnd`, `Duration.between` and `Duration.seconds`. The dates are the
+  day where Greg and the lead work, ahead of a run's clock in UTC. None
+  needs a refusal: `mise run kotlin` agrees on every edge. `String.take`
+  counts UTF-16 units, as `substring` does, and across half a surrogate
+  pair leaves U+FFFD where Kotlin's leaves the half, as spec 3 says
+  (`"😀a".take(1)`); the comparison agrees there only because Kotlin's
+  output writes the half as U+FFFD. Not taken: a code-point `take`,
+  which is not Kotlin's.
+  - **A type argument settled as `Nothing` is emitted when the call never
+    returns and takes nothing that holds a function**: its result, with
+    the arguments put in, is `Nothing`, and no parameter's type is a
+    function, or a declared generic type other than `Either` (taken to
+    possibly hold one). Such a call gives out no value whose Go type holds
+    `rt.Nothing`, so nothing is later widened for free to a type it is not
+    (`instantiate`, `emit/types.go`). It is `orThrow(what, left)`. Not
+    taken: emitting every `Nothing` argument, which lets a sealed value
+    built with `Nothing` fail a later `is` test; using the argument's
+    own Go type in place of `Nothing`, which needs the checker's
+    unnarrowed type at each call. Reopen when a port passes `Nothing` to
+    a call that returns a value.

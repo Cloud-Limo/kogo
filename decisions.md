@@ -3037,12 +3037,21 @@ Each entry: what was decided, why, and what would reopen it.
   only where its shape otherwise fits, so one fault gives one error.
 - **The word stays true is `idle-action`; a `::` reference, a member and a kept lambda
   are `action-kept`.** A local fun cannot be an `action fun`: a call in one is
-  `unmarked-action`.
+  `unmarked-action`, whose message says to move the call into the action fun around it
+  (review of PR 90), and `action fun` in a body is the parser's error. Not taken: letting
+  a local fun be one, which nothing needs.
 - **Left to row 6 (a proof's rules)**: that an `action fun` takes a proof only as a step
   or as gated work that runs wholly outside, and `outside-passes-proof`.
 - **Left to row 3 (DEV-961)**: serving a gated `action fun` with no transaction. `kogo
   emit` still refuses every gated row; `Func.Action` on the row's operation is what the
   server reads.
+- **A row with both `after` and an `action fun` as its work is refused under `step`, in
+  DEV-961** (Ruling on PR 90), where serving meets it; no cusoon2 operation has both. Not
+  taken: serving gate, step and work all outside.
+- **Open: whether printing is an action** is Greg's (Ruling on PR 90); it stays one
+  meanwhile. If not, `Console`'s bindings and `examples/26_action.kg` change.
+- **Open: a `kogo test` cannot call an `action fun` today**: a test is a `val`, and its
+  block is handed a `Tx`. Decided in row 9 with the fake `Http`, and brought to Greg then.
 
 ## Spec gaps found by the leakage ports, unresolved
 

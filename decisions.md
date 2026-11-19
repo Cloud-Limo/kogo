@@ -3101,6 +3101,38 @@ Each entry: what was decided, why, and what would reopen it.
 - **Open: a `kogo test` cannot call an `action fun` today**: a test is a `val`, and its
   block is handed a `Tx`. Decided in row 9 with the fake `Http`, and brought to Greg then.
 
+## Taken telling `SerializableTx` from `Tx` (DEV-965), not yet discussed
+
+- **Only the literal `true` makes `db.tx`'s block a `SerializableTx`.**
+  `db.tx(serializable = flag)` hands a `Tx`, which is true at either level. Not taken: a
+  second fun, `db.serializableTx { }`, which `doc/gates.md` did not write. Reopen if a
+  program wants the level from a value.
+- **`SerializableTx` is the checker's alone**: core.kg declares it beside `Tx`, the
+  checker makes it fit a `Tx` (an external class has no supertypes in the syntax), and
+  the emitter writes it as Go's `kogo.Tx`. Not taken: a Go type of its own, which would
+  need a conversion wherever one is passed as a `Tx`.
+- **A plain `db.tx` is run once at READ COMMITTED, and a deadlock in it is a panic, as
+  before; a `Tx` the server opens is rerun on a deadlock** (`doc/gates.md`). Spec 10.7
+  now says so of `db.tx`, and a test holds each. Not taken: rerunning a plain `db.tx`.
+- **A list's check takes a `Tx`, and a `SerializableTx` there is refused**: the server
+  runs it read-only at the database's default and does not rerun it (DEV-964 owns
+  `Handler.check`). Not taken: accepting one, which would let it read with no lock where
+  nothing reruns it.
+- **The rows' constructors take the kind as a bool after the name**:
+  `rpc.Tx(name, serializable, f)`, `rpc.Gated(name, serializable, ...)`,
+  `rpc.Outside(name, serializable, ...)`. Not taken: a constructor for each kind, six in
+  all.
+- **The refusal is `needs-serializable`, at the argument**, and names the called fun,
+  not the caller as `doc/gates.md`'s sample does: the checker has the call at hand. It
+  offers taking a `SerializableTx` too, the change to make in a gate on a `Tx`.
+- **Not done here: the printed table's `runs serializable` / `runs plain` line**, which
+  waits for the printed table.
+- **Open: a `kogo test` block is handed a `Tx`**, so a test cannot call a fun that takes
+  a `SerializableTx`. The Review on PR 93 leans to `RolledBack` opening at SERIALIZABLE
+  and handing a `SerializableTx`; it is Greg's, brought to him before roadmap row 13. Not
+  taken now (the lead, 19 Nov 2026): building that here, which changes what a test may
+  call without his word.
+
 ## Taken serving a list's Origin and CSRF check (DEV-964), not yet discussed
 
 - **The check is an example, served, and no code of the prelude's.** `doc/origin.md`'s
@@ -3120,10 +3152,12 @@ Each entry: what was decided, why, and what would reopen it.
   `Uuid.parseOrNull` (DEV-932) and before Kogo was held to a subset of Kotlin (DEV-957):
   Kotlin has the second and not the first. Not taken: adding `toUuidOrNull`, a second
   name for one function.
-- **`liveSession` takes a `Tx` here**, where `doc/origin.md` has `SerializableTx`: that
-  type is DEV-965's, which runs beside this. The example's two readers change their
-  parameter's type when it lands. Not taken: leaving the reader out until then, which
-  leaves "the token is the check's and `liveSession` compares nothing" unserved.
+- **`liveSession`, `session` and `whoAmI` take a `SerializableTx`**, as `doc/origin.md`
+  has them (the lead's Ruling on PR 92, 19 Nov 2026, once DEV-965 merged). This replaced
+  the entry that had them take a `Tx` until DEV-965 landed. The list's check,
+  `fromOurPage`, and `tokenMatches` stay on `Tx`: a check on a `SerializableTx` is
+  refused (DEV-965, above). Not taken: merging on `Tx` with a follow-up issue, which
+  left the example reading its session at READ COMMITTED meanwhile.
 - **The example's cookie has one name, `SID`.** The design's `isSecure(request)` and
   the `__Host-` prefix are the application's and read nothing of the check's.
 

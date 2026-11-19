@@ -1081,7 +1081,24 @@ func TestTables(t *testing.T) {
 		{"fmt.Sprint([]string{t.Other_api.Operations[0].Name}, t.Other_api.Enums)", "[g] [[S M]]"},
 		{"fmt.Sprintf(\"%T\", t.Hooks)[:13]", "rpc.Unserved["},
 		{"fmt.Sprint(t.Other_Int(4), t.Kind_entries_val)", "4 3"},
-	}, `package t
+	}, tables, theirs)
+	// A row's bool is the kind of transaction its first parameter names.
+	_, files, errs := emit(t, "t", tables, theirs)
+	if errs != nil {
+		t.Fatal(errs)
+	}
+	var out string
+	for _, f := range files {
+		out += string(f)
+	}
+	for _, want := range []string{`Gated("held", true,`, `Gated("sent", false,`, `Outside("rung", true,`, `Tx("me", false,`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the emitted table has no %s", want)
+		}
+	}
+}
+
+const tables = `package t
 import kogo.io.Console
 import kogo.rpc.Request
 import u.g
@@ -1091,7 +1108,7 @@ api other checkedBy theirs { g ungated }
 api hooks unchecked { me ungated }
 data class Who(val tx: Tx)
 fun ours(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }
-fun who(tx: Tx, env: Env, request: Request): Either<String, Who> = either { Who(tx) }
+fun who(tx: SerializableTx, env: Env, request: Request): Either<String, Who> = either { Who(tx) }
 fun asked(tx: Tx, env: Env, request: Request, input: Ask): Either<String, Who> = either { Who(tx) }
 action fun step(env: Env, who: Who, input: Ask): Either<String, Unit> = either { env.console.println("") }
 action fun rung(env: Env, who: Who, input: Unit): Either<String, Unit> = either { env.console.println("") }
@@ -1106,11 +1123,12 @@ enum class Kind { Alone, Shared }
 enum class State { Open, Done }
 fun me(tx: Tx, env: Env, request: Request, input: Unit): Either<String, Unit> = either { }
 fun f(db: Db, env: Env, request: Request, input: Ask): Either<String, State> = either { raise("no") }
-`, `package u
+`
+
+const theirs = `package u
 import kogo.rpc.Request
 data class Env(val s: String)
 enum class Size { S, M }
 fun theirs(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }
 fun g(tx: Tx, env: Env, request: Request, input: List<Size?>): Either<String, Unit> = either { }
-`)
-}
+`

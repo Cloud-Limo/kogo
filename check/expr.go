@@ -475,6 +475,17 @@ func (c *checker) prelude(name string) *TypeDecl {
 	return nil
 }
 
+// isTx reports whether t is a transaction: a Tx or a SerializableTx.
+func (c *checker) isTx(t Type) bool {
+	d := named(t)
+	return d != nil && (d == c.prelude("Tx") || c.serializable(t))
+}
+
+// serializable reports whether t is a SerializableTx.
+func (c *checker) serializable(t Type) bool {
+	return named(t) != nil && named(t) == c.prelude("SerializableTx")
+}
+
 // sel reads x.name or x?.name that is not called.
 func (c *checker) sel(e *syntax.Select) Type {
 	if q := c.qualifier(e.X); q != "" {
@@ -981,7 +992,7 @@ func (c *checker) lambda(l *syntax.Lambda, params []Type, want Type) *FuncType {
 	}
 	defer func(n int, b, bl, il bool) { c.loops, c.buried, c.buriedLoop, c.inLambda = n, b, bl, il }(c.loops, c.buried, c.buriedLoop, c.inLambda)
 	c.loops, c.buried, c.buriedLoop, c.inLambda = 0, false, false, true
-	if slices.ContainsFunc(ft.Params, func(t Type) bool { return t != nil && named(nonNull(t)) == c.prelude("Tx") }) {
+	if slices.ContainsFunc(ft.Params, func(t Type) bool { return t != nil && c.isTx(nonNull(t)) }) {
 		c.inTx++
 		defer func() { c.inTx-- }()
 	}

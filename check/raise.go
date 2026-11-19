@@ -88,6 +88,24 @@ func (c *checker) txRaise(f *Func) bool {
 	return f.file == c.core && f.Name == "tx" && len(f.TypeParams) == 2
 }
 
+// handles gives the parameters of f as k calls it: the block of the
+// core's db.tx(serializable = true) takes a SerializableTx, and of
+// db.tx otherwise a Tx (spec.md 10.7).
+func (c *checker) handles(k candidate) []*Var {
+	f := k.f
+	if f.file != c.core || f.Name != "tx" || len(k.placed[0]) != 1 {
+		return f.Params
+	}
+	if l, ok := k.placed[0][0].(*syntax.Literal); !ok || l.Kind != "Boolean" || l.Value != "true" {
+		return f.Params
+	}
+	block := *f.Params[1]
+	ft := *block.Type.(*FuncType)
+	ft.Params = []Type{&Named{Decl: c.prelude("SerializableTx")}}
+	block.Type = &ft
+	return []*Var{f.Params[0], &block}
+}
+
 // otherTx reports whether f is the core's db.tx that does not apply
 // here: the one whose block is a raise scope is called where the
 // enclosing fun returns an Either, and the other everywhere else.

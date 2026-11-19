@@ -1,7 +1,9 @@
 package kogo
 
 import (
+	"context"
 	"math"
+	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -9,7 +11,9 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Cloud-Limo/kogo/rt"
 )
@@ -421,4 +425,31 @@ func TestNullableAndOverloads(t *testing.T) {
 	if List_OrEmpty[int32](nil) == nil {
 		t.Error("orEmpty of null is a nil list")
 	}
+}
+
+// A plain db.tx is run once: a deadlock in it is a panic, not a rerun
+// (spec.md 10.7).
+func TestPlainTxRunsOnce(t *testing.T) {
+	url := os.Getenv("KOGO_TEST_DATABASE_URL")
+	if url == "" {
+		url = "postgres://kogo:kogo@127.0.0.1/kogo_test"
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	runs := 0
+	defer func() {
+		if p, _ := recover().(*pgconn.PgError); p == nil || p.Code != "40P01" || runs != 1 {
+			t.Errorf("a deadlock in a plain db.tx ran it %d times and panicked with %v", runs, p)
+		}
+	}()
+	Db_Tx_Boolean_TxToA(NewDb(ctx, pool), nil, func(Tx) rt.Unit {
+		if runs++; runs == 1 {
+			panic(&pgconn.PgError{Code: "40P01"})
+		}
+		return rt.Unit{}
+	})
 }

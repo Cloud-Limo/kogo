@@ -47,22 +47,26 @@ func must[T any](v T, err error) T {
 // Db_Tx_Boolean_TxToA is db.tx { } where the enclosing fun returns no
 // Either: it commits when block returns and rolls back when block
 // panics, with a failure of a raise scope around it or with a bug.
+// It is at READ COMMITTED, and run once; db.tx(serializable = true)
+// is at SERIALIZABLE, and rerun on each conflict.
 func Db_Tx_Boolean_TxToA[A any](this Db, serializable *bool, block func(Tx) A) A {
-	if serializable != nil && *serializable {
-		return SerializableTx(this, func(*pgconn.PgError) bool { return true }, block)
-	}
-	a, _ := attempt(this, pgx.TxOptions{}, block)
-	return a
+	s := serializable != nil && *serializable
+	return InTx(this, s, func(*pgconn.PgError) bool { return s }, block)
 }
 
-// SerializableTx is db.tx(serializable = true) { }, for the server
-// too, which limits its reruns: block is run again from the start for
-// as long as Postgres ends it with a serialization failure or a
-// deadlock and again, told which, says to go on. Where again says not
-// to, Postgres's error is a panic.
-func SerializableTx[A any](db Db, again func(conflict *pgconn.PgError) bool, block func(Tx) A) A {
+// InTx is db.tx { }, for the server too, which limits its reruns: at
+// SERIALIZABLE where serializable says so, and at READ COMMITTED
+// where not, as stated and not left to the database's default. block
+// is run again from the start for as long as Postgres ends it with a
+// serialization failure or a deadlock and again, told which, says to
+// go on. Where again says not to, Postgres's error is a panic.
+func InTx[A any](db Db, serializable bool, again func(conflict *pgconn.PgError) bool, block func(Tx) A) A {
+	level := pgx.ReadCommitted
+	if serializable {
+		level = pgx.Serializable
+	}
 	for {
-		a, conflict := attempt(db, pgx.TxOptions{IsoLevel: pgx.Serializable}, block)
+		a, conflict := attempt(db, pgx.TxOptions{IsoLevel: level}, block)
 		if conflict == nil {
 			return a
 		}
@@ -94,7 +98,7 @@ func attempt[A any](db Db, opts pgx.TxOptions, block func(Tx) A) (a A, conflict 
 		}
 		p := recover()
 		tx.Rollback(db.ctx)
-		if err, ok := p.(error); !ok || opts.IsoLevel != pgx.Serializable || !errors.As(err, &conflict) ||
+		if err, ok := p.(error); !ok || !errors.As(err, &conflict) ||
 			conflict.Code != "40001" && conflict.Code != "40P01" {
 			panic(p)
 		}

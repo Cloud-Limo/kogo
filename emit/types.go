@@ -50,6 +50,9 @@ func (e *emitter) typ(t check.Type) string {
 			}
 		}
 		s := e.qualify(t.Decl.Pkg, e.names[t.Decl])
+		if t.Decl.Pkg == "kogo" && t.Decl.Name == "SerializableTx" {
+			s = e.qualify("kogo", "Tx") // the checker tells the two apart; Go need not
+		}
 		if len(t.Args) > 0 {
 			s += "[" + e.typs(t.Args) + "]"
 		}

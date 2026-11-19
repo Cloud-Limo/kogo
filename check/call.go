@@ -538,7 +538,7 @@ func (c *checker) byLambda(left []candidate, typed map[syntax.Expr]Type) []candi
 // 5.1, checks every argument against them, records the call and
 // gives its type. typed holds the arguments read while choosing.
 func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, typeArgs []syntax.Type, typed map[syntax.Expr]Type, want Type) Type {
-	f, b := k.f, k.b
+	f, b, params := k.f, k.b, c.handles(k)
 	now := func(p *TypeParam, t Type) {
 		if b[p] == nil {
 			b[p] = t
@@ -555,7 +555,7 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 		}
 	}
 	// Rule 2: the arguments that are not lambdas.
-	for i, p := range f.Params {
+	for i, p := range params {
 		for _, a := range k.placed[i] {
 			if _, read := typed[a]; read || lambdaParam(p, a) != nil {
 				continue
@@ -581,7 +581,7 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 	}
 	// Rule 4: what each lambda returns, left to right. Its own
 	// parameters are settled by now, or it states them.
-	for i, p := range f.Params {
+	for i, p := range params {
 		for _, a := range k.placed[i] {
 			ft := lambdaParam(p, a)
 			if ft == nil {
@@ -589,10 +589,10 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 			}
 			got, read := typed[a].(*FuncType)
 			if !read {
-				params := make([]Type, len(ft.Params))
+				lps := make([]Type, len(ft.Params))
 				for j, pt := range ft.Params {
 					if !open(pt, b) {
-						params[j] = subst(pt, b)
+						lps[j] = subst(pt, b)
 					}
 				}
 				var w Type
@@ -600,13 +600,13 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 					w = subst(ft.Result, b)
 				}
 				if r := c.raised(ft.Receiver); r == nil {
-					got = c.lambda(a.(*syntax.Lambda), params, w)
+					got = c.lambda(a.(*syntax.Lambda), lps, w)
 				} else {
 					if open(r, b) { // it says what may be raised in the block
 						c.errorf(where, "type-arguments", "nothing settles %s's type parameter %s before its block is read: write its type arguments, %s<...> { ... }", f.Name, r, f.Name)
 						unify(r, unknown, b, now)
 					}
-					got = c.raiseBlock(a.(*syntax.Lambda), subst(ft.Receiver, b), params, w)
+					got = c.raiseBlock(a.(*syntax.Lambda), subst(ft.Receiver, b), lps, w)
 				}
 				typed[a] = got
 			}
@@ -624,7 +624,7 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 	}
 	// Every argument is checked against what was settled.
 	call := &Call{Func: f, Receiver: recv, Args: k.placed}
-	for i, p := range f.Params {
+	for i, p := range params {
 		pt := subst(p.Type, b)
 		for _, a := range k.placed[i] {
 			c.kept(f, a)
@@ -633,6 +633,8 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 			case fits(t, pt):
 			case wholeLiteral(a) && fits(tLong, pt):
 				c.expr(a, tLong)
+			case c.serializable(pt) && c.isTx(t):
+				c.errorf(a, "needs-serializable", "%s takes a SerializableTx and this is a Tx, which is not rerun on a conflict: call a function that locks, take a SerializableTx, or open the transaction with db.tx(serializable = true) (spec.md 10.7)", f.Name)
 			default:
 				c.mismatch(a, t, pt)
 			}

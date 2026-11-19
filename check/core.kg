@@ -1,6 +1,7 @@
 // The core's own declarations: Either and the forms of a raise scope
-// (spec.md section 9), and the transactions of section 10.7. The
-// checker reads them before the prelude and knows each by name. Only
+// (spec.md section 9), and the transactions of section 10.7: a
+// SerializableTx fits a Tx, and db.tx(serializable = true) hands its
+// block one. The checker reads them before the prelude and knows each by name. Only
 // this file writes Raise<E>: a fun whose receiver is Raise<E> is
 // called on the raise scope around the call, bind needs one that takes
 // its E, a block of type Raise<E>.() -> A is a raise scope for E, and
@@ -25,6 +26,7 @@ external fun <E, A> Either<E, A>.bind(): A
 
 external class Db
 external class Tx
+external class SerializableTx
 
 external fun <A> Db.tx(serializable: Boolean = false, block: (Tx) -> A): A
 external fun <E, A> Db.tx(serializable: Boolean = false, block: Raise<E>.(Tx) -> A): Either<E, A>

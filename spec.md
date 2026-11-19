@@ -1151,7 +1151,7 @@ api hooks unchecked {
   | changes something outside and writes nothing of ours | `op gatedBy gate`, with `op` an `action fun` | one for the gate; none for the work | anywhere | in the work |
   | changes something outside, then writes | `op gatedBy gate after step` | one for the gate; none for the step; one for the gate again and the work | anywhere | in the step |
   | finds out who is asking itself | `op ungated`, taking a `SerializableTx` or a `Tx` | one | in it; the transaction waits | nowhere |
-  | finds out who is asking itself, and must keep a write after a refusal or write what an action answered | `op ungated`, taking a `Db` | its own, each a `db.tx` | anywhere | between its transactions |
+  | finds out who is asking itself, and must keep a write after a refusal or write what an action answered, or asks outside with no transaction open | `op ungated`, taking a `Db` | its own, each a `db.tx` | anywhere | between its transactions |
 
   - A change outside that can wait, or must not be lost, is not made
     by the request: the operation writes a row, as the first line
@@ -1287,7 +1287,7 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   redeeming a code with another service must.
 
 ```kotlin
-fun completeLogin(db: Db, env: OpsEnv, request: Request, input: CompleteLoginInput): Either<String, DriverAccount> = either {
+action fun completeLogin(db: Db, env: OpsEnv, request: Request, input: CompleteLoginInput): Either<String, DriverAccount> = either {
     val attempts = db.tx { tx -> countAttempt(tx, request.clientAddress) }.bind()
     ensure(attempts <= 5) { "Too many attempts. Try again later." }
     val user = redeemCode(env.idp, input.oneTimeCode).bind()

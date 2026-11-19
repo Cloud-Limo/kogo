@@ -25,6 +25,8 @@ func TestActions(t *testing.T) {
 		{head + "action fun g(b: Bell) {\n    b.‸ring(1)\n}", "arguments", "ring takes 0 arguments"},
 		{head + "action ‸fun Tx.g(b: Bell) = f(b)", "action-tx", "g is an action fun on a Tx"},
 		{head + "action fun g(‸tx: Tx, b: Bell) = f(b)", "action-tx", "g is an action fun and takes a Tx, tx: an action runs with no transaction open, so take a Db"},
+		{head + "action fun g(‸tx: SerializableTx, b: Bell) = f(b)", "action-tx", "g is an action fun and takes a Tx, tx"},
+		{head + "action fun g(db: Db, b: Bell): Int = db.tx(serializable = true) { tx ->\n    ‸f(b)\n    1\n}", "action-in-tx", "f is an action, called in a block that holds a Tx"},
 		{head + "action fun g(db: Db, b: Bell): Int = db.tx { tx ->\n    ‸f(b)\n    1\n}", "action-in-tx", "f is an action, called in a block that holds a Tx: a transaction may roll back or run again and the action cannot, so move the call before or after the block"},
 		{head + "action fun g(b: Bell) {\n    val h = ::‸f\n    f(b)\n}", "action-kept", "::f names an action fun, and an action is not kept in a value: call f where it is wanted"},
 		{head + "fun later(block: () -> Unit) = block()\naction fun g(b: Bell) = later ‸{ f(b) }", "action-kept", "this lambda calls f, an action, and is not passed straight to a fun of the prelude"},

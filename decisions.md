@@ -658,7 +658,7 @@ Each entry: what was decided, why, and what would reopen it.
     what is there and starts none (Greg's Ruling 10): else a change to `doc/clerk.md` is
     read one event late, and starting the poller starts a clerk for every open issue.
   - The sizes stand (Ruling 8): `doc/lead.md` 246 lines for about 170, `doc/clerk.md`
-    214 for about 120, Rulings 11 to 16 included. What is over is written once and repeats nothing. Not taken:
+    221 for about 120, Rulings 11 to 18 included. What is over is written once and repeats nothing. Not taken:
     cutting the cusoon2 paragraph of Merging or Talking to Greg.
   - This PR waits for DEV-1000 and the two merge on one day (Ruling 9), since
     `doc/clerk.md` describes a poller not yet built: DEV-1000 is built to this branch,
@@ -679,6 +679,12 @@ Each entry: what was decided, why, and what would reopen it.
     failed step and Greg restarts by hand, as the poller starts no step twice. A
     speculative run is labelled with `lin label`. A merge that changes the poller's own
     file is handed to Greg to restart it: a clerk that did would stop itself.
+  - The merge takes the full sha, from `git rev-parse HEAD` in the worktree after the
+    checks (Greg's Ruling 17, 20 Nov): `gh` matches the head against the whole one, and a
+    short sha from a step's comment would be refused and handed on as a head that moved.
+  - The clerk writes its comment and brief files under `/tmp`, in a `mktemp -d`
+    directory, never in a checkout (Ruling 18): one left in the worktree makes it not
+    clean, and the clerk that tidies after the merge would leave it and hand on.
   It changes five entries besides "The lead merges": in "Kogo's async runs" the table is
   now in `doc/clerk.md`; in "The side-by-side run" the clerk runs the comparison, under
   `doc/clerk.md`, "Merging"; in "The lead lists Greg's next moves in two lists" nobody

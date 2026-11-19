@@ -34,7 +34,12 @@ lines. Anyone may say "Clerk DEV-NNN" by hand.
 
 You launch runs, check, merge and tidy. You write no code and make no
 commit, you run no Pickup, Code review or Fix yourself, and you make no
-choice a step left open: that goes to the lead.
+choice a step left open: that goes to the lead. Write every file a
+command reads (`clerk.md`, `brief.md`, the `Merged:` text) under
+`/tmp`, in a directory of its own from `mktemp -d`, and never in a
+checkout: one left in the issue's worktree makes it not clean, so
+After a merge leaves it and hands on, and `~/Dev/kogo` is never
+written to.
 
 ## The step
 
@@ -145,7 +150,9 @@ both checks end `0 differ` with a case count above zero, or were
 skipped. Then `gh pr merge <PR url> --merge --match-head-commit
 <sha>`, the sha being the head the checks ran on: a run's wrapper may
 push what was left in its tree after the `Fixed:` is posted, and you
-merge only what you tested. Run it as a command of its own, with no
+merge only what you tested. It is the full sha, 40 characters, from
+`git rev-parse HEAD` in the worktree once the checks have run: `gh`
+refuses the short one a step's comment carries. Run it as a command of its own, with no
 `cd`, `&&` or pipe, since the rule that allows it matches that form
 alone. It moves the issue to Done. Post `Merged: <sha>`, the built-ins
 check's last line and the comparison's `N cases` with `0 differ` (or

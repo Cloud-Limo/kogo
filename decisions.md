@@ -2839,7 +2839,8 @@ Each entry: what was decided, why, and what would reopen it.
 - **The 32-digit corner is stated in spec 12 and not held by `mise run kotlin`**, which
   does not cover `Uuid` (Kotlin 2.4's `parseOrNull` reads
   `01934f2abcde7f0189abcdef01234567`, run on 19 Nov 2026). Not taken: a `Uuid` case in
-  the check against Kotlin here, beyond the issue's budget.
+  the check against Kotlin here, which would have conflicted with DEV-933's PR 81 in the
+  same files. DEV-952 adds it, with the corner as a `kept` row.
 
 ## Going public (DEV-941), not yet discussed
 
@@ -2873,7 +2874,31 @@ Each entry: what was decided, why, and what would reopen it.
   `kept`, which holds only the differences `spec.md` states. DEV-952 fixes them and
   widens the cases.
 - **`Clock.now` has no case**: its value is the time of the run, and the prelude gives no
-  way to build a fixed `Clock`. `Uuid.parse` and `atStartOfDay` are DEV-932's.
+  way to build a fixed `Clock`. `Uuid.parseOrNull`, `atStartOfDay` and `toInstant` are
+  DEV-952's (corrected: this line left them to DEV-932, which added none).
+
+## Taken making `kogo.time` fail and name zones as Java does (DEV-952), not yet discussed
+
+- **`ZoneId.of` refuses the names Go loads and `java.time` 21's tz database lacks by a
+  list in the code** (`EST`, `HST`, `MST`, `ROC`, `Factory`, `posixrules`, `localtime`,
+  `Local`, and `posix/` and `right/`), found by comparing `ZoneId.getAvailableZoneIds()`
+  with the host's `/usr/share/zoneinfo` and Go's `time/tzdata` on 19 Nov 2026. Not
+  taken: an allow-list of Java's 604 IDs in the code, which would also refuse names a
+  newer tz release adds. Reopen when a tz release adds a name one side lacks.
+- **`plusDays` on a date in December of year 999,999,999 panics with `Invalid value for
+  Year` for a sum within 59 days**, as Java's short path does. Not taken: the EpochDay
+  message alone, which the brief named, as it differs from Java there.
+- **The cases add `zoneOf`, `ZoneId.of` of the shared texts**, which reaches the
+  invalid-format messages; `zone()` holds `+05:30`, `GMT+1`, `UTC-0`, `-0930` and `Z`
+  besides the brief's unknown zone and `EST`, and `Factory`. Not taken: one offset only.
+- **`Uuid` reaches the shared source by `import kogo.Uuid`**, which Kogo accepts, and
+  `kotlin/kogo.kt`'s typealias for kotlinc. Not taken: a typealias in package `builtins`,
+  as `arrow.kt` does, which the brief's `kogo.Uuid` did not ask for.
+- **`offsetOf` picks its offset by `n * 10 + m`**, as `n` alone reaches 11 of the
+  20 offsets and Kogo has no `Long.toInt()`. **`plusDaysMax` is checked to fail without
+  the Year corner** (101 differ), not without the UTF-16 fix, which it cannot reach; the
+  Ruling's "each new case fails with item 1's fix taken out" holds for `offsetOf` (64
+  differ). Reopen if a case gets a wider index than `n`.
 
 ## Spec gaps found by the leakage ports, unresolved
 

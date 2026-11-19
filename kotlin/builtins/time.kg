@@ -1,32 +1,55 @@
-// The prelude's kogo.time functions (see lists.kg); for Kotlin,
-// time.kt names java.time's types kogo.time's. An instant's seconds
-// are clamped to java.time's range, so the edges reach its ends.
+// The prelude's kogo.time functions and Uuid.parseOrNull (see
+// lists.kg); for Kotlin, time.kt names java.time's types kogo.time's
+// and Kotlin's Uuid kogo's. An instant's seconds are clamped to
+// java.time's range, so the edges reach its ends.
 package builtins
 
+import kogo.Uuid
 import kogo.time.Duration
 import kogo.time.Instant
 import kogo.time.ZoneId
 
-fun time(f: String, x: Long, y: Long, n: Int, m: Int): String? = when (f) {
+fun time(f: String, s: String, t: String, x: Long, y: Long, n: Int, m: Int): String? = when (f) {
     "ofEpochSecond" -> "${Instant.ofEpochSecond(x, n.toLong())} ${Duration.ofSeconds(y, m.toLong())}"
     "isBefore" -> "${instant(x, n).isBefore(instant(y, m))} ${instant(x, n).isAfter(instant(y, m))} ${instant(x, n).isBefore(instant(x, n))}"
     "plusDuration" -> "${instant(x, n).plus(Duration.ofSeconds(y, m.toLong()))}"
     "minusDuration" -> "${instant(x, n).minus(Duration.ofSeconds(y, m.toLong()))}"
-    "atZone" -> "${ZoneId.of(zone(m))} ${dated(x, n).atZone(ZoneId.of(zone(m)))} ${dated(x, n).atZone(ZoneId.of(zone(m))).toLocalDate()}"
-    "plusDays" -> "${dated(x, n).atZone(ZoneId.of(zone(m))).toLocalDate().plusDays(y % 1000000L)}"
+    "atZone" -> "${ZoneId.of(zone(m))} ${instant(x, n).atZone(ZoneId.of(zone(m)))} ${instant(x, n).atZone(ZoneId.of(zone(m))).toLocalDate()}"
+    "plusDays" -> "${instant(x, n).atZone(ZoneId.of(zone(m))).toLocalDate().plusDays(y)}"
+    "plusDaysMax" -> "${Instant.ofEpochSecond(31556889832694400L - 86400L * (x % 8L), 0L).atZone(ZoneId.of("UTC")).toLocalDate().plusDays(y % 60L)}"
+    "offsetOf" -> "${ZoneId.of(offset(n * 10 + m))}"
+    "zoneOf" -> "${ZoneId.of(s)} ${ZoneId.of(t)}"
     "atZoneEra" -> "${era(x, y, n).atZone(ZoneId.of(zone(m)))} ${era(x, y, n).atZone(ZoneId.of(zone(m))).toLocalDate()}"
+    "atStartOfDay" -> "${era(x, y, n).atZone(ZoneId.of(zone(m))).toLocalDate().atStartOfDay(ZoneId.of(zone(m)))} ${era(x, y, n).atZone(ZoneId.of(zone(m))).toLocalDate().atStartOfDay(ZoneId.of(zone(m))).toInstant()}"
+    "parseOrNull" -> "${Uuid.parseOrNull(uuid(n))} ${Uuid.parseOrNull(s + uuid(m))} ${Uuid.parseOrNull("${Uuid.parseOrNull(uuid(n))}") == Uuid.parseOrNull(uuid(n))}"
+    "parseOrNull32" -> "${Uuid.parseOrNull("01934f2abcde7f0189abcdef0123456" + s)}"
     else -> null
 }
 
 // Zones with a half hour, 45 minutes, a negative offset, a change at
-// midnight and summer time. An unknown zone's panic, and a LocalDate
-// past java.time's range, differ (decisions.md, DEV-933), so the cases
-// keep to known zones and to dates a million days inside the range.
+// midnight and summer time; offsets, alone and after a prefix; an
+// unknown name, and names the tz database has and java.time lacks.
 fun zone(m: Int): String =
-    listOf("UTC", "Australia/Sydney", "America/St_Johns", "Asia/Kolkata", "Pacific/Chatham", "Europe/Dublin", "America/Sao_Paulo")[(m % 7 + 7) % 7]
+    listOf(
+        "UTC", "Australia/Sydney", "America/St_Johns", "Asia/Kolkata", "Pacific/Chatham", "Europe/Dublin", "America/Sao_Paulo",
+        "Mars/Olympus", "+05:30", "GMT+1", "UTC-0", "-0930", "Z", "EST", "Factory",
+    )[(m % 15 + 15) % 15]
 
-fun dated(seconds: Long, nanos: Int): Instant =
-    Instant.ofEpochSecond(seconds.coerceAtLeast(-31556927735596800L).coerceAtMost(31556803432694400L), nanos.toLong())
+// Offsets that reach each of ZoneOffset.of's messages, in each form,
+// with characters that are one UTF-16 unit and two.
+fun offset(n: Int): String =
+    listOf(
+        "+1", "+19", "-18:01", "+18:00:01", "+05:60", "+05:30:60", "+0530x", "+05:3x", "+05_30", "+053015", "-09:30:15",
+        "+é", "+1é", "+é5", "+😀", "GMT+x", "UT+", "UTC+05:30:15", "-1", "+05:30:1",
+    )[(n % 20 + 20) % 20]
+
+// Texts around an id: as a template writes it, in capitals, a digit
+// short, a digit long, and with a letter that is not a hex digit.
+fun uuid(n: Int): String =
+    listOf(
+        "01934f2a-bcde-7f01-89ab-cdef01234567", "01934F2A-BCDE-7F01-89AB-CDEF01234567", "01934f2a-bcde-7f01-89ab-cdef0123456",
+        "01934f2a-bcde-7f01-89ab-cdef012345678", "01934f2a-bcde-7f01-89ab-cdef0123456g", "1934f2a-bcde-7f01-89ab-cdef01234567",
+    )[(n % 6 + 6) % 6]
 
 // Seconds from about 1685 to 2128, where zones change offset.
 fun era(x: Long, y: Long, n: Int): Instant =

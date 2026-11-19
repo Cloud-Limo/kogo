@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	gotime "time"
+	"unicode/utf16"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -182,21 +184,111 @@ func (d Duration) IntervalValue() (pgtype.Interval, error) {
 	return pgtype.Interval{Microseconds: d.Seconds*1e6 + int64(d.Nanos)/1000, Valid: true}, nil
 }
 
-// A ZoneId is a named zone of the tz database.
+// A ZoneId is a zone as java.time's ZoneId.of names it: a region of
+// the tz database, or a fixed offset. Offset is true for one written
+// as an offset alone (+05:30, Z), which java.time's ZoneOffset is.
 type ZoneId struct {
-	Name string
-	loc  *gotime.Location
+	Name   string
+	loc    *gotime.Location
+	Offset bool
 }
 
 func (z ZoneId) String() string { return z.Name }
 
-// ZoneId_Of is ZoneId.of(name). A name the tz database lacks is a bug.
-func ZoneId_Of(name string) ZoneId {
-	loc, err := gotime.LoadLocation(name)
-	if err != nil || name == "" || name == "Local" {
-		panic("unknown time zone " + name)
+// ZoneId_Of is ZoneId.of(id), which takes java.time's IDs and panics
+// with its message on any other.
+func ZoneId_Of(id string) ZoneId {
+	if id != "Z" && len(utf16.Encode([]rune(id))) <= 1 {
+		panic("Invalid ID for ZoneOffset, invalid format: " + id)
 	}
-	return ZoneId{name, loc}
+	if id == "Z" || id[0] == '+' || id[0] == '-' {
+		secs := zoneOffset(id)
+		return ZoneId{offsetText(secs), gotime.FixedZone("", secs), true}
+	}
+	for _, prefix := range []string{"UTC", "GMT", "UT"} {
+		if rest, ok := strings.CutPrefix(id, prefix); ok && (rest == "" || rest[0] == '+' || rest[0] == '-') {
+			secs := 0
+			if rest != "" {
+				func() {
+					defer func() {
+						if recover() != nil {
+							panic("Invalid ID for offset-based ZoneId: " + id)
+						}
+					}()
+					secs = zoneOffset(rest)
+				}()
+			}
+			if secs != 0 {
+				prefix += offsetText(secs)
+			}
+			return ZoneId{prefix, gotime.FixedZone("", secs), false}
+		}
+	}
+	if !regionID.MatchString(id) {
+		panic("Invalid ID for region-based ZoneId, invalid format: " + id)
+	}
+	loc, err := gotime.LoadLocation(id)
+	if err != nil || notJava[id] || strings.HasPrefix(id, "posix/") || strings.HasPrefix(id, "right/") {
+		panic("Unknown time-zone ID: " + id)
+	}
+	return ZoneId{id, loc, false}
+}
+
+var regionID = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9~/._+-]+$`)
+
+// notJava are the names Go loads, from the host or time/tzdata, that
+// java.time's tz database lacks.
+var notJava = map[string]bool{"EST": true, "HST": true, "MST": true, "ROC": true, "Factory": true, "posixrules": true, "localtime": true, "Local": true}
+
+// zoneOffset is java.time's ZoneOffset.of(id) in seconds: Z, or a sign
+// and then h, hh, hhmm, hh:mm, hhmmss or hh:mm:ss, up to 18 hours.
+func zoneOffset(id string) int {
+	if id == "Z" {
+		return 0
+	}
+	u := utf16.Encode([]rune(id)) // Java counts and indexes UTF-16 units
+	if len(u) == 2 {
+		u = []uint16{u[0], '0', u[1]}
+	}
+	num := func(pos int, colon bool) int {
+		if colon && u[pos-1] != ':' {
+			panic("Invalid ID for ZoneOffset, colon not found when expected: " + string(utf16.Decode(u)))
+		}
+		if u[pos] < '0' || u[pos] > '9' || u[pos+1] < '0' || u[pos+1] > '9' {
+			panic("Invalid ID for ZoneOffset, non numeric characters found: " + string(utf16.Decode(u)))
+		}
+		return int(u[pos]-'0')*10 + int(u[pos+1]-'0')
+	}
+	var h, m, s int
+	switch len(u) {
+	case 3:
+		h = num(1, false)
+	case 5:
+		h, m = num(1, false), num(3, false)
+	case 6:
+		h, m = num(1, false), num(4, true)
+	case 7:
+		h, m, s = num(1, false), num(3, false), num(5, false)
+	case 9:
+		h, m, s = num(1, false), num(4, true), num(7, true)
+	default:
+		panic("Invalid ID for ZoneOffset, invalid format: " + id)
+	}
+	if u[0] == '-' {
+		h, m, s = -h, -m, -s
+	}
+	for _, f := range []struct {
+		what   string
+		v, max int
+	}{{"hours", h, 18}, {"minutes", m, 59}, {"seconds", s, 59}} {
+		if f.v < -f.max || f.v > f.max {
+			panic(fmt.Sprintf("Zone offset %s not in valid range: value %d is not in the range %d to %d", f.what, f.v, -f.max, f.max))
+		}
+	}
+	if (h == 18 || h == -18) && m|s != 0 {
+		panic("Zone offset not in valid range: -18:00 to +18:00")
+	}
+	return h*3600 + m*60 + s
 }
 
 type ZonedDateTime struct {
@@ -213,13 +305,18 @@ func (z ZonedDateTime) String() string {
 	if t.Second() != 0 || z.Instant.Nanos != 0 {
 		layout += ":05"
 	}
-	return year(t.Year()) + t.Format(layout) + fraction(z.Instant.Nanos) + offset(t) + "[" + z.Zone.Name + "]"
+	text := year(t.Year()) + t.Format(layout) + fraction(z.Instant.Nanos)
+	_, secs := t.Zone()
+	s := text + offsetText(secs)
+	if !z.Zone.Offset {
+		s += "[" + z.Zone.Name + "]"
+	}
+	return s
 }
 
-// offset writes t's offset from UTC as java.time does: Z for none, and
-// the seconds only where there are some, as in a zone's local mean time.
-func offset(t gotime.Time) string {
-	_, secs := t.Zone()
+// offsetText writes an offset from UTC as java.time does: Z for none,
+// and the seconds only where there are some, as in local mean time.
+func offsetText(secs int) string {
 	if secs == 0 {
 		return "Z"
 	}
@@ -234,22 +331,43 @@ func offset(t gotime.Time) string {
 	return s
 }
 
-func Clock_Now(this Clock) Instant                           { return this.now() }
-func Instant_AtZone(this Instant, zone ZoneId) ZonedDateTime { return ZonedDateTime{this, zone} }
-func ZonedDateTime_ToInstant(this ZonedDateTime) Instant     { return this.Instant }
+func Clock_Now(this Clock) Instant                       { return this.now() }
+func ZonedDateTime_ToInstant(this ZonedDateTime) Instant { return this.Instant }
 
 // The days since 1970-01-01 of java.time's first and last LocalDate,
 // in years -999999999 and 999999999.
 const minEpochDay, maxEpochDay = -365243219162, 365241780471
 
-// LocalDate_PlusDays counts across months and years, as java.time does,
-// and panics past java.time's range rather than give a wrong date.
-func LocalDate_PlusDays(this LocalDate, daysToAdd int64) LocalDate {
-	day := gotime.Date(int(this.Year), gotime.Month(this.Month), int(this.Day), 0, 0, 0, 0, gotime.UTC).Unix() / 86400
-	if daysToAdd > maxEpochDay-day || daysToAdd < minEpochDay-day {
-		panic(fmt.Sprintf("%v plus %d days is outside the range of a LocalDate", this, daysToAdd))
+func checkEpochDay(day int64) {
+	if day < minEpochDay || day > maxEpochDay {
+		panic(fmt.Sprintf("Invalid value for EpochDay (valid values %d - %d): %d", minEpochDay, maxEpochDay, day))
 	}
-	y, m, d := gotime.Unix((day+daysToAdd)*86400, 0).UTC().Date()
+}
+
+// Instant_AtZone panics, as java.time's does, where the date in zone
+// is past a LocalDate's range.
+func Instant_AtZone(this Instant, zone ZoneId) ZonedDateTime {
+	_, offset := this.utc().In(zone.loc).Zone()
+	local := this.Seconds + int64(offset)
+	day := local / 86400
+	if local%86400 < 0 {
+		day--
+	}
+	checkEpochDay(day)
+	return ZonedDateTime{this, zone}
+}
+
+// LocalDate_PlusDays counts across months and years, and panics past
+// a LocalDate's range, as java.time's does: in December of its last
+// year, a sum inside 59 days is a year past it.
+func LocalDate_PlusDays(this LocalDate, daysToAdd int64) LocalDate {
+	if dom := int64(this.Day) + daysToAdd; this.Year == 999999999 && this.Month == 12 && dom > 31 && dom <= 59 {
+		panic("Invalid value for Year (valid values -999999999 - 999999999): 1000000000")
+	}
+	day := gotime.Date(int(this.Year), gotime.Month(this.Month), int(this.Day), 0, 0, 0, 0, gotime.UTC).Unix() / 86400
+	day = addExact(day, daysToAdd)
+	checkEpochDay(day)
+	y, m, d := gotime.Unix(day*86400, 0).UTC().Date()
 	return LocalDate{int32(y), int32(m), int32(d)}
 }
 

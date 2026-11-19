@@ -213,7 +213,8 @@ func TestUuidParseOrNull(t *testing.T) {
 	}
 	for _, s := range []string{"", "01934f2a-bcde-7f01-89ab-cdef0123456", "01934f2a-bcde-7f01-89ab-cdef012345678",
 		"01934f2a0bcde-7f01-89ab-cdef01234567", "01934f2a-bcde07f01-89ab-cdef01234567", "01934f2a-bcde-7f01089ab-cdef01234567",
-		"01934f2a-bcde-7f01-89ab0cdef01234567", "01934f2a-bcde-7f01-89ab-cdef0123456g", "{01934f2a-bcde-7f01-89ab-cdef01234567}"} {
+		"01934f2a-bcde-7f01-89ab0cdef01234567", "01934f2a-bcde-7f01-89ab-cdef0123456g", "{01934f2a-bcde-7f01-89ab-cdef01234567}",
+		"01934f2abcde7f0189abcdef01234567"} {
 		if u := Uuid_ParseOrNull(s); u != nil {
 			t.Errorf("Uuid.parseOrNull(%q) = %v, want null", s, u)
 		}

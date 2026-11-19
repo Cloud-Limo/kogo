@@ -7,7 +7,7 @@ test lines, from counting the Kotlin a piece replaces or from the
 designs' own guesses; nothing was built to measure it. Linear holds
 each piece's state; this file holds the order and the reasons, and is
 rewritten when either moves. Last rewritten to the evening of 19 Nov
-2026 (DEV-979), when eleven pieces had merged.
+2026 (DEV-979).
 
 ## The goal
 
@@ -31,8 +31,8 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   and the port then matches them exactly.
 - **The port is kept in step with Kogo the day Kogo changes**, so that
   `kogo/run.sh` keeps comparing against `main`: the list in its new
-  form (cusoon2 PR 1529), with a named check (PR 1533) that becomes the
-  Kotlin's whole Origin and CSRF check (DEV-974, PR 1535, in review);
+  form (cusoon2 PR 1529), with a named check (PR 1533) that became the
+  Kotlin's whole Origin and CSRF check (DEV-974, PR 1535);
   its operations on `SerializableTx` (PR 1534). The port's rule for a
   transaction's kind: a read with no lock, and whatever calls one,
   takes a `SerializableTx`, as the Kotlin runs it; a one-statement
@@ -100,11 +100,11 @@ Every prelude name is imported from a `kogo.` package (DEV-939, DEV-954).
 | 3 | Kogo | Serve a gated row: check, gate, work | 150 / 150 | merged, PR 91 |
 | 4 | Kogo | The Origin and CSRF check (`doc/origin.md`) | 120 / 150 | merged, PR 92 |
 | 5 | Kogo | `SerializableTx` beside `Tx` | 70 / 70 | merged, PR 93 |
-| 6a | Kogo | A proof's rules in the checker (DEV-976) | 170 / 150, 6a and 6b | started |
-| 6b | Kogo | A gate only reads (DEV-977) | (in 6a's) | started |
+| 6a | Kogo | A proof's rules in the checker (DEV-976) | 170 / 150, 6a and 6b | |
+| 6b | Kogo | A gate only reads (DEV-977) | (in 6a's) | |
 | 7 | Kogo | `action fun`, `lookup` and `action` bindings | 100 / 100 | merged, PR 90 |
 | 8 | Kogo | `Reply` and `Cookie` | 50 / 50 | merged, PR 89 |
-| 9 | Kogo | `kogo.http` (DEV-978) | 360 / 250 | started |
+| 9 | Kogo | `kogo.http` (DEV-978) | 360 / 250 | |
 | 10 | Kogo | Compare and shift an `Instant` | 30 / 30 | merged, PR 79 |
 | 11 | Kogo | `main`'s prelude: `rpc.Call`, `_op`, settings | 150 / 150 | |
 | 12 | Kogo | `ByteArray` and `kogo.mail` | 130 / 120 | |
@@ -148,8 +148,9 @@ longest lead time and can go out early.
 
 - What a `kogo test` is handed (DEV-969), before row 13.
 - A place with no stored address, filled when read (cusoon2 DEV-972),
-  and the three Google operations folded back into one transaction
-  (cusoon2 DEV-975), before the booker's port.
+  in the Kotlin, before the jobs' port (rows 13–18).
+- The three Google operations folded back into one transaction
+  (cusoon2 DEV-975), before the booker's places slice is ported.
 - From the test form's build (DEV-940): what three refusals buried in
   application code and two expected panics become.
 - `doc/remains.md`'s review of `find` and `fair`, with the runner.

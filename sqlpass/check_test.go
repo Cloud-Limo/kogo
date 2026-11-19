@@ -89,6 +89,9 @@ func TestSignatures(t *testing.T) {
 				"flag: Boolean, small: Int, big: Long, ratio: Double, amount: Decimal, body: String, folded: String, " +
 				"code: String, id: Uuid, at: Instant, day: LocalDate, clock: LocalTime, span: Duration, " +
 				"kind: InviteKind, tags: List<String>, share: Int, note: String?, pending: String?"},
+		{"bytea, as parameter and as column",
+			`insert into letter (id, eml, draft) values ($id, $eml, $draft) returning eml, draft`,
+			"(id: Uuid, eml: ByteArray, draft: ByteArray) -> eml: ByteArray, draft: ByteArray?"},
 		{"a NOT NULL column and a nullable one, ordered by a column not selected",
 			`select legal_name, abn from business order by created_at`, "() -> legal_name: String, abn: String?"},
 		{"a $ that starts no parameter is SQL text",

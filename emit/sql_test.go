@@ -251,3 +251,55 @@ fun zero(db: Db): Decimal = db.tx { tx -> tx.querySingle<Decimal>(sql"""select 0
 fun zeros(db: Db): List<Decimal> = db.tx { tx -> tx.querySingle<List<Decimal>>(sql"""select array[0.00, 0, 1.50] as "z!" """) }
 `)
 }
+
+// A ByteArray is read from a bytea and sent to one as it was, a zero
+// byte and none at all included; a ByteArray? is NULL, and a NULL is
+// refused where a ByteArray is read (spec.md 10.4).
+func TestBytes(t *testing.T) {
+	expectWith(t, withDB, "defer drop()\n", [][2]string{
+		{`t.Keep(db, kogo.NewId(), kogo.ByteArray("a\x00\xff"), nil)`, "1"},
+		{`t.Keep(db, kogo.NewId(), kogo.ByteArray(nil), rt.Ptr(kogo.ByteArray("d")))`, "1"}, // as a binding may give none
+		{`func() string { var s string; for _, l := range t.Kept(db) { s += fmt.Sprintf("%q %v;", l.Eml, l.Draft) }; return s }()`, `"" &[100];"a\x00\xff" <nil>;`},
+		{`t.Drafts(db)`, "panics: can't scan into dest[0] (col: draft!): null is not a ByteArray"},
+	}, `package t
+
+data class Letter(val eml: ByteArray, val draft: ByteArray?)
+
+fun keep(db: Db, id: Uuid, eml: ByteArray, draft: ByteArray?): Int = db.tx { tx ->
+    tx.execute(sql"insert into letter (id, eml, draft) values ($id, $eml, $draft)")
+}
+
+fun kept(db: Db): List<Letter> = db.tx { tx -> tx.query<Letter>(sql"select eml, draft from letter order by eml") }
+
+fun drafts(db: Db): List<ByteArray> = db.tx { tx -> tx.query<ByteArray>(sql"""select draft as "draft!" from letter""") }
+`)
+}
+
+// A ByteArray where check cannot see it compared, in a contains, an in,
+// a Set or behind a type parameter, panics, since Kotlin compares it by
+// identity and the bytes would answer otherwise; inside a data class's
+// text it is Kotlin's signed bytes (spec.md 3; kotlinc 2.4.21 gives
+// F(name=x, data=[97, 0, -1])).
+func TestBytesIdentity(t *testing.T) {
+	const bytes = "\nimport \"github.com/Cloud-Limo/kogo/prelude/kogo\"\nvar a, b = kogo.ByteArray(\"a\\x00\\xff\"), kogo.ByteArray(\"a\\x00\\xff\")\n"
+	identity := "panics: a ByteArray cannot be compared: Kotlin compares it by identity"
+	expectWith(t, bytes, "", [][2]string{
+		{"t.InList(a, b)", identity},
+		{"t.Contains(a, b)", identity},
+		{"t.InSet(a, b)", identity},
+		{"t.Same(a, b)", identity},
+		{"t.Boxed(a, b)", identity},
+		{"t.Text(a)", "F(name=x, data=[97, 0, -1])"},
+	}, `package t
+
+data class F(val name: String, val data: ByteArray)
+
+fun <T> same(a: T, b: T): Boolean = a == b
+
+fun inList(a: ByteArray, b: ByteArray): Boolean = b in listOf(a)
+fun contains(a: ByteArray, b: ByteArray): Boolean = listOf(a).contains(b)
+fun inSet(a: ByteArray, b: ByteArray): Boolean = b in setOf(a)
+fun boxed(a: ByteArray, b: ByteArray): Boolean = same(F("x", a), F("x", b))
+fun text(a: ByteArray): String = "${F("x", a)}"
+`)
+}

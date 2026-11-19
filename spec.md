@@ -68,6 +68,7 @@ import kogo.time.Instant
 | `Nothing` | no value; the type of `raise`, `error` and `return` |
 | `Uuid`, `Instant`, `LocalDate`, `LocalTime`, `ZoneId`, `ZonedDateTime`, `Duration`, `Decimal` | prelude types, section 12 |
 | `List<T>`, `Set<T>`, `Map<K, V>`, `Pair<A, B>` | immutable collections, section 12 |
+| `ByteArray` | bytes that are carried and never read: below |
 | `T?` | `T` or `null` |
 | `(A, B) -> R` | function type |
 | `Either<E, A>` | a failure `E` or a value `A`, section 9 |
@@ -106,6 +107,25 @@ type does not show the function, behind a type parameter or an
 interface, the comparison panics once it reaches the function, and
 answers `false` where a part before it differs, `contains`, `distinct`
 and a `Set`'s or `Map`'s keys included.
+
+A `ByteArray` is bytes, as a `bytea` column holds them (10.4) and a
+binding makes or takes them. Kogo code names the type, reads a value
+from a row, binds it into a statement, passes it, holds it in a data
+class and hands it to a binding, and nothing else: it has no index, no
+`size`, no `set` and no constructor, so it is the one array Kogo has
+and it cannot change. `==` and `!=` are an error (`bytes-equality`)
+where either side's type is or holds one, as for a function above and
+through the same types, since Kotlin compares a `ByteArray` by identity
+and a data class by its properties': compare the other properties, or
+what the bytes were made from. Comparing with `null` is allowed. Where
+check cannot see one compared, behind a type parameter or in
+`contains`, `in`, `distinct` or a `Set`'s or `Map`'s keys, `==` panics
+on reaching it, as on a function, where Kotlin would answer `false` for
+two arrays of the same bytes. In a template it is an error
+(`bytes-text`): Kotlin writes its identity, `[B@` and a number that
+changes every run. Inside a data class's text it is written as Kotlin's
+`toString` writes it, its bytes signed: `F(name=x, data=[97, 0, -1])`.
+It is in no operation's input or answer (15.4).
 
 A `String` counts as Kotlin's does: `length`, `substring`, `padStart`
 and reading it as `Char`s count UTF-16 units, so `"😀".length` is 2. It
@@ -680,6 +700,7 @@ column.
 | `date` | `LocalDate` |
 | `time` | `LocalTime` |
 | `interval` | `Duration` |
+| `bytea` | `ByteArray` |
 | an enum type | the enum of the same constants in `schema.kg` |
 | `T[]` | `List<T>`, or `List<T?>` |
 | a domain | its base type's mapping |
@@ -715,7 +736,8 @@ it is read (section 8): `infinity` in a `timestamptz` or a `date`,
 length. A `Duration` too long for an `interval`'s microseconds is a
 panic when it is sent. A `Decimal` holds `NaN` and `Infinity` as well
 as numbers, and a zero keeps its scale: `0.00`. An empty `List` is sent as an
-empty array, never as `NULL`.
+empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
+`bytea`.
 
 ### 10.5 Nullability
 
@@ -882,7 +904,8 @@ type of its own in a package `kogo.<name>`, imported by name as
 `kogo.time` is, and so for input and output, where Kotlin's are
 global functions and Kogo's an effect (section 7). So a file's imports
 show what in it is not Kotlin's.
-`Uuid`, `newId` and `Decimal` are Kogo's own and need no import.
+`Uuid`, `newId` and `Decimal` are Kogo's own and need no import;
+`ByteArray` (section 3) is Kotlin's name and needs none either.
 
 **Collections** (immutable; "changing" one returns a new one).
 `listOf`, `emptyList`, `setOf`, `mapOf`, `size`, `isEmpty`, `isNotEmpty`,
@@ -1077,6 +1100,69 @@ Every 3xx and 4xx is logged in Go, with its method, path, status and
 body, the body's first 4 KiB with a mark where it is cut. A handle's
 own headers and query fields are never logged.
 
+**Mail** (`kogo.mail`). A message is data that Kogo builds, and
+`eml(mail: Mail): ByteArray` writes it as the bytes of an EML file, for
+a row to hold until a sender sends them. `examples/30_mail.kg` builds
+one and keeps it.
+
+```kotlin
+data class Address(val name: String, val address: String)
+data class Attachment(val name: String, val mimeType: String, val data: ByteArray)
+data class Mail(val messageId: String, val date: Instant, val from: Address, val replyTo: Address?,
+                val to: List<Address>, val cc: List<Address>, val bcc: List<Address>,
+                val subject: String, val text: String, val html: String?, val attachments: List<Attachment>)
+```
+
+`eml` reads no clock and makes nothing up: the same `Mail` gives the
+same bytes, every time, so a message stored twice is the same message.
+The application chooses the Message-ID and the date, and keeps each
+address once across `to`, `cc` and `bcc`. A name of `""` is no name.
+`bcc` is written into the bytes, as a `Bcc` header: they are all a
+sender is given, so it reads who the message goes to from them and
+leaves that header out of what it sends.
+
+Where Go's `net/mail` and `mime` packages would decide, Kogo writes
+the bytes itself and states them:
+
+| What | Kogo's rule |
+| --- | --- |
+| The headers' order | `Message-ID`, `Date`, `From`, `Reply-To`, `To`, `Cc`, `Bcc`, `Subject`, `MIME-Version: 1.0`, then the content's. One with nothing to say (no `replyTo`, an empty list) is not written. No other header is: no `User-Agent`, no `X-Mailer`. |
+| `Message-ID` | `<` `messageId` `>`, as given: the application writes the `@` and what follows it, by the address rule below. |
+| `Date` | In UTC, to the second: `Mon, 16 Nov 2026 14:30:00 +0000`. |
+| An address | `"name" <address>`, or `<address>` with no name; a list has one address to a line, each but the last ending in `,`. A name is quoted, with `\` before a `"` or a `\`, when it is printable ASCII, holds no `=?` and has no run of over 60 characters without a space; any other is encoded words. |
+| The subject | As it is by the same rule as a name, unquoted; if not, encoded words. |
+| A control character | In a name or a subject, a space, CR and LF included, so that no reader gives one back. |
+| Folding | A header's line is broken, as CR LF before a space, wherever it would pass 78 characters, but never before the header's first word. |
+| Encoded words | `=?UTF-8?B?...?=`, each the base64 of at most 39 bytes of UTF-8 and of whole characters, a space between, so that one fits a line after its header's name. |
+| `text` and `html` | `text/plain; charset=UTF-8` and `text/html; charset=UTF-8`, quoted-printable, by these rules alone: a byte outside printable ASCII but a tab, and `=`, is `=XX`, in capitals; a space or a tab that ends a line is `=20` or `=09`; a line break is CR LF; when the next character's encoding would take a line past 75 characters, a soft break, `=` and CR LF, comes before it; and a text that does not end in a line break ends in a soft break. |
+| An attachment's body | Base64, 76 characters to a line. |
+| The parts | `text` alone is the message's body. With `html`, a `multipart/alternative` of `text`, then `html`. With attachments, a `multipart/mixed` of that body, then each attachment in order. |
+| A boundary | `boundary="=_kogo-mixed"` and `boundary="=_kogo-alternative"`, always: quoted-printable writes `=` only before two hex digits or a line end, and base64 only at a line's end, so no body holds `=_`. |
+| An attachment | `Content-Type:` its `mimeType`, then `Content-Disposition: attachment; filename="name"`, quoted as a name is, when that is printable ASCII and at most 45 characters; any other name is RFC 2231's pieces, a line each, `filename*0*=UTF-8''...;`, `filename*1*=...`, of its UTF-8 percent-encoded but for letters, digits, `.`, `-` and `_`, each at most 60 characters with the first's `UTF-8''`. |
+| Line ends | CR LF, every one. |
+
+No line is then over 78 characters but the `Message-ID`'s, an
+address's and an attachment's `Content-Type`, each of which the
+application chooses.
+
+**The address rule.** `Address.address`, wherever one is written,
+`replyTo` included, and `messageId` match
+
+```
+^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$
+```
+
+and are at most 254 characters: an ASCII addr-spec of RFC 5322's atext
+and dots with one `@`, so that none ends its header or names a second
+recipient. One that does not is a bug in the caller, and `eml` panics
+(section 8). An address a person typed is checked against this rule,
+with `Regex`, where the application takes it, so that the person meets
+a refusal there and never the panic; an application's own rule is no
+wider than this one. An address outside ASCII (an IDN domain, a UTF-8
+local part) is refused: a customer who has one brings it. A `mimeType`
+is printable ASCII, a parameter such as `; charset=utf-8` included,
+and one that is empty or is not panics likewise.
+
 **Tests** (`kogo.test`; test files only, section 16).
 `kogo.test` has `Test<E>`, `test(sentence) { tx, env -> ... }` and
 `Refusal` (10.8), and `kotlin.test`'s assertions, each imported by
@@ -1164,6 +1250,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `return` inside a lambda, as `xs.forEach { if (it < 0) return false }` | end the lambda with its value; return after the call |
 | `suspend`, coroutines, `Flow`, threads | plain blocking code |
 | `Sequence`, `generateSequence`, `MutableList`, arrays | a `while` loop with a local `var`, or the list functions |
+| `bytes[i]`, `bytes.size`, `byteArrayOf(...)`, `a == b` on a `ByteArray` | none: a `ByteArray` is carried, and a binding reads it (section 3) |
 | `java.time.*`, `java.util.UUID`, `BigDecimal` | `kogo.time.*`, `Uuid`, `Decimal` |
 | `kotlin.test.*` | `kogo.test.*` |
 | `BigDecimal.valueOf(x).stripTrailingZeros().toPlainString()` | `plain(x)`, from `kogo.text`, not `Decimal` |
@@ -1443,7 +1530,9 @@ Inputs and answers are JSON.
 
 - Any other type in an input or an answer is a compile error: a `Map`,
   a `Set`, a `Pair`, a `Decimal`, a type of `kogo.time`, a function, an
-  external class. Send text that the server has formatted.
+  external class. Send text that the server has formatted. A
+  `ByteArray` is one too: bytes stay in a row, and an operation answers
+  what the page shows of them.
 - A sealed interface, or a variant of one, is a compile error too: send
   a data class, with an enum that says which case it is.
 - `Unit` stands only as the whole input or the whole answer.

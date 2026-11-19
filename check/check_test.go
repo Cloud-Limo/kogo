@@ -47,6 +47,7 @@ external fun <T> requireNotNull(value: T?, lazyMessage: () -> String): T
 external fun require(value: Boolean, lazyMessage: () -> String)
 external fun error(message: String): Nothing
 external class Uuid
+external class ByteArray
 external object Text {
     fun of(n: Int): String
 }
@@ -415,6 +416,21 @@ func TestFunctionEquality(t *testing.T) {
 		{rule + "fun f(a: Rule?, b: Rule): Boolean = a ‸== b", "function-equality", "compares a Rule?, and Rule's property test"},
 		{rule + "fun f(a: Pair<String, Rule>, b: Pair<String, Rule>): Boolean = a ‸== b", "function-equality", "Rule's property test"},
 		{"data class N(val next: N?, val f: () -> Unit)\nfun f(a: N): Boolean = a ‸== a", "function-equality", "N's property f"},
+	})
+}
+
+// Nor is a ByteArray, which Kotlin compares by identity (spec.md 3):
+// it is named, passed and held, and has no operations.
+func TestByteArray(t *testing.T) {
+	file := "data class File(val name: String, val data: ByteArray)\n"
+	passes(t, file+"fun f(a: ByteArray, b: ByteArray?): File? = if (b == null) File(\"a\", a) else null")
+	refused(t, [][3]string{
+		{"fun f(a: ByteArray, b: ByteArray): Boolean = a ‸== b", "bytes-equality", "== compares a ByteArray, which Kotlin compares by identity, not by its bytes: compare the other properties, or what the bytes were made from"},
+		{file + "fun f(a: File, b: File): Boolean = a ‸!= b", "bytes-equality", "!= compares a File, and File's property data holds a ByteArray, which Kotlin compares by identity"},
+		{file + "fun f(a: List<File?>, b: List<File?>): Boolean = a ‸== b", "bytes-equality", "File's property data holds a ByteArray"},
+		{"fun f(a: ByteArray): Int = a.‸size", "unknown-name", "a ByteArray has no property size"},
+		{"fun f(a: ByteArray): Int = a‸[0]", "no-overload", "this operator is not defined for a ByteArray"},
+		{"fun f(a: ByteArray?): String = \"x ${‸a}\"", "bytes-text", "a ByteArray? in a template is written as Kotlin writes its identity, [B@ and a number that changes every run: write a name or a size kept beside it"},
 	})
 }
 

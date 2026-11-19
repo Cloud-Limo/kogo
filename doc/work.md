@@ -147,6 +147,13 @@ fun enqueueMail(at: AtTenant, id: ID, now: Instant, mail: Mail, label: String, n
   chosen (`"outbound-$id"`, as the Kotlin's). Go holds the MIME and
   the SMTP conversation, with a deadline on the connection, since Go's
   `net/smtp` takes none.
+- The stored bytes hold a `Bcc` header (spec 12), which `send` reads
+  for the envelope and leaves out of the DATA it sends: the outbox's
+  port has a test that the bytes it sends hold no `Bcc`, since Go's
+  `net/smtp.SendMail` sends them as they are. Nothing shows the stored
+  bytes to a person raw (a page, a download, a support person's
+  forward, a log of a failed send): each would show every recipient
+  the `Bcc` list. Ruling on PR 103 (DEV-988), 20 Nov 2026.
 - Perhaps 80 lines of Go and 20 of prelude. Weighed and not taken:
   the message's parts in columns, built into an EML when sent, which
   changes cusoon2's schema and outbox for nothing a replay or the
@@ -1306,7 +1313,12 @@ built once. Agreed with Greg on 17 Nov 2026.
   does it by the clock it is handed ("How it is tested").
 - What sits behind cusoon2's PDF extension: a small writer of its
   own, or a wrapped library.
-- How a data class that a binding file declares reaches its Go.
+- How a data class that a binding file declares reaches its Go. The
+  prelude's are written in Go by hand, as the emitter would write
+  them (`kogo.mail`'s `Mail`; `decisions.md`, DEV-988); an
+  application's extension is not settled.
+- A message's date. `Mail` was built with `date: Instant`, which the
+  sketch above lacks: for Greg (`decisions.md`, DEV-988).
 - A hash in the prelude. The run sheet's job keeps a SHA-1 of what it
   last sent, to see a change (`daemon.kt`, `sha1Hex`); Kogo has none.
 - For the runner's build, found on 20 Nov 2026:

@@ -31,8 +31,10 @@ type unordered interface {
 // is nil, a T? holding a value is equal to that T, lists and data
 // classes are compared part by part, sets regardless of order, and a
 // Double as Kotlin's equals compares it, so NaN is equal to NaN and
-// 0.0 is not equal to -0.0. A function panics: the checker refuses ==
-// where it sees one, and cannot see one behind a type parameter.
+// 0.0 is not equal to -0.0. A function or a ByteArray panics, as
+// Kotlin compares neither by what it holds: the checker refuses ==
+// where it sees one, and cannot see one behind a type parameter or in
+// a contains, an in, or a Set's or a Map's keys.
 func Equal(a, b any) bool { return equal(reflect.ValueOf(a), reflect.ValueOf(b)) }
 
 // EqualDouble is a == b for two Double? values as Kotlin compares
@@ -90,6 +92,9 @@ func equal(a, b reflect.Value) bool {
 	if a.Kind() == reflect.Func || b.Kind() == reflect.Func {
 		panic("a function cannot be compared")
 	}
+	if isBytes(a) || isBytes(b) {
+		panic("a ByteArray cannot be compared: Kotlin compares it by identity")
+	}
 	if a.Kind() != b.Kind() {
 		return false
 	}
@@ -132,6 +137,12 @@ func equal(a, b reflect.Value) bool {
 	return false
 }
 
+// isBytes reports whether v is a ByteArray (prelude/kogo), which this
+// package cannot import.
+func isBytes(v reflect.Value) bool {
+	return v.Kind() == reflect.Slice && v.Type().Name() == "ByteArray" && v.Type().PkgPath() == "github.com/Cloud-Limo/kogo/prelude/kogo"
+}
+
 // ToString is x.toString(), and the text of x in a string template,
 // as Kotlin writes it.
 func ToString(x any) string { return text(reflect.ValueOf(x)) }
@@ -157,7 +168,11 @@ func text(v reflect.Value) string {
 	case reflect.Slice:
 		parts := make([]string, v.Len())
 		for i := range parts {
-			parts[i] = text(v.Index(i))
+			if isBytes(v) { // as a data class's toString writes one
+				parts[i] = strconv.Itoa(int(int8(v.Index(i).Uint())))
+			} else {
+				parts[i] = text(v.Index(i))
+			}
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
 	case reflect.Struct:

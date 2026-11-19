@@ -114,6 +114,13 @@ create table every_type (
 alter table every_type add column pending text;
 alter table every_type add constraint pending_not_null not null pending not valid;
 
+-- Bytes, kept and absent (examples/30_mail.kg).
+create table letter (
+    id uuid primary key,
+    eml bytea not null,
+    draft bytea
+);
+
 -- The domains whose pages may call, and their visitors' sessions
 -- (examples/27_origin.kg, examples/28_session.kg).
 create table shop (

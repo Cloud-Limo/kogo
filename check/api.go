@@ -197,6 +197,9 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 		if !is(gives, tUnit) && gives != unknown {
 			c.errorf(row.After, "step", "%s returns %s: a step named with after returns Either<String, Unit>, a refusal or nothing, and the work gives the answer (spec.md 15.2)", s.Name, s.Result)
 		}
+		if !s.Action && len(c.errs) == errs { // said of a step that otherwise fits
+			c.errorf(row.After, "step", "%s is not an action fun: a step named with after runs with no transaction open, to change something outside, so write action fun %s; what only checks or writes belongs in the gate or in %s (spec.md 15.2)", s.Name, s.Name, id.Name)
+		}
 		op.After = s
 	}
 	if len(c.errs) > errs {

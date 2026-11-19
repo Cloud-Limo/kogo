@@ -132,6 +132,7 @@ type Func struct {
 	Params     []*Var
 	Result     Type
 	External   bool        // a binding: Go provides it
+	Action     bool        // an action fun: it changes something outside (spec.md 7.1)
 	Owner      *TypeDecl   // of a Method, a Constructor, a Copy, a ToString, an override and an object's fun
 	Decl       syntax.Node // a *syntax.FunDecl, a *syntax.ValDecl or a *syntax.ClassDecl; nil for Copy and ToString
 	vis

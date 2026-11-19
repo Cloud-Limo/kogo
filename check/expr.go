@@ -296,6 +296,9 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 		}
 		c.info.Uses[e] = found[0]
 		c.demand(e, e.Name, found[0].vis)
+		if found[0].Action {
+			c.errorf(e, "action-kept", "::%s names an action fun, and an action is not kept in a value: call %s where it is wanted, in an action fun (spec.md 7.1)", e.Name, e.Name)
+		}
 		ft := &FuncType{Result: found[0].Result}
 		for _, p := range found[0].Params {
 			ft.Params = append(ft.Params, p.Type)
@@ -978,6 +981,10 @@ func (c *checker) lambda(l *syntax.Lambda, params []Type, want Type) *FuncType {
 	}
 	defer func(n int, b, bl, il bool) { c.loops, c.buried, c.buriedLoop, c.inLambda = n, b, bl, il }(c.loops, c.buried, c.buriedLoop, c.inLambda)
 	c.loops, c.buried, c.buriedLoop, c.inLambda = 0, false, false, true
+	if slices.ContainsFunc(ft.Params, func(t Type) bool { return t != nil && named(nonNull(t)) == c.prelude("Tx") }) {
+		c.inTx++
+		defer func() { c.inTx-- }()
+	}
 	if ft.Result = c.block(l.Body, want, true, nil); want != nil {
 		ft.Result = want
 	}

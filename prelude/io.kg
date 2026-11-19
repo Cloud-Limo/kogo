@@ -4,6 +4,6 @@ package kogo.io
 
 external class Console
 
-external fun Console.println(message: String)
-external fun Console.print(message: String)
-external fun Console.readln(): String
+action external fun Console.println(message: String)
+action external fun Console.print(message: String)
+lookup external fun Console.readln(): String

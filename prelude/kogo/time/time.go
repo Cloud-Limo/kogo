@@ -236,6 +236,7 @@ func offset(t gotime.Time) string {
 
 func Clock_Now(this Clock) Instant                           { return this.now() }
 func Instant_AtZone(this Instant, zone ZoneId) ZonedDateTime { return ZonedDateTime{this, zone} }
+func ZonedDateTime_ToInstant(this ZonedDateTime) Instant     { return this.Instant }
 
 // The days since 1970-01-01 of java.time's first and last LocalDate,
 // in years -999999999 and 999999999.
@@ -257,10 +258,10 @@ func ZonedDateTime_ToLocalDate(this ZonedDateTime) LocalDate {
 	return LocalDate{int32(y), int32(m), int32(d)}
 }
 
-// LocalDate_AtStartOfDay is the earliest instant of the date in zone,
-// as java.time's: where a change of offset skips midnight, the time
-// the gap ends; where midnight comes twice, the first.
-func LocalDate_AtStartOfDay(this LocalDate, zone ZoneId) Instant {
+// LocalDate_AtStartOfDay is the earliest time of the date in zone, as
+// java.time's: where a change of offset skips midnight, the time the
+// gap ends; where midnight comes twice, the first.
+func LocalDate_AtStartOfDay(this LocalDate, zone ZoneId) ZonedDateTime {
 	y, m, d := int(this.Year), gotime.Month(this.Month), int(this.Day)
 	t := gotime.Date(y, m, d, 0, 0, 0, 0, zone.loc)
 	if ty, tm, td := t.Date(); ty != y || tm != m || td != d {
@@ -271,7 +272,7 @@ func LocalDate_AtStartOfDay(this LocalDate, zone ZoneId) Instant {
 			t = p
 		}
 	}
-	return Instant{t.Unix(), int32(t.Nanosecond())}
+	return ZonedDateTime{Instant{t.Unix(), int32(t.Nanosecond())}, zone}
 }
 
 // java.time's range of an Instant, in seconds since 1970: the years

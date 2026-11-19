@@ -842,7 +842,7 @@ arithmetic in v0. Its `==` is Java's `equals`, which counts the scale:
 **Time** (`kogo.time`). `Instant` (`Instant.ofEpochSecond(seconds,
 nanos)`, `isBefore`, `isAfter`, `plus(duration)`, `minus(duration)`),
 `LocalDate` (`plusDays`, `year`, `monthValue`, `dayOfMonth`,
-`atStartOfDay(zone): Instant`), `LocalTime`, `ZoneId.of(name)`,
+`atStartOfDay(zone): ZonedDateTime`), `LocalTime`, `ZoneId.of(name)`,
 `ZonedDateTime` (`instant.atZone(zone)`, `hour`, `minute`,
 `toLocalDate`, `plusSeconds`, `toInstant`), `Duration` (`ofDays`,
 `ofMinutes`, `Duration.ofSeconds(seconds, nanos)`), `Clock.now()`.
@@ -850,7 +850,7 @@ nanos)`, `isBefore`, `isAfter`, `plus(duration)`, `minus(duration)`),
 `java.time`'s throw, with its message: `Instant exceeds minimum or
 maximum instant`, or `long overflow`. There is no default zone: every
 conversion names its zone. `atStartOfDay(zone)` is the day's earliest
-instant in the zone: where midnight is skipped, the end of the gap.
+time in the zone: where midnight is skipped, the end of the gap.
 Each writes itself as `java.time` does, in a template too: an
 `Instant` as `2026-11-15T14:30:00.120Z`, with the fraction in groups
 of three digits and none when it is zero; a `LocalDate` as
@@ -874,10 +874,11 @@ the shortest digits are one, Java writes the closest two, so the
 smallest `Double` ends in `5` here and `49` in Java. The difference is
 `plain`'s alone: a template and `toString` write these as Java does.
 
-**Ids.** `Uuid`, `Uuid.parse(text): Uuid?`, `newId(): Uuid` (time-ordered
-random). `Uuid.parse` reads 36 characters, hyphens at 8, 13, 18 and 23 and
-hex digits of either case elsewhere, and gives `null` for any other text;
-`Uuid.parse("$id") == id`.
+**Ids.** `Uuid`, `Uuid.parseOrNull(text): Uuid?`, `newId(): Uuid`
+(time-ordered random). `Uuid.parseOrNull` reads 36 characters, hyphens
+at 8, 13, 18 and 23 and hex digits of either case elsewhere, and gives
+`null` for any other text; `Uuid.parseOrNull("$id") == id`. Kotlin's
+also reads 32 hex digits without hyphens; Kogo's gives `null` for them.
 
 **Requests** (`kogo.rpc`). A `Request` is what the server read of one
 HTTP request, passed to an operation (section 15):
@@ -897,7 +898,7 @@ external class Http
 external fun Http.get(url: String): Either<HttpError, Response>
 
 external object Uuid {
-    fun parse(text: String): Uuid?
+    fun parseOrNull(text: String): Uuid?
 }
 
 external class List<out T>
@@ -910,7 +911,7 @@ external fun List<Long>.sum(): Long
 ```
 
 - `external object` holds functions called on its name:
-  `Uuid.parse(text)`. They have no effect: an object is reachable from
+  `Uuid.parseOrNull(text)`. They have no effect: an object is reachable from
   anywhere, and section 7 has effects arrive as parameters.
 - A binding with an effect, an outbound call, takes a handle: an
   external class such as `Http`, passed to the function that calls out
@@ -919,7 +920,7 @@ external fun List<Long>.sum(): Long
   it is the rule for whoever writes one.
 - `external class Name<T>` names a type that Go implements. It has no
   body, and Kogo code cannot construct or implement it. An external
-  object may share its name, which gives `Uuid.parse(text)`.
+  object may share its name, which gives `Uuid.parseOrNull(text)`.
 - `external fun` and `external val` declare a function and a property
   with no body. Every member of an external class is declared this way,
   with the class as the receiver. One with a receiver is a member: it is

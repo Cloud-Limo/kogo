@@ -532,9 +532,9 @@ func (u Uuid) String() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", u[0:4], u[4:6], u[6:8], u[8:10], u[10:16])
 }
 
-// Uuid_Parse is Uuid.parse(text): the id that a template writes as text,
+// Uuid_ParseOrNull is Uuid.parseOrNull(text): the id that a template writes as text,
 // hex of either case, or nil for any other text.
-func Uuid_Parse(s string) *Uuid {
+func Uuid_ParseOrNull(s string) *Uuid {
 	if len(s) != 36 || s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-' {
 		return nil
 	}

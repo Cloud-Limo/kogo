@@ -5,14 +5,32 @@ package builtins
 
 import kogo.time.Duration
 import kogo.time.Instant
+import kogo.time.ZoneId
 
 fun time(f: String, x: Long, y: Long, n: Int, m: Int): String? = when (f) {
     "ofEpochSecond" -> "${Instant.ofEpochSecond(x, n.toLong())} ${Duration.ofSeconds(y, m.toLong())}"
     "isBefore" -> "${instant(x, n).isBefore(instant(y, m))} ${instant(x, n).isAfter(instant(y, m))} ${instant(x, n).isBefore(instant(x, n))}"
     "plusDuration" -> "${instant(x, n).plus(Duration.ofSeconds(y, m.toLong()))}"
     "minusDuration" -> "${instant(x, n).minus(Duration.ofSeconds(y, m.toLong()))}"
+    "atZone" -> "${ZoneId.of(zone(m))} ${dated(x, n).atZone(ZoneId.of(zone(m)))} ${dated(x, n).atZone(ZoneId.of(zone(m))).toLocalDate()}"
+    "plusDays" -> "${dated(x, n).atZone(ZoneId.of(zone(m))).toLocalDate().plusDays(y % 1000000L)}"
+    "atZoneEra" -> "${era(x, y, n).atZone(ZoneId.of(zone(m)))} ${era(x, y, n).atZone(ZoneId.of(zone(m))).toLocalDate()}"
     else -> null
 }
+
+// Zones with a half hour, 45 minutes, a negative offset, a change at
+// midnight and summer time. An unknown zone's panic, and a LocalDate
+// past java.time's range, differ (decisions.md, DEV-933), so the cases
+// keep to known zones and to dates a million days inside the range.
+fun zone(m: Int): String =
+    listOf("UTC", "Australia/Sydney", "America/St_Johns", "Asia/Kolkata", "Pacific/Chatham", "Europe/Dublin", "America/Sao_Paulo")[(m % 7 + 7) % 7]
+
+fun dated(seconds: Long, nanos: Int): Instant =
+    Instant.ofEpochSecond(seconds.coerceAtLeast(-31556927735596800L).coerceAtMost(31556803432694400L), nanos.toLong())
+
+// Seconds from about 1685 to 2128, where zones change offset.
+fun era(x: Long, y: Long, n: Int): Instant =
+    Instant.ofEpochSecond(x % 5000000000L + y % 3L * 1000000000L - 2000000000L, n.toLong())
 
 fun instant(seconds: Long, nanos: Int): Instant =
     Instant.ofEpochSecond(seconds.coerceAtLeast(-31557014167219200L).coerceAtMost(31556889864403199L), nanos.toLong())

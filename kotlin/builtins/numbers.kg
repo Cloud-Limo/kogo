@@ -19,4 +19,5 @@ fun call(
     n: Int, m: Int, x: Long, y: Long, d: Double,
 ): String =
     lists(f, xs, ys, n, m) ?: strings(f, s, t, n, m) ?: numbers(f, x, y, d, n)
-        ?: probes(f, xs, ys, s, t, n, m, x, y, d) ?: time(f, x, y, n, m) ?: "no case $f"
+        ?: probes(f, xs, ys, s, t, n, m, x, y, d) ?: time(f, x, y, n, m)
+        ?: eithers(f, s, n, m, x, y) ?: "no case $f"

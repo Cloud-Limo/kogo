@@ -1052,7 +1052,7 @@ func TestPrelude(t *testing.T) {
 		// Counted apart from the trees: each declaration begins a line.
 		declared := 0
 		for _, name := range must(filepath.Glob("../prelude/*.kg")) {
-			declared += len(regexp.MustCompile(`(?m)^((action |lookup )?external (class|fun|val)|    fun) `).FindAll(must(os.ReadFile(name)), -1))
+			declared += len(regexp.MustCompile(`(?m)^((action )?external (class|fun|val)|    fun) `).FindAll(must(os.ReadFile(name)), -1))
 		}
 		if n != declared || n == 0 {
 			t.Errorf("%d declarations of the prelude are used, and it has %d", n, declared)

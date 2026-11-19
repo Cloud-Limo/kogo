@@ -611,7 +611,9 @@ The file enforces nothing: it is what a reviewer reads.
   printed as its package's last name and its own, `stripe.charge`. A
   gate's lookups are on a `gate asks` line. So a change to what an
   operation reaches outside is a diff, a lookup added to a helper
-  three calls down included.
+  three calls down included. A binding no longer says `lookup`, the
+  word that was kept for this table: when the table is built, it is
+  given whatever it needs to find an operation's `asks` lines.
 - **A lookup made while a transaction is open is marked `(in
   transaction)`**: it holds the transaction open while the service
   answers, and a rerun asks again. An action needs no mark, since
@@ -772,10 +774,13 @@ act too, on both sites, inside their transaction today: they are
 `ungated` with a `Db` here, and act between their transactions. Six
 comments argue, call by call, what a rerun would do.
 
-- **A binding says what kind of call it is**: a `lookup` asks and
-  changes nothing; an `action` changes something outside. The one
-  outbound binding is a general HTTP call, and each endpoint of a
-  service is declared once with its kind (`doc/work.md`).
+- **Only a binding that acts is marked**: an `action` binding
+  changes something outside, and any other says nothing, a lookup
+  among them; nothing checks that one is right to say nothing. The
+  word `lookup` on a binding, settled on 17 Nov 2026, was removed on
+  20 Nov (`decisions.md`). The one outbound binding is a general HTTP
+  call, and each endpoint of a service is declared once with its kind
+  (`doc/work.md`).
 - **An action is refused where a transaction is open**: in a function
   that holds a `Tx` or a proof, and in a `db.tx { }` block. A function
   that calls an action says so ("A function that acts says so"
@@ -948,7 +953,7 @@ taken: it rests on the binding's word, and fits one of them. Nor does
 it decide a worker's retry: cusoon2's mail is not safe to repeat and
 is retried without limit, and its charge is safe to repeat under its
 key and is never retried. Retry is a judgment for each queue, so a
-binding says `lookup` or `action` and nothing more.
+binding says `action` or nothing, and nothing more.
 
 ## What the checker holds
 
@@ -1031,7 +1036,8 @@ it: a habit of the application's code, not a rule.
   READ COMMITTED; the first parameter of a gate or an ungated
   operation says which the server opens, where 15.3 has it always
   SERIALIZABLE.
-- **13:** a binding with an effect says `lookup` or `action`.
+- **13:** a binding that changes something outside says `action`;
+  any other says nothing.
 - **11 and 13:** a binding that acts is an `action fun`, and so is
   every function that calls one; spec 1 lists `action fun` among the
   deviations.
@@ -1137,8 +1143,6 @@ it: a habit of the application's code, not a rule.
 
 ## Open
 
-- How a binding spells `lookup`; an action is an `action fun`. The
-  lists' words were settled on 18 Nov 2026 (DEV-894, `decisions.md`).
 - The printed table's command is deferred: named when it is built
   (`doc/roadmap.md`, "Settled for the ops site").
 - **`driverJobs`**: settled 19 Nov 2026 as one call per operator,

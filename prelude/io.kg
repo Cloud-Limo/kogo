@@ -6,4 +6,4 @@ external class Console
 
 action external fun Console.println(message: String)
 action external fun Console.print(message: String)
-lookup external fun Console.readln(): String
+external fun Console.readln(): String

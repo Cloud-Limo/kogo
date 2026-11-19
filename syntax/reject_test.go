@@ -73,7 +73,7 @@ func TestFaults(t *testing.T) {
 	for _, c := range []struct{ src, code, message string }{
 		{"val s = ‸sql\"select 1\"", "sql-placement", "only the argument of tx.query<R>"},
 		{"‸action val x = 1", "syntax", "action goes before fun, and before nothing else"},
-		{"‸lookup fun g(): Boolean = true", "syntax", "lookup marks a binding, lookup external fun"},
+		{"‸lookup fun g(): Boolean = true", "syntax", "lookup is no word of Kogo's before fun: leave it out"},
 		{"fun g(‸action b: Bell) {}", "syntax", "a parameter takes no modifier"},
 		{"fun g() {\n    ‸action fun h() {}\n}", "syntax", "action goes before a top-level fun only"},
 		{"fun f() = tx.query<R>(a, ‸sql\"select 1\")", "sql-placement", "only the argument"},

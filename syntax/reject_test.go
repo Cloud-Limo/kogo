@@ -45,6 +45,7 @@ func TestSection14(t *testing.T) {
 		{"‸suspend fun f() {}", "kotlin-suspend", "plain blocking code"},
 		{"fun f() = String‸::class", "kotlin-class-literal", "only ::class is inside @file:OptIn"},
 		{"‸@Suppress(\"x\") fun f() {}", "kotlin-annotation", "only markers"},
+		{"‸@OptIn(Beta::class) fun f() {}", "kotlin-annotation", "opt in on the file: begin this file with @file:OptIn(Beta::class)"},
 		{"‸@get:JvmName(\"x\") val x = 1", "kotlin-annotation", "only markers"},
 		{"val x: Int ‸by lazy { 1 }", "kotlin-delegation", "compute the value once"},
 		{"fun f(‸vararg xs: Int) {}", "kotlin-vararg", "take a List"},

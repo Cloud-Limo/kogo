@@ -1783,9 +1783,9 @@ Each entry: what was decided, why, and what would reopen it.
   `tx.atomically` is one plain declaration for the same reason. Not taken: choosing by the
   type wanted, which `val r = db.tx { }` does not state.
 - **Markers count only the file's opt-in** (spec 11). Kotlin also lets a marked declaration
-  use another of the same marker, and its declaring file needs no opt-in; example 19 opts in
-  all the same. One rule, checked at each call, constructor and read of a val. A type
-  carries no marker, and `@RequiresOptIn` goes on nothing but a marker.
+  use another of the same marker, and lets `@OptIn` sit on one declaration; Kogo's error
+  there says to opt in on the file. One rule, checked at each call, constructor and read of
+  a val. A type carries no marker, and `@RequiresOptIn` goes on nothing but a marker.
 - **A lambda whose value is a wanted `Unit` may end with `Unit`**: it is the lambda's
   value, not a statement (spec 6). Example 18 ends `db.tx`'s block so.
 - **Where an error is reported**: Postgres's refusal at the place it names, a parameter's

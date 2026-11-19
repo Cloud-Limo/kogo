@@ -2927,11 +2927,16 @@ Each entry: what was decided, why, and what would reopen it.
   its own. A one-character ID other than `Z` keeps Java's `Invalid ID for ZoneOffset,
   invalid format` message, as `zoneOf` reaches it with ordinary text. Not taken: refusing
   `UT` too, which Java accepts as a region.
-- **`mise run kotlin` counts a refusal by a `refused` rule beside `kept`**: in the cases
-  named, Kogo's result is exactly the limit panic, and Kotlin's result is not a panic
-  inside the subset (`Unknown time-zone ID`, region format), which stays compared. Not
-  taken: also matching Kotlin's result to an offset's text, which `UTC-0` (Java writes
-  `UTC`) defeats.
+- **`mise run kotlin` counts a refusal by a `refused` rule beside `kept`, decided by the
+  input**: the cases `zoneId` and `offsetId` give Kotlin's own ID on the same inputs, and a
+  case named counts as refused only when Kogo's result is exactly the limit panic and that
+  ID is an offset ID by `java.time`'s rule; the limit on any other input differs (Review
+  1 and its Ruling). Not taken: deciding by Kotlin's output (refused unless Kotlin's
+  result is a panic inside the subset), which let a Kogo refusing a valid region pass.
+- **`kogo check` refuses `ZoneId.of` on a string literal that is an offset ID**, code
+  `zone-offset`, with the limit's message (the lead's Ruling, Fix 6); a literal is one with
+  no template. The rule is the prelude's, written again in `check` so neither package needs
+  the other (rule 3). Not taken: sharing one regexp between them.
 - **The zone cases index `zone()` by `n * 10 + m`**, as `offsetOf` does: by `m` alone
   they never reached indices 8 to 12, the offsets, which DEV-952's cases therefore never
   compared. Not taken: reordering the list, which `m`'s edges reach only 10 of 15 of.

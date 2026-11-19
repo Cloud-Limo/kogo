@@ -3,6 +3,7 @@ package check
 import (
 	"fmt"
 	"maps"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -114,6 +115,7 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 	if call := c.info.Calls[e]; call != nil {
 		c.info.Uses[e.Fun] = call.Func
 		c.fails(e, call)
+		c.zoneOffset(e, call.Func)
 		if id, ok := e.Fun.(*syntax.Ident); ok && call.Func.Receiver != nil && c.raised(call.Func.Receiver) == nil {
 			c.narrowedThis(id)
 		}
@@ -123,6 +125,24 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 	}
 	return t
 }
+
+// zoneOffset refuses kogo.time's ZoneId.of on a string literal that
+// is an offset ID, outside Kogo's subset (spec.md 12); any other
+// string is refused when the program runs.
+func (c *checker) zoneOffset(e *syntax.Call, f *Func) {
+	if f.Pkg != "kogo.time" || f.Owner == nil || f.Owner.Name != "ZoneId" || f.Name != "of" || len(e.Args) != 1 {
+		return
+	}
+	if s, ok := e.Args[0].Value.(*syntax.StringLit); ok && len(s.Parts) == 1 {
+		if l, ok := s.Parts[0].(*syntax.Literal); ok && offsetID.MatchString(l.Value) {
+			c.errorf(s, "zone-offset", "ZoneId.of takes a region name, such as Australia/Melbourne; offsets are not supported (spec 12)")
+		}
+	}
+}
+
+// offsetID is java.time's rule for an ID that ZoneId.of reads as an
+// offset: Z, a sign, or UTC, GMT or UT and then a sign.
+var offsetID = regexp.MustCompile(`^(Z$|[+-]|(UTC|GMT|UT)[+-])`)
 
 // holds reports whether name is a val: a property of a value of type
 // rt, or when the call names no receiver, a top-level val.

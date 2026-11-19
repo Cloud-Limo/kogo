@@ -197,8 +197,7 @@ func (z ZoneId) String() string { return z.Name }
 // messages for an unknown or malformed one. An offset ID, which
 // java.time reads, panics with Kogo's limit instead.
 func ZoneId_Of(id string) ZoneId {
-	if id == "Z" || strings.HasPrefix(id, "+") || strings.HasPrefix(id, "-") ||
-		prefixedOffset.MatchString(id) {
+	if offsetID.MatchString(id) {
 		panic("ZoneId.of takes a region name, such as Australia/Melbourne; offsets are not supported (spec 12)")
 	}
 	if len(utf16.Encode([]rune(id))) <= 1 {
@@ -217,7 +216,9 @@ func ZoneId_Of(id string) ZoneId {
 	return ZoneId{id, loc}
 }
 
-var prefixedOffset = regexp.MustCompile(`^(UTC|GMT|UT)[+-]`)
+// offsetID is java.time's rule for an ID that ZoneId.of reads as an
+// offset: Z, a sign, or UTC, GMT or UT and then a sign.
+var offsetID = regexp.MustCompile(`^(Z$|[+-]|(UTC|GMT|UT)[+-])`)
 
 var regionID = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9~/._+-]+$`)
 

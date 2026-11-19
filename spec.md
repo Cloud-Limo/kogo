@@ -900,7 +900,8 @@ database (`Australia/Melbourne`, `UTC`), and an unknown or malformed one
 panics with `java.time`'s message. An offset ID (`Z`, `+05:30`,
 `GMT+1`, `UTC+10`) is outside Kogo's subset of `java.time` and panics
 `ZoneId.of takes a region name, such as Australia/Melbourne; offsets
-are not supported (spec 12)`. There is no default zone: every
+are not supported (spec 12)`; on a string literal, `kogo check` refuses
+it with that message and code `zone-offset`. There is no default zone: every
 conversion names its zone. `atStartOfDay(zone)` is the day's earliest
 time in the zone: where midnight is skipped, the end of the gap.
 Each writes itself as `java.time` does, in a template too: an

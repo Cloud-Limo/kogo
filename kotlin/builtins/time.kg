@@ -18,6 +18,8 @@ fun time(f: String, s: String, t: String, x: Long, y: Long, n: Int, m: Int): Str
     "plusDays" -> "${instant(x, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().plusDays(y)}"
     "plusDaysMax" -> "${Instant.ofEpochSecond(31556889832694400L - 86400L * (x % 8L), 0L).atZone(ZoneId.of("UTC")).toLocalDate().plusDays(y % 60L)}"
     "offsetOf" -> "${ZoneId.of(offset(n * 10 + m))}"
+    "zoneId" -> zone(n * 10 + m)
+    "offsetId" -> offset(n * 10 + m)
     "zoneOf" -> "${ZoneId.of(s)} ${ZoneId.of(t)}"
     "atZoneEra" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m)))} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate()}"
     "atStartOfDay" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().atStartOfDay(ZoneId.of(zone(n * 10 + m)))} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().atStartOfDay(ZoneId.of(zone(n * 10 + m))).toInstant()}"

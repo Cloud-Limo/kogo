@@ -27,6 +27,7 @@ import (
 type env struct {
 	ready    *sync.WaitGroup // the two first attempts of race, each having read
 	attempts *atomic.Int32
+	gates    *atomic.Int32 // the runs of gate
 }
 
 type Person struct {
@@ -107,8 +108,74 @@ func who(_ kogo.Db, _ env, r Request, _ rt.Unit) kogo.Either[string, Who] {
 		Missing: Request_Header(r, "x-none"), Host: Request_Header(r, "host"), Address: Request_ClientAddress(r)}}
 }
 
-var table = Table[env]{Operations: []Operation[env]{
+// ours is the list's check: it refuses or writes as a header says,
+// and Postgres refuses the write.
+func ours(tx kogo.Tx, _ env, r Request) kogo.Either[string, rt.Unit] {
+	switch h := Request_Header(r, "x-check"); {
+	case h != nil && *h == "check forged":
+		return kogo.Either_Left[string]{Value: "secret check"}
+	case h != nil:
+		insert(tx, "checked")
+	}
+	return kogo.Either_Right[rt.Unit]{}
+}
+
+type Held struct {
+	name string
+	tx   kogo.Tx
+}
+
+// gate, step and work each refuse a name of their own. The gate and
+// the work insert first, which a gate would not: a refusal of either,
+// or of the step after the gate, leaves no row.
+func gate(tx kogo.Tx, e env, _ Request, p Person) kogo.Either[string, Held] {
+	e.gates.Add(1)
+	insert(tx, "gate "+p.Name)
+	if strings.HasPrefix(p.Name, "nobody") {
+		return kogo.Either_Left[string]{Value: "secret gate"}
+	}
+	return kogo.Either_Right[Held]{Value: Held{p.Name, tx}}
+}
+
+// ended reports whether tx has ended: a statement on it panics.
+func ended(tx kogo.Tx) (ended bool) {
+	defer func() { ended = recover() != nil }()
+	count(tx)
+	return
+}
+
+func step(_ env, h Held, p Person) kogo.Either[string, rt.Unit] {
+	if !ended(h.tx) || h.name != p.Name || strings.HasPrefix(p.Name, "unsent") {
+		return kogo.Either_Left[string]{Value: "secret step"}
+	}
+	return kogo.Either_Right[rt.Unit]{}
+}
+
+func work(e env, h Held, p Person) kogo.Either[string, string] {
+	return add(h.tx, e, Request{}, p)
+}
+
+// act is work that is an action fun: no transaction is open.
+func act(_ env, h Held, p Person) kogo.Either[string, string] {
+	if !ended(h.tx) || strings.HasPrefix(p.Name, "refused") {
+		return kogo.Either_Left[string]{Value: "secret refusal"}
+	}
+	return kogo.Either_Right[string]{Value: "secret answer"}
+}
+
+// raceGate counts its runs and gives its Tx, on which the work races.
+func raceGate(tx kogo.Tx, e env, _ Request, _ rt.Unit) kogo.Either[string, kogo.Tx] {
+	e.gates.Add(1)
+	return kogo.Either_Right[kogo.Tx]{Value: tx}
+}
+
+func raceWork(e env, tx kogo.Tx, u rt.Unit) kogo.Either[string, int32] {
+	return race(tx, e, Request{}, u)
+}
+
+var table = Table[env]{Check: ours, Operations: []Operation[env]{
 	Tx("add", add), Tx("race", race), Tx("deadlocked", deadlocked), Db("login", login), Db("who", who), Tx("signIn", signIn),
+	Gated("held", gate, nil, work), Gated("sent", gate, step, work), Gated("heldRace", raceGate, nil, raceWork), Outside("rung", gate, act),
 }}
 
 func TestHandler(t *testing.T) {
@@ -121,12 +188,15 @@ func TestHandler(t *testing.T) {
 	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
 	defer drop()
 	var log bytes.Buffer
-	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}}, slog.New(slog.NewJSONHandler(&log, nil)))
+	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}}, slog.New(slog.NewJSONHandler(&log, nil)))
 	var cookies []string
 	post := func(method, name, body string) (int, string) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(method, "/"+name, strings.NewReader(body))
 		r.Header.Set("X-Who", "me")
+		if strings.HasPrefix(body, "check ") {
+			r.Header.Set("X-Check", body)
+		}
 		r.AddCookie(&http.Cookie{Name: "c", Value: "crumb"})
 		h.ServeHTTP(w, r)
 		cookies = w.Header().Values("Set-Cookie")
@@ -153,6 +223,23 @@ func TestHandler(t *testing.T) {
 		{"POST", "who", `not read`, `200 {"type":"ok","value":{"header":"me","cookie":"crumb","missing":null,"host":"example.com","address":"192.0.2.1"}}`},
 		{"POST", "nothing", `{}`, `404 `},
 		{"GET", "add", ``, `405 `},
+		// The check runs first, before the name is looked up or the
+		// method read, and only reads; then the gate, the step and
+		// the work.
+		{"POST", "add", `check forged`, `403 secret check`},
+		{"GET", "add", `check forged`, `403 secret check`},
+		{"POST", "nothing", `check forged`, `403 secret check`},
+		{"POST", "add", `check writes`, `500 request `},
+		{"POST", "held", `{"name":"held"}`, `200 {"type":"ok","value":"secret answer"}`},
+		{"POST", "held", `{"name":"nobody held"}`, `200 {"type":"refused","message":"secret gate"}`},
+		{"POST", "held", `{"name":"refused held"}`, `200 {"type":"refused","message":"secret refusal"}`},
+		{"POST", "sent", `{"name":"nobody sent"}`, `200 {"type":"refused","message":"secret gate"}`},
+		{"POST", "sent", `{"name":"unsent"}`, `200 {"type":"refused","message":"secret step"}`},
+		{"POST", "sent", `{"name":"refused sent"}`, `200 {"type":"refused","message":"secret refusal"}`},
+		{"POST", "sent", `{"name":"sent"}`, `200 {"type":"ok","value":"secret answer"}`},
+		{"POST", "rung", `{"name":"rung"}`, `200 {"type":"ok","value":"secret answer"}`},
+		{"POST", "rung", `{"name":"nobody rung"}`, `200 {"type":"refused","message":"secret gate"}`},
+		{"POST", "rung", `{"name":"refused rung"}`, `200 {"type":"refused","message":"secret refusal"}`},
 	} {
 		if status, body := post(c.method, c.name, c.body); !strings.HasPrefix(fmt.Sprint(status, " ", body), c.want) {
 			t.Errorf("%s %s %s answers %d %s, want %s", c.method, c.name, c.body, status, body, c.want)
@@ -168,6 +255,22 @@ func TestHandler(t *testing.T) {
 	}
 	if rows("answers") != 1 || rows("refused") != 0 || rows("panics") != 0 || rows("kept") != 1 {
 		t.Error("an answer does not commit, or a refusal or a panic does not roll back, or a Db operation's db.tx does not stay")
+	}
+	// A gated row: the gate and the work are one transaction, and a
+	// step's gate ran before it in one that was rolled back, so the
+	// gate runs twice where the step passes and once where it or the
+	// gate refuses: 3 runs for held, and 1, 1, 2 and 2 for sent. The
+	// gate of work that is an action fun runs once, in a transaction
+	// that commits unless the gate refuses: 3 runs for rung.
+	for name, want := range map[string]int{"held": 1, "gate held": 1, "gate nobody held": 0, "refused held": 0, "gate refused held": 0,
+		"gate nobody sent": 0, "gate unsent": 0, "refused sent": 0, "gate refused sent": 0, "sent": 1, "gate sent": 1, "checked": 0,
+		"gate rung": 1, "gate nobody rung": 0, "gate refused rung": 1} {
+		if rows(name) != want {
+			t.Errorf("%d rows of %q, want %d: a gated row keeps what it wrote, or a refusal does not roll back", rows(name), name, want)
+		}
+	}
+	if n := h.env.gates.Swap(0); n != 12 {
+		t.Errorf("the gate ran %d times, want 12", n)
 	}
 	h.Limit = 50 * time.Millisecond
 	if status, body := post("POST", "deadlocked", ""); status != 503 || !strings.HasPrefix(body, "request ") {
@@ -185,10 +288,22 @@ func TestHandler(t *testing.T) {
 		!strings.Contains(answers[0]+answers[1], `{"type":"ok","value":1}`) {
 		t.Errorf("two requests in conflict answer %v after %d attempts", answers, h.env.attempts.Load())
 	}
+	// A gated row races as a Tx operation does: its transaction is
+	// SERIALIZABLE, and each rerun runs the gate again.
+	h.env.attempts.Store(0)
+	h.env.ready.Add(2)
+	for i := range answers {
+		wg.Go(func() { _, answers[i] = post("POST", "heldRace", "") })
+	}
+	wg.Wait()
+	if n := h.env.attempts.Load(); n < 3 || h.env.gates.Load() != n || !strings.Contains(answers[0]+answers[1], `{"type":"ok","value":2}`) ||
+		!strings.Contains(answers[0]+answers[1], `{"type":"ok","value":3}`) {
+		t.Errorf("two gated requests in conflict answer %v after %d attempts and %d runs of the gate", answers, n, h.env.gates.Load())
+	}
 
 	// The log: a line for each request, with its id; reruns and a
 	// panic under the request's id; no input, answer or refusal.
-	ids, reruns := map[any]string{}, map[any]string{}
+	ids, reruns, checkWrote := map[any]string{}, map[any]string{}, false
 	for _, l := range lines() {
 		switch l["msg"] {
 		case "served":
@@ -199,13 +314,19 @@ func TestHandler(t *testing.T) {
 		case "rerun":
 			reruns[l["request"]] = l["cause"].(string)
 		case "panic":
-			if m := l["message"].(string); m != "add panics" && !strings.Contains(m, "cookie") ||
+			// The check that writes panics with Postgres's refusal.
+			if m := l["message"].(string); strings.Contains(m, "cannot execute INSERT in a read-only transaction") {
+				checkWrote = true
+			} else if m != "add panics" && !strings.Contains(m, "cookie") ||
 				m == "add panics" && !strings.Contains(l["trace"].(string), "rpc.add(") {
 				t.Errorf("a panic is logged as %v", l)
 			}
 		}
 	}
-	if len(ids) != 17 || strings.Contains(log.String(), "secret") {
+	if !checkWrote {
+		t.Error("a check that writes is not refused by Postgres")
+	}
+	if len(ids) != 33 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
 	causes := map[string]bool{}

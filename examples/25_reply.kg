@@ -9,7 +9,7 @@ import kogo.rpc.Reply
 import kogo.rpc.Request
 import kogo.rpc.SameSite
 
-api session unchecked {
+api session checkedBy notFromAnotherSite {
     signIn   ungated
     signOut  ungated
 }
@@ -34,4 +34,9 @@ fun signIn(tx: Tx, env: SessionEnv, request: Request, input: SignIn): Either<Str
 fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<String, Reply<Unit>> = either {
     ensure(request.cookie("session") != null) { "You are not signed in." }
     Reply(Unit, listOf(sessionCookie("", 0L, env)))
+}
+
+// The list is served, so it names its check (22_api.kg).
+fun notFromAnotherSite(tx: Tx, env: SessionEnv, request: Request): Either<String, Unit> = either {
+    ensure(request.header("Sec-Fetch-Site") != "cross-site") { "Invalid origin" }
 }

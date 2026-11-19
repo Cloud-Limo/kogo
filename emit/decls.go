@@ -188,31 +188,39 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 	}
 }
 
-// table writes an api list's rpc.Table: each operation's name on the
-// wire and its fun, in the list's order, and the entries of each enum
-// the operations reach, by which the server reads an input's enum.
+// table writes an api list's rpc.Table: its check, each operation's
+// name on the wire and its fun, or its gate, step and work, in the
+// list's order, and the entries of each enum the operations reach, by
+// which the server reads an input's enum. An unchecked list is an
+// rpc.Unserved, which no handler takes.
 func (e *emitter) table(d *syntax.API) {
 	defer e.enter(d)()
 	a := e.info.APIs[d]
-	// Serving a check, a gate and a step is the server's next piece
-	// (doc/roadmap.md, row 3): until then a list that names one is
-	// refused, not served without it.
-	if d.Check != nil {
-		e.notYet(d.Check, "a list's check", "emit a list that is unchecked and whose rows are ungated")
-	}
-	for _, row := range d.Rows {
-		if row.Gate != nil {
-			e.notYet(row.Gate, "a gated row", "emit a list that is unchecked and whose rows are ungated")
-		}
-	}
 	rpc := func(name string) string { return e.qualify("kogo.rpc", name) }
+	fun := func(f *check.Func) string { return e.qualify(f.Pkg, e.names[f]) }
 	var ops, enums []string
 	for _, op := range a.Ops {
-		kind := "Db"
+		kind, funs := "Db", fun(op.Func)
 		if op.Tx {
 			kind = "Tx"
 		}
-		ops = append(ops, fmt.Sprintf("%s(%q, %s)", rpc(kind), op.Func.Name, e.qualify(op.Func.Pkg, e.names[op.Func])))
+		if op.Gate != nil {
+			// A gate that reads no input is shared: rpc.Shared gives
+			// it the row's input. A row with no step has a nil one.
+			gate, step := fun(op.Gate), "nil"
+			if len(op.Gate.Params) == 3 {
+				gate = fmt.Sprintf("%s[%s](%s)", rpc("Shared"), e.typ(op.Input), gate)
+			}
+			if op.After != nil {
+				step = fun(op.After)
+			}
+			if kind, funs = "Gated", gate+", "+step+", "+funs; op.Func.Action {
+				// Work that is an action fun runs after its gate's
+				// transaction, with none open; it has no step.
+				kind, funs = "Outside", gate+", "+fun(op.Func)
+			}
+		}
+		ops = append(ops, fmt.Sprintf("%s(%q, %s)", rpc(kind), op.Func.Name, funs))
 	}
 	for _, t := range a.Types {
 		if t.Kind == "enum class" {
@@ -220,8 +228,12 @@ func (e *emitter) table(d *syntax.API) {
 		}
 	}
 	env := e.typ(a.Env)
-	e.w("var %s = %s[%s]{Operations: []%s[%s]{%s}, Enums: []any{%s}}",
-		e.names[d], rpc("Table"), env, rpc("Operation"), env, strings.Join(ops, ", "), strings.Join(enums, ", "))
+	rows := fmt.Sprintf("[]%s[%s]{%s}, []any{%s}", rpc("Operation"), env, strings.Join(ops, ", "), strings.Join(enums, ", "))
+	if a.Check == nil {
+		e.w("var %s = %s(%s)", e.names[d], rpc("NewUnserved"), rows)
+		return
+	}
+	e.w("var %s = %s[%s]{%s, %s}", e.names[d], rpc("Table"), env, fun(a.Check), rows)
 }
 
 // tests writes a tests list's test.List: each test with the file,

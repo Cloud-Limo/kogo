@@ -1,8 +1,8 @@
 // Gates (spec.md 15.1, 15.2): a list names its check, and each row
 // its gate or says ungated. A gate finds out who is asking and gives
 // a proof, which the work takes where an ungated operation takes the
-// request. The compiler checks these forms and does not serve them
-// yet: 22_api.kg is served.
+// request. The server runs each in turn (15.3), and serves a list
+// that is unchecked to no browser.
 package example.gates
 
 import kogo.io.Console
@@ -13,6 +13,7 @@ api desk checkedBy fromOurPage {
     unpaid      gatedBy clerk
     markPaid    gatedBy markPaidGate                      // a gate of its own, which reads the input
     sendInvoice gatedBy sendInvoiceGate after tellPrinter // a step between the gate and the work
+    testPrinter gatedBy clerk                             // an action fun: its gate, then it, with no transaction open
     looks       ungated
 }
 
@@ -82,6 +83,15 @@ action fun tellPrinter(env: DeskEnv, invoice: OpenInvoice, input: InvoiceRef): E
 fun sendInvoice(env: DeskEnv, invoice: OpenInvoice, input: InvoiceRef): Either<String, Sent> = either {
     invoice.tx.execute(sql"update invoice set status = 'sent' where number = ${invoice.number}")
     Sent(invoice.number, env.printer)
+}
+
+// Gated work that is an action fun: the server runs the gate in a
+// transaction, ends it, and calls this with none open. The gate runs
+// once, and the proof is read for its facts alone.
+action fun testPrinter(env: DeskEnv, clerk: Clerk, input: Unit): Either<String, String> = either {
+    ensure(env.printer != "") { "No printer is set up." }
+    env.console.println("${env.printer}: a test page for ${clerk.address}")
+    env.printer
 }
 
 // Ungated: today's four parameters, and no proof.

@@ -969,9 +969,6 @@ func TestRefused(t *testing.T) {
 		{"fun f(x: Int?): Int? = x.takeIf { true }", "1:24: not-yet-emitted", "a nullable type argument for T, which is used as T?"},
 		{"fun <T> none(x: T?): T? = x\nfun g(): Int? = none(null)", "2:17: not-yet-emitted", "write the type arguments, none<...>(...)"},
 		{"sealed interface S<out T> {\n    data class A<T>(val v: T) : S<T>\n}\nfun f(s: S<S.A<Int>>): S<S<Int>> = s", "4:36: not-yet-emitted", "build the value with the wider type argument"},
-		// A list's check and a row's gate are checked and not served yet.
-		{"import kogo.rpc.Request\ndata class Env(val n: Int)\nfun ours(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }\nfun me(tx: Tx, env: Env, request: Request, input: Unit): Either<String, Unit> = either { }\napi ops checkedBy ours { me ungated }", "5:19: not-yet-emitted", "a list's check is not emitted yet: emit a list that is unchecked and whose rows are ungated"},
-		{"import kogo.rpc.Request\ndata class Env(val n: Int)\nfun g(tx: Tx, env: Env, request: Request): Either<String, Int> = either { 1 }\nfun me(env: Env, n: Int, input: Unit): Either<String, Unit> = either { }\napi ops unchecked { me gatedBy g }", "5:32: not-yet-emitted", "a gated row is not emitted yet: emit a list that is unchecked and whose rows are ungated"},
 		{"enum class Kind { entries, b }", "1:19: go-name", "are both Kind_entries in Go"},
 		{"data class D(val a: Int, val A: Int)", "1:26: go-name", "two members of D are both A in Go"},
 		{"interface I {\n    val name: String\n}\ndata class D(override val name: String, val getName: String) : I", "4:14: go-name", "two members of D are both GetName in Go"},
@@ -1071,21 +1068,36 @@ func TestPrelude(t *testing.T) {
 	}
 }
 
-// Each api list is a table in its package: its operations in order,
-// by their names on the wire, an imported one among them, and the
-// entries of each enum they reach. A table whose name a type or a fun
-// has takes _api, and a val named as an enum's entries takes _val.
+// Each api list is a table in its package: its check, its operations
+// in order, by their names on the wire, an imported one among them,
+// and the entries of each enum they reach. A gated row is its gate, a
+// shared one given the row's input, its step and its work, whose
+// types Go fits. An unchecked list is an rpc.Unserved, which no
+// handler takes. A table whose name a type or a fun has takes _api,
+// and a val named as an enum's entries takes _val.
 func TestTables(t *testing.T) {
 	expect(t, [][2]string{
-		{"fmt.Sprint([]string{t.Ops.Operations[0].Name, t.Ops.Operations[1].Name}, t.Ops.Enums)", "[me f] [[Alone Shared] [Open Done]]"},
+		{"fmt.Sprint([]string{t.Ops.Operations[0].Name, t.Ops.Operations[1].Name, t.Ops.Operations[2].Name, t.Ops.Operations[3].Name, t.Ops.Operations[4].Name}, t.Ops.Enums, t.Ops.Check != nil)", "[me f held sent rung] [[Alone Shared] [Open Done]] true"},
 		{"fmt.Sprint([]string{t.Other_api.Operations[0].Name}, t.Other_api.Enums)", "[g] [[S M]]"},
+		{"fmt.Sprintf(\"%T\", t.Hooks)[:13]", "rpc.Unserved["},
 		{"fmt.Sprint(t.Other_Int(4), t.Kind_entries_val)", "4 3"},
 	}, `package t
+import kogo.io.Console
 import kogo.rpc.Request
 import u.g
-api ops unchecked { me ungated, f ungated }
-api other unchecked { g ungated }
-data class Env(val n: Int)
+import u.theirs
+api ops checkedBy ours { me ungated, f ungated, held gatedBy who, sent gatedBy asked after step, rung gatedBy who }
+api other checkedBy theirs { g ungated }
+api hooks unchecked { me ungated }
+data class Who(val tx: Tx)
+fun ours(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }
+fun who(tx: Tx, env: Env, request: Request): Either<String, Who> = either { Who(tx) }
+fun asked(tx: Tx, env: Env, request: Request, input: Ask): Either<String, Who> = either { Who(tx) }
+action fun step(env: Env, who: Who, input: Ask): Either<String, Unit> = either { env.console.println("") }
+action fun rung(env: Env, who: Who, input: Unit): Either<String, Unit> = either { env.console.println("") }
+fun held(env: Env, who: Who, input: Unit): Either<String, Unit> = either { }
+fun sent(env: Env, who: Who, input: Ask): Either<String, State> = either { State.Done }
+data class Env(val n: Int, val console: Console)
 data class Other(val n: Int)
 fun other(n: Int): Int = n
 val kind_entries: Int = 3
@@ -1098,6 +1110,7 @@ fun f(db: Db, env: Env, request: Request, input: Ask): Either<String, State> = e
 import kogo.rpc.Request
 data class Env(val s: String)
 enum class Size { S, M }
+fun theirs(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }
 fun g(tx: Tx, env: Env, request: Request, input: List<Size?>): Either<String, Unit> = either { }
 `)
 }

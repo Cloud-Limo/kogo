@@ -124,7 +124,7 @@ func Tx[Env, I, A any](name string, f func(kogo.Tx, Env, Request, I) kogo.Either
 	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
 		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) answered {
 			return kogo.SerializableTx(db, again, func(tx kogo.Tx) answered {
-				return answer(name, kogo.Either_Bind[string, A](f(tx, env, r, input.(I)), raise, func(s string) string { return s }))
+				return answer(name, bind[A](f(tx, env, r, input.(I)), raise))
 			})
 		})
 	}}
@@ -136,6 +136,61 @@ func Db[Env, I, A any](name string, f func(kogo.Db, Env, Request, I) kogo.Either
 	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, _ func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
 		return kogo.Either_Map[string](f(db, env, r, input.(I)), func(a A) answered { return answer(name, a) })
 	}}
+}
+
+// Gated is a gated row: the gate runs in the operation's transaction
+// and gives a proof or a refusal, and the work takes the proof where
+// an ungated operation takes the request (doc/gates.md). With a step,
+// the gate first runs in a transaction of its own that is rolled
+// back, the step runs once with none open, and a new transaction
+// runs the gate again and then the work. A refusal of any of them is
+// the operation's, and rolls back.
+func Gated[Env, I, P, A any](name string, gate func(kogo.Tx, Env, Request, I) kogo.Either[string, P],
+	step func(Env, P, I) kogo.Either[string, rt.Unit], work func(Env, P, I) kogo.Either[string, A]) Operation[Env] {
+	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
+		in := input.(I)
+		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) answered {
+			if step != nil {
+				var held kogo.Either[string, P]
+				kogo.Either_RaiseEToA(func(undo kogo.Raise[rt.Unit]) rt.Unit {
+					return kogo.SerializableTx(db, again, func(tx kogo.Tx) rt.Unit {
+						held = gate(tx, env, r, in)
+						panic(kogo.Raise_Raise(undo, rt.Unit{}))
+					})
+				})
+				bind[rt.Unit](step(env, bind[P](held, raise), in), raise)
+			}
+			return kogo.SerializableTx(db, again, func(tx kogo.Tx) answered {
+				proof := bind[P](gate(tx, env, r, in), raise)
+				return answer(name, bind[A](work(env, proof, in), raise))
+			})
+		})
+	}}
+}
+
+// Outside is a gated row whose work is an action fun, so that it runs
+// with no transaction open (doc/gates.md, "An operation that runs
+// wholly outside"): the gate runs once, in a transaction that commits
+// before the work is called. A refusal of either is the operation's.
+func Outside[Env, I, P, A any](name string, gate func(kogo.Tx, Env, Request, I) kogo.Either[string, P], work func(Env, P, I) kogo.Either[string, A]) Operation[Env] {
+	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
+		in := input.(I)
+		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) answered {
+			proof := kogo.SerializableTx(db, again, func(tx kogo.Tx) P { return bind[P](gate(tx, env, r, in), raise) })
+			return answer(name, bind[A](work(env, proof, in), raise))
+		})
+	}}
+}
+
+// bind gives what e holds, or raises its refusal.
+func bind[A any](e kogo.Either[string, A], raise kogo.Raise[string]) A {
+	return kogo.Either_Bind[string, A](e, raise, func(s string) string { return s })
+}
+
+// Shared makes a gate that reads no input the gate of a row whose
+// input is I.
+func Shared[I, Env, P any](gate func(kogo.Tx, Env, Request) kogo.Either[string, P]) func(kogo.Tx, Env, Request, I) kogo.Either[string, P] {
+	return func(tx kogo.Tx, env Env, r Request, _ I) kogo.Either[string, P] { return gate(tx, env, r) }
 }
 
 // answer writes a, or the answer of a Reply with its cookies. A
@@ -172,12 +227,26 @@ func answer[A any](op string, a A) answered {
 	return answered{b.Bytes(), cookies}
 }
 
-// A Table is what the emitter writes for an api list: its operations
-// and the entries (Name_entries) of each enum they reach. NewHandler
-// needs those of each enum an input reaches, and panics without them.
+// A Table is what the emitter writes for an api list that names its
+// check: the check, its operations and the entries (Name_entries) of
+// each enum they reach. NewHandler needs those of each enum an input
+// reaches, and panics without them.
 type Table[Env any] struct {
+	Check      func(kogo.Tx, Env, Request) kogo.Either[string, rt.Unit]
 	Operations []Operation[Env]
 	Enums      []any
+}
+
+// An Unserved is what the emitter writes for an unchecked list. No
+// handler takes one and its fields are unexported, so it cannot be
+// mounted for a browser (doc/origin.md).
+type Unserved[Env any] struct {
+	operations []Operation[Env]
+	enums      []any
+}
+
+func NewUnserved[Env any](operations []Operation[Env], enums []any) Unserved[Env] {
+	return Unserved[Env]{operations, enums}
 }
 
 // A Handler serves a table at the names of its operations, POST
@@ -186,6 +255,7 @@ type Handler[Env any] struct {
 	// Limit is how long the reruns of a Tx operation go on before
 	// the answer is 503.
 	Limit time.Duration
+	check func(kogo.Tx, Env, Request) kogo.Either[string, rt.Unit]
 	ops   map[string]Operation[Env]
 	read  reader
 	pool  *pgxpool.Pool
@@ -194,10 +264,13 @@ type Handler[Env any] struct {
 }
 
 // NewHandler serves t over pool with env, and logs to log. Its Limit
-// is 90 seconds. It panics if t lacks an enum's entries that an input
-// reaches.
+// is 90 seconds. It panics if t has no check, or lacks an enum's
+// entries that an input reaches.
 func NewHandler[Env any](t Table[Env], pool *pgxpool.Pool, env Env, log *slog.Logger) *Handler[Env] {
-	h := &Handler[Env]{90 * time.Second, map[string]Operation[Env]{}, newReader(t.Enums), pool, env, log}
+	if t.Check == nil {
+		panic("the table has no check: a list that a browser calls names one, api name checkedBy check")
+	}
+	h := &Handler[Env]{90 * time.Second, t.Check, map[string]Operation[Env]{}, newReader(t.Enums), pool, env, log}
 	for _, op := range t.Operations {
 		h.read.check(op.input, map[reflect.Type]bool{})
 		h.ops[op.Name] = op
@@ -234,6 +307,13 @@ func (h *Handler[Env]) serve(w http.ResponseWriter, r *http.Request, name, id st
 			outcome = text(http.StatusInternalServerError, "request "+id)
 		}
 	}()
+	// The list's check runs first, once, in a read-only transaction
+	// of its own: its refusal is a 403 with its words.
+	db := kogo.NewDb(r.Context(), h.pool)
+	checked := kogo.ReadOnlyTx(db, func(tx kogo.Tx) kogo.Either[string, rt.Unit] { return h.check(tx, h.env, Request{r}) })
+	if refusal, refused := checked.(kogo.Either_Left[string]); refused {
+		return text(http.StatusForbidden, refusal.Value)
+	}
 	op, found := h.ops[name]
 	if !found {
 		return text(http.StatusNotFound, "")
@@ -255,7 +335,7 @@ func (h *Handler[Env]) serve(w http.ResponseWriter, r *http.Request, name, id st
 		return !ranOut
 	}
 	w.Header().Set("Content-Type", "application/json")
-	switch result := op.run(kogo.NewDb(r.Context(), h.pool), again, h.env, Request{r}, input.Interface()).(type) {
+	switch result := op.run(db, again, h.env, Request{r}, input.Interface()).(type) {
 	case kogo.Either_Left[string]:
 		w.Write([]byte(`{"type":"refused","message":` + quote(result.Value) + `}`))
 		return "refused"

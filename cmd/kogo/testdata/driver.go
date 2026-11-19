@@ -7,23 +7,27 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 
 	"ROOT/cusoon/invoice"
 	"ROOT/cusoon/model"
 	"ROOT/example"
+	"ROOT/example/gates"
 	"ROOT/example/markers"
 	"ROOT/example/ops"
 	"ROOT/example/reply"
 	"github.com/Cloud-Limo/kogo/internal/testdb"
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	"github.com/Cloud-Limo/kogo/prelude/kogo/io"
 	"github.com/Cloud-Limo/kogo/prelude/kogo/rpc"
 	ktime "github.com/Cloud-Limo/kogo/prelude/kogo/time"
 	"github.com/Cloud-Limo/kogo/rt"
 )
 
-// The rows that examples 10 to 19, 21 and 22 read.
+// The rows that examples 10 to 19, 21, 22 and 24 read.
 const seed = `
 insert into business (id, slug, legal_name, created_at, abn) values
     ('00000000-0000-0000-0000-000000000001', 'acme', 'Acme Pty Ltd', '2026-01-02 03:04:05+00', '51824753556'),
@@ -50,6 +54,16 @@ func show(what string, value any) { fmt.Println(what+":", rt.ToString(value)) }
 func panics(what string, f func()) {
 	defer func() { fmt.Println(what, "panics:", recover()) }()
 	f()
+}
+
+// inUse is the console of 24's actions: it prints, before what an
+// action prints, how many of the pool's connections are in use then,
+// which is none where no transaction is open.
+type inUse func() int32
+
+func (n inUse) Write(b []byte) (int, error) {
+	fmt.Printf("with %d transactions open, %s", n(), b)
+	return len(b), nil
 }
 
 func main() {
@@ -190,10 +204,15 @@ func main() {
 
 	// 22: the table of an api list, served as main serves it, each
 	// request from one address.
-	h := rpc.NewHandler(ops.Ops, pool, ops.OpsEnv{MaxLooks: 2}, slog.New(slog.DiscardHandler))
+	var h http.Handler = rpc.NewHandler(ops.Ops, pool, ops.OpsEnv{MaxLooks: 2}, slog.New(slog.DiscardHandler))
+	cookie := ""
 	post := func(what, op, body string) {
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest("POST", "/"+op, strings.NewReader(body)))
+		r := httptest.NewRequest("POST", "/"+op, strings.NewReader(body))
+		if cookie != "" {
+			r.AddCookie(&http.Cookie{Name: cookie, Value: "1"})
+		}
+		h.ServeHTTP(w, r)
 		fmt.Println(strings.TrimSpace(fmt.Sprintf("%s: %d %s", what, w.Code, w.Body)))
 	}
 	post("invoices", "invoices", "")
@@ -208,6 +227,35 @@ func main() {
 	post("look up a missing invoice", "lookUp", `{"number": "INV-9"}`)
 	post("look up another missing invoice", "lookUp", `{"number": "INV-8"}`)
 	post("look up after two misses", "lookUp", `{"number": "INV-1"}`)
+
+	// 24: a checked list of gated rows, each stage refusing in turn.
+	// The address has two looks, which its gate refuses; hooks, an
+	// unchecked list, is a value that no handler takes.
+	var _ rpc.Unserved[gates.DeskEnv] = gates.Hooks
+	console := io.NewConsole(os.Stdin, inUse(func() int32 { return pool.Stat().AcquiredConns() }))
+	desk := func(printer string) {
+		h = rpc.NewHandler(gates.Desk, pool, gates.DeskEnv{Printer: printer, Console: console}, slog.New(slog.DiscardHandler))
+	}
+	desk("")
+	post("refused by the check", "unpaid", "")
+	post("the check before the name", "cancel", "")
+	cookie = "desk"
+	post("refused by a shared gate", "unpaid", "")
+	post("ungated, after the check", "looks", "")
+	if _, err := pool.Exec(ctx, "delete from look; update invoice set status = 'sent' where number = 'INV-1'"); err != nil {
+		panic(err)
+	}
+	post("unpaid", "unpaid", "")
+	post("refused by its own gate", "markPaid", `{"number": "INV-2"}`)
+	post("refused by the work", "statusOf", `{"number": "INV-9"}`)
+	post("refused by the step", "sendInvoice", `{"number": "INV-1"}`)
+	post("refused by work that is an action", "testPrinter", "")
+	desk("front")
+	post("sent after the step", "sendInvoice", `{"number": "INV-1"}`)
+	post("mark paid", "markPaid", `{"number": "INV-1"}`)
+	post("mark paid again", "markPaid", `{"number": "INV-1"}`)
+	post("status", "statusOf", `{"number": "INV-1"}`)
+	post("work that is an action", "testPrinter", "")
 
 	// 25: an answer that sets cookies, and refusals that set none.
 	h2 := rpc.NewHandler(reply.Session, pool, reply.SessionEnv{Secure: true}, slog.New(slog.DiscardHandler))

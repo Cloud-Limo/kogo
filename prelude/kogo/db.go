@@ -72,6 +72,16 @@ func SerializableTx[A any](db Db, again func(conflict *pgconn.PgError) bool, blo
 	}
 }
 
+// ReadOnlyTx runs block in a transaction of its own that Postgres
+// holds to reading, and rolls it back: the server's, for a list's
+// check (spec.md 15.3).
+func ReadOnlyTx[A any](db Db, block func(Tx) A) A {
+	tx := must(db.pool.BeginTx(db.ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly}))
+	defer tx.Rollback(db.ctx)
+	decimals(tx.Conn().TypeMap())
+	return block(Tx{db.ctx, tx})
+}
+
 // attempt runs block in one transaction. It gives the conflict that
 // ended the transaction where it is to be run again.
 func attempt[A any](db Db, opts pgx.TxOptions, block func(Tx) A) (a A, conflict *pgconn.PgError) {

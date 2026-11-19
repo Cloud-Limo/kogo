@@ -194,6 +194,7 @@ action fun s(env: Env, p: P, input: In): Either<String, Unit> = either { ring() 
 		{head + "api ops unchecked { v gatedBy g after ‸s }", "step", "s takes a In third, and v's input is a Unit: a step takes its operation's input"},
 		{head + "api ops unchecked { w gatedBy g after ‸w }", "step", "w returns Either<String, Int>: a step named with after returns Either<String, Unit>"},
 		{fun("x(env: E2, p: P, input: In): Either<String, Unit>") + "api ops unchecked { w gatedBy g after ‸x }", "step", "x takes the environment E2, and g takes Env"},
+		{head + "action fun a(env: Env, p: P, input: In): Either<String, Int> = either { ring(); 1 }\napi ops unchecked { a gatedBy g after ‸s }", "step", "a is an action fun, and its row names the step s too: work that is an action fun runs with no transaction open, after its gate alone, so make s's call in a, or write a as a fun"},
 		{fun("x(env: Env, p: P, input: In): Either<String, Unit>") + "api ops unchecked { w gatedBy g after ‸x }", "step", "x is not an action fun: a step named with after runs with no transaction open, to change something outside, so write action fun x"},
 	})
 }

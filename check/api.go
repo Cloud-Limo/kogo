@@ -200,6 +200,9 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 		if !s.Action && len(c.errs) == errs { // said of a step that otherwise fits
 			c.errorf(row.After, "step", "%s is not an action fun: a step named with after runs with no transaction open, to change something outside, so write action fun %s; what only checks or writes belongs in the gate or in %s (spec.md 15.2)", s.Name, s.Name, id.Name)
 		}
+		if f.Action && len(c.errs) == errs {
+			c.errorf(row.After, "step", "%s is an action fun, and its row names the step %s too: work that is an action fun runs with no transaction open, after its gate alone, so make %s's call in %s, or write %s as a fun (spec.md 15.2)", id.Name, s.Name, s.Name, id.Name, id.Name)
+		}
 		op.After = s
 	}
 	if len(c.errs) > errs {

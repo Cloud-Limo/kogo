@@ -170,7 +170,7 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 	env(id, f, workRole)
 	op := &Op{Func: f, Gate: g, Serializable: c.serializable(g.Params[0].Type), Proof: proof, Input: f.Params[2].Type, Answer: answer}
 	if d := named(proof); d != nil && (c.isTx(proof) || d == c.prelude("Db") || d.Pkg == "kogo.rpc" && d.Name == "Request") {
-		c.errorf(row.Gate, "gate", "%s gives a %s: a gate gives a proof, not the handle, so give a data class that holds the Tx and what the gate read (spec.md 15.2)", g.Name, proof)
+		c.errorf(row.Gate, "gate", "%s gives a %s: a gate gives a proof, not the handle, so give a proof that holds the Tx and what the gate read (spec.md 15.7), or the facts alone (spec.md 15.2)", g.Name, proof)
 	}
 	if t := f.Params[1].Type; !same(t, proof) {
 		c.errorf(id, "operation", "%s takes a %s second, and its gate %s gives a %s: gated work takes its gate's proof, so take a %s or name the gate that gives a %s (spec.md 15.2)", id.Name, t, g.Name, proof, proof, t)
@@ -185,6 +185,9 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 	}
 	if _, ok := gates[g]; !ok {
 		gates[g] = id.Name
+		if held, in := c.heldTx(proof, nil); held != "" && !c.isTx(proof) {
+			c.errorf(row.Gate, "gate-proof", "%s gives %s, which holds a transaction, %s, %s, or give the facts alone (spec.md 15.7)", g.Name, proof, held, c.holdFix(in, held))
+		}
 	}
 	if row.After != nil {
 		s, gives := c.shaped(row.After, stepRole)

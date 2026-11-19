@@ -791,8 +791,8 @@ Each entry: what was decided, why, and what would reopen it.
     JSON is read by key through `Json`, in Go; retries are off, and the runner's.
   - **What may enter the prelude.** A binding that passes four tests: it is mechanism, and
     decides nothing an application would decide differently; its declaration names nothing
-    of one application; it says whether it has no effect, is a `lookup` or is an `action`;
-    and it lands with its Go and a test (15 Nov). One that fails a test and is taken anyway
+    of one application; it says `action` if it changes something outside (20 Nov 2026,
+    below); and it lands with its Go and a test (15 Nov). One that fails a test and is taken anyway
     is recorded here by name, with the test it fails.
   - Not taken: every binding closed, with PDF in the prelude behind a library or a writer
     of our own; and every binding open, under which each guarantee of `doc/gates.md` and
@@ -841,6 +841,27 @@ Each entry: what was decided, why, and what would reopen it.
   - Not taken: the kind left worked out; `action fun`, a word of Kogo's own, which is
     plainer and keeps spec 11 to one rule; two environments, one that can act.
   - Respelt `action fun` on 18 Nov 2026 (DEV-894, below), which reopened it.
+- **Only a binding that acts is marked: a binding says `action` or nothing** (20 Nov 2026,
+  Greg, in the design session on outside calls; DEV-984; spec 7.1 and 13; `doc/gates.md`,
+  "Only a binding that acts is marked"). It reverses `doc/gates.md`'s bullet of 17 Nov
+  2026, "A binding says what kind of call it is", which put `lookup` before `external` on
+  a binding that asks and changes nothing. Greg: "remove lookup with no test", "And no new words".
+  - **Why.** The checker asks one thing of a binding, whether it may run in a transaction
+    that can be rolled back and run again, and `action` answers it. Nothing read `lookup`;
+    it put the clock, the console and a network call under one word; and the forced
+    choice it was added for ("An outbound binding that says neither `lookup` nor `action`
+    is an error", `doc/work.md`) cannot be checked without two new words. The idea of a
+    lookup stays, and so do `Lookup`, `lookup(...)` and `ask` in `kogo.http`.
+  - **The printed table** (`doc/gates.md`, "asks and acts"), for which the word was the
+    reserved hook, is given whatever it needs to find an operation's `asks` lines when it
+    is built.
+  - Not taken: keeping the word, unread, with the spec saying so; a test that lists every
+    binding on a handle with its decision, which asks the same author twice and misses a
+    new handle class; a forced choice in the language, with a word marking a handle class
+    and a third word for a binding that takes a handle and calls nothing (a guess of 20 /
+    20).
+  - Accepted cost: a binding that changes something outside and says nothing is its
+    author's mistake, and nothing finds it. Reopen if one is found in the prelude.
 - **A transaction's kind is its handle's type: `Tx` is any, and `SerializableTx` is one
   that is rerun on a conflict** (17 Nov 2026, Greg; `doc/gates.md`, "Two kinds of
   transaction"). Kogo is to support explicit locking as naturally as cusoon2's way.
@@ -3078,7 +3099,8 @@ Each entry: what was decided, why, and what would reopen it.
   Reopen if a command that prints inside a transaction is wanted.
 - **The kind is a word before `fun`, in either order with `external`**, since the parser
   reads modifiers in any order: `doc/work.md` writes both `action external fun` and
-  `external lookup fun`. Nothing reads `lookup` yet; the printed table will.
+  `external lookup fun`. Nothing reads `lookup` yet; the printed table will. (`lookup`
+  was removed on 20 Nov 2026, above.)
 - **A binding that says neither kind is not refused**: nothing tells the checker which
   bindings call outside until `kogo.http` lands. Not taken: every binding on an external
   class says one, which would mark `List.map`.
@@ -3198,10 +3220,31 @@ Each entry: what was decided, why, and what would reopen it.
   gate gives, which misses the proofs no gate gives (`AtTenant`, a new row's, an interface)
   and the model's files, where the two rules on the transaction are read; a marked `Tx`
   alone, which the design does not call a proof.
-- **A gate is not yet held to give a proof.** A `P` of any other shape still passes 15.2
-  and is held to none of the three rules, which spec 15.7 says. Holding it changes what
-  every gated program looks like (a marker, a file that opts in), so it is left to Greg.
-  `examples/24_gates.kg` is such a program and is unchanged: no rule refuses it.
+- **A gate that gives a transaction gives a proof** (Greg's choice C, 20 Nov 2026, DEV-982):
+  a `P` that holds a `Tx` or a `SerializableTx` anywhere but as a proof's own marked one
+  is `gate-proof`, said once per gate, at its first row; a `P` of facts alone stays a
+  plain data class. Not taken: A, every gate gives a proof, which makes every gated
+  program carry a marker and an opt-in for facts that need none; B, as before, where a
+  port that forgets the marker gets no rules and no error, PR 91's 500 included.
+- **"Holds" has no limit** (the lead's Ruling on PR 99, 20 Nov 2026): `heldTx` walks every
+  named type, its type arguments (`List<Plain>`, `Box<Tx>`, `Map<String, Tx>`), a sealed
+  interface's variants, a function type's result and nullables, at any depth, and does
+  not stop at a proof: it skips only the proof's own marked transaction. So a proof's
+  second, unmarked `Tx` (`Two(val other: Tx, @property:M val tx: Tx)`) and a plain class
+  inside a proof are refused too, since each hands work a transaction no rule holds,
+  the same hole by another door. A `P` that holds a `List` of proofs passes. This
+  reverses PR 99's first cut, which stopped at a proof and at type arguments. The error
+  names the type that holds the transaction, and says to mark an interface's `val`, a
+  data class's constructor and transaction, or take a proof's second one out. Not
+  taken: refusing in an `action fun` any `Tx` it did not open, which closes doors a gate
+  cannot see but is a rule on actions, not C. Reopen: a port whose gate must hand on a
+  transaction in a shape this refuses.
+- **`examples/24_gates.kg` moved to C**: `OpenInvoice` is a proof marked `@DeskOnly`, and
+  `statusOf` and `unpaid` take a narrower proof, `AtDesk`, of the transaction alone, from
+  a gate `atDesk` that calls `clerk` and binds its answer. Not taken: binding
+  `${clerk.address}` in their statements, which would scope by nothing the SQL needs.
+  `clerk` now gives `Clerk(address)`, facts alone, to `testPrinter`, the action fun that
+  reads only facts: C's lighter half, shown.
 - **A marked property is built here** (spec 11): a marker on a data class's property was a
   syntax error, and an interface's marked `val` was read and not held. Both are now
   marked, and read only in a file that opts in, by name or by destructuring. The proof
@@ -3230,16 +3273,8 @@ Each entry: what was decided, why, and what would reopen it.
 - **Not seen by `action-proof`: a proof held in a list or in a plain data class**, as
   `xs: List<Held>` or `Box(val held: Held)`. Only a file that opts in can make one: a
   step or work that runs outside cannot, since building either passes the proof.
-- **Open, Greg's: must a gate give a proof of this shape?** Built as B meanwhile (the
-  Ruling on PR 98). A: every gate gives a proof, a new refusal ("gate gives Clerk, which
-  is no proof: mark its constructor and its tx"), so every gated program has a marker
-  and a gates' file that opts in, and a forgotten marker is a compile error. B: as now,
-  the rules hold only marked proofs, and a port that forgets the marker gets no rules
-  and no error. C: only a `P` that holds a `Tx` must be a proof, which closes PR 91's 500
-  and leaves a proof of facts alone light. A or C is its own issue, with
-  `examples/24_gates.kg` moved (its `statusOf` and `unpaid` bind nothing of `clerk`).
 - **The codes** are the design's `proof-tx-escapes` and `outside-passes-proof`, and two it
-  did not name: `unbound-statement` and `action-proof`.
+  did not name: `unbound-statement` and `action-proof`; DEV-982 adds `gate-proof`.
 - **"Written directly" is `proof.fact` or a property under it**, `${held.business.id}`,
   spelt on the same name as the receiver. Not taken: `proof.fact` alone, which refuses a
   proof that keeps its row as a data class, as spec 11's `HeldBusiness` does.
@@ -3378,8 +3413,9 @@ Each entry: what was decided, why, and what would reopen it.
 - **Section 13's sample binding is `Http.ask` and `perform`**, in place of an invented
   `Http.get` in a Go package `httpx`, which the real `Http` would contradict. The sample
   no longer shows `@go`; its bullet stays.
-- **A binding that says neither kind is still not refused** (DEV-962's entry): nothing
-  marks which bindings call outside. Not taken here: the rule is the checker's.
+- **A binding that says nothing is not refused** (DEV-962's entry; since 20 Nov 2026 a
+  binding says `action` or nothing, above): nothing marks which bindings call outside,
+  and nothing checks that one that says nothing is right to.
 
 ## Taken building what `main` needs (DEV-986), not yet discussed
 

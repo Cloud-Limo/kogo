@@ -1052,7 +1052,7 @@ func TestPrelude(t *testing.T) {
 		// Counted apart from the trees: each declaration begins a line.
 		declared := 0
 		for _, name := range must(filepath.Glob("../prelude/*.kg")) {
-			declared += len(regexp.MustCompile(`(?m)^((action |lookup )?external (class|fun|val)|    fun) `).FindAll(must(os.ReadFile(name)), -1))
+			declared += len(regexp.MustCompile(`(?m)^((action )?external (class|fun|val)|    fun) `).FindAll(must(os.ReadFile(name)), -1))
 		}
 		if n != declared || n == 0 {
 			t.Errorf("%d declarations of the prelude are used, and it has %d", n, declared)
@@ -1106,10 +1106,10 @@ import u.theirs
 api ops checkedBy ours { me ungated, f ungated, held gatedBy who, sent gatedBy asked after step, rung gatedBy who }
 api other checkedBy theirs { g ungated }
 api hooks unchecked { me ungated }
-data class Who(val tx: Tx)
+data class Who(val n: Int)
 fun ours(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }
-fun who(tx: SerializableTx, env: Env, request: Request): Either<String, Who> = either { Who(tx) }
-fun asked(tx: Tx, env: Env, request: Request, input: Ask): Either<String, Who> = either { Who(tx) }
+fun who(tx: SerializableTx, env: Env, request: Request): Either<String, Who> = either { Who(1) }
+fun asked(tx: Tx, env: Env, request: Request, input: Ask): Either<String, Who> = either { Who(1) }
 action fun step(env: Env, who: Who, input: Ask): Either<String, Unit> = either { env.console.println("") }
 action fun rung(env: Env, who: Who, input: Unit): Either<String, Unit> = either { env.console.println("") }
 fun held(env: Env, who: Who, input: Unit): Either<String, Unit> = either { }

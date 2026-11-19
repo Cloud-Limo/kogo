@@ -1127,21 +1127,41 @@ the bytes itself and states them:
 | What | Kogo's rule |
 | --- | --- |
 | The headers' order | `Message-ID`, `Date`, `From`, `Reply-To`, `To`, `Cc`, `Bcc`, `Subject`, `MIME-Version: 1.0`, then the content's. One with nothing to say (no `replyTo`, an empty list) is not written. No other header is: no `User-Agent`, no `X-Mailer`. |
-| `Message-ID` | `<` `messageId` `>`, as given: the application writes the `@` and what follows it. |
+| `Message-ID` | `<` `messageId` `>`, as given: the application writes the `@` and what follows it, by the address rule below. |
 | `Date` | In UTC, to the second: `Mon, 16 Nov 2026 14:30:00 +0000`. |
-| An address | `"name" <address>`, or `<address>` with no name; a list has one address to a line. A name of printable ASCII, 60 characters at most, is quoted, with `\` before a `"` or a `\`; any other is encoded words. |
-| The subject | As it is when it is printable ASCII, its line is at most 78 characters and it holds no `=?`; if not, encoded words. |
-| Encoded words | `=?UTF-8?B?...?=`, each the base64 of at most 45 bytes of UTF-8 and of whole characters, one to a line. A line break in a subject or a name is inside its words, and ends no header. |
-| A body | Every part is base64, 76 characters to a line, text included: no line of a message is over 78 characters or outside ASCII. A text's line breaks are sent as CR LF. `text` is `text/plain; charset=UTF-8` and `html` is `text/html; charset=UTF-8`. |
+| An address | `"name" <address>`, or `<address>` with no name; a list has one address to a line, each but the last ending in `,`. A name is quoted, with `\` before a `"` or a `\`, when it is printable ASCII, holds no `=?` and has no run of over 60 characters without a space; any other is encoded words. |
+| The subject | As it is by the same rule as a name, unquoted; if not, encoded words. |
+| A control character | In a name or a subject, a space, CR and LF included, so that no reader gives one back. |
+| Folding | A header's line is broken, as CR LF before a space, wherever it would pass 78 characters, but never before the header's first word. |
+| Encoded words | `=?UTF-8?B?...?=`, each the base64 of at most 39 bytes of UTF-8 and of whole characters, a space between, so that one fits a line after its header's name. |
+| `text` and `html` | `text/plain; charset=UTF-8` and `text/html; charset=UTF-8`, quoted-printable, by these rules alone: a byte outside printable ASCII but a tab, and `=`, is `=XX`, in capitals; a space or a tab that ends a line is `=20` or `=09`; a line break is CR LF; when the next character's encoding would take a line past 75 characters, a soft break, `=` and CR LF, comes before it; and a text that does not end in a line break ends in a soft break. |
+| An attachment's body | Base64, 76 characters to a line. |
 | The parts | `text` alone is the message's body. With `html`, a `multipart/alternative` of `text`, then `html`. With attachments, a `multipart/mixed` of that body, then each attachment in order. |
-| A boundary | `kogo-mixed` and `kogo-alternative`, always: every line of a body is base64, which has no hyphen, so no body holds one. |
-| An attachment | `Content-Type:` its `mimeType`, then `Content-Disposition: attachment; filename="name"`, quoted as a name is; a name not of printable ASCII is `filename*=UTF-8''` and its UTF-8, percent-encoded but for letters, digits, `.`, `-` and `_`. |
+| A boundary | `boundary="=_kogo-mixed"` and `boundary="=_kogo-alternative"`, always: quoted-printable writes `=` only before two hex digits or a line end, and base64 only at a line's end, so no body holds `=_`. |
+| An attachment | `Content-Type:` its `mimeType`, then `Content-Disposition: attachment; filename="name"`, quoted as a name is, when that is printable ASCII and at most 45 characters; any other name is RFC 2231's pieces, a line each, `filename*0*=UTF-8''...;`, `filename*1*=...`, of its UTF-8 percent-encoded but for letters, digits, `.`, `-` and `_`, each at most 60 characters with the first's `UTF-8''`. |
 | Line ends | CR LF, every one. |
 
-A `messageId`, an `address` or a `mimeType` that is empty or holds a
-space, an angle bracket, a control character or a character outside
-ASCII is a bug in the caller, and `eml` panics (section 8): each is
-written as it is, and would end its header.
+No line is then over 78 characters but the `Message-ID`'s, an
+address's and an attachment's `Content-Type`, each of which the
+application chooses.
+
+**The address rule.** `Address.address`, wherever one is written,
+`replyTo` included, and `messageId` match
+
+```
+^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$
+```
+
+and are at most 254 characters: an ASCII addr-spec of RFC 5322's atext
+and dots with one `@`, so that none ends its header or names a second
+recipient. One that does not is a bug in the caller, and `eml` panics
+(section 8). An address a person typed is checked against this rule,
+with `Regex`, where the application takes it, so that the person meets
+a refusal there and never the panic; an application's own rule is no
+wider than this one. An address outside ASCII (an IDN domain, a UTF-8
+local part) is refused: a customer who has one brings it. A `mimeType`
+is printable ASCII, a parameter such as `; charset=utf-8` included,
+and one that is empty or is not panics likewise.
 
 **Tests** (`kogo.test`; test files only, section 16).
 `kogo.test` has `Test<E>`, `test(sentence) { tx, env -> ... }` and

@@ -254,8 +254,8 @@ read back as eml wrote it: true
   To: "Ann" <ann@a.example>
   Subject: Your receipt for 7
   MIME-Version: 1.0
-  Content-Type: multipart/mixed; boundary=kogo-mixed
-  Content-Type: multipart/alternative; boundary=kogo-alternative
+  Content-Type: multipart/mixed; boundary="=_kogo-mixed"
+  Content-Type: multipart/alternative; boundary="=_kogo-alternative"
   Content-Type: text/plain; charset=UTF-8
   Content-Type: text/html; charset=UTF-8
   Content-Type: text/plain

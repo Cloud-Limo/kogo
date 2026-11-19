@@ -1,0 +1,16 @@
+// The prelude's Either functions (see lists.kg); for Kotlin, arrow.kt
+// names Arrow's. n > m picks Right; s is the error.
+package builtins
+
+fun eithers(f: String, s: String, n: Int, m: Int, x: Long, y: Long): String? = when (f) {
+    "right" -> "${x.right()} ${s.left()} ${pick(s, n, m, x)}"
+    "fold" -> pick(s, n, m, x).fold({ "left $it" }, { "right $it" })
+    "mapLeft" -> "${pick(s, n, m, x).mapLeft { it.length }}"
+    "mapRight" -> "${pick(s, n, m, x).map { it + y }}"
+    "flatMapEither" -> "${pick(s, n, m, x).flatMap { pick("$it", if (it > y) 1 else 0, 0, y) }}"
+    "getOrElse" -> "${pick(s, n, m, x).getOrElse { it.length.toLong() }}"
+    "getOrNull" -> "${pick(s, n, m, x).getOrNull()}"
+    else -> null
+}
+
+fun pick(s: String, n: Int, m: Int, x: Long): Either<String, Long> = if (n > m) x.right() else s.left()

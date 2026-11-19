@@ -12,10 +12,18 @@ go build -tags kotlin -o _work/driver ./driver
 rm -r _work/builtins # built in: gofmt -l . stays clean
 _work/driver < _work/cases > _work/kogo
 
+# Either is Arrow's: its jar, fetched once and checked.
+arrow=${XDG_CACHE_HOME:-$HOME/.cache}/kogo/arrow-core-jvm-2.2.3.jar
+if ! sha256sum -c --status <<<"a2d334ad01cf22cc534ff254788d1877e4df1564fd2b1101736a6c0e8d9a7a47  $arrow" 2>/dev/null; then
+    mkdir -p "$(dirname "$arrow")"
+    curl -fsSLo "$arrow" https://repo1.maven.org/maven2/io/arrow-kt/arrow-core-jvm/2.2.3/arrow-core-jvm-2.2.3.jar
+    sha256sum -c --quiet <<<"a2d334ad01cf22cc534ff254788d1877e4df1564fd2b1101736a6c0e8d9a7a47  $arrow"
+fi
+
 # kotlinc reads only .kt: the same bytes, under that name.
 for f in builtins/*.kg; do cp "$f" "_work/$(basename "$f" .kg).kt"; done
-kotlinc -nowarn _work/*.kt main.kt time.kt -d _work/kotlin.jar
-kotlin -cp _work/kotlin.jar MainKt _work/cases > _work/kotlin
+kotlinc -nowarn -cp "$arrow" _work/*.kt main.kt time.kt arrow.kt -d _work/kotlin.jar
+kotlin -cp "_work/kotlin.jar:$arrow" MainKt _work/cases > _work/kotlin
 
 go run ./cases diff _work/cases _work/kogo _work/kotlin
 

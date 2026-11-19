@@ -2614,7 +2614,9 @@ Each entry: what was decided, why, and what would reopen it.
     rename about ten commands, roughly 6 lines. The list's name stays: `main` calls it by
     it.
   - **No commas in any list; one entry per line.** The work list repeats `queue` on each
-    line, and spec 15.1's `api ops { me, updateJob }` goes to one per line.
+    line, and spec 15.1's `api ops { me, updateJob }` goes to one per line. *Superseded
+    19 Nov 2026 by "A list's entries are separated by a comma, a new line or both"
+    (DEV-947, DEV-948) below.*
   - **An effect's and a job's lines are in a fixed order, the order they run**, and the
     checker refuses any other (about 10 / 10): settings `find`, `fair`, `soonest`,
     `attempts`; steps `enter`, `prepare`, `act`, `record`; on failure `failed`,
@@ -2648,7 +2650,7 @@ Each entry: what was decided, why, and what would reopen it.
   taken: keeping `outside` in the table alone.
 - **`doc/lists-assessment.md` keeps `@Acts` and the old forms**, under a note: it is the
   record of what was weighed. Spec 15.1's commas wait for the lists to be built, since
-  the parser reads them today.
+  the parser reads them today. (Settled by DEV-948, "A list's entries" below.)
 
 ## The test form (DEV-929, DEV-938, DEV-940), agreed with Greg 19 Nov 2026
 
@@ -2680,7 +2682,8 @@ Each entry: what was decided, why, and what would reopen it.
   the list states it once, read as Kotlin's type argument. Not taken: `tests name: Env { }`;
   the type on the first test only; one environment per program, which rules out a second
   environment for the stand-in servers. The list's separator stays as built: commas in
-  lists are revisited across Kogo in an issue of their own.
+  lists are revisited across Kogo in an issue of their own (DEV-948, "A list's entries"
+  below).
 - **A `Db` in a test's environment commits** (Greg, 19 Nov 2026): the rollback covers `tx`,
   and spec 16.2 says so. **Owed with `kogo.test.request`:** whether the checker refuses a
   `tests` list whose environment holds a `Db`, directly or in a field, decided when tests
@@ -2760,6 +2763,25 @@ Each entry: what was decided, why, and what would reopen it.
   any other field is read, and 500 for a body that is not a JSON object, on purpose, so
   SMTP2GO keeps form-encoded events for 48 hours rather than dropping them. Not taken:
   `doc/gates.md`'s sketch, 400 for both.
+
+## A list's entries (DEV-947, DEV-948), agreed with Greg 19 Nov 2026
+
+- **A list's entries are separated by a comma, a new line or both, with a comma allowed
+  after the last**, as Kotlin separates a collection's (Greg, 19 Nov 2026, choice A of
+  DEV-947). One helper in `syntax/parse.go` reads the `api` and the `tests` list; spec
+  15.1 states it and 16.1 points there. An entry of more than one word (a row with
+  `gatedBy`, `after`, `ungated`) stays on one line, since a line end ends it. Supersedes
+  DEV-894's "no commas in any list". Not taken: B, no commas and one entry a line, as
+  DEV-894 had it, which the built lists and spec 15.1 did not follow; C, commas always, as
+  built, which the designs' one-entry-a-line lists did not follow. Reopen if a row of
+  words needs to run over a line.
+- **The work list names its alert in its head**: `work daemon alertedBy opsAlert { ... }`,
+  its queues a list of names, in the shape of `api name checkedBy check { ... }` (Greg, 19
+  Nov 2026, DEV-947). Not taken: the `alert` line and a `queue` word on each line, which
+  only a list without commas needed. Respelt in the docs alone; no work list is parsed yet.
+- **A missing separator says so**: `api ops { a b }` is "expected , or a new line between a
+  list's entries" at `b` (DEV-948), where it said "expected }". Not taken: the old message,
+  which names one of the three ways on.
 
 ## Taken comparing and shifting an Instant (DEV-946), not yet discussed
 

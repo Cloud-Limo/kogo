@@ -71,8 +71,9 @@ api booker checkedBy fromOurPage {
 every row, ungated ones included: the Origin's check, then the CSRF
 token's (`doc/origin.md`; `decisions.md`, 18 Nov 2026). A list with
 no check says so, `api hooks unchecked { ... }`, as a row says
-`ungated`, and its Go type cannot be mounted for a browser. A list
-has one entry a line and no commas.
+`ungated`, and its Go type cannot be mounted for a browser. A list's
+entries are separated by a comma, a new line or both (spec 15.1),
+and a row of more than one word stays on one line.
 
 ### A gate and its work are two functions
 

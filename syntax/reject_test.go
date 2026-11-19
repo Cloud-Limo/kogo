@@ -119,6 +119,9 @@ func TestFaults(t *testing.T) {
 		{"external fun f(): Int ‸= 1", "syntax", "a binding has no body"},
 		{"external ‸data class D(val x: Int)", "syntax", "external goes before class, object, fun or val"},
 		{"fun f(‸external x: Int) {}", "syntax", "a parameter takes no modifier"},
+		// A list's entries are separated by a comma or a line end.
+		{"api ops { a ‸b }", "syntax", "expected , or a new line between a list's entries"},
+		{"tests ts<Unit> { a ‸b }", "syntax", "expected , or a new line between a list's entries"},
 	} {
 		e, line, column := fault(t, c.src)
 		if e.Line != line || e.Column != column || e.Code != c.code || !strings.Contains(e.Message, c.message) {

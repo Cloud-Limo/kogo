@@ -5,7 +5,11 @@ package example.ops
 
 import kogo.rpc.Request
 
-api ops { invoices, setStatus, lookUp }
+api ops {
+    invoices
+    setStatus
+    lookUp
+}
 
 data class OpsEnv(val maxLooks: Int)
 

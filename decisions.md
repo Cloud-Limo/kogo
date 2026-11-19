@@ -651,13 +651,16 @@ Each entry: what was decided, why, and what would reopen it.
   taken: Go's `rand.Int(rand.Reader, 62)` per character, even too but a big integer each
   time. Reopen if a program needs another alphabet, random numbers or bytes, or a test needs
   a fixed token.
-- **Ids are UUID version 7, whatever an application used before** (16 Nov 2026). cusoon2's
-  ids are its own layout, 65.5 µs ticks since 23 Feb 2018 in the first 48 bits, made for
-  index locality, which version 7 gives; Postgres 18 has `uuidv7()`. The two never sort
-  together: a version 7 id made now sorts after cusoon2's ids from before about November
-  2021 and before every later one. Not taken: cusoon2's layout in the prelude, which is
-  specific to one application. Amended 20 Nov 2026 (Greg; DEV-995; spec 7, 12): an
-  application keeps its own format. Its `main` hands the runtime its id maker, in Go, with
+- **Kogo's ids are UUID version 7; an application's `main` may hand over its own** (16 Nov
+  2026, amended 20 Nov). cusoon2's ids are its own layout, 65.5 µs ticks since 23 Feb 2018
+  in the first 48 bits, made for index locality, which version 7 gives; Postgres 18 has
+  `uuidv7()`. The two never sort together: a version 7 id made now sorts after cusoon2's ids
+  from before about November 2021 and before every later one. So an application whose ids
+  are not version 7 and that hands over no maker gets rows that do not sort with its own by
+  id: it makes its ids in Postgres, by a function both sides call, or orders those queries
+  by a time. Not taken: cusoon2's layout in the prelude, which is specific to one
+  application. Amended 20 Nov 2026 (Greg; DEV-995; spec 7, 12): an application keeps its
+  own format. Its `main` hands the runtime its id maker, in Go, with
   `kogo.MakeIdsWith`, once and before any id is made, else a panic; `newId()` then calls it,
   and with none handed over gives version 7. cusoon2's ids are on their own clock and never
   go backwards within a process, its Kotlin lists a booking's passengers in id order, and

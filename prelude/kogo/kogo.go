@@ -599,6 +599,8 @@ func NewId() Uuid {
 
 // MakeIdsWith has newId() give maker's ids. A main calls it once, before
 // any id is made: how ids are made does not change while a program runs.
+// That no other call gives the same id, and that ids sort by when they
+// were made, is then maker's to keep (spec.md 7).
 func MakeIdsWith(maker func() Uuid) {
 	if !idMaker.CompareAndSwap(nil, &maker) {
 		if idMaker.Load() == &ownIds {

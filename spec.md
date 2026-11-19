@@ -460,7 +460,8 @@ A function can only do what its parameters let it do.
 - `newId()` gives an id that no other call gives. Kogo's own sort by
   when they were made and increase within a process. An application's
   `main` may hand the runtime a maker of its own, in Go, before any id
-  is made (`kogo.MakeIdsWith`); keeping that order is then its maker's.
+  is made (`kogo.MakeIdsWith`); keeping that promise, and that order,
+  is then its maker's.
 
 ### 7.1 Actions
 
@@ -1016,10 +1017,11 @@ smallest `Double` ends in `5` here and `49` in Java. The difference is
 `plain`'s alone: a template and `toString` write these as Java does.
 
 **Ids.** `Uuid`, `Uuid.parseOrNull(text): Uuid?`, `newId(): Uuid`
-(an id no other call gives: section 7). `Uuid.parseOrNull` reads 36 characters, hyphens
-at 8, 13, 18 and 23 and hex digits of either case elsewhere, and gives
-`null` for any other text; `Uuid.parseOrNull("$id") == id`. Kotlin's
-also reads 32 hex digits without hyphens; Kogo's gives `null` for them.
+(an id no other call gives: section 7). `Uuid.parseOrNull` reads 36
+characters, hyphens at 8, 13, 18 and 23 and hex digits of either case
+elsewhere, and gives `null` for any other text;
+`Uuid.parseOrNull("$id") == id`. Kotlin's also reads 32 hex digits
+without hyphens; Kogo's gives `null` for them.
 
 **Secrets.** `randomString(length: Int): String` gives `length`
 characters, each drawn evenly from the 62 letters and digits (`a` to

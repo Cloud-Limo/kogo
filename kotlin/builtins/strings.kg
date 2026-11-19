@@ -10,6 +10,7 @@ fun strings(f: String, s: String, t: String, n: Int, m: Int): String? = when (f)
     "isNullOrBlank" -> "${s.takeIf { n > m }.isNullOrBlank()} ${t.takeIf { n <= m }.isNullOrBlank()}"
     "ifEmpty" -> s.ifEmpty { t }
     "startsWith" -> "${s.startsWith(t)} ${(t + s).startsWith(t)}"
+    "endsWith" -> "${s.endsWith(t)} ${(s + t).endsWith(t)}"
     "contains" -> "${s.contains(t)} ${(s + t + s).contains(t)}"
     "containsChar" -> "${t.map { s.contains(it) }} ${s.map { (t + s).contains(it) }}"
     "lowercase" -> s.lowercase()

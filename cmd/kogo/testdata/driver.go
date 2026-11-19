@@ -18,6 +18,7 @@ import (
 	"ROOT/example/gates"
 	"ROOT/example/markers"
 	"ROOT/example/ops"
+	"ROOT/example/origin"
 	"ROOT/example/reply"
 	"github.com/Cloud-Limo/kogo/internal/testdb"
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
@@ -27,7 +28,7 @@ import (
 	"github.com/Cloud-Limo/kogo/rt"
 )
 
-// The rows that examples 10 to 19, 21, 22 and 24 read.
+// The rows that examples 10 to 19, 21, 22, 24, 27 and 28 read.
 const seed = `
 insert into business (id, slug, legal_name, created_at, abn) values
     ('00000000-0000-0000-0000-000000000001', 'acme', 'Acme Pty Ltd', '2026-01-02 03:04:05+00', '51824753556'),
@@ -42,6 +43,10 @@ insert into supply_agreement (operator_id, supplier_id, driver_share_percent) va
 insert into invoice (id, number, total_cents, status) values
     ('00000000-0000-0000-0000-000000000005', 'INV-1', 1000, 'paid'),
     ('00000000-0000-0000-0000-000000000006', 'INV-2', null, 'sent');
+insert into shop (domain) values ('https://shop.example');
+insert into session (id, csrf_token, expires_at) values
+    ('00000000-0000-0000-0000-00000000000a', 'live token', '2027-01-01 00:00:00+00'),
+    ('00000000-0000-0000-0000-00000000000b', 'old token', '2026-01-01 00:00:00+00');
 `
 
 // in runs f in a transaction of db, as db.tx { } does.
@@ -271,4 +276,48 @@ func main() {
 	cookies("sign in refused", "signIn", "", `{"name": " "}`)
 	cookies("sign out", "signOut", "session=Ann", "")
 	cookies("sign out refused", "signOut", "", "")
+
+	// 27 and 28: a list's check of the Origin and the session's
+	// token, each request with the headers named: Sec-Fetch-Site,
+	// Origin, the session's cookie and X-CSRF-Token, "" for none.
+	h3 := rpc.NewHandler(origin.Counter, pool, origin.CounterEnv{Clock: clock, Settings: origin.Settings{
+		AdminOrigin: "https://admin.example", ExtraAllowedOrigins: kogo.ListOf("http://localhost:5173")}}, slog.New(slog.DiscardHandler))
+	op := "whoAmI"
+	from := func(what, site, from, sid, token string) {
+		w, r := httptest.NewRecorder(), httptest.NewRequest("POST", "/"+op, nil)
+		for name, value := range map[string]string{"Sec-Fetch-Site": site, "Origin": from, "Cookie": sid, "X-CSRF-Token": token} {
+			if value != "" {
+				r.Header.Set(name, value)
+			}
+		}
+		h3.ServeHTTP(w, r)
+		fmt.Printf("%s: %d %s\n", what, w.Code, strings.TrimSpace(w.Body.String()))
+	}
+	const live, old = "SID=00000000-0000-0000-0000-00000000000a", "SID=00000000-0000-0000-0000-00000000000b"
+	from("no browser", "", "", "", "")
+	from("a shop's page", "same-origin", "https://shop.example", "", "")
+	from("the admin's page, typed in", "none", "https://admin.example", "", "")
+	from("an extra origin, with a slash", "", "http://localhost:5173/", "", "")
+	from("an old browser on a shop's page", "", "https://shop.example", "", "")
+	from("another of the site's hosts", "same-site", "https://shop.example", "", "")
+	from("another site", "cross-site", "https://shop.example", "", "")
+	from("same-origin, from an origin not ours", "same-origin", "https://other.example", "", "")
+	from("an origin not ours", "", "https://other.example", "", "")
+	from("a prefix of ours", "", "https://shop.exampl", "", "")
+	from("null", "", "null", "", "")
+	from("null, same-origin", "same-origin", "null", "", "")
+	from("null, none", "none", "null", "", "")
+	from("a session with its token", "same-origin", "https://shop.example", live, "live token")
+	from("a session with no token", "same-origin", "https://shop.example", live, "")
+	from("a session with another's token", "same-origin", "https://shop.example", live, "old token")
+	from("no browser, with a session and no token", "", "", live, "")
+	from("the Origin before the token", "cross-site", "", live, "")
+	from("an expired session with no token", "same-origin", "https://shop.example", old, "")
+	from("an expired session with its token", "same-origin", "https://shop.example", old, "old token")
+	from("a cookie that is no UUID", "same-origin", "https://shop.example", "SID=live token", "")
+	from("a cookie of no session", "same-origin", "https://shop.example", "SID=00000000-0000-0000-0000-00000000000c", "")
+	op = "signOut"
+	from("sign out", "same-origin", "https://shop.example", live, "live token")
+	op = "whoAmI"
+	from("an ended session with no token", "same-origin", "https://shop.example", live, "")
 }

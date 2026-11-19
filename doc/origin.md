@@ -10,10 +10,11 @@ and the rest by the lead, and DEV-915 wrote the answers into this
 document, the designs and `decisions.md`: "What changes" lists what
 is left, which is code, `spec.md` and cusoon2's Kotlin. Invented here: `rpc.Unserved`,
 `rpc.NewUnserved`, `Table.Check`, `kogo.ReadOnlyTx`, the code
-`check-shape`, `toUuidOrNull`, and the name of every Kogo function
+`check-shape`, and the name of every Kogo function
 but `sameSite` and `liveSession`. `fromOurPage` and `tokenMatches` are
 the names of the session that answered Q6, not decided: cusoon2's to
-name.
+name. The cookie is read with Kotlin's `Uuid.parseOrNull`, not the
+`toUuidOrNull` this document first invented (`decisions.md`, DEV-964).
 
 ## What the Kotlin does
 
@@ -139,7 +140,7 @@ the row read later has that token or is gone.
 ```kotlin
 // cusoon.gate, session.kg: the only file that reads the cookie or selects a session (Q10)
 private fun sessionId(request: Request): Uuid? =
-    request.cookie(if (isSecure(request)) "__Host-SID" else "SID")?.let { toUuidOrNull(it) }
+    request.cookie(if (isSecure(request)) "__Host-SID" else "SID")?.let { Uuid.parseOrNull(it) }
 
 fun tokenMatches(tx: Tx, request: Request): Either<String, Unit> = either {
     val row = sessionId(request)?.let { tx.queryOne<Session>(sql"select * from session where id = $it") }

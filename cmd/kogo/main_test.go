@@ -65,8 +65,8 @@ func examples(t *testing.T, patterns ...string) map[string]string {
 func TestExamples(t *testing.T) {
 	testDB(t)
 	files := examples(t, "*.kg")
-	if len(files) != 27 {
-		t.Fatalf("%d examples, want 27", len(files))
+	if len(files) != 29 {
+		t.Fatalf("%d examples, want 29", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)
@@ -75,7 +75,7 @@ func TestExamples(t *testing.T) {
 
 // The Go that kogo emit writes for the examples is built with
 // testdata/driver.go and run, 10 to 19, 21 and 22 against the test
-// database, 22 served over HTTP: each result was worked out by hand
+// database, 22, 24, 25, 27 and 28 served over HTTP: each result was worked out by hand
 // from the Kogo and the rows the driver begins with.
 func TestEmittedGoRuns(t *testing.T) {
 	testDB(t)
@@ -212,6 +212,30 @@ sign in: 200 ["session=Ann; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax
 sign in refused: 200 [] {"type":"refused","message":"Say who you are."}
 sign out: 200 ["session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"] {"type":"ok","value":{}}
 sign out refused: 200 [] {"type":"refused","message":"You are not signed in."}
+no browser: 200 {"type":"ok","value":"nobody"}
+a shop's page: 200 {"type":"ok","value":"nobody"}
+the admin's page, typed in: 200 {"type":"ok","value":"nobody"}
+an extra origin, with a slash: 200 {"type":"ok","value":"nobody"}
+an old browser on a shop's page: 200 {"type":"ok","value":"nobody"}
+another of the site's hosts: 403 Invalid origin
+another site: 403 Invalid origin
+same-origin, from an origin not ours: 403 Invalid origin
+an origin not ours: 403 Invalid origin
+a prefix of ours: 403 Invalid origin
+null: 403 Invalid origin
+null, same-origin: 403 Invalid origin
+null, none: 403 Invalid origin
+a session with its token: 200 {"type":"ok","value":"session 00000000-0000-0000-0000-00000000000a"}
+a session with no token: 403 Invalid CSRF token
+a session with another's token: 403 Invalid CSRF token
+no browser, with a session and no token: 403 Invalid CSRF token
+the Origin before the token: 403 Invalid origin
+an expired session with no token: 403 Invalid CSRF token
+an expired session with its token: 200 {"type":"ok","value":"nobody"}
+a cookie that is no UUID: 200 {"type":"ok","value":"nobody"}
+a cookie of no session: 200 {"type":"ok","value":"nobody"}
+sign out: 200 {"type":"ok","value":{}}
+an ended session with no token: 200 {"type":"ok","value":"nobody"}
 `
 	if err != nil || string(out) != want {
 		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)

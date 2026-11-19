@@ -560,3 +560,20 @@ func NewId() Uuid {
 	u[6], u[8] = u[6]&0x0F|0x70, u[8]&0x3F|0x80
 	return u
 }
+
+// RandomString gives length letters and digits from the operating
+// system's cryptographic source, each as likely as any other: a byte
+// of 248 or more, past four times the 62, is drawn again, not folded.
+func RandomString(length int32) string {
+	if length < 0 {
+		panic("randomString's length " + strconv.Itoa(int(length)) + " is negative")
+	}
+	const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	out, b := make([]byte, 0, length), make([]byte, 1)
+	for len(out) < int(length) {
+		if rand.Read(b); b[0] < 248 {
+			out = append(out, alphabet[b[0]%62])
+		}
+	}
+	return string(out)
+}

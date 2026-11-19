@@ -88,3 +88,4 @@ external fun require(value: Boolean, lazyMessage: () -> String)
 external fun check(value: Boolean, lazyMessage: () -> String)
 
 external fun newId(): Uuid
+external fun randomString(length: Int): String

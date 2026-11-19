@@ -55,6 +55,7 @@ func TestTransactions(t *testing.T) {
 		{`t.Invoiced(db, between)`, "1"},
 		{`runs`, "2"},
 		{`t.Totals(db)`, "[0, 1]"},
+		{`t.Token(db)`, "20 true"},
 	}, `package t
 
 // In a fun on Tx, a call is written on this.
@@ -117,6 +118,14 @@ fun invoiced(db: Db, between: () -> Unit): Long = db.tx(serializable = true) { t
 }
 
 fun totals(db: Db): List<Long?> = db.tx { tx -> tx.query<Long?>(sql"select total_cents from invoice order by total_cents") }
+
+// A session's token is made, stored and read back the same.
+fun token(db: Db): String = db.tx { tx ->
+    val token = randomString(20)
+    val id = newId()
+    tx.execute(sql"insert into person (id, name, email) values ($id, $token, ${"$token@x"})")
+    "${token.length} ${tx.querySingle<String>(sql"select name from person where id = $id") == token}"
+}
 `)
 }
 

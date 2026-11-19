@@ -449,9 +449,9 @@ the parser.
 A function can only do what its parameters let it do.
 
 - There are no globals, singletons or ambient state. The clock, the
-  database and outbound calls arrive as parameters. `newId()` is the
-  one exception, because an id's value never changes what a program
-  does.
+  database and outbound calls arrive as parameters. `newId()` and
+  `randomString(n)` are the two exceptions, because neither's value
+  changes what a program does.
 - `Tx` is an open database transaction and `Db` is a connection pool
   (section 10). A function that touches the database has one of them,
   or a proof that holds a `Tx` (15.7), as a parameter.
@@ -904,7 +904,8 @@ type of its own in a package `kogo.<name>`, imported by name as
 `kogo.time` is, and so for input and output, where Kotlin's are
 global functions and Kogo's an effect (section 7). So a file's imports
 show what in it is not Kotlin's.
-`Uuid`, `newId` and `Decimal` are Kogo's own and need no import;
+`Uuid`, `newId`, `randomString` and `Decimal` are Kogo's own and need
+no import;
 `ByteArray` (section 3) is Kotlin's name and needs none either.
 
 **Collections** (immutable; "changing" one returns a new one).
@@ -1011,6 +1012,12 @@ smallest `Double` ends in `5` here and `49` in Java. The difference is
 at 8, 13, 18 and 23 and hex digits of either case elsewhere, and gives
 `null` for any other text; `Uuid.parseOrNull("$id") == id`. Kotlin's
 also reads 32 hex digits without hyphens; Kogo's gives `null` for them.
+
+**Secrets.** `randomString(length: Int): String` gives `length`
+characters, each drawn evenly from the 62 letters and digits (`a` to
+`z`, `A` to `Z`, `0` to `9`) by the operating system's cryptographic
+source, so it cannot be guessed: a session's token. Zero gives `""`;
+a negative `length` is a bug, and it panics naming it.
 
 **Requests** (`kogo.rpc`). A `Request` is what the server read of one
 HTTP request, passed to an operation (section 15):

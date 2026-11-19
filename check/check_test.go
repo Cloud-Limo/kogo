@@ -64,6 +64,15 @@ func split(src string) []string {
 	return files
 }
 
+// fileName names the i'th file: f<i>.kg, or f<i>_test.kg, a test
+// file (spec.md 16), where its text holds /*test*/.
+func fileName(i int, text string) string {
+	if strings.Contains(text, "/*test*/") {
+		return fmt.Sprintf("f%d_test.kg", i)
+	}
+	return fmt.Sprintf("f%d.kg", i)
+}
+
 // run checks src with the tests' prelude, which is f0.kg and the real
 // prelude's either.kg; the files of src are f1.kg and on. A file of
 // src in package kogo, or one under it, joins the prelude, to hold
@@ -80,7 +89,7 @@ func run(t *testing.T, src string) (*Info, []*syntax.Error) {
 	}
 	pre, program := []*syntax.File{either}, []*syntax.File(nil)
 	for i, text := range append([]string{bindings}, split(src)...) {
-		f, err := syntax.Parse(fmt.Sprintf("f%d.kg", i), []byte(text))
+		f, err := syntax.Parse(fileName(i, text), []byte(text))
 		if err != nil {
 			t.Fatalf("%s\n%v", text, err)
 		}
@@ -164,7 +173,7 @@ func refused(t *testing.T, cases [][3]string) {
 		for i, text := range split(src) {
 			if before, _, found := strings.Cut(text, "‸"); found {
 				column := len([]rune(before[strings.LastIndexByte(before, '\n')+1:])) + 1
-				want = fmt.Sprintf("f%d.kg:%d:%d: %s: ", i+1, strings.Count(before, "\n")+1, column, code)
+				want = fmt.Sprintf("%s:%d:%d: %s: ", fileName(i+1, text), strings.Count(before, "\n")+1, column, code)
 			}
 		}
 		_, errs := run(t, strings.Replace(src, "‸", "", 1))

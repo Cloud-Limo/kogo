@@ -172,6 +172,9 @@ func (e *emitter) name(files []*syntax.File) {
 		for _, d := range f.APIs {
 			add(d, d, "", export(d.Name), export(d.Name)+"_api")
 		}
+		for _, d := range f.Tests {
+			add(d, d, "", export(d.Name), export(d.Name)+"_tests")
+		}
 	}
 	for _, pkg := range pkgs {
 		shared := map[string]int{}

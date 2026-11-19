@@ -21,8 +21,10 @@ func kogo(t *testing.T, files map[string]string, out ...string) (code int, stdou
 		}
 	}
 	args := []string{"check", dir}
-	if out != nil {
+	if len(out) == 1 {
 		args = []string{"emit", dir, out[0]}
+	} else if len(out) == 2 { // out and the test main
+		args = []string{"test", dir, out[0], out[1]}
 	}
 	var stdoutText, fatal bytes.Buffer
 	code = run(args, &stdoutText, &fatal)
@@ -63,8 +65,8 @@ func examples(t *testing.T, patterns ...string) map[string]string {
 func TestExamples(t *testing.T) {
 	testDB(t)
 	files := examples(t, "*.kg")
-	if len(files) != 23 {
-		t.Fatalf("%d examples, want 23", len(files))
+	if len(files) != 24 {
+		t.Fatalf("%d examples, want 24", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)
@@ -287,6 +289,95 @@ func TestEmitPassesUnreadable(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if code := run([]string{"emit", src, dir}, &stdout, &stderr); code != 0 || stdout.Len() > 0 || stderr.Len() > 0 {
 		t.Errorf("exit %d, want 0\n%s%s", code, stdout.String(), stderr.String())
+	}
+}
+
+// failing is a test file of three tests: an assertion that fails
+// after a row is written, a statement Postgres refuses outside
+// tx.refusal, which is a bug, and one that passes only if both were
+// rolled back.
+const failing = `package example.ops
+
+import kogo.test.test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+
+tests failing<OpsEnv> { wrongSum, bug, timedOut, clean }
+
+val wrongSum =
+    test("adds one and one") { tx, env ->
+        draft(tx, "F-1", null)
+        assertEquals(3L, 1L + 1L, "the sum")
+    }
+
+val bug =
+    test("writes one number twice") { tx, env ->
+        draft(tx, "F-2", null)
+        draft(tx, "F-2", null)
+    }
+
+val timedOut =
+    test("is stopped, not refused") { tx, env ->
+        tx.execute(sql"set local statement_timeout = 50")
+        assertEquals("57014", tx.refusal(sql"select pg_sleep(1)")?.sqlState)
+    }
+
+val clean =
+    test("sees no row of a test that failed") { tx, env ->
+        assertNull(tx.queryOne<String>(sql"select number from invoice where number like 'F-%' limit 1"))
+    }
+`
+
+// kogo test runs the tests of examples/23_test.kg, which pass: among
+// them one that sees no row of the test before it, and one that a
+// refused statement gives a Refusal and leaves its transaction open.
+// A test that fails is printed with its sentence, where it is
+// declared and the line that failed, and the tests after it run; and
+// kogo emit leaves the test files out.
+func TestKogoTest(t *testing.T) {
+	testDB(t)
+	dir, err := os.MkdirTemp(".", "emitted") // inside the module, as in TestEmittedGoRuns
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	main, err := os.ReadFile("testdata/testmain.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.ReplaceAll(string(main), "ROOT", "kogo/cmd/kogo/"+filepath.Base(dir))
+	test := func(files map[string]string) (int, string) {
+		if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return kogo(t, files, dir, dir)
+	}
+	files := examples(t, "22_api.kg", "23_test.kg")
+	if code, out := test(files); code != 0 || out != "" {
+		t.Errorf("exit %d, want 0 and no output\n%s", code, out)
+	}
+	files["failing_test.kg"] = failing
+	// A list whose environment the main gives none of, and one in a
+	// package the main does not import.
+	files["unit_test.kg"] = "package example.ops\n\nimport kogo.test.test\n\ntests units<Unit> { one }\n\nval one =\n    test(\"runs\") { tx, env -> }\n"
+	files["lone_test.kg"] = "package example.lone\n\nimport kogo.test.test\n\ntests lone<Unit> { one }\n\nval one =\n    test(\"runs\") { tx, env -> }\n"
+	code, out := test(files)
+	want := `{"file":"failing_test.kg","line":9,"column":1,"code":"test-failed","test":"adds one and one","message":"the sum. Expected <3>, actual <2>.","at":"failing_test.kg:12"}
+{"file":"failing_test.kg","line":15,"column":1,"code":"test-failed","test":"writes one number twice","message":"ERROR: duplicate key value violates unique constraint \"invoice_number_key\" (SQLSTATE 23505)","at":"23_test.kg:16"}
+{"file":"failing_test.kg","line":21,"column":1,"code":"test-failed","test":"is stopped, not refused","message":"ERROR: canceling statement due to statement timeout (SQLSTATE 57014)","at":"failing_test.kg:24"}
+{"file":"unit_test.kg","line":5,"column":1,"code":"no-env","test":"example.ops.units","message":"the test main gives test.Run no environment of the type that tests list example.ops.units takes: pass one","at":""}
+{"file":"lone_test.kg","line":5,"column":1,"code":"not-linked","test":"example.lone.lone","message":"the test main does not import the package of tests list example.lone.lone, so its tests did not run: import it, as _ if need be","at":""}
+`
+	if code != 1 || out != want {
+		t.Errorf("exit %d, want 1\n got %s\nwant %s", code, out, want)
+	}
+	delete(files, "lone_test.kg") // its package's Go is stale once emit leaves it out
+	os.RemoveAll(filepath.Join(dir, "example/lone"))
+	if code, out := kogo(t, files, dir); code != 0 || out != "" {
+		t.Fatalf("exit %d, want 0\n%s", code, out)
+	}
+	if text, err := os.ReadFile(filepath.Join(dir, "example/ops/kogo.go")); err != nil || bytes.Contains(text, []byte("InvoiceTests")) {
+		t.Errorf("kogo emit wrote the tests of a _test.kg file, or nothing: %v", err)
 	}
 }
 

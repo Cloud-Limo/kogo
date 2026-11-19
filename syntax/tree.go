@@ -1,6 +1,9 @@
 // Package syntax reads Kogo source files into syntax trees: spec.md
-// sections 2 to 13 and 15.1. It resolves no names and checks no types.
+// sections 2 to 13, 15.1 and 16.1. It resolves no names and checks no
+// types.
 package syntax
+
+import "strings"
 
 // A Pos is a place in a source file: a byte offset, and a line and a
 // column counted from 1, the column in characters.
@@ -42,9 +45,10 @@ type File struct {
 	Package *Ident        // a dotted name, as cusoon.model
 	Imports []*Ident
 	Decls   []Decl
-	APIs    []*API // the api lists
-	SQL     []*SQL // every sql literal of the file, in source order
-	Lines   int    // the line the source ends on
+	APIs    []*API   // the api lists
+	Tests   []*Tests // the tests lists
+	SQL     []*SQL   // every sql literal of the file, in source order
+	Lines   int      // the line the source ends on
 }
 
 // An API is an api list, api name { f, g }: the funs it names as
@@ -54,6 +58,20 @@ type API struct {
 	Name string
 	Funs []*Ident
 }
+
+// A Tests is a tests list, tests name<Env> { a, b }: the top-level
+// vals it names as tests, and the environment each takes (spec.md
+// 16.1).
+type Tests struct {
+	Pos
+	Name string
+	Env  Type
+	Vals []*Ident
+}
+
+// IsTest reports whether a file is a test file, by its name: one that
+// kogo emit leaves out and kogo test runs (spec.md 16).
+func (f *File) IsTest() bool { return strings.HasSuffix(f.Name, "_test.kg") }
 
 // An Annotation is @Name or @Name(args), and in a file's head,
 // @file:OptIn(X::class, ...).

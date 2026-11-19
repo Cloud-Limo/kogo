@@ -4,6 +4,19 @@
 //	kogo check <dir>        check the .kg files under dir as one program
 //	kogo emit <dir> <out>   check them and, when they pass, write their Go under out
 //	kogo ts <dir> <out>     check them and, when they pass, write out/<name>.ts for each api list
+//	kogo test <dir> <out> <main>
+//	                        check them and, when they pass, write their Go under out with
+//	                        their tests and run the Go main package in the directory main
+//
+// A file named _test.kg is a test file (spec.md 16): check and test
+// read it, and emit and ts leave it out of the program, as Go leaves
+// out a _test.go. test builds and runs <main>, the application's own
+// Go, which makes the environment and the pool and hands the tests
+// lists to test.Run of kogo/prelude/kogo/test. That program's output
+// is test's, one JSON object a line for each test that failed, and
+// so is its exit status, which it makes 1 when a test failed; a main
+// that does not build is 2. Give test an <out> of its own: the Go it
+// writes there holds the tests.
 //
 // It prints one JSON object a line for each error (file, line, column,
 // code, message) and exits 0 when there are none, 1 when there are
@@ -30,6 +43,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"slices"
@@ -50,8 +64,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	out, fatal := json.NewEncoder(stdout), json.NewEncoder(stderr)
 	out.SetEscapeHTML(false)
 	fatal.SetEscapeHTML(false)
-	if !(len(args) == 2 && args[0] == "check" || len(args) == 3 && (args[0] == "emit" || args[0] == "ts")) {
-		fatal.Encode(syntax.Error{Code: "usage", Message: "usage: kogo check <dir>, kogo emit <dir> <out>, or kogo ts <dir> <out>"})
+	if !(len(args) == 2 && args[0] == "check" || len(args) == 3 && (args[0] == "emit" || args[0] == "ts") || len(args) == 4 && args[0] == "test") {
+		fatal.Encode(syntax.Error{Code: "usage", Message: "usage: kogo check <dir>, kogo emit <dir> <out>, kogo ts <dir> <out>, or kogo test <dir> <out> <main>"})
 		return 2
 	}
 	pre, err := prelude.Files()
@@ -65,6 +79,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	err = filepath.WalkDir(args[1]+string(filepath.Separator), func(file string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(file, ".kg") {
 			return err
+		}
+		if strings.HasSuffix(file, "_test.kg") && (args[0] == "emit" || args[0] == "ts") {
+			return nil // a test file is no part of the program
 		}
 		src, err := os.ReadFile(file)
 		if err != nil {
@@ -118,7 +135,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	var written map[string][]byte
-	if len(faults) == 0 && args[0] == "emit" {
+	if len(faults) == 0 && (args[0] == "emit" || args[0] == "test") {
 		root, err := importPath(args[2])
 		if err != nil {
 			fatal.Encode(syntax.Error{Code: "no-module", Message: err.Error()})
@@ -154,6 +171,39 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		if err != nil {
 			fatal.Encode(syntax.Error{Code: "write", Message: err.Error()})
+			return 2
+		}
+	}
+	if args[0] == "test" {
+		// Built apart from the run, so that Go's own words are not the
+		// tests' output, and a main that does not build is not a test
+		// that failed.
+		dir, err := os.MkdirTemp("", "kogo-test")
+		if err != nil {
+			fatal.Encode(syntax.Error{Code: "write", Message: err.Error()})
+			return 2
+		}
+		defer os.RemoveAll(dir)
+		build := exec.Command("go", "build", "-o", filepath.Join(dir, "tests"), ".")
+		build.Dir = args[3]
+		if said, err := build.CombinedOutput(); err != nil {
+			fatal.Encode(syntax.Error{Code: "go-build", Message: fmt.Sprintf("go build in %s, the test main, failed: %v\n%s", args[3], err, said)})
+			return 2
+		}
+		tests := exec.Command(filepath.Join(dir, "tests"))
+		tests.Dir, tests.Stdout, tests.Stderr = args[3], stdout, stderr
+		var lists []string // each list the runner must find linked: name, file, line, column
+		for _, f := range files {
+			for _, d := range f.Tests {
+				lists = append(lists, fmt.Sprintf("%s.%s\t%s\t%d\t%d", f.Package.Name, d.Name, f.Name, d.At().Line, d.At().Column))
+			}
+		}
+		tests.Env = append(os.Environ(), "KOGO_TEST_LISTS="+strings.Join(lists, "\n"))
+		var exit *exec.ExitError
+		if err := tests.Run(); errors.As(err, &exit) {
+			return exit.ExitCode()
+		} else if err != nil {
+			fatal.Encode(syntax.Error{Code: "run", Message: fmt.Sprintf("the test main in %s did not run: %v", args[3], err)})
 			return 2
 		}
 	}

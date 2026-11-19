@@ -195,4 +195,4 @@ When any of this is built, the sections it changes
 are listed at the end of `doc/gates.md` and of `doc/work.md`; the
 largest are 15.2 ("Nothing runs before an operation", reversed for a
 gated one), 7 (a proof beside `Tx` and `Db`) and 13 (an outbound
-binding says `lookup` or `action`).
+binding that acts says `action`).

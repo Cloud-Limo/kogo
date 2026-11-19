@@ -791,8 +791,8 @@ Each entry: what was decided, why, and what would reopen it.
     JSON is read by key through `Json`, in Go; retries are off, and the runner's.
   - **What may enter the prelude.** A binding that passes four tests: it is mechanism, and
     decides nothing an application would decide differently; its declaration names nothing
-    of one application; it says whether it has no effect, is a `lookup` or is an `action`;
-    and it lands with its Go and a test (15 Nov). One that fails a test and is taken anyway
+    of one application; it says `action` if it changes something outside (20 Nov 2026,
+    below); and it lands with its Go and a test (15 Nov). One that fails a test and is taken anyway
     is recorded here by name, with the test it fails.
   - Not taken: every binding closed, with PDF in the prelude behind a library or a writer
     of our own; and every binding open, under which each guarantee of `doc/gates.md` and
@@ -841,6 +841,27 @@ Each entry: what was decided, why, and what would reopen it.
   - Not taken: the kind left worked out; `action fun`, a word of Kogo's own, which is
     plainer and keeps spec 11 to one rule; two environments, one that can act.
   - Respelt `action fun` on 18 Nov 2026 (DEV-894, below), which reopened it.
+- **Only a binding that acts is marked: a binding says `action` or nothing** (20 Nov 2026,
+  Greg, in the design session on outside calls; DEV-984; spec 7.1 and 13; `doc/gates.md`,
+  "Only a binding that acts is marked"). It reverses `doc/gates.md`'s bullet of 17 Nov
+  2026, "A binding says what kind of call it is", which put `lookup` before `external` on
+  a binding that asks and changes nothing. Greg: "remove lookup with no test", "And no new words".
+  - **Why.** The checker asks one thing of a binding, whether it may run in a transaction
+    that can be rolled back and run again, and `action` answers it. Nothing read `lookup`;
+    it put the clock, the console and a network call under one word; and the forced
+    choice it was added for ("An outbound binding that says neither `lookup` nor `action`
+    is an error", `doc/work.md`) cannot be checked without two new words. The idea of a
+    lookup stays, and so do `Lookup`, `lookup(...)` and `ask` in `kogo.http`.
+  - **The printed table** (`doc/gates.md`, "asks and acts"), for which the word was the
+    reserved hook, is given whatever it needs to find an operation's `asks` lines when it
+    is built.
+  - Not taken: keeping the word, unread, with the spec saying so; a test that lists every
+    binding on a handle with its decision, which asks the same author twice and misses a
+    new handle class; a forced choice in the language, with a word marking a handle class
+    and a third word for a binding that takes a handle and calls nothing (a guess of 20 /
+    20).
+  - Accepted cost: a binding that changes something outside and says nothing is its
+    author's mistake, and nothing finds it. Reopen if one is found in the prelude.
 - **A transaction's kind is its handle's type: `Tx` is any, and `SerializableTx` is one
   that is rerun on a conflict** (17 Nov 2026, Greg; `doc/gates.md`, "Two kinds of
   transaction"). Kogo is to support explicit locking as naturally as cusoon2's way.
@@ -3094,7 +3115,8 @@ Each entry: what was decided, why, and what would reopen it.
   Reopen if a command that prints inside a transaction is wanted.
 - **The kind is a word before `fun`, in either order with `external`**, since the parser
   reads modifiers in any order: `doc/work.md` writes both `action external fun` and
-  `external lookup fun`. Nothing reads `lookup` yet; the printed table will.
+  `external lookup fun`. Nothing reads `lookup` yet; the printed table will. (`lookup`
+  was removed on 20 Nov 2026, above.)
 - **A binding that says neither kind is not refused**: nothing tells the checker which
   bindings call outside until `kogo.http` lands. Not taken: every binding on an external
   class says one, which would mark `List.map`.
@@ -3408,8 +3430,9 @@ Each entry: what was decided, why, and what would reopen it.
 - **Section 13's sample binding is `Http.ask` and `perform`**, in place of an invented
   `Http.get` in a Go package `httpx`, which the real `Http` would contradict. The sample
   no longer shows `@go`; its bullet stays.
-- **A binding that says neither kind is still not refused** (DEV-962's entry): nothing
-  marks which bindings call outside. Not taken here: the rule is the checker's.
+- **A binding that says nothing is not refused** (DEV-962's entry; since 20 Nov 2026 a
+  binding says `action` or nothing, above): nothing marks which bindings call outside,
+  and nothing checks that one that says nothing is right to.
 
 ## Spec gaps found by the leakage ports, unresolved
 

@@ -353,7 +353,7 @@ func (p *parser) modifiers() Modifiers {
 		case p.modifier() && p.at("external"):
 			m.External = true
 			p.next()
-		case p.modifier() && (p.at("action") || p.at("lookup")):
+		case p.modifier() && p.at("action"):
 			m.Calls = p.tok.text
 			p.next()
 		default:
@@ -392,11 +392,12 @@ func (p *parser) annotation() *Annotation {
 func (p *parser) decl(abstract bool) Decl {
 	pos := p.tok.pos
 	m := p.modifiers()
+	next := p.peek(1).text
 	switch {
+	case p.tok.kind == tIdent && !p.at("fun") && !p.at("val") && (next == "external" || next == "fun" || next == "val"):
+		p.fail(p.tok.pos, "syntax", "%s is no word of Kogo's before %s: leave it out, or write one that is (private, internal, override, const, external, action)", p.tok.text, next)
 	case m.Calls != "" && !p.at("fun"):
 		p.fail(pos, "syntax", "%s goes before fun, and before nothing else: %s fun", m.Calls, m.Calls)
-	case m.Calls == "lookup" && !m.External:
-		p.fail(pos, "syntax", "lookup marks a binding, lookup external fun: a fun with a body says nothing where it only asks, so leave the word out")
 	case m.External && (p.at("class") || p.at("object")):
 		kind := "external " + p.tok.text
 		p.next()

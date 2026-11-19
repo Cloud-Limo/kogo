@@ -5,6 +5,7 @@
 // that is unchecked to no browser.
 package example.gates
 
+import kogo.io.Console
 import kogo.rpc.Request
 
 api desk checkedBy fromOurPage {
@@ -19,7 +20,7 @@ api hooks unchecked {
     forgetLooks ungated
 }
 
-data class DeskEnv(val printer: String)
+data class DeskEnv(val printer: String, val console: Console)
 
 data class InvoiceRef(val number: String)
 
@@ -70,10 +71,12 @@ fun markPaid(env: DeskEnv, invoice: OpenInvoice, input: InvoiceRef): Either<Stri
 fun sendInvoiceGate(tx: Tx, env: DeskEnv, request: Request, input: InvoiceRef): Either<String, OpenInvoice> =
     openInvoice(tx, input.number)
 
-// The step takes the gate's proof and the operation's input, and
-// may refuse before the work writes anything.
-fun tellPrinter(env: DeskEnv, invoice: OpenInvoice, input: InvoiceRef): Either<String, Unit> = either {
+// The step takes the gate's proof and the operation's input, and may
+// refuse before the work writes anything. It is an action fun: it
+// runs with no transaction open, and changes something outside.
+action fun tellPrinter(env: DeskEnv, invoice: OpenInvoice, input: InvoiceRef): Either<String, Unit> = either {
     ensure(env.printer != "") { "No printer is set up." }
+    env.console.println("${env.printer}: invoice ${invoice.number}")
 }
 
 fun sendInvoice(env: DeskEnv, invoice: OpenInvoice, input: InvoiceRef): Either<String, Sent> = either {

@@ -32,7 +32,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{}, SQL: map[*syntax.SQL]*Query{}, APIs: map[*syntax.API]*API{}, Tests: map[*syntax.Tests]*TestList{}, Core: core,
 		},
 		pkgs: map[string]*pkg{}, members: map[string][]*Func{}, imports: map[*syntax.File]map[string]*pkg{},
-		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{}, reads: map[Object][]Object{},
+		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{}, reads: map[Object][]Object{}, acting: map[*syntax.Lambda]string{},
 	}
 	order := map[string]int{}
 	for i, f := range files {
@@ -86,11 +86,14 @@ type checker struct {
 	file       *syntax.File
 	pkg        *pkg
 	scope      *scope
-	result     Type             // what the enclosing fun returns
-	loops      int              // the loops around this place, inside its fun or lambda
-	raise      Type             // the E of the raise scope around this place, or nil
-	lambdas    []*syntax.Lambda // the lambdas around this place
-	raiseDepth int              // how many of lambdas are outside the raise scope
+	result     Type                      // what the enclosing fun returns
+	loops      int                       // the loops around this place, inside its fun or lambda
+	raise      Type                      // the E of the raise scope around this place, or nil
+	lambdas    []*syntax.Lambda          // the lambdas around this place
+	acted      bool                      // the fun at hand has called an action
+	inTx       int                       // how many of lambdas are handed a Tx
+	acting     map[*syntax.Lambda]string // the lambdas that call an action, and not yet seen passed to the prelude: the action's name
+	raiseDepth int                       // how many of lambdas are outside the raise scope
 
 	// A jump stands only where a value goes straight to a val, an
 	// assignment, a return or a result (spec.md 6). straight is the
@@ -354,11 +357,12 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 		c.later(&c.sigs, func() { c.aliased(a) })
 	case *syntax.FunDecl:
 		v.visibility = d.Mods.Visibility
-		f := &Func{Kind: Fun, Name: d.Name, External: d.Mods.External, Decl: d, vis: v}
+		f := &Func{Kind: Fun, Name: d.Name, External: d.Mods.External, Action: d.Mods.Calls == "action", Decl: d, vis: v}
 		c.addFunc(f, d.Receiver != nil)
 		c.later(&c.sigs, func() {
 			f.markers = c.marks(d.Mods)
 			c.signature(f, d, nil)
+			c.keepsOut(f, d)
 			c.later(&c.bodies, func() { c.body(f, d) })
 		})
 	case *syntax.ValDecl:
@@ -615,6 +619,14 @@ func (c *checker) body(f *Func, d *syntax.FunDecl) {
 		c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda = r, l, e, n, b, bl, il
 	}(c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda)
 	c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda = f.Result, 0, raise, len(c.lambdas), false, false, false
+	defer func(a bool, n int, k map[*syntax.Lambda]string) { c.acted, c.inTx, c.acting = a, n, k }(c.acted, c.inTx, c.acting)
+	c.acted, c.inTx, c.acting = false, 0, map[*syntax.Lambda]string{}
+	errs := len(c.errs)
+	defer func() {
+		if c.actionKept(); f.Action && !f.External && !c.acted && len(c.errs) == errs {
+			c.errorf(d, "idle-action", "%s is an action fun and calls no action: leave the word out, fun %s, so that it may run in a transaction (spec.md 7.1)", d.Name, d.Name)
+		}
+	}()
 	c.straight = d.Expr
 	switch {
 	case d.Expr != nil && d.Result == nil:
@@ -685,6 +697,9 @@ func (c *checker) class(td *TypeDecl) {
 			td.Props = append(td.Props, v)
 			c.info.Vars[m] = []*Var{v}
 		case *syntax.FunDecl:
+			if m.Mods.Calls != "" {
+				c.errorf(m, "action-kept", "%s is a member of %s, and a member is not an %s fun: a value of the type would carry it unseen, so declare %s at the top level and pass it the value (spec.md 7.1)", m.Name, d.Name, m.Mods.Calls, m.Name)
+			}
 			f := &Func{Kind: Fun, Name: m.Name, External: d.Kind == "external object", Decl: m, vis: td.vis}
 			f.markers = c.marks(m.Mods)
 			if d.Kind == "interface" || d.Kind == "sealed interface" {

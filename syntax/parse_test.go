@@ -67,8 +67,8 @@ func write(b *strings.Builder, v reflect.Value) {
 // line a declaration, then one an api or a tests list.
 func TestExamples(t *testing.T) {
 	files, _ := filepath.Glob("../examples/*.kg")
-	if len(files) != 25 {
-		t.Fatalf("%d examples, want 25", len(files))
+	if len(files) != 27 {
+		t.Fatalf("%d examples, want 27", len(files))
 	}
 	var got strings.Builder
 	for _, file := range files {
@@ -160,6 +160,9 @@ func TestDeclarations(t *testing.T) {
 			`[(ClassDecl (Modifiers External) "external class" List [(TypeParam Out T)]) (ValDecl (Modifiers External) [(TypeParam T)] (NamedType List [(NamedType T)]) size (NamedType Int)) (FunDecl (Modifiers External) [(TypeParam T)] (NamedType List [(NamedType T)] Nullable) orEmpty (NamedType List [(NamedType T)]))]`},
 		{"external fun <T> listOf(vararg elements: T): List<T>\nexternal fun String?.isNullOrBlank(): Boolean",
 			`[(FunDecl (Modifiers External) [(TypeParam T)] listOf [(Param Vararg elements (NamedType T))] (NamedType List [(NamedType T)])) (FunDecl (Modifiers External) (NamedType String Nullable) isNullOrBlank (NamedType Boolean))]`},
+		// The kind and external go in either order.
+		{"external action fun Bell.ring()\naction external fun Bell.ring()",
+			`[(FunDecl (Modifiers External action) (NamedType Bell) ring) (FunDecl (Modifiers External action) (NamedType Bell) ring)]`},
 	}, func(t *testing.T, src string) string { return show(parse(t, src).Decls) })
 
 	f, err := Parse("t.kg", []byte("@file:OptIn(A::class, b.B::class)\n\npackage x.y\n\nimport a.b.C\nimport d.e\n"))

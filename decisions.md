@@ -3016,10 +3016,72 @@ Each entry: what was decided, why, and what would reopen it.
   program, whose test asserts the refusal. Not taken: emitting the table without the
   check or the gate, which would serve the work with nothing before it.
 
+## Taken answering an ungated operation with `Reply` and cookies (DEV-963), not yet discussed
+
+- **`SameSite` is an enum of `kogo.rpc`, `Strict`, `Lax` and `None`**, which
+  `doc/gates.md` names and does not declare. Not taken: a `String`, which a typo would
+  pass.
+- **`maxAgeSeconds` of 0 or less ends the cookie (`Max-Age=0`)**, as HTTP reads it; a
+  cookie with no `Max-Age`, one that ends with the browser, cannot be written. Not
+  taken: Go's reading, where 0 leaves `Max-Age` out. Reopen when a cookie must last only
+  the browser's session.
+- **A cookie HTTP cannot carry panics** (500, and a `Tx` operation rolls back, since the
+  answer is written inside its transaction). Not taken: Go's `http.SetCookie`, which
+  drops it with a log line, so the browser silently goes without it.
+- **A cookie a browser refuses panics too** (review of PR 89): `SameSite.None`, or a
+  `__Secure-` name, without `secure`, and a `__Host-` name without `secure` or the path
+  `/`. The prefixes are read in any case, as browsers read them. Not taken: only
+  `http.Cookie.Valid`, which lets these through to a browser that drops them, or a
+  case-sensitive prefix. `Domain` is not checked: `Cookie` has none.
+- **A `Reply` anywhere else on the wire is one `wire` error** that says only an ungated
+  operation's whole answer is one, gated work's answer included. Not taken: an
+  `operation` error for gated work, a second rule for the same fact.
+- **The server finds a `Reply` by a method of the Go type** (`answer` in
+  `prelude/kogo/rpc`), so the emitter writes `rpc.Tx` and `rpc.Db` as before. Not taken:
+  `rpc.TxReply` and `rpc.DbReply`, and an emitter that tells them apart.
+- **`examples/25_reply.kg` is a list of its own**, served by the driver, so 22 stays as
+  it was while DEV-961 and DEV-962 change the same files.
+
+## Taken building `action fun` (DEV-962), not yet discussed
+
+- **`Console.println` and `print` are actions; `Console.readln` and `Clock.now` are
+  lookups.** The issue asks that an existing binding carry its kind, and an `action fun`
+  must call an action, so an example needs one in the prelude before `kogo.http` (row 9).
+  Printing cannot be rolled back and happens twice when run twice. No example or test
+  printed before. Not taken: no action until row 9, which leaves no example that checks.
+  Reopen if a command that prints inside a transaction is wanted.
+- **The kind is a word before `fun`, in either order with `external`**, since the parser
+  reads modifiers in any order: `doc/work.md` writes both `action external fun` and
+  `external lookup fun`. Nothing reads `lookup` yet; the printed table will.
+- **A binding that says neither kind is not refused**: nothing tells the checker which
+  bindings call outside until `kogo.http` lands. Not taken: every binding on an external
+  class says one, which would mark `List.map`.
+- **"In a transaction" is "in a block handed a `Tx`"** (`action-in-tx`), which is
+  `db.tx`'s block and any other the prelude gains. Not taken: knowing `db.tx` by name.
+- **A step that is not an `action fun` is refused under `step`**, the role's one code, and
+  only where its shape otherwise fits, so one fault gives one error.
+- **The word stays true is `idle-action`; a `::` reference, a member and a kept lambda
+  are `action-kept`.** A local fun cannot be an `action fun`: a call in one is
+  `unmarked-action`, whose message says to move the call into the action fun around it
+  (review of PR 90), and `action fun` in a body is the parser's error. Not taken: letting
+  a local fun be one, which nothing needs.
+- **Left to row 6 (a proof's rules)**: that an `action fun` takes a proof only as a step
+  or as gated work that runs wholly outside, and `outside-passes-proof`.
+- **Left to row 3 (DEV-961)**: serving a gated `action fun` with no transaction. `kogo
+  emit` still refuses every gated row; `Func.Action` on the row's operation is what the
+  server reads.
+- **A row with both `after` and an `action fun` as its work is refused under `step`, in
+  DEV-961** (Ruling on PR 90), where serving meets it; no cusoon2 operation has both. Not
+  taken: serving gate, step and work all outside.
+- **Open: whether printing is an action** is Greg's (Ruling on PR 90); it stays one
+  meanwhile. If not, `Console`'s bindings and `examples/26_action.kg` change.
+- **Open: a `kogo test` cannot call an `action fun` today**: a test is a `val`, and its
+  block is handed a `Tx`. Decided in row 9 with the fake `Http`, and brought to Greg then.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no
   design. (An application's own binding files stood here until 17 Nov 2026: `doc/work.md` has them,
   as extensions.)
-- Operations (spec 15) leave out, on purpose: how one sets a cookie, which a login needs;
-  Origin and CSRF checks; a limit on the reruns of a `db.tx` written in a `Db` operation.
+- Operations (spec 15) leave out, on purpose: Origin and CSRF checks; a limit on the
+  reruns of a `db.tx` written in a `Db` operation.

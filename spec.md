@@ -24,8 +24,7 @@ only bindings write `external` (section 13), so no author meets it:
 - the `sql"""..."""` literal (section 10);
 - the `external` binding declarations (section 13);
 - the lists, `api` (section 15) and `tests` (section 16);
-- `action fun`, a function that changes something outside (not yet
-  in this spec: `doc/gates.md`).
+- `action fun`, a function that changes something outside (7.1).
 
 ## 2. Files, packages, visibility
 
@@ -437,6 +436,37 @@ A function can only do what its parameters let it do.
   (section 10). A function that touches the database has one of them as a
   parameter.
 - `Clock` gives the time: `clock.now(): Instant`.
+
+### 7.1 Actions
+
+A transaction is all or nothing and may run again; a call that
+changes something outside is neither. So the call says what it is,
+and so does every fun that makes it:
+
+```kotlin
+action fun announce(console: Console, message: String) {
+    console.println(message)        // println is an action of the prelude's
+}
+```
+
+- A binding with an effect outside says its kind before `external`:
+  an `action` changes something, a `lookup` asks and changes nothing
+  (section 13). Only an action is held to the rules here: a lookup is
+  allowed anywhere.
+- A fun that calls an action, a binding or an `action fun`, is an
+  `action fun`; one that is not is a compile error
+  (`unmarked-action`), and so is the call in a val's value or getter.
+  An `action fun` that calls no action is one too (`idle-action`).
+- An `action fun` takes no `Tx`, as a parameter or a receiver
+  (`action-tx`): it takes a `Db` and acts between its transactions.
+  It calls no action in a block that is handed a `Tx`, as `db.tx`'s
+  is (`action-in-tx`).
+- An action is not kept in a value (`action-kept`): there is no `::`
+  reference to an `action fun`, no member of an interface or a data
+  class is one, and a lambda that acts is passed straight to a fun of
+  the prelude, which runs it before it returns.
+- `action` goes before a top-level `fun` only, and `lookup` on a
+  binding only.
 
 ## 8. Bugs are panics
 
@@ -937,7 +967,11 @@ also reads 32 hex digits without hyphens; Kogo's gives `null` for them.
 HTTP request, passed to an operation (section 15):
 `request.header(name): String?`, `request.cookie(name): String?` and
 `request.clientAddress: String`. A header's name is matched whatever
-its case. Kogo code does not build or change one.
+its case. Kogo code does not build or change one. An ungated
+operation that sets cookies answers a `Reply<A>(answer: A, cookies:
+List<Cookie>)`, each a `Cookie(name, value, path, maxAgeSeconds: Long,
+sameSite: SameSite, secure, httpOnly)`, with `SameSite` one of
+`Strict`, `Lax` and `None` (15.2).
 
 **Tests** (`kogo.test`; test files only, section 16).
 `kogo.test` has `Test<E>`, `test(sentence) { tx, env -> ... }` and
@@ -997,6 +1031,9 @@ external fun List<Long>.sum(): Long
 - Three things are allowed in a binding and nowhere else: a nullable
   receiver, `out` on an external class's type parameter, and `vararg` on
   a parameter, which then takes any number of arguments.
+- `action external fun` and `lookup external fun` say the kind of a
+  binding that calls outside (7.1): `Console.println` is an action,
+  `Console.readln` and `Clock.now` are lookups.
 - `@go("package")` names the Go package of the declaration it precedes.
 
 Bindings are written by whoever maintains the prelude. Application code
@@ -1130,8 +1167,8 @@ one returns an `Either` whose `Left` is a refusal in words:
 | the check | a `Tx`, the environment, a `Request` | `Either<String, Unit>` |
 | a gate | a `Tx`, the environment, a `Request`, and the operation's input if it reads it | `Either<String, P>`, with `P` its proof |
 | gated work, the `op` of a gated row | the environment, the proof, the input | `Either<String, A>` |
-| a step | the environment, the proof, the input | `Either<String, Unit>` |
-| an ungated operation | a `Tx` or a `Db` (15.3), the environment, a `Request`, the input | `Either<String, A>` |
+| a step, an `action fun` (7.1) | the environment, the proof, the input | `Either<String, Unit>` |
+| an ungated operation | a `Tx` or a `Db` (15.3), the environment, a `Request`, the input | `Either<String, A>` or `Either<String, Reply<A>>` |
 
 - The environment is one type of the application's, the same for
   every fun of a list, its check, gates and steps included: a data
@@ -1161,6 +1198,27 @@ one returns an `Either` whose `Left` is a refusal in words:
 - Nothing but the list's check runs before an ungated operation. It
   finds out who is asking in its own first lines, from the `Request`
   it was given.
+- An ungated operation that answers a `kogo.rpc.Reply<A>` sets
+  cookies: the server sends its `answer` as the operation's answer,
+  and each of its `cookies` as one `Set-Cookie` header, in order. A
+  refusal sets none. `A` is the operation's answer on the wire and in
+  TypeScript (15.4, 15.6), which never see the `Reply`. A `Reply`
+  anywhere else on the wire is a compile error: in an input, inside an
+  answer, or as gated work's answer, so a search for `Reply` finds
+  every operation that sets a cookie.
+- A cookie's `maxAgeSeconds` is its `Max-Age`; 0 or less ends it, as
+  `Max-Age=0`. A cookie that HTTP cannot carry, such as one whose name
+  holds a space, or one a browser refuses, such as `SameSite.None`, a
+  name that starts `__Secure-` or one that starts `__Host-` without
+  `secure` (`__Host-` needs the path `/` too), is a bug, and panics
+  (section 8).
+
+```kotlin
+fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<String, Reply<Unit>> = either {
+    ensure(request.cookie("session") != null) { "You are not signed in." }
+    Reply(Unit, listOf(Cookie("session", "", "/", 0L, SameSite.Lax, env.secure, true)))
+}
+```
 
 ### 15.3 The transaction
 
@@ -1262,7 +1320,7 @@ application chooses.
 
 | What happened | Status | Body |
 | --- | --- | --- |
-| the operation answered | 200 | the `ok` object |
+| the operation answered | 200 | the `ok` object, and a `Reply`'s cookies |
 | the operation, its gate or its step refused | 200 | the `refused` object |
 | the list's check refused, whatever else is wrong | 403 | the check's words, as text |
 | the input does not read (15.4) | 400 | the operation and the key, never the value |

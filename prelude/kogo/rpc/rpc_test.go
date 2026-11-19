@@ -87,6 +87,22 @@ func login(db kogo.Db, _ env, _ Request, p Person) kogo.Either[string, rt.Unit] 
 	return kogo.Either_Left[string]{Value: "secret refusal"}
 }
 
+// signIn inserts, then sets the cookie its input names: secure, at
+// the path "/", unless the name says otherwise.
+func signIn(tx kogo.Tx, _ env, _ Request, p Person) kogo.Either[string, Reply[string]] {
+	insert(tx, p.Name)
+	c := Cookie{Name: p.Name, Value: "v", Path: "/", MaxAgeSeconds: 60, SameSite: SameSite_Lax, Secure: true}
+	switch {
+	case strings.HasSuffix(p.Name, "insecure"):
+		c.Secure = false
+	case strings.HasSuffix(p.Name, "none"):
+		c.SameSite, c.Secure = SameSite_None, false
+	case strings.HasSuffix(p.Name, "path"):
+		c.Path = "/x"
+	}
+	return kogo.Either_Right[Reply[string]]{Value: Reply[string]{Answer: "in", Cookies: kogo.List[Cookie]{c}}}
+}
+
 func who(_ kogo.Db, _ env, r Request, _ rt.Unit) kogo.Either[string, Who] {
 	return kogo.Either_Right[Who]{Value: Who{Header: Request_Header(r, "x-who"), Cookie: Request_Cookie(r, "c"),
 		Missing: Request_Header(r, "x-none"), Host: Request_Header(r, "host"), Address: Request_ClientAddress(r)}}
@@ -133,7 +149,7 @@ func work(e env, h Held, p Person) kogo.Either[string, string] {
 }
 
 var table = Table[env]{Check: ours, Operations: []Operation[env]{
-	Tx("add", add), Tx("race", race), Tx("deadlocked", deadlocked), Db("login", login), Db("who", who),
+	Tx("add", add), Tx("race", race), Tx("deadlocked", deadlocked), Db("login", login), Db("who", who), Tx("signIn", signIn),
 	Gated("held", gate, nil, work), Gated("sent", gate, step, work),
 }}
 
@@ -148,6 +164,7 @@ func TestHandler(t *testing.T) {
 	defer drop()
 	var log bytes.Buffer
 	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}}, slog.New(slog.NewJSONHandler(&log, nil)))
+	var cookies []string
 	post := func(method, name, body string) (int, string) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(method, "/"+name, strings.NewReader(body))
@@ -157,6 +174,7 @@ func TestHandler(t *testing.T) {
 		}
 		r.AddCookie(&http.Cookie{Name: "c", Value: "crumb"})
 		h.ServeHTTP(w, r)
+		cookies = w.Header().Values("Set-Cookie")
 		return w.Code, w.Body.String()
 	}
 	rows := func(name string) (n int) {
@@ -195,6 +213,14 @@ func TestHandler(t *testing.T) {
 	} {
 		if status, body := post(c.method, c.name, c.body); !strings.HasPrefix(fmt.Sprint(status, " ", body), c.want) {
 			t.Errorf("%s %s %s answers %d %s, want %s", c.method, c.name, c.body, status, body, c.want)
+		}
+	}
+	// A cookie HTTP cannot carry or a browser refuses panics, and
+	// rolls its Tx back; a cookie both keep is set.
+	for _, name := range []string{"a b", "samesite-none", "__Secure-insecure", "__host-insecure", "__Host-path", "__Host-ok"} {
+		status, _ := post("POST", "signIn", `{"name":"`+name+`"}`)
+		if kept := map[bool]int{true: 1}[name == "__Host-ok"]; status != 500-300*kept || rows(name) != kept || len(cookies) != kept {
+			t.Errorf("signIn %q answers %d, keeps %d rows and sets %v", name, status, rows(name), cookies)
 		}
 	}
 	if rows("answers") != 1 || rows("refused") != 0 || rows("panics") != 0 || rows("kept") != 1 {
@@ -244,9 +270,10 @@ func TestHandler(t *testing.T) {
 			reruns[l["request"]] = l["cause"].(string)
 		case "panic":
 			// The check that writes panics with Postgres's refusal.
-			if strings.Contains(l["message"].(string), "cannot execute INSERT in a read-only transaction") {
+			if m := l["message"].(string); strings.Contains(m, "cannot execute INSERT in a read-only transaction") {
 				checkWrote = true
-			} else if l["message"] != "add panics" || !strings.Contains(l["trace"].(string), "rpc.add(") {
+			} else if m != "add panics" && !strings.Contains(m, "cookie") ||
+				m == "add panics" && !strings.Contains(l["trace"].(string), "rpc.add(") {
 				t.Errorf("a panic is logged as %v", l)
 			}
 		}
@@ -254,7 +281,7 @@ func TestHandler(t *testing.T) {
 	if !checkWrote {
 		t.Error("a check that writes is not refused by Postgres")
 	}
-	if len(ids) != 21 || strings.Contains(log.String(), "secret") {
+	if len(ids) != 27 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
 	causes := map[string]bool{}

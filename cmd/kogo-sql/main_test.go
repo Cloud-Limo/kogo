@@ -59,14 +59,15 @@ func TestCheckExamples(t *testing.T) {
 		"23_test.kg:45:34 (newId(): Uuid) -> ",
 		"23_test.kg:48:75 () -> status: InvoiceStatus",
 		"23_test.kg:53:34 (newId(): Uuid) -> ",
-		"24_gates.kg:40:35 (request.clientAddress: String) -> count: Int",
-		"24_gates.kg:46:31 (input.number: String) -> status: String",
-		"24_gates.kg:52:28 () -> number: String",
-		"24_gates.kg:56:35 (number: String) -> total_cents: Long",
-		"24_gates.kg:66:24 (invoice.number: String) -> ",
-		"24_gates.kg:80:24 (invoice.number: String) -> ",
-		"24_gates.kg:86:22 (request.clientAddress: String) -> count: Int",
-		"24_gates.kg:90:16 (request.clientAddress: String) -> ",
+		"24_gates.kg:41:35 (request.clientAddress: String) -> count: Int",
+		"24_gates.kg:47:31 (input.number: String) -> status: String",
+		"24_gates.kg:53:28 () -> number: String",
+		"24_gates.kg:57:35 (number: String) -> total_cents: Long",
+		"24_gates.kg:67:24 (invoice.number: String) -> ",
+		"24_gates.kg:83:24 (invoice.number: String) -> ",
+		"24_gates.kg:89:22 (request.clientAddress: String) -> count: Int",
+		"24_gates.kg:93:16 (request.clientAddress: String) -> ",
+		"26_action.kg:31:22 (address: String) -> count: Int",
 	}
 	lines, code := kogoSQL(t, "check", "../../examples")
 	if code != 0 || len(lines) != len(want) {

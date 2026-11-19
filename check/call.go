@@ -628,6 +628,7 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 		pt := subst(p.Type, b)
 		for _, a := range k.placed[i] {
 			c.kept(f, a)
+			c.ran(f, a)
 			switch t := typed[a]; {
 			case fits(t, pt):
 			case wholeLiteral(a) && fits(tLong, pt):
@@ -646,5 +647,6 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 	} else {
 		c.demand(where, f.Name, f.vis)
 	}
+	c.acts(where, f)
 	return subst(f.Result, b)
 }

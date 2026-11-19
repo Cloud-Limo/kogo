@@ -1,0 +1,35 @@
+// An action fun (spec.md 7.1) changes something outside, which no
+// transaction rolls back, so it runs with none open. The word is
+// carried up: a fun that calls an action fun is one. Here the outside
+// is the console, whose println is an action of the prelude's.
+package example.action
+
+import kogo.io.Console
+import kogo.rpc.Request
+
+api bell unchecked {
+    ring ungated
+}
+
+data class BellEnv(val console: Console)
+
+// It takes a Db, not a Tx, and acts between its transactions: the
+// count stays whatever the bell does, and the bell rings once.
+action fun ring(db: Db, env: BellEnv, request: Request, input: Unit): Either<String, Int> = either {
+    val count = db.tx { tx -> countLook(tx, request.clientAddress) }.bind()
+    announce(env.console, "ring ${count}")
+    count
+}
+
+// An action fun, since it calls println. It takes no Tx.
+action fun announce(console: Console, message: String) {
+    console.println(message)
+}
+
+// An ordinary fun: it may run in a transaction, and calls no action.
+fun countLook(tx: Tx, address: String): Int =
+    tx.queryOne<Int>(sql"""
+        insert into look (address, count) values ($address, 1)
+        on conflict (address) do update set count = look.count + 1
+        returning count
+    """) ?: 0

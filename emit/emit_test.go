@@ -1052,7 +1052,7 @@ func TestPrelude(t *testing.T) {
 		// Counted apart from the trees: each declaration begins a line.
 		declared := 0
 		for _, name := range must(filepath.Glob("../prelude/*.kg")) {
-			declared += len(regexp.MustCompile(`(?m)^(external (class|fun|val)|    fun) `).FindAll(must(os.ReadFile(name)), -1))
+			declared += len(regexp.MustCompile(`(?m)^((action |lookup )?external (class|fun|val)|    fun) `).FindAll(must(os.ReadFile(name)), -1))
 		}
 		if n != declared || n == 0 {
 			t.Errorf("%d declarations of the prelude are used, and it has %d", n, declared)
@@ -1082,6 +1082,7 @@ func TestTables(t *testing.T) {
 		{"fmt.Sprintf(\"%T\", t.Hooks)[:13]", "rpc.Unserved["},
 		{"fmt.Sprint(t.Other_Int(4), t.Kind_entries_val)", "4 3"},
 	}, `package t
+import kogo.io.Console
 import kogo.rpc.Request
 import u.g
 import u.theirs
@@ -1092,10 +1093,10 @@ data class Who(val tx: Tx)
 fun ours(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }
 fun who(tx: Tx, env: Env, request: Request): Either<String, Who> = either { Who(tx) }
 fun asked(tx: Tx, env: Env, request: Request, input: Ask): Either<String, Who> = either { Who(tx) }
-fun step(env: Env, who: Who, input: Ask): Either<String, Unit> = either { }
+action fun step(env: Env, who: Who, input: Ask): Either<String, Unit> = either { env.console.println("") }
 fun held(env: Env, who: Who, input: Unit): Either<String, Unit> = either { }
 fun sent(env: Env, who: Who, input: Ask): Either<String, State> = either { State.Done }
-data class Env(val n: Int)
+data class Env(val n: Int, val console: Console)
 data class Other(val n: Int)
 fun other(n: Int): Int = n
 val kind_entries: Int = 3

@@ -160,6 +160,34 @@ Each entry: what was decided, why, and what would reopen it.
   Java's everywhere. `Uuid`, `newId` and `Decimal` are Kogo's own with no import; none is
   a member of a Kotlin type, and they stay. Reopen if imports of `kogo.` functions come to
   crowd a file, or a function keeps reading worse than the member would.
+- **Every prelude name is imported from a `kogo.` package** (19 Nov 2026; DEV-939, DEV-954;
+  spec 1, 12 and 14). The test form (PR 76) shipped `kotlin.test`, which a Kogo-only
+  codebase would import from a library that is not there. Greg, 19 Nov 2026: option 2,
+  every prelude name is imported from a `kogo.` package, and the names inside keep
+  Kotlin's, `java.time`'s and Arrow's spelling and meaning. A Kogo file imports only from
+  its own application and from `kogo.*`, or needs no import (`Either`, `Uuid`, `listOf`,
+  as today). Tests take `kotlin.test`'s names from `kogo.test`: `import
+  kogo.test.assertEquals`, not `import kotlin.test.assertEquals`. This extends the 15 Nov
+  decision ("`kogo.time` stands for `java.time`") rather than reversing it.
+  Not taken. Option 1, Kotlin's and Java's real packages (`java.time.Instant`,
+  `arrow.core.Either`, `kotlin.uuid.Uuid`, `kotlin.test`): the most faithful to an agent's
+  training, but a Kogo-only codebase would import from libraries that are not there, and
+  the import would promise their whole API; it also reverses 15 Nov. Option 3, mixed
+  (`kotlin.test` by Kotlin's package, `java.time` as `kogo.time`): the same cost as option
+  2 but a second rule to remember, and it keeps `kotlin.` in Kogo files for good. Option 4,
+  Kogo's own names throughout: it contradicts principle 3 and DEV-894's reason that agents
+  copy the Kotlin they know.
+  Accepted cost. The import no longer tells whether a name has exactly Kotlin's meaning:
+  `kogo.test.assertEquals` (Kotlin's) and `kogo.text.plain` (Kogo's own) look alike. That
+  is already true of `kogo.time`, and principle 3 says a Kotlin name means Kotlin's meaning
+  wherever it is imported from.
+  An agent writes Kotlin's import out of habit, so `unknown-import` on `java.time.X`,
+  `kotlin.test.X`, `java.util.UUID` or `arrow.core.X` (and `arrow.core.raise.X`) names
+  the fix: `kogo.time.X`, `kogo.test.X`, or no import for `Uuid` and Arrow's names. It
+  does only when Kogo has that X, so a hint never leads to a second error
+  (`java.time.OffsetDateTime` gets the plain "there is no package"). Not taken: a hint for every
+  package of Kotlin's and Java's, which is a table to keep for imports no port has
+  written. Reopen if a port meets another such import more than once.
 - **`Console` is `kogo.io.Console`, imported** (15 Nov 2026; spec 12 and 14). Kotlin's
   `println` and `readln` are global functions; Kogo's are members of a handle passed in,
   as section 7 has every effect, and the handle is Kogo's own, so the entry above puts it
@@ -1783,9 +1811,10 @@ Each entry: what was decided, why, and what would reopen it.
   `tx.atomically` is one plain declaration for the same reason. Not taken: choosing by the
   type wanted, which `val r = db.tx { }` does not state.
 - **Markers count only the file's opt-in** (spec 11). Kotlin also lets a marked declaration
-  use another of the same marker, and its declaring file needs no opt-in; example 19 opts in
-  all the same. One rule, checked at each call, constructor and read of a val. A type
-  carries no marker, and `@RequiresOptIn` goes on nothing but a marker.
+  use another of the same marker, lets `@OptIn` sit on one declaration (Kogo's error there
+  says to opt in on the file), and lets `copy` skip a marked constructor's opt-in. One rule,
+  checked at each call, constructor and read of a val. A type carries no marker, and
+  `@RequiresOptIn` goes on nothing but a marker.
 - **A lambda whose value is a wanted `Unit` may end with `Unit`**: it is the lambda's
   value, not a statement (spec 6). Example 18 ends `db.tx`'s block so.
 - **Where an error is reported**: Postgres's refusal at the place it names, a parameter's

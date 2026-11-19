@@ -320,6 +320,12 @@ func (p *parser) annotation() *Annotation {
 	_, name := p.ident()
 	a := &Annotation{Pos: pos, Name: name}
 	if p.at("(") && !p.tok.nl {
+		if name == "OptIn" && p.peek(1).kind == tIdent {
+			p.next()
+			if x := p.path(); p.at("::") {
+				p.notKogo(pos, "annotation", "@OptIn on a declaration", "opt in on the file: begin this file with @file:OptIn("+x.Name+"::class)")
+			}
+		}
 		if name != "go" {
 			p.notKogo(pos, "annotation", "an annotation with arguments", "only markers exist, written @Marker with none")
 		}

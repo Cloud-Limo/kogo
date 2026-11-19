@@ -1,8 +1,8 @@
-// Package test is the Go behind Kogo's package kotlin.test, in
-// prelude/kotlin_test.kg: kotlin.test's assertions (spec.md 12).
-// One that fails panics with the message Kotlin's gives, which fails
-// the test that called it.
 package test
+
+// Kotlin's assertions, in Kogo's package kogo.test
+// (spec.md 12). One that fails panics with the message Kotlin's
+// gives, which fails the test that called it.
 
 import (
 	"slices"

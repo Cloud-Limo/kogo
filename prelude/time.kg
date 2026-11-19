@@ -18,3 +18,16 @@ external fun Instant.atZone(zone: ZoneId): ZonedDateTime
 external fun ZonedDateTime.toLocalDate(): LocalDate
 external fun LocalDate.plusDays(daysToAdd: Long): LocalDate
 external fun LocalDate.atStartOfDay(zone: ZoneId): Instant
+
+external object Instant {
+    fun ofEpochSecond(epochSecond: Long, nanoAdjustment: Long): Instant
+}
+
+external object Duration {
+    fun ofSeconds(seconds: Long, nanoAdjustment: Long): Duration
+}
+
+external fun Instant.isBefore(otherInstant: Instant): Boolean
+external fun Instant.isAfter(otherInstant: Instant): Boolean
+external fun Instant.plus(amountToAdd: Duration): Instant
+external fun Instant.minus(amountToSubtract: Duration): Instant

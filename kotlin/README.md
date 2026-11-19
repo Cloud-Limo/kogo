@@ -6,7 +6,8 @@ Kogo's own forms is refused by kotlinc. It needs a JVM
 and is not part of `go test ./...`.
 
 - `builtins/*.kg` is the shared source: Kogo, and Kotlin unchanged
-  (kotlinc is given the same bytes under a `.kt` name). Each branch of
+  (kotlinc is given the same bytes under a `.kt` name, and `time.kt`,
+  which names `java.time`'s types `kogo.time`'s). Each branch of
   a `when` is one case, calling prelude functions singly or in a short
   chain, and its value is a template of what must agree.
 - `cases gen` writes the inputs, edges first and then random from a

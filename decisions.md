@@ -2665,6 +2665,24 @@ Each entry: what was decided, why, and what would reopen it.
   SMTP2GO keeps form-encoded events for 48 hours rather than dropping them. Not taken:
   `doc/gates.md`'s sketch, 400 for both.
 
+## Taken comparing and shifting an Instant (DEV-946), not yet discussed
+
+- **`Instant.ofEpochSecond(epochSecond, nanoAdjustment)` and `Duration.ofSeconds(seconds,
+  nanoAdjustment)`, the two-argument forms alone.** The check against Kotlin needs to build
+  both from numbers, and `plus` needs a `Duration` that does not come from SQL. One form
+  each, since an external overload would need two Go names. Not taken: the one-argument
+  `ofSeconds`, `ofMinutes` and `ofDays` of spec 12's list, each a line when first needed.
+- **`plus` and `minus` add the seconds and then the nanoseconds, as `java.time`'s do**, so
+  a sum that leaves the range part way through panics where Java's throws, with its
+  message (`Instant exceeds minimum or maximum instant`, `long overflow`). Not taken: one
+  exact sum, which accepts a few results at the range's ends that Java refuses.
+- **For kotlinc, `kotlin/time.kt` names `java.time`'s types `kogo.time`'s** by typealias,
+  so the shared source imports `kogo.time` in both languages. Not taken: a Kotlin copy of
+  each prelude function.
+- **`Duration`'s text writes its seconds' digits exactly**, where it went through a
+  `float64` and wrote `PT-1.9999999960000001S` for Java's `PT-1.999999996S`; the check
+  found it. Not taken: leaving it to an issue of its own, for a three-line fix.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

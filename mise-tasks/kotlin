@@ -14,7 +14,7 @@ _work/driver < _work/cases > _work/kogo
 
 # kotlinc reads only .kt: the same bytes, under that name.
 for f in builtins/*.kg; do cp "$f" "_work/$(basename "$f" .kg).kt"; done
-kotlinc -nowarn _work/*.kt main.kt -d _work/kotlin.jar
+kotlinc -nowarn _work/*.kt main.kt time.kt -d _work/kotlin.jar
 kotlin -cp _work/kotlin.jar MainKt _work/cases > _work/kotlin
 
 go run ./cases diff _work/cases _work/kogo _work/kotlin

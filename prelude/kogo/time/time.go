@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	gotime "time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -103,8 +104,15 @@ func (d Duration) String() string {
 	if m := secs % 3600 / 60; m != 0 {
 		text += fmt.Sprintf("%dM", m)
 	}
-	if s := float64(secs%60) + float64(nanos)/1e9; s != 0 || text == "PT" {
-		text += strconv.FormatFloat(s, 'f', -1, 64) + "S"
+	if s := secs % 60; s != 0 || nanos != 0 || text == "PT" {
+		if s == 0 && nanos < 0 {
+			text += "-"
+		}
+		text += strconv.FormatInt(s, 10)
+		if nanos != 0 { // the digits, exactly: a float64 rounds them
+			text += "." + strings.TrimRight(fmt.Sprintf("%09d", max(nanos, -nanos)), "0")
+		}
+		text += "S"
 	}
 	return text
 }
@@ -264,4 +272,69 @@ func LocalDate_AtStartOfDay(this LocalDate, zone ZoneId) Instant {
 		}
 	}
 	return Instant{t.Unix(), int32(t.Nanosecond())}
+}
+
+// java.time's range of an Instant, in seconds since 1970: the years
+// -1000000000 and 1000000000.
+const minSecond, maxSecond = -31557014167219200, 31556889864403199
+
+// The arithmetic below is java.time's, step by step, so that it
+// overflows where java.time's does and panics with its message.
+
+func addExact(a, b int64) int64 {
+	if b > 0 && a > math.MaxInt64-b || b < 0 && a < math.MinInt64-b {
+		panic("long overflow")
+	}
+	return a + b
+}
+
+// floorDiv splits nanos into whole seconds and the nanoseconds past them.
+func floorDiv(nanos int64) (int64, int64) {
+	s, n := nanos/1e9, nanos%1e9
+	if n < 0 {
+		s, n = s-1, n+1e9
+	}
+	return s, n
+}
+
+func Instant_OfEpochSecond(epochSecond, nanoAdjustment int64) Instant {
+	s, n := floorDiv(nanoAdjustment)
+	if s = addExact(epochSecond, s); s < minSecond || s > maxSecond {
+		panic("Instant exceeds minimum or maximum instant")
+	}
+	return Instant{s, int32(n)}
+}
+
+func Duration_OfSeconds(seconds, nanoAdjustment int64) Duration {
+	s, n := floorDiv(nanoAdjustment)
+	return Duration{addExact(seconds, s), int32(n)}
+}
+
+func Instant_IsBefore(this, other Instant) bool {
+	return this.Seconds < other.Seconds || this.Seconds == other.Seconds && this.Nanos < other.Nanos
+}
+
+func Instant_IsAfter(this, other Instant) bool { return Instant_IsBefore(other, this) }
+
+// plus is java.time's Instant.plus(seconds, nanos).
+func (i Instant) plus(seconds, nanos int64) Instant {
+	if seconds == 0 && nanos == 0 {
+		return i
+	}
+	return Instant_OfEpochSecond(addExact(addExact(i.Seconds, seconds), nanos/1e9), int64(i.Nanos)+nanos%1e9)
+}
+
+// Instant_Plus adds the seconds and then the nanoseconds, as java.time
+// does, so a sum past the range part way through panics.
+func Instant_Plus(this Instant, d Duration) Instant {
+	return this.plus(d.Seconds, 0).plus(0, int64(d.Nanos))
+}
+
+func Instant_Minus(this Instant, d Duration) Instant {
+	if d.Seconds == math.MinInt64 {
+		this = this.plus(math.MaxInt64, 0).plus(1, 0)
+	} else {
+		this = this.plus(-d.Seconds, 0)
+	}
+	return this.plus(0, -int64(d.Nanos))
 }

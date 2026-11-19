@@ -839,15 +839,20 @@ Postgres sent, exactly: it has `toDouble` (the closest `Double`),
 arithmetic in v0. Its `==` is Java's `equals`, which counts the scale:
 `1.50 == 1.5` is false.
 
-**Time** (`kogo.time`). `Instant`, `LocalDate` (`plusDays`, `year`,
-`monthValue`, `dayOfMonth`, `atStartOfDay(zone): Instant`), `LocalTime`,
-`ZoneId.of(name)`, `ZonedDateTime` (`instant.atZone(zone)`, `hour`,
-`minute`, `toLocalDate`, `plusSeconds`, `toInstant`), `Duration`
-(`ofDays`, `ofMinutes`, `ofSeconds`), `Clock.now()`. There is no default
-zone: every conversion names its zone. `atStartOfDay(zone)` is the
-day's earliest instant in the zone: where midnight is skipped, the end
-of the gap. Each writes itself as `java.time` does, in a template too:
-an `Instant` as `2026-11-15T14:30:00.120Z`, with the fraction in groups
+**Time** (`kogo.time`). `Instant` (`Instant.ofEpochSecond(seconds,
+nanos)`, `isBefore`, `isAfter`, `plus(duration)`, `minus(duration)`),
+`LocalDate` (`plusDays`, `year`, `monthValue`, `dayOfMonth`,
+`atStartOfDay(zone): Instant`), `LocalTime`, `ZoneId.of(name)`,
+`ZonedDateTime` (`instant.atZone(zone)`, `hour`, `minute`,
+`toLocalDate`, `plusSeconds`, `toInstant`), `Duration` (`ofDays`,
+`ofMinutes`, `Duration.ofSeconds(seconds, nanos)`), `Clock.now()`.
+`ofEpochSecond`, `ofSeconds`, `plus` and `minus` panic where
+`java.time`'s throw, with its message: `Instant exceeds minimum or
+maximum instant`, or `long overflow`. There is no default zone: every
+conversion names its zone. `atStartOfDay(zone)` is the day's earliest
+instant in the zone: where midnight is skipped, the end of the gap.
+Each writes itself as `java.time` does, in a template too: an
+`Instant` as `2026-11-15T14:30:00.120Z`, with the fraction in groups
 of three digits and none when it is zero; a `LocalDate` as
 `2026-11-15`; a `ZonedDateTime` as
 `2026-11-16T01:30:00.120+11:00[Australia/Sydney]`, without the seconds

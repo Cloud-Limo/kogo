@@ -1132,3 +1132,79 @@ enum class Size { S, M }
 fun theirs(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }
 fun g(tx: Tx, env: Env, request: Request, input: List<Size?>): Either<String, Unit> = either { }
 `
+
+// What an application's hand-written main needs of the emitted Go
+// (doc/main.md): Env and an input built by the chain, the settings
+// read from JSON, and an operation called by its typed value. Each
+// mistake that must not compile is main with one edit, or the Kogo
+// with a property renamed, and go build's own error.
+func TestHandWrittenMain(t *testing.T) {
+	try := func(source string, edits ...string) string {
+		return build(t, func(root string) map[string][]byte {
+			_, files, errs := emit(t, root, source)
+			if errs != nil {
+				t.Fatalf("%v", errs)
+			}
+			files["main.go"] = []byte(strings.NewReplacer(edits...).Replace(handWritten))
+			return files
+		})
+	}
+	for _, c := range []struct {
+		what, want string
+		edits      []string
+		source     string
+	}{
+		{"main", "settings.old is not a key of Settings: ignored\nhello Ann: hi 3 <nil>\n", nil, routes},
+		{"a missing setting", "settings.retries is missing\n", []string{`"retries":3,`, ``}, routes},
+		{"an enum that is no entry", " 400 note: input.kind is not one of Short, Long\n", []string{"t.Kind_Short", `t.Kind("Wide")`}, routes},
+		{"a step of Env left out", "t.Env_().Settings undefined (type t.Env_needsGreeting has no field or method Settings)", []string{`.Greeting("hello")`, ``}, routes},
+		{"the last step of Env left out", "t.Env_needsSettings", []string{`.Settings(settings)`, ``}, routes},
+		{"two steps exchanged", "(type t.Note_needsTo has no field or method Text)", []string{`.To("Ann").Text("hi")`, `.Text("hi").To("Ann")`}, routes},
+		{"a property renamed in Kogo", "(type t.Note_needsRecipient has no field or method To)", nil, strings.ReplaceAll(routes, "to", "recipient")},
+		{"an input of another type", "does not match inferred type", []string{"rpc.Call(calls, r, t.Note_op, in)", "rpc.Call(calls, r, t.Note_op, env)"}, routes},
+		{"calls served to a browser", "cannot convert calls", []string{"in))", "in))\n\tfmt.Println((*rpc.Handler[t.Env])(calls))"}, routes},
+		{"a checked list's operation", "undefined: t.Note_op", []string{"(t.Routes,", "(rpc.NewUnserved(t.Routes.Operations, t.Routes.Enums),"}, strings.Replace(routes, "unchecked", "checkedBy allow", 1) + "fun allow(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }\n"},
+	} {
+		if got := try(c.source, c.edits...); !strings.Contains(got, c.want) || c.edits == nil && c.source == routes && got != c.want {
+			t.Errorf("%s gives\n%s\nwant %s", c.what, got, c.want)
+		}
+	}
+}
+
+const routes = `package t
+import kogo.rpc.Request
+api routes unchecked { note ungated }
+data class Settings(val origin: String, val retries: Int)
+data class Env(val greeting: String, val settings: Settings)
+data class Note(val to: String, val text: String, val kind: Kind)
+enum class Kind { Short, Long }
+fun note(db: Db, env: Env, request: Request, input: Note): Either<String, String> =
+    either { "${env.greeting} ${input.to}: ${input.text} ${env.settings.retries}" }
+`
+
+const handWritten = `package main
+
+import (
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http/httptest"
+	"os"
+
+	"ROOT/t"
+	"github.com/Cloud-Limo/kogo/prelude/kogo/rpc"
+)
+
+func main() {
+	settings, err := rpc.ReadSettings[t.Settings]([]byte(` + "`" + `{"origin":"https://ops.example","retries":3,"old":true}` + "`" + `), os.Stdout)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	env := t.Env_().Greeting("hello").Settings(settings)
+	calls := rpc.NewCalls(t.Routes, nil, env, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	r := httptest.NewRequest("POST", "/a/route", nil)
+	in := t.Note_().To("Ann").Text("hi").Kind(t.Kind_Short)
+	fmt.Println(rpc.Call(calls, r, t.Note_op, in))
+}
+`

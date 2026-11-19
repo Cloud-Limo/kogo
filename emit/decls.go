@@ -160,6 +160,7 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 			e.w("%s %s `kogo:%q`", claim(v.Decl, export(v.Name)), e.typ(v.Type), v.Name)
 		}
 		e.shut("}")
+		e.chain(td, name, tps, args)
 		recv := fmt.Sprintf("func (this_ %s%s) ", name, args)
 		getters := map[string]bool{} // one for a val that two interfaces declare
 		for _, s := range td.Supers {
@@ -188,11 +189,70 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 	}
 }
 
+// chain writes what hand-written Go builds a data class by, where it
+// builds one: a list's environment, or a class an input reaches. Name_()
+// begins it, and a step for each property, named for it and in the
+// class's order, gives a type that has only the next step, the last
+// one the class. So a property left out, misplaced or misnamed does
+// not compile, and Go's error names the step's type, which names the
+// property it needs. Emitted Go itself writes the keyed literal.
+func (e *emitter) chain(td *check.TypeDecl, name, tps, args string) {
+	if !e.chained[td] || len(td.Props) == 0 {
+		return
+	}
+	next := func(i int) string {
+		if i == len(td.Props) {
+			return name + args
+		}
+		return e.names[step{td, i}] + args
+	}
+	e.w("func %s_%s() %s { return %s{} }", name, tps, next(0), next(0))
+	for i, v := range td.Props {
+		e.w("type %s%s struct{ v %s%s }", e.names[step{td, i}], tps, name, args)
+		give := "s.v"
+		if i+1 < len(td.Props) {
+			give = next(i+1) + "(s)"
+		}
+		e.w("func (s %s) %s(x %s) %s { s.v.%s = x; return %s }", next(i), export(v.Name), e.typ(v.Type), next(i+1), export(v.Name), give)
+	}
+}
+
+// chains marks the data classes that hand-written Go builds: each
+// list's environment and each data class an operation's input reaches.
+func (e *emitter) chains() {
+	var reach func(t check.Type)
+	reach = func(t check.Type) {
+		switch t := t.(type) {
+		case *check.Nullable:
+			reach(t.Elem)
+		case *check.Named:
+			for _, a := range t.Args {
+				reach(a)
+			}
+			if t.Decl.Kind == "data class" && !e.chained[t.Decl] {
+				e.chained[t.Decl] = true
+				for _, v := range t.Decl.Props {
+					reach(v.Type)
+				}
+			}
+		}
+	}
+	for _, a := range e.info.APIs {
+		reach(a.Env)
+		for _, op := range a.Ops {
+			reach(op.Input)
+		}
+	}
+}
+
 // table writes an api list's rpc.Table: its check, each operation's
 // name on the wire and its fun, or its gate, step and work, in the
 // list's order, and the entries of each enum the operations reach, by
 // which the server reads an input's enum. An unchecked list is an
-// rpc.Unserved, which no handler takes.
+// rpc.Unserved, which no handler takes. Beside it goes each of its
+// operations' rpc.Op, the typed value that rpc.Call runs it by: its
+// environment, its input and what its fun answers, a Reply whole. A
+// checked list's operations have none: only a browser calls them.
 func (e *emitter) table(d *syntax.API) {
 	defer e.enter(d)()
 	a := e.info.APIs[d]
@@ -224,6 +284,9 @@ func (e *emitter) table(d *syntax.API) {
 			funs = fmt.Sprint(op.Serializable) + ", " + funs
 		}
 		ops = append(ops, fmt.Sprintf("%s(%q, %s)", rpc(kind), op.Func.Name, funs))
+		if a.Check == nil {
+			e.w("var %s = %s[%s, %s, %s](%q)", e.names[opValue{op}], rpc("NewOp"), e.typ(a.Env), e.typ(op.Input), e.typ(op.Func.Result.(*check.Named).Args[1]), op.Func.Name)
+		}
 	}
 	for _, t := range a.Types {
 		if t.Kind == "enum class" {

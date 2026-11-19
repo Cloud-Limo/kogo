@@ -3417,6 +3417,57 @@ Each entry: what was decided, why, and what would reopen it.
   binding says `action` or nothing, above): nothing marks which bindings call outside,
   and nothing checks that one that says nothing is right to.
 
+## Taken building what `main` needs (DEV-986), not yet discussed
+
+The three entries of 18 Nov 2026 are built as they say. What they left open:
+
+- **The session's four Go names are kept**: `rpc.NewCalls`, `rpc.Calls`,
+  `rpc.ReadSettings`, and a step's type as `Class_needsProperty`. The chain starts at
+  `Class_()`, a name no declaration can have, since the naming rule ends no name in `_`;
+  a step's type and an operation's `_op` value go through the naming rule, so a clash
+  with a nested type or an enum's constant is a `go-name` error, not Go that fails to
+  build. Not taken: `rpc.NewRoutes` or `rpc.Unmounted` for `Calls`, which say no more.
+- **An `_op` value names its operation and carries its types**:
+  `rpc.NewOp[Env, I, A]("logout")`, which `rpc.Call` looks up in the list of its `Calls`.
+  Where two lists of a package hold one name, each is spelled with its list,
+  `Routes_Logout_op`. `A` is what the fun answers, a `Reply<A>` whole, so that a route
+  has the cookies. It is written for the operations of a list that names no check, and
+  for no other (the lead's ruling on the review, 20 Nov 2026; Greg is told, since it
+  narrows "a typed value for each operation" of 18 Nov): a checked list's operation
+  has no caller but a browser, its value let hand-written Go run it with its check
+  skipped, and without the value a route that names one is a compile error where it
+  was a 404 at run time. Not taken: a value for each operation, as first built. Nor an
+  `Op` that holds the row's functions, which would need the four row constructors to
+  return a second type; the types are the checker's either way.
+- **`rpc.Calls` and `rpc.Handler` share an unexported server** (`Handler` is
+  `struct{ *server }`, `Calls` is `struct{ *server; _ struct{} }`): one `run` serves a
+  browser's call and `rpc.Call`, so the id, the `served` line, the limit and the reruns
+  cannot drift apart, and `Limit` is promoted to both. `Calls` is a type of its own and
+  not a named `Handler` because a named `Handler` has a `Handler`'s underlying type:
+  `(*rpc.Handler[Env])(calls)` would then compile outside `rpc` and mount an unchecked
+  list for a browser with no check at all (the review of PR 101 did, and was answered
+  200). The blank field makes the two types' structs differ, so Go refuses the
+  conversion; `TestHandWrittenMain` holds it. The `served` line is now logged before
+  the answer is written, not after. Not taken: a second struct that copies the
+  handler's; a named `Handler`, as first built.
+- **`rpc.Call`'s error** is an `rpc.Refused` with the refusal's words, or the status and
+  text a browser would get: `400 op: input.kind is not one of ...` for an enum that is
+  no entry, `404` for an operation not of the list, `500 request <id>` for a panic,
+  which is logged as a browser's is, and `503 request <id>` past the limit. Not taken:
+  one plain error, where a route could not tell a refusal from a bug; a panic passed
+  on to the route, which would then lack the `served` line.
+- **The settings' reader is `rpc.ReadSettings[S](settings []byte, report io.Writer)
+  (S, error)`, in `prelude/kogo/rpc`**, since the strict reader is that package's and
+  unexported; the spec states it in 15.4, as one more thing read as an input is. A
+  nested class reports and ignores its unknown keys too. An enum, a class of the
+  prelude and a type that crosses no wire are each refused before the file is read,
+  by the property's name; a prelude class is told by its Go package. Not taken: a
+  package of its own, which would export the reader for one caller. Reopens with the
+  first setting that is an enum or a prelude class.
+- **A chain is written for a generic data class too**, with its type parameters, and
+  for none of the prelude's, whose Go is hand-written. A `data object` has no chain.
+- **The clock does not go to the handler here**: none of the three reads it.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

@@ -1467,6 +1467,16 @@ Inputs and answers are JSON.
   larger number as a `String`.
 - A `Double` that is `NaN` or an infinity has no JSON: an answer that
   holds one panics.
+- An application's settings are read this way too. They are a data
+  class the application declares, which its environment holds as one
+  property, and one object of its configuration file, a key for each
+  property. Nothing defaults: a key that is missing or of another
+  type stops the start with an error that names the key and never
+  its value, `settings.opsOrigin is missing`. It differs from an input
+  twice: a key the class does not have is reported and ignored, so
+  that one file serves the program before and after a deploy; and an
+  enum or a data class of the prelude is no setting yet, and an error
+  at the start.
 
 The answer is one of two objects:
 

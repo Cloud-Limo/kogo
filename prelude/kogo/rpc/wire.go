@@ -25,15 +25,19 @@ const maxLong = 1<<53 - 1 // the whole numbers JavaScript holds exactly
 
 var uuidType = reflect.TypeFor[kogo.Uuid]()
 
-// A reader reads input strictly. It knows each enum's constants.
+// A reader reads input strictly. It knows each enum's constants. With
+// extra, it reports a key that a data class does not have, by where
+// it is and the class's name, and reads on; with none, the key is an
+// error.
 type reader struct {
 	enums map[reflect.Type][]string
+	extra func(at, class string)
 }
 
 // newReader takes each enum's entries as the emitter writes them, a
 // slice of its constants.
 func newReader(enums []any) reader {
-	r := reader{map[reflect.Type][]string{}}
+	r := reader{enums: map[reflect.Type][]string{}}
 	for _, entries := range enums {
 		v := reflect.ValueOf(entries)
 		t := v.Type().Elem()
@@ -188,11 +192,41 @@ func (r reader) object(t reflect.Type, m map[string]any, at string) (reflect.Val
 		return v, nil
 	}
 	for _, k := range slices.Sorted(maps.Keys(m)) {
-		if !keys[k] {
+		if !keys[k] && r.extra == nil {
 			return v, bad(at+"."+k, "is not a key of %s", name(t))
+		} else if !keys[k] {
+			r.extra(at+"."+k, name(t))
 		}
 	}
 	return v, nil
+}
+
+// valid says whether each enum that v holds is one of its entries, as
+// read does of JSON: v is Go's, where an enum is any string.
+func (r reader) valid(v reflect.Value, at string) error {
+	switch t := v.Type(); {
+	case t.Kind() == reflect.String && t != reflect.TypeFor[string]():
+		if names := r.enums[t]; !slices.Contains(names, v.String()) {
+			return bad(at, "is not one of %s", strings.Join(names, ", "))
+		}
+	case t.Kind() == reflect.Pointer && !v.IsNil():
+		return r.valid(v.Elem(), at)
+	case t.Kind() == reflect.Slice:
+		for i := range v.Len() {
+			if err := r.valid(v.Index(i), fmt.Sprintf("%s[%d]", at, i)); err != nil {
+				return err
+			}
+		}
+	case t.Kind() == reflect.Struct:
+		for i := range t.NumField() {
+			if f := t.Field(i); f.Name != "_" {
+				if err := r.valid(v.Field(i), at+"."+f.Tag.Get("kogo")); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // check panics if r lacks the constants of an enum that t reaches, or

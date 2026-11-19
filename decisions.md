@@ -651,14 +651,30 @@ Each entry: what was decided, why, and what would reopen it.
   taken: Go's `rand.Int(rand.Reader, 62)` per character, even too but a big integer each
   time. Reopen if a program needs another alphabet, random numbers or bytes, or a test needs
   a fixed token.
-- **Ids are UUID version 7, whatever an application used before** (16 Nov 2026). cusoon2's
-  ids are its own layout, 65.5 µs ticks since 23 Feb 2018 in the first 48 bits, made for
-  index locality, which version 7 gives; Postgres 18 has `uuidv7()`. The two never sort
-  together: a version 7 id made now sorts after cusoon2's ids from before about November
-  2021 and before every later one. So a Kogo module must not write a table that Kotlin code
-  orders by id until the application either makes its ids in Postgres, by a function both
-  sides call, or moves to version 7 and orders those queries by a time. That choice is the application's migration, not Kogo's. Not taken: cusoon2's
-  layout in the prelude, which is specific to one application.
+- **Kogo's ids are UUID version 7; an application's `main` may hand over its own** (16 Nov
+  2026, amended 20 Nov). cusoon2's ids are its own layout, 65.5 µs ticks since 23 Feb 2018
+  in the first 48 bits, made for index locality, which version 7 gives; Postgres 18 has
+  `uuidv7()`. The two never sort together: a version 7 id made now sorts after cusoon2's ids
+  from before about November 2021 and before every later one. So an application whose ids
+  are not version 7 and that hands over no maker gets rows that do not sort with its own by
+  id: it makes its ids in Postgres, by a function both sides call, or orders those queries
+  by a time. Not taken: cusoon2's layout in the prelude, which is specific to one
+  application. Amended 20 Nov 2026 (Greg; DEV-995; spec 7, 12): an application keeps its
+  own format. Its `main` hands the runtime its id maker, in Go, with
+  `kogo.MakeIdsWith`, once and before any id is made, else a panic; `newId()` then calls it,
+  and with none handed over gives version 7. cusoon2's ids are on their own clock and never
+  go backwards within a process, its Kotlin lists a booking's passengers in id order, and
+  Kogo, with no state between calls, cannot write that layout. Kogo's own ids now increase
+  within a process too (the lead's, 20 Nov), by RFC 9562's method 1 (6.2): `rand_a` is a
+  12-bit counter, set at random below 2048 in each new millisecond, so a millisecond holds
+  at least 2048 ids before borrowing the next; the time never goes back from the last id's,
+  so a clock that goes back holds the last millisecond and counts on. Not taken: (b) a
+  second kind of extension, an application's Go for a function that is not pure and changes
+  nothing, the general layer, which waits for a second need; (c) the application moving to
+  version 7 and no longer ordering by id; methods 2 and 3 of 6.2, a random increment of the
+  74 random bits or a finer fraction of the clock, which hold as much but read less plainly
+  in hex. Reopen (b) when a second function an application needs reads the clock,
+  randomness or a remembered value.
 - **cusoon2's databases are transient, not forbidden** (16 Nov 2026, Greg). `cusoon` and
   `cusoon_b` are the stacks' own and re-created all the time, so a session uses a database of
   its own for writes and reports a mistake in its step's comment rather than stopping. Not

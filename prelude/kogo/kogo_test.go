@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode"
@@ -204,6 +205,65 @@ func TestIds(t *testing.T) {
 	}()
 	Check(true, func() string { return "yes" })
 	Check(false, func() string { return "no" })
+}
+
+// Kogo's own ids increase within a process however fast they are
+// made, and ids made at once from several goroutines are all different
+// and in order as each goroutine saw them.
+func TestOwnIdsIncrease(t *testing.T) {
+	last := NewId()
+	for range 100000 {
+		id := NewId()
+		if id.String() <= last.String() {
+			t.Fatalf("%s then %s", last, id)
+		}
+		last = id
+	}
+	var wg sync.WaitGroup
+	ids := make([][]Uuid, 8)
+	for g := range ids {
+		wg.Go(func() {
+			for range 10000 {
+				id := NewId()
+				if n := len(ids[g]); n > 0 && id.String() <= ids[g][n-1].String() {
+					t.Errorf("%s then %s", ids[g][n-1], id)
+				}
+				ids[g] = append(ids[g], id)
+			}
+		})
+	}
+	wg.Wait()
+	seen := map[Uuid]bool{}
+	for _, id := range slices.Concat(ids...) {
+		if seen[id] {
+			t.Fatalf("%s twice", id)
+		}
+		seen[id] = true
+	}
+}
+
+// A maker handed over before any id is made gives newId()'s ids; one
+// handed over twice, or after an id was made, is a panic.
+func TestMakeIdsWith(t *testing.T) {
+	defer idMaker.Store(nil)
+	panics := func(want string) {
+		t.Helper()
+		defer func() {
+			if got := recover(); got == nil || !strings.Contains(got.(string), want) {
+				t.Errorf("MakeIdsWith panics with %v, want %q", got, want)
+			}
+		}()
+		MakeIdsWith(func() Uuid { return Uuid{} })
+	}
+	idMaker.Store(nil)
+	MakeIdsWith(func() Uuid { return Uuid{15: 7} })
+	if id := NewId(); id != (Uuid{15: 7}) {
+		t.Errorf("newId() gives %s", id)
+	}
+	panics("twice")
+	idMaker.Store(nil)
+	NewId()
+	panics("after an id was made")
 }
 
 // randomString gives its length in letters and digits, each of the 62

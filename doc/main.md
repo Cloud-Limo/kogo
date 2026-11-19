@@ -83,6 +83,7 @@ func run() int {
 		fmt.Fprintln(os.Stderr, "--config goes before", mode) // else it is read from the environment
 		return 1
 	}
+	kogo.MakeIdsWith(cusoonId) // first: newId() gives cusoon2's layout, the one its Kotlin orders by
 	clock := ktime.SystemClock()
 	cfg, err := load(*path) // [1]
 	var env app.Env
@@ -474,6 +475,9 @@ of them:
   that agreed exception. `pool.Ping` reads the pool outside `Call`,
   `command.Run` and `work.Run`; it reads nothing of the application's
   and stays. Origin and CSRF are no third: both are Kogo's (Q4).
+- **Ids**: `kogo.MakeIdsWith(cusoonId)` hands the runtime cusoon2's
+  own id maker, hand-written Go beside `main` and not shown, so rows
+  either server writes sort by id together (DEV-995, `decisions.md`).
 - **Rules a reviewer holds**, since nothing checks them: `main` builds
   `Env` by the chain and never as `app.Env{}`; no secret is a setting.
 - **Added to the prelude**: `NewHandler` gains the clock ("How it is

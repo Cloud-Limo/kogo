@@ -1219,6 +1219,32 @@ func TestHandWrittenMain(t *testing.T) {
 	}
 }
 
+// newId() gives the ids of the maker a hand-written main hands over.
+func TestIdsHandedOver(t *testing.T) {
+	got := build(t, func(root string) map[string][]byte {
+		_, files, errs := emit(t, root, "package t\nfun id(): Uuid = newId()\n")
+		if errs != nil {
+			t.Fatalf("%v", errs)
+		}
+		files["main.go"] = []byte(`package main
+import (
+	"fmt"
+	"ROOT/t"
+	"github.com/Cloud-Limo/kogo/prelude/kogo"
+)
+func main() {
+	var n byte
+	kogo.MakeIdsWith(func() kogo.Uuid { n++; return kogo.Uuid{0: 0xab, 15: n} })
+	fmt.Println(t.Id(), t.Id())
+}
+`)
+		return files
+	})
+	if want := "ab000000-0000-0000-0000-000000000001 ab000000-0000-0000-0000-000000000002\n"; got != want {
+		t.Errorf("newId() gives %s, want %s", got, want)
+	}
+}
+
 const routes = `package t
 import kogo.rpc.Request
 api routes unchecked { note ungated }

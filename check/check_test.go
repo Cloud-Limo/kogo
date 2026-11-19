@@ -107,7 +107,8 @@ func run(t *testing.T, src string) (*Info, []*syntax.Error) {
 // List<Long>?", the parameters in the pass's order, a name once,
 // Kind{x y} an enum of the constants x and y, and t(a: Int, b: Uuid?)
 // the composite type t of fields a and b. A literal holding « is
-// refused there.
+// refused there. A word @person:update says the statement needs
+// update of the table person, and @person that it reads it.
 func signature(lit *syntax.SQL) (*sqlpass.Statement, error) {
 	if i := strings.Index(lit.Text, "«"); i >= 0 {
 		return nil, &sqlpass.Error{Offset: i, Code: "sql-rejected", Message: "Postgres refused this"}
@@ -153,8 +154,14 @@ func signature(lit *syntax.SQL) (*sqlpass.Statement, error) {
 		}
 		return cols
 	}
-	params, cols, _ := strings.Cut(lit.Text, "->")
-	st := &sqlpass.Statement{SQL: lit.Text, Columns: columns(cols)}
+	text, tables := lit.Text, []sqlpass.Table(nil)
+	for _, w := range strings.Fields(text) {
+		if name, need, _ := strings.Cut(w, ":"); w[0] == '@' {
+			tables, text = append(tables, sqlpass.Table{Name: name[1:], Needs: strings.Fields(need)}), strings.Replace(text, w, "", 1)
+		}
+	}
+	params, cols, _ := strings.Cut(text, "->")
+	st := &sqlpass.Statement{SQL: lit.Text, Columns: columns(cols), Tables: tables}
 	for _, p := range strings.Split(params, ",") {
 		if source, t, ok := strings.Cut(strings.TrimSpace(p), ": "); ok {
 			st.Params = append(st.Params, sqlpass.Param{Source: source, Type: typ(t)})

@@ -32,7 +32,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{}, SQL: map[*syntax.SQL]*Query{}, APIs: map[*syntax.API]*API{}, Tests: map[*syntax.Tests]*TestList{}, Core: core,
 		},
 		pkgs: map[string]*pkg{}, members: map[string][]*Func{}, imports: map[*syntax.File]map[string]*pkg{},
-		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{}, reads: map[Object][]Object{}, acting: map[*syntax.Lambda]string{},
+		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{}, reads: map[Object][]Object{}, stmts: map[Object][]reached{}, acting: map[*syntax.Lambda]string{},
 	}
 	order := map[string]int{}
 	for i, f := range files {
@@ -61,6 +61,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 		c.bodies[i]()
 	}
 	c.vals(program)
+	c.gateWrites(program)
 	slices.SortStableFunc(c.errs, func(a, b *syntax.Error) int {
 		return cmp.Or(cmp.Compare(order[a.File], order[b.File]), cmp.Compare(a.Line, b.Line), cmp.Compare(a.Column, b.Column))
 	})
@@ -79,6 +80,7 @@ type checker struct {
 	signer  Signatures
 	optIns  map[*syntax.File]map[*TypeDecl]bool // the markers each file opts in to
 	reads   map[Object][]Object                 // the top-level vals and the funs each val's value and each fun refers to
+	stmts   map[Object][]reached                // the sql literals in each val's value and each fun's body, for gate.go
 	tested  map[*syntax.ValDecl]Type            // the Test<E> of each val a tests list names
 
 	// Where the checker is.

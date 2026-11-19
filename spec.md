@@ -1210,6 +1210,14 @@ one returns an `Either` whose `Left` is a refusal in words:
   step take is the very type their row's gate gives; a step's input
   and the input of a gate that reads one are the operation's input
   type. Anything else is a compile error.
+- A gate reads and decides; it does not write. A statement that a
+  gate reaches, in its own body or through the funs it calls or names,
+  and that inserts into, updates or deletes from a table or a view is
+  a compile error, `gate-writes`, and so is one that locks rows (`for
+  update`, `for share`) where the gate takes a `SerializableTx`; a
+  gate on a `Tx` may lock. Postgres says what each statement needs of
+  each table, as it types the statement (section 10). It does not say
+  what a function the statement calls writes, nor `nextval`: 15.3.
 - A gate that reads no input may stand in many rows, whose operations
   have no gate of their own. A gate that reads an input stands in one
   row of a list.
@@ -1268,6 +1276,15 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   in a transaction of its own that the server commits, and then the
   work with no transaction open. The work's answer or refusal is the
   request's. Its proof's `Tx` has ended, as a step's has.
+- A gate on a `SerializableTx` runs held to reading, each time it
+  runs: in a savepoint that Postgres holds read-only and the server
+  releases before the work. There a write, one inside a function of
+  the database's too, `nextval` and a row lock are each a bug, and a
+  panic (section 8). A setting the gate makes with `set_config` is
+  allowed, and is still set in the work, which writes as before. A
+  gate on a `Tx` is not run so, since Postgres's read-only mode
+  refuses the lock such a gate may take: the compile error of 15.2
+  alone holds it.
 - The first parameter of the gate, or of an ungated operation that
   takes a transaction, names the kind the server opens (10.7): at
   SERIALIZABLE for a `SerializableTx`, at READ COMMITTED for a `Tx`.

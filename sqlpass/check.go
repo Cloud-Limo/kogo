@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -46,11 +47,20 @@ type Column struct {
 	Nullable bool
 }
 
-// A Statement is a checked literal: the SQL to send and its signature.
+// A Table is a table or a view that Postgres's tree lists for a
+// statement, and what the statement needs of it beyond select.
+type Table struct {
+	Name  string   // as Postgres writes it on the connection's search path
+	Needs []string // of insert, update, delete and lock, in that order; none where the statement only reads it
+}
+
+// A Statement is a checked literal: the SQL to send, its signature
+// and the tables it touches, by name.
 type Statement struct {
 	SQL     string
 	Params  []Param
 	Columns []Column
+	Tables  []Table
 }
 
 // A Checker checks literals against one database. It only prepares
@@ -157,6 +167,9 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 			spelling(params[i]), row)}
 	}
 	st := &Statement{SQL: sql, Params: params}
+	if st.Tables, err = c.tables(ctx, query); err != nil {
+		return nil, err
+	}
 	if discard {
 		return st, nil
 	}
@@ -184,6 +197,29 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 		st.Columns = append(st.Columns, col)
 	}
 	return st, nil
+}
+
+// tables gives the tables and views the tree lists, with what the
+// statement needs of each: Postgres's own answer, read and not worked
+// out. A function the statement calls is not in the tree, so what it
+// writes is not here, nor is nextval's sequence.
+func (c *Checker) tables(ctx context.Context, query *node) ([]Table, error) {
+	seen, out := map[int]int{}, []Table(nil)
+	query.perms(seen)
+	for oid, perms := range seen {
+		t := Table{}
+		if err := c.conn.QueryRow(ctx, "select $1::oid::regclass::text", uint32(oid)).Scan(&t.Name); err != nil {
+			return nil, err
+		}
+		for _, n := range needs {
+			if perms&n.bit != 0 {
+				t.Needs = append(t.Needs, n.name)
+			}
+		}
+		out = append(out, t)
+	}
+	slices.SortFunc(out, func(a, b Table) int { return strings.Compare(a.Name, b.Name) })
+	return out, nil
 }
 
 // prepare asks Postgres to prepare a statement of n parameters.

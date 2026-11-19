@@ -3195,3 +3195,20 @@ Each entry: what was decided, why, and what would reopen it.
   as extensions.)
 - Operations (spec 15) leave out, on purpose: Origin and CSRF checks; a limit on the
   reruns of a `db.tx` written in a `Db` operation.
+- **A gate is held to reading (DEV-977, 19 Nov 2026).**
+  - **The read-only savepoint goes round a gate on a `SerializableTx` alone.** `doc/gates.md`,
+    "What a gate on a `Tx` loses": Postgres's read-only mode refuses a lock with a write,
+    and a gate on a `Tx` may lock, so `gate-writes` alone holds it. Not taken: the savepoint
+    round every gate, as the issue's "every constructor" could be read, which refuses the
+    lock the design allows.
+  - **A lock is told from an update by the tree**: Postgres asks update's privilege of a
+    table whose rows are locked and names no updated column. Not taken: reading the
+    statement's `rowMarks`, which says the same through each query's own range table.
+  - **`gate-writes` names the gate**, after the design's words: "(the gate g reaches it;
+    spec.md 15.3)", since the statement may be several calls from the gate, and a lock's
+    says "a gate on a SerializableTx only reads". A statement is refused once, for the
+    first gate that reaches it. Not taken: the design's sample to the letter.
+  - **`rpc_test.go`'s gate no longer inserts**, since Postgres now refuses it, so the rows
+    that showed which gate's transaction commits are gone; that the gate's transaction of
+    an `action fun` commits is no longer seen by a test, a gate having nothing to keep.
+  - Reopen if a port's gate must write, which the design gives to an ungated operation.

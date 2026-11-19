@@ -1050,8 +1050,12 @@ fun updateJob(tx: Tx, env: OpsEnv, request: Request, input: UpdateJobInput): Eit
 
 - `api name { f, g, h }` is a top-level declaration, the third thing
   Kogo adds to Kotlin. It names top-level funs that are in scope where
-  it is written, its own package's or imported ones. The list may end
-  with a comma.
+  it is written, its own package's or imported ones.
+- A list's entries are separated by a comma, a new line or both, as
+  Kotlin separates a collection's, with a comma allowed after the
+  last; an entry of more than one word, as a row naming its gate with
+  `gatedBy`, `after` or `ungated` will be (`doc/gates.md`), stays on
+  one line.
 - A fun's name is its operation's name on the wire, so a list holds no
   name twice, and the name is one fun's: not two funs of that name in
   scope. A fun may stand in more than one list.
@@ -1237,8 +1241,8 @@ val cardDiscount =
   nothing of its tests (section 2).
 - `tests name<Env> { a, b, c }` is a top-level declaration of a test
   file, a list as `api` is (15.1). It names top-level vals of its own
-  file, each once and in one list, and at least one. The list may end
-  with a comma.
+  file, each once and in one list, and at least one. Its entries are
+  separated as `api`'s are (15.1).
 - `Env` is the environment every test of the list takes: the
   application's, as an operation's is (15.2), or `Unit` for none.
 - Each val a list names is a `Test<Env>`, and need not say so: this

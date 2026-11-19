@@ -80,7 +80,7 @@ How prelude names are imported is open (DEV-939).
 | --- | --- | --- | --- |
 | 1 | cusoon2 | Kotlin first: the first call makes the session; gates bind the storefront; Origin drops `null` | 60 / 60 |
 | 1b | cusoon2 | Kotlin first: job pages show the stored address; `operatorJobs` replaces `driverJobs` | ~80 / 80 |
-| 2 | Kogo | The lists in their agreed forms (`gatedBy`, `ungated`, `after`, `checkedBy`/`unchecked`, one per line) | 250 / 250 |
+| 2 | Kogo | The lists in their agreed forms (`gatedBy`, `ungated`, `after`, `checkedBy`/`unchecked`) | 250 / 250 |
 | 3 | Kogo | Serve a gated row: check, gate, work | 150 / 150 |
 | 4 | Kogo | The Origin and CSRF check (`doc/origin.md`) | 120 / 150 |
 | 5 | Kogo | `SerializableTx` beside `Tx` | 70 / 70 |

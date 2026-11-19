@@ -149,8 +149,9 @@ Agreed subject to this review:
   source need not compile under kotlinc, SQL keeps its templated
   parameters, a function that acts is an `action fun`, and the lists
   keep bare words, with `after` for the outside step, `unchecked` for
-  a list with no check, a command named by its function, no commas
-  and a fixed order of lines (`doc/gates.md`, `doc/work.md`,
+  a list with no check, a command named by its function and a fixed
+  order of lines; since 19 Nov 2026 (DEV-947) a list's entries are
+  separated by a comma, a new line or both (`doc/gates.md`, `doc/work.md`,
   `doc/lists.md`).
 - **Where Kogo ends and Go begins.** Settled 17 Nov 2026
   (`decisions.md`, "Where Kogo ends and Go begins"): Kogo for what

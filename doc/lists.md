@@ -108,10 +108,9 @@ job notifyBooker {
     failed  bookerNoticeFailed
 }
 
-work daemon {
-    alert  opsAlert
-    queue  chargeCard
-    queue  notifyBooker
+work daemon alertedBy opsAlert {
+    chargeCard
+    notifyBooker
 }
 ```
 
@@ -127,7 +126,13 @@ work daemon {
 - **A command's name is its function's name**, run as `cusoon2
   recordAbn --gstRegistered true`. The list's name is what `main`
   calls it by.
-- **No commas; one entry a line.** The work list repeats `queue`.
+- **Entries are separated by a comma, a new line or both**, as
+  Kotlin separates a collection's, with a comma allowed after the
+  last (spec 15.1; Greg, 19 Nov 2026, DEV-947). A row of more than
+  one word stays on one line. The work list names its alert in its
+  head, `alertedBy`, and its queues as a list of names. A job's and
+  an effect's parts are not a list: they stand one a line, with no
+  commas.
 - **An effect's and a job's lines are in the order they run**, and
   the checker refuses any other: settings `find`, `fair`, `soonest`,
   `attempts`; steps `enter`, `prepare`, `act`, `record`; on failure

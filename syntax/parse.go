@@ -160,6 +160,20 @@ func (p *parser) list(close string, item func()) {
 	p.want(close)
 }
 
+// entries reads the entries of an api or a tests list up to close,
+// each separated from the next by a comma, a line end or both, with
+// a comma allowed after the last, and steps past close (spec.md 15.1).
+// entry reads one entry, words and all.
+func (p *parser) entries(close string, entry func()) {
+	for !p.at(close) {
+		entry()
+		if !p.got(",") && !p.tok.nl && !p.at(close) {
+			p.fail(p.tok.pos, "syntax", "expected , or a new line between a list's entries, found %s", describe(p.tok))
+		}
+	}
+	p.want(close)
+}
+
 func (p *parser) file() {
 	f := p.f
 	for p.at("@") && p.peek(1).text == "file" {
@@ -212,7 +226,7 @@ func (p *parser) api() *API {
 	p.next()
 	_, a.Name = p.ident()
 	p.want("{")
-	p.list("}", func() {
+	p.entries("}", func() {
 		pos, name := p.ident()
 		a.Funs = append(a.Funs, &Ident{pos, name})
 	})
@@ -232,7 +246,7 @@ func (p *parser) tests() *Tests {
 	t.Env = p.typ()
 	p.want(">")
 	p.want("{")
-	p.list("}", func() {
+	p.entries("}", func() {
 		pos, name := p.ident()
 		t.Vals = append(t.Vals, &Ident{pos, name})
 	})

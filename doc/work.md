@@ -684,32 +684,28 @@ job notifyBooker {
 }
 
 // daemon.kg
-work daemon {
-    alert  opsAlert               // "An alert is the application's to send" below
-    queue  saveCard
-    queue  chargeCard
-    queue  sendRunSheet
-    queue  frequently
-    queue  platformDaily
-    queue  tenantDaily
-    queue  runBatchJob
-    queue  notifyBooker
-    queue  remindBooker
-    queue  notifyDriver
-    queue  remindDriver
-    queue  warnAdmin
-    queue  chargeAndSendInvoice
-    queue  resendInvoice
-    queue  sendPaymentInvite
-    queue  sendMail
+work daemon alertedBy opsAlert {  // "An alert is the application's to send" below
+    saveCard
+    chargeCard
+    sendRunSheet
+    frequently, platformDaily, tenantDaily
+    runBatchJob
+    notifyBooker, remindBooker
+    notifyDriver, remindDriver
+    warnAdmin
+    chargeAndSendInvoice, resendInvoice, sendPaymentInvite
+    sendMail
 }
 ```
 
-A list has one entry a line and no commas, so the work list repeats
-`queue` on each. An effect's and a job's lines come in the order they
-run, and the checker refuses any other: the settings `find`, `fair`,
-`soonest`, `attempts`; the steps `enter`, `prepare`, `act`, `record`;
-on failure `failed`, `recovery`. A job's are `next`, `run`, `failed`,
+The work list names its alert in its head, `alertedBy`, and its
+queues as a list, whose entries are separated by a comma, a new line
+or both, as every list's are (spec 15.1; Greg, 19 Nov 2026, DEV-947).
+A job's and an effect's parts are not a list: they stand one a line,
+with no commas. They come in the order they run, and the checker
+refuses any other: the settings `find`, `fair`, `soonest`,
+`attempts`; the steps `enter`, `prepare`, `act`, `record`; on failure
+`failed`, `recovery`. A job's are `next`, `run`, `failed`,
 `recovery`. Agreed with Greg on 18 Nov 2026 (DEV-894). Perhaps
 10 / 10.
 
@@ -729,12 +725,12 @@ The checker holds that:
 - no step of a job acts;
 - every job states `failed`;
 - an effect's and a job's lines are in the order they run;
-- every `work` list names an `alert`, an `action fun` that
-  takes the environment and an `Alert`;
-- every `job` and `effect` is named on a `queue` line of some `work`
-  list. One that is not is refused, with a message that says to add
-  it to a list, so no queue's rows pile up unserved and unseen. A
-  declared queue cannot be parked switched off. Perhaps 10 / 10.
+- every `work` list is `alertedBy` an `action fun` that takes the
+  environment and an `Alert`;
+- every `job` and `effect` is named in some `work` list. One that is
+  not is refused, with a message that says to add it to a list, so no
+  queue's rows pile up unserved and unseen. A declared queue cannot
+  be parked switched off. Perhaps 10 / 10.
   Agreed with Greg on 17 Nov 2026 (`doc/lists-assessment.md`, choice
   D), over allowing it and never running it.
 
@@ -793,7 +789,7 @@ is told "Timed out" when the charge comes late, so the wait is felt.
 
 So the runner gives every queue a loop of its own: claim one row, do
 it, and again, waiting a little when there is none. No queue waits
-for another, and the `queue` lines of the `work` list above are a
+for another, and the `work` list above is a
 list whose order means nothing. There are no lanes, no sweep and no pass.
 
 - **What the Kotlin needs of one thing at a time still holds**, since
@@ -931,11 +927,10 @@ the application's says where it goes and how it reads:
 
 ```kotlin
 // daemon.kg
-work daemon {
-    alert  opsAlert
-    queue  saveCard
-    queue  chargeCard
-    ...                           // one queue a line, as in "The list of work"
+work daemon alertedBy opsAlert {
+    saveCard
+    chargeCard
+    ...                           // as in "The list of work"
 }
 
 // The runner's package. A sketch: the fields are to be settled.

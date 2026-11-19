@@ -172,6 +172,29 @@ func TestDeclarations(t *testing.T) {
 	if got := show(f.APIs); got != `[(API ops [(Ident me) (Ident updateJob)]) (API other [(Ident me)])]` || len(f.Decls) != 1 {
 		t.Errorf("api lists: %s, %d declarations", got, len(f.Decls))
 	}
+
+	// An api or a tests list separates its entries by a comma, a new
+	// line or both, as Kotlin does a collection (spec.md 15.1).
+	for _, sep := range []string{", ", "\n", ",\n", "\n,"} {
+		for _, list := range []string{"api l", "tests l<Unit>"} {
+			src := list + " {\n    a" + sep + "b" + sep + "c\n}"
+			f := parse(t, src)
+			got := show(f.APIs) + show(f.Tests)
+			if !strings.Contains(got, "[(Ident a) (Ident b) (Ident c)]") {
+				t.Errorf("%q: got %s, want the entries a, b and c", src, got)
+			}
+		}
+	}
+	f = parse(t, "api l { a, b\n    c,\n    d, }")
+	if got := show(f.APIs); got != `[(API l [(Ident a) (Ident b) (Ident c) (Ident d)])]` {
+		t.Errorf("an api list of commas and new lines mixed: %s", got)
+	}
+	// A blank line or a comment between entries still separates them,
+	// and a list may be empty.
+	f = parse(t, "api l {\n\n    a // c\n\n    b /* x */, c,\n}\napi e { }")
+	if got := show(f.APIs); got != `[(API l [(Ident a) (Ident b) (Ident c)]) (API e)]` {
+		t.Errorf("blank lines, comments and an empty list: %s", got)
+	}
 }
 
 func TestExpressions(t *testing.T) {

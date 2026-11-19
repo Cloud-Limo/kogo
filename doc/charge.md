@@ -175,9 +175,8 @@ fun chargeRecovery(tx: Tx, env: Env, row: ChargeRow, why: Failure): String? =
     }
 
 // daemon.kg: the alert is doc/work.md's opsAlert, unchanged.
-work daemon {
-    alert  opsAlert
-    queue  chargeCard
+work daemon alertedBy opsAlert {
+    chargeCard
     ...
 }
 ```

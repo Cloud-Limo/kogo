@@ -32,7 +32,15 @@ type Op struct {
 	Proof  Type  // what the gate gives and the work takes
 	After  *Func // the step between the gate and the work; nil for none
 	Input  Type  // Unit for none
-	Answer Type  // the A of its Either<String, A>
+	Answer Type  // the A of its Either<String, A>, or of an ungated one's Reply<A>
+}
+
+// reply gives A where t is kogo.rpc's Reply<A>, and nil otherwise.
+func reply(t Type) Type {
+	if n, _ := t.(*Named); n != nil && n.Decl.Pkg == "kogo.rpc" && n.Decl.Name == "Reply" {
+		return n.Args[0]
+	}
+	return nil
 }
 
 // A role is the shape of a fun that an api list names (spec.md 15.2).
@@ -143,7 +151,11 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 			return nil
 		}
 		env(id, f, ungatedRole)
-		return &Op{Func: f, Tx: named(f.Params[0].Type) == c.prelude("Tx"), Input: f.Params[3].Type, Answer: answer}
+		op := &Op{Func: f, Tx: named(f.Params[0].Type) == c.prelude("Tx"), Input: f.Params[3].Type, Answer: answer}
+		if a := reply(answer); a != nil {
+			op.Answer = a
+		}
+		return op
 	}
 	g, proof := c.shaped(row.Gate, gateRole)
 	f, answer := c.shaped(id, workRole)
@@ -369,6 +381,8 @@ func (c *checker) wire(id *syntax.Ident, what string, whole Type, w *reach) {
 			bad(t, path, "which does not cross the wire: send an enum, or Unit as the whole input or answer")
 		case d.Kind != "enum class" && d.Kind != "data class":
 			bad(t, path, "which does not cross the wire: send text the server has formatted")
+		case reply(n) != nil:
+			bad(t, path, "and only an ungated operation answers with a Reply, its whole answer: answer the value, and set cookies from an ungated operation")
 		case len(d.Params) > 0:
 			bad(t, path, "and a type on the wire has no type parameters: declare one type for each use")
 		case what == "input" && d.Kind == "data class" && len(d.Ctor.markers) > 0:

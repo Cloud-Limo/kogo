@@ -76,12 +76,12 @@ func TestWire(t *testing.T) {
 		if err != nil || !rt.Equal(got, want) {
 			t.Errorf("%s reads as %v (%v)", text, got, err)
 		}
-		if back := answer("op", want); string(back) != `{"type":"ok","value":`+text+`}` {
-			t.Errorf("%v writes as %s", want, back)
+		if back := answer("op", want); string(back.body) != `{"type":"ok","value":`+text+`}` {
+			t.Errorf("%v writes as %s", want, back.body)
 		}
 	}
-	if back := answer("op", rt.Unit{}); string(back) != `{"type":"ok","value":{}}` {
-		t.Errorf("Unit writes as %s", back)
+	if back := answer("op", rt.Unit{}); string(back.body) != `{"type":"ok","value":{}}` {
+		t.Errorf("Unit writes as %s", back.body)
 	}
 }
 

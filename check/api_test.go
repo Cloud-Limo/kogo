@@ -107,6 +107,29 @@ func TestOperationFacts(t *testing.T) {
 	}
 }
 
+// An ungated operation may answer a Reply: its answer is the wire's,
+// and the Reply and its cookies are not. Nothing else crosses as one.
+func TestReply(t *testing.T) {
+	head := "package kogo.rpc\nexternal class Request\ndata class Cookie(val name: String)\ndata class Reply<A>(val answer: A, val cookies: List<Cookie>)\n---\n" +
+		"import kogo.rpc.Request\nimport kogo.rpc.Reply\ndata class Env(val n: Int)\ndata class Job(val n: Int)\ndata class P(val tx: Tx)\n" +
+		"fun g(tx: Tx, env: Env, request: Request): Either<String, P> = either { raise(\"no\") }\n"
+	info, errs := run(t, head+"api ops unchecked { f ungated }\n"+op("Unit", "Reply<Job?>"))
+	if errs != nil {
+		t.Fatal(errs)
+	}
+	for _, a := range info.APIs {
+		if got := fmt.Sprint(a.Ops[0].Answer, " ", len(a.Types), " ", a.Types[0].Name); got != "Job? 1 Job" {
+			t.Errorf("got %s", got)
+		}
+	}
+	why := "only an ungated operation answers with a Reply, its whole answer"
+	refused(t, [][3]string{
+		{head + "api ops unchecked { ‸f ungated }\n" + op("Reply<Job>", "Unit"), "wire", "f's input is a Reply<Job>, and " + why},
+		{head + "api ops unchecked { ‸f ungated }\n" + op("Unit", "List<Reply<Job>>"), "wire", "f's answer holds a Reply<Job>, and " + why},
+		{head + "api ops unchecked { ‸w gatedBy g }\nfun w(env: Env, p: P, input: Unit): Either<String, Reply<Unit>> = either { raise(\"no\") }", "wire", "w's answer is a Reply<Unit>, and " + why},
+	})
+}
+
 // Sections 15.1 and 15.2: a list's check, a row's gate and its step,
 // and that what one gives is what the next takes.
 func TestGates(t *testing.T) {

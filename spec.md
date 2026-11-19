@@ -937,7 +937,11 @@ also reads 32 hex digits without hyphens; Kogo's gives `null` for them.
 HTTP request, passed to an operation (section 15):
 `request.header(name): String?`, `request.cookie(name): String?` and
 `request.clientAddress: String`. A header's name is matched whatever
-its case. Kogo code does not build or change one.
+its case. Kogo code does not build or change one. An ungated
+operation that sets cookies answers a `Reply<A>(answer: A, cookies:
+List<Cookie>)`, each a `Cookie(name, value, path, maxAgeSeconds: Long,
+sameSite: SameSite, secure, httpOnly)`, with `SameSite` one of
+`Strict`, `Lax` and `None` (15.2).
 
 **Tests** (`kogo.test`; test files only, section 16).
 `kogo.test` has `Test<E>`, `test(sentence) { tx, env -> ... }` and
@@ -1133,7 +1137,7 @@ one returns an `Either` whose `Left` is a refusal in words:
 | a gate | a `Tx`, the environment, a `Request`, and the operation's input if it reads it | `Either<String, P>`, with `P` its proof |
 | gated work, the `op` of a gated row | the environment, the proof, the input | `Either<String, A>` |
 | a step | the environment, the proof, the input | `Either<String, Unit>` |
-| an ungated operation | a `Tx` or a `Db` (15.3), the environment, a `Request`, the input | `Either<String, A>` |
+| an ungated operation | a `Tx` or a `Db` (15.3), the environment, a `Request`, the input | `Either<String, A>` or `Either<String, Reply<A>>` |
 
 - The environment is one type of the application's, the same for
   every fun of a list, its check, gates and steps included: a data
@@ -1163,6 +1167,27 @@ one returns an `Either` whose `Left` is a refusal in words:
 - Nothing but the list's check runs before an ungated operation. It
   finds out who is asking in its own first lines, from the `Request`
   it was given.
+- An ungated operation that answers a `kogo.rpc.Reply<A>` sets
+  cookies: the server sends its `answer` as the operation's answer,
+  and each of its `cookies` as one `Set-Cookie` header, in order. A
+  refusal sets none. `A` is the operation's answer on the wire and in
+  TypeScript (15.4, 15.6), which never see the `Reply`. A `Reply`
+  anywhere else on the wire is a compile error: in an input, inside an
+  answer, or as gated work's answer, so a search for `Reply` finds
+  every operation that sets a cookie.
+- A cookie's `maxAgeSeconds` is its `Max-Age`; 0 or less ends it, as
+  `Max-Age=0`. A cookie that HTTP cannot carry, such as one whose name
+  holds a space, or one a browser refuses, such as `SameSite.None`, a
+  name that starts `__Secure-` or one that starts `__Host-` without
+  `secure` (`__Host-` needs the path `/` too), is a bug, and panics
+  (section 8).
+
+```kotlin
+fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<String, Reply<Unit>> = either {
+    ensure(request.cookie("session") != null) { "You are not signed in." }
+    Reply(Unit, listOf(Cookie("session", "", "/", 0L, SameSite.Lax, env.secure, true)))
+}
+```
 
 ### 15.3 The transaction
 
@@ -1250,7 +1275,7 @@ application chooses.
 
 | What happened | Status | Body |
 | --- | --- | --- |
-| the operation answered | 200 | the `ok` object |
+| the operation answered | 200 | the `ok` object, and a `Reply`'s cookies |
 | the operation refused | 200 | the `refused` object |
 | the input does not read (15.4) | 400 | the operation and the key, never the value |
 | no operation of that name | 404 | |

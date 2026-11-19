@@ -152,13 +152,13 @@ skipped. Then `gh pr merge <PR url> --merge --match-head-commit
 push what was left in its tree after the `Fixed:` is posted, and you
 merge only what you tested. It is the full sha, 40 characters, from
 `git rev-parse HEAD` in the worktree once the checks have run: `gh`
-refuses the short one a step's comment carries. Run it as a command of its own, with no
-`cd`, `&&` or pipe, since the rule that allows it matches that form
-alone. It moves the issue to Done. Post `Merged: <sha>`, the built-ins
-check's last line and the comparison's `N cases` with `0 differ` (or
-"checks skipped") in full on the PR and its first line on the issue.
-Otherwise hand on, with what failed or differed, as when the merge is
-refused because the head moved.
+refuses the short one a step's comment carries. Run it as a command
+of its own, with no `cd`, `&&` or pipe, since the rule that allows it
+matches that form alone. It moves the issue to Done. Post `Merged:
+<sha>`, the built-ins check's last line and the comparison's `N
+cases` with `0 differ` (or "checks skipped") in full on the PR and
+its first line on the issue. Otherwise hand on, with what failed or
+differed, as when the merge is refused because the head moved.
 
 A cusoon2 PR is Greg's to merge. On the same comments, in a worktree
 at its pushed head, `~/Dev/cusoon2-dev-NNN`: made when missing with

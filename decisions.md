@@ -3188,6 +3188,72 @@ Each entry: what was decided, why, and what would reopen it.
   something at another service, so written as `fun` it was `unmarked-action` by 7.1 (the
   lead's Ruling on PR 94). Not taken: a docs issue of its own for one word.
 
+## Taken holding a proof's rules (DEV-976), not yet discussed
+
+- **The checker knows a proof by its shape**: a data class whose constructor is marked and
+  which has a marked property that is a `Tx` or a `SerializableTx`, or an interface that
+  declares such a `val` (`doc/gates.md`'s `OnBooking`). Not taken: by role, whatever type a
+  gate gives, which misses the proofs no gate gives (`AtTenant`, a new row's, an interface)
+  and the model's files, where the two rules on the transaction are read; a marked `Tx`
+  alone, which the design does not call a proof.
+- **A gate is not yet held to give a proof.** A `P` of any other shape still passes 15.2
+  and is held to none of the three rules, which spec 15.7 says. Holding it changes what
+  every gated program looks like (a marker, a file that opts in), so it is left to Greg.
+  `examples/24_gates.kg` is such a program and is unchanged: no rule refuses it.
+- **A marked property is built here** (spec 11): a marker on a data class's property was a
+  syntax error, and an interface's marked `val` was read and not held. Both are now
+  marked, and read only in a file that opts in, by name or by destructuring. The proof
+  rules rest on it. Not taken: a proof's transaction known by its name, `tx`.
+- **A data class's property is marked `@property:M`** (the Review and Ruling on PR 98, 19
+  Nov 2026), and a bare `@M` before its `val` is refused with that to write: kotlinc 2.4.21
+  refuses the bare form ("opt-in requirement marker annotation cannot be used on
+  parameter") and takes `@property:M` with the meaning wanted, so by principle 3 Kogo
+  writes Kotlin's. It is the one target there is. An interface's `@M val` is Kotlin's
+  as it stands. Not taken: the bare form as a deviation listed in `kotlin/deviations`.
+- **An override of a marked member needs the file's opt-in** (the same Review, Fix 2), a
+  `val` or a `fun` of an interface, as kotlinc has it: without it a file that does not opt
+  in made a data class of an interface proof from any `Tx`. Not taken: making the
+  override carry the marker too, which the read through the interface already holds.
+- **A `_` in a destructuring takes no transaction out of a proof, and still needs the
+  opt-in of the property in its place.** The Review's Fix 5 skipped both; kotlinc 2.4.21
+  refuses `val (id, _) = held` in a file that does not opt in to the marker of the second
+  property, so skipping the opt-in would accept what Kotlin refuses. Not taken: the
+  Review's whole Fix. Reopen: a later kotlinc accepts it.
+- **A statement on the transaction of a proof with no name binds nothing** (Fix 3):
+  `xs.first().tx.execute(sql"${id}")` matched the bare `id` of `this`. It is
+  `unbound-statement`, with "keep the proof in a val" to do.
+- **A block that takes or gives a proof counts as passing one** from a fun that runs
+  outside (Fix 4), whatever fun it is handed to, the prelude's included. Not taken:
+  following the block into the fun that calls it.
+- **Not seen by `action-proof`: a proof held in a list or in a plain data class**, as
+  `xs: List<Held>` or `Box(val held: Held)`. Only a file that opts in can make one: a
+  step or work that runs outside cannot, since building either passes the proof.
+- **Open, Greg's: must a gate give a proof of this shape?** Built as B meanwhile (the
+  Ruling on PR 98). A: every gate gives a proof, a new refusal ("gate gives Clerk, which
+  is no proof: mark its constructor and its tx"), so every gated program has a marker
+  and a gates' file that opts in, and a forgotten marker is a compile error. B: as now,
+  the rules hold only marked proofs, and a port that forgets the marker gets no rules
+  and no error. C: only a `P` that holds a `Tx` must be a proof, which closes PR 91's 500
+  and leaves a proof of facts alone light. A or C is its own issue, with
+  `examples/24_gates.kg` moved (its `statusOf` and `unpaid` bind nothing of `clerk`).
+- **The codes** are the design's `proof-tx-escapes` and `outside-passes-proof`, and two it
+  did not name: `unbound-statement` and `action-proof`.
+- **"Written directly" is `proof.fact` or a property under it**, `${held.business.id}`,
+  spelt on the same name as the receiver. Not taken: `proof.fact` alone, which refuses a
+  proof that keeps its row as a data class, as spec 11's `HeldBusiness` does.
+- **A statement on a proof's transaction in a fun that runs outside is refused too**, under
+  `outside-passes-proof`: the design says SQL in a step is the checker's error, and in a
+  file that opts in nothing else refused it. Not taken: leaving it to the marker, which
+  holds only the operations' files.
+- **Passing counts a receiver, and a proof of any type**, `booking.tenant` included. Only
+  an `action fun` that takes a proof is held to it, as the issue says. Not taken: every
+  `action fun` outside a `db.tx` block, which no case needs.
+- **`copy` fills a proof's transaction as its constructor does** (spec 11 holds a copy to
+  the constructor's marker), and destructuring a proof down to its transaction is
+  `proof-tx-escapes`.
+- **The rules are 15.7, after TypeScript**, so that no section is renumbered under the
+  messages that cite them.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

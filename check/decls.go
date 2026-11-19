@@ -33,6 +33,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 		},
 		pkgs: map[string]*pkg{}, members: map[string][]*Func{}, imports: map[*syntax.File]map[string]*pkg{},
 		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{}, reads: map[Object][]Object{}, stmts: map[Object][]reached{}, acting: map[*syntax.Lambda]string{},
+		placed: map[*Func]*role{}, txReads: map[syntax.Expr]*Var{},
 	}
 	order := map[string]int{}
 	for i, f := range files {
@@ -59,6 +60,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 	c.apis(program)
 	for i := 0; i < len(c.bodies); i++ {
 		c.bodies[i]()
+		c.escaped()
 	}
 	c.vals(program)
 	c.gateWrites(program)
@@ -82,6 +84,7 @@ type checker struct {
 	reads   map[Object][]Object                 // the top-level vals and the funs each val's value and each fun refers to
 	stmts   map[Object][]reached                // the sql literals in each val's value and each fun's body, for gate.go
 	tested  map[*syntax.ValDecl]Type            // the Test<E> of each val a tests list names
+	placed  map[*Func]*role                     // the funs an api list names as gated work or as a step, and as which
 
 	// Where the checker is.
 	owner      Object // the val whose value, or the fun whose body, is being read
@@ -95,6 +98,8 @@ type checker struct {
 	acted      bool                      // the fun at hand has called an action
 	inTx       int                       // how many of lambdas are handed a Tx
 	acting     map[*syntax.Lambda]string // the lambdas that call an action, and not yet seen passed to the prelude: the action's name
+	outside    *Func                     // the action fun at hand that takes a proof, whose transaction has ended
+	txReads    map[syntax.Expr]*Var      // each read of a proof's transaction not yet seen where one goes
 	raiseDepth int                       // how many of lambdas are outside the raise scope
 
 	// A jump stands only where a value goes straight to a val, an
@@ -623,6 +628,10 @@ func (c *checker) body(f *Func, d *syntax.FunDecl) {
 	c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda = f.Result, 0, raise, len(c.lambdas), false, false, false
 	defer func(a bool, n int, k map[*syntax.Lambda]string) { c.acted, c.inTx, c.acting = a, n, k }(c.acted, c.inTx, c.acting)
 	c.acted, c.inTx, c.acting = false, 0, map[*syntax.Lambda]string{}
+	defer func(o *Func) { c.outside = o }(c.outside)
+	if c.takesProof(f, d) {
+		c.outside = f
+	}
 	errs := len(c.errs)
 	defer func() {
 		if c.actionKept(); f.Action && !f.External && !c.acted && len(c.errs) == errs {
@@ -669,6 +678,7 @@ func (c *checker) class(td *TypeDecl) {
 	}
 	for _, p := range d.Params {
 		v := &Var{Kind: Property, Name: p.Name, Type: c.typ(p.Type), Owner: td, Decl: p}
+		v.markers = c.marks(syntax.Modifiers{Annotations: p.Marks})
 		td.Props = append(td.Props, v)
 		c.info.Vars[p] = []*Var{v}
 	}
@@ -698,6 +708,7 @@ func (c *checker) class(td *TypeDecl) {
 				continue
 			}
 			v := &Var{Kind: Property, Name: m.Name, Type: c.declared(m), Owner: td, Decl: m}
+			v.markers = c.marks(m.Mods)
 			variance(m, v.Type, true, m.Name)
 			td.Props = append(td.Props, v)
 			c.info.Vars[m] = []*Var{v}
@@ -763,6 +774,7 @@ func (c *checker) conform(td *TypeDecl) {
 				continue
 			}
 			used[td.Props[i]] = true
+			c.demand(td.Props[i].Decl, p.Name, p.vis)
 		}
 		for _, m := range s.Decl.Methods {
 			want := describe(m, b)
@@ -775,6 +787,7 @@ func (c *checker) conform(td *TypeDecl) {
 				continue
 			}
 			used[td.Methods[i]] = true
+			c.demand(td.Methods[i].Decl, m.Name, m.vis)
 		}
 	}
 	for _, v := range td.Props {

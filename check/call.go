@@ -627,6 +627,7 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 	for i, p := range params {
 		pt := subst(p.Type, b)
 		for _, a := range k.placed[i] {
+			c.passed(where, f, p, a, typed[a])
 			c.kept(f, a)
 			c.ran(f, a)
 			switch t := typed[a]; {
@@ -639,6 +640,9 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 				c.mismatch(a, t, pt)
 			}
 		}
+	}
+	if recv != nil {
+		c.passed(where, f, nil, recv, c.info.Types[recv])
 	}
 	for _, p := range f.TypeParams {
 		call.TypeArgs = append(call.TypeArgs, b[p])

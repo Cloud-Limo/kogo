@@ -29,7 +29,7 @@ fun createStripeCharge(env: Env, invoice: PayableInvoice, input: ChargeInput): E
 ```kotlin
 // gate.kg: opts in to UnscopedRead and BindsTenant.
 data class PayableInvoice @UnscopedRead constructor(
-    val id: ID, val owingCents: Long, val bookerId: ID, val tenant: AtTenant, @UnscopedRead val tx: SerializableTx)
+    val id: ID, val owingCents: Long, val bookerId: ID, val tenant: AtTenant, @property:UnscopedRead val tx: SerializableTx)
 
 fun createStripeChargeGate(tx: SerializableTx, env: Env, request: Request, input: ChargeInput): Either<String, PayableInvoice> = either {
     val tenant = atTenant(tx, request).bind()
@@ -110,7 +110,7 @@ data class Charged(val paymentId: String, val amountCents: Long)
 
 // model.kg: the writes a request shares, each on an interface (doc/gates.md, "A proof made both ways")
 interface OnInvoice { val id: ID; @UnscopedRead val tx: Tx }       // as doc/gates.md's OnBooking
-data class WorkerInvoice @UnscopedRead constructor(override val id: ID, @UnscopedRead override val tx: Tx) : OnInvoice
+data class WorkerInvoice @UnscopedRead constructor(override val id: ID, @property:UnscopedRead override val tx: Tx) : OnInvoice
 fun recordPayment(on: OnInvoice, invoice: Invoice, amountCents: Long, at: Instant, reference: String?): Invoice = ...  // the invoice as it now is
 fun enqueueMail(at: InTenant, id: ID, now: Instant, mail: Mail, label: String, notAfter: Instant?) = ...
 
@@ -239,7 +239,7 @@ work daemon alertedBy opsAlert {
 
 ```kotlin
 // gate.kg
-data class HeldCharge @UnscopedRead constructor(val job: ChargeJob, val tenant: AtTenant, @UnscopedRead val tx: SerializableTx)
+data class HeldCharge @UnscopedRead constructor(val job: ChargeJob, val tenant: AtTenant, @property:UnscopedRead val tx: SerializableTx)
 
 fun stripeChargeGate(tx: SerializableTx, env: Env, request: Request, input: ChargeIdInput): Either<String, HeldCharge> = either {
     val tenant = atTenant(tx, request).bind()

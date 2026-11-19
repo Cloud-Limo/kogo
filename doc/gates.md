@@ -782,7 +782,9 @@ comments argue, call by call, what a rerun would do.
 - **An action has three homes**: a worker, fed by a row; an ungated
   operation, between its own transactions; and the outside step.
 - **A lookup is allowed anywhere.** A slow one still holds a
-  transaction open, as today.
+  transaction open, as today. Which kind of operation to write, by
+  where it asks and changes things outside, is the table in `spec.md`
+  15.1.
 
 ### A function that acts says so
 
@@ -794,8 +796,8 @@ calls is:
 action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
 
 // The application.
-action fun placeDetails(google: Http, placeId: String): Json { ... }     // calls perform
-action fun pickupOf(google: Http, placeId: String): Place = ...          // calls placeDetails
+action fun setUserEmail(idp: Http, userId: String, email: String): Boolean { ... }   // calls perform
+action fun renameLogins(env: Env, booker: HeldBooker, input: BookerInput): Either<String, Unit> = ...   // calls setUserEmail
 ```
 
 The word is carried up as Kotlin carries a marker: a function that
@@ -815,7 +817,7 @@ is nothing to opt in to, and the checker holds three rules:
   is (spec 9).
 
 ```
-places.kg:3:5 unmarked-action: placeDetails calls perform, an action: make placeDetails an action fun, or move the call
+logins.kg:3:5 unmarked-action: setUserEmail calls perform, an action: make setUserEmail an action fun, or move the call
 ```
 
 As first written, whether a function acts was worked out through what

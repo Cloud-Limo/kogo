@@ -3128,6 +3128,24 @@ Each entry: what was decided, why, and what would reopen it.
   taken now (the lead, 19 Nov 2026): building that here, which changes what a test may
   call without his word.
 
+## Taken showing an operation's five kinds in one table (DEV-970)
+
+- **An operation that must ask outside asks in its transaction and keeps its gate, unless
+  many requests would wait at once** (Greg, 19 Nov 2026). Spec 15.1 says so under the
+  table of the five kinds, which only gathers what 7.1, 15.2 and 15.3 already hold: a
+  lookup is allowed anywhere, and "never inside a transaction" is no rule of Kogo's. The
+  cost, a transaction and its connection held while the service answers and the question
+  asked again on a rerun, is taken over a gate written by hand. Not taken: the table at the
+  end of 15.3, which says 15.1's rows twice; trimming 15.3's bullets to remove the overlap
+  with the table's Transactions column, which rewords what the spec promises in a docs
+  change. Reopen on a measured wait that is felt on an operation asked rarely.
+- **The table's first bullet stays**: it names what serves a row (a worker, in
+  `doc/work.md`) without the word, since the spec has no workers yet. Not taken: leaving it
+  to the change that brings workers into the spec, which would drop the shape that most
+  changes outside should take from the one place that says which shape to pick.
+- **The ungated line with one transaction says "taking a `SerializableTx` or a `Tx`"**, where
+  the issue said "taking a `Tx`": 15.2 and 15.3 on `main` (DEV-965) allow either.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

@@ -208,6 +208,11 @@ func TestNames(t *testing.T) {
 		{"package a\nfun f(s: ‸Stamp): Int = 1\n---\npackage kogo.time\nexternal class Stamp", "unknown-name", "add import kogo.time.Stamp"},
 		{"package a\nimport ‸b.g\n---\npackage c\nfun g(): Int = 1", "unknown-import", "no package b"},
 		{"package a\nimport ‸c.h\n---\npackage c\nfun g(): Int = 1", "unknown-import", "package c declares nothing named h"},
+		// Kotlin's imports, and the one Kogo has instead.
+		{"package a\nimport ‸java.time.Instant", "unknown-import", "no package java.time in Kogo: import kogo.time.Instant instead"},
+		{"package a\nimport ‸kotlin.test.assertEquals", "unknown-import", "no package kotlin.test in Kogo: import kogo.test.assertEquals instead"},
+		{"package a\nimport ‸java.util.UUID", "unknown-import", "Uuid needs no import: remove this one and write Uuid"},
+		{"package a\nimport ‸arrow.core.Either", "unknown-import", "Either needs no import: remove this one"},
 		{"package a\nimport ‸kogo.time.seconds\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int", "member-import", "seconds is a member, in scope wherever a value of its receiver's type is: remove this import"},
 		// Section 13: only the prelude declares bindings, and an
 		// external object holds funs.

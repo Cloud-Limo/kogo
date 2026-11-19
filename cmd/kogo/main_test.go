@@ -298,9 +298,9 @@ func TestEmitPassesUnreadable(t *testing.T) {
 // rolled back.
 const failing = `package example.ops
 
+import kogo.test.assertEquals
+import kogo.test.assertNull
 import kogo.test.test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 tests failing<OpsEnv> { wrongSum, bug, timedOut, clean }
 

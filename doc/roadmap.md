@@ -68,9 +68,9 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
 
 A test is a value, `test("sentence") { tx, env -> ... }`, named in a
 `tests` list, run in a transaction always rolled back, checked with
-kotlin.test's assertions. A statement Postgres refuses is seen through
+Kotlin's assertions, imported from `kogo.test`. A statement Postgres refuses is seen through
 `tx.refusal(sql"...")`, a value; panics stay bugs and are never caught.
-How prelude names are imported is open (DEV-939).
+Every prelude name is imported from a `kogo.` package (DEV-939, DEV-954).
 
 ## The work, in order
 

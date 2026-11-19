@@ -247,6 +247,8 @@ func (c *checker) importAll(f *syntax.File) {
 		switch {
 		case from != nil && testOnly[from.name] && !f.IsTest():
 			c.errorf(imp, "test-import", "package %s is for test files, those named _test.kg: move what uses %s into one (spec.md 16)", from.name, name)
+		case from == nil && kotlinFix(imp.Name[:i], name) != "":
+			c.errorf(imp, "unknown-import", "there is no package %s in Kogo: %s", imp.Name[:i], kotlinFix(imp.Name[:i], name))
 		case from == nil:
 			c.errorf(imp, "unknown-import", "there is no package %s", imp.Name[:i])
 		case from.named(name) == nil && slices.ContainsFunc(c.members[name], func(f *Func) bool { return f.Pkg == from.name }):
@@ -264,8 +266,22 @@ func (c *checker) importAll(f *syntax.File) {
 	}
 }
 
+// kotlinFix says what to write for an import a Kotlin program has:
+// Kogo takes those names from its own packages (decisions.md, 19 Nov).
+func kotlinFix(from, name string) string {
+	switch {
+	case from == "java.time" || from == "kotlin.test":
+		return fmt.Sprintf("import kogo.%s.%s instead", from[strings.IndexByte(from, '.')+1:], name)
+	case from == "java.util" && name == "UUID":
+		return "Uuid needs no import: remove this one and write Uuid"
+	case from == "arrow.core":
+		return name + " needs no import: remove this one"
+	}
+	return ""
+}
+
 // testOnly holds the prelude's packages that only a test file imports.
-var testOnly = map[string]bool{"kogo.test": true, "kotlin.test": true}
+var testOnly = map[string]bool{"kogo.test": true}
 
 func typeParams(ps []*syntax.TypeParam) []*TypeParam {
 	var out []*TypeParam

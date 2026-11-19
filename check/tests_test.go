@@ -29,7 +29,7 @@ func TestTestLists(t *testing.T) {
 		{kt + "tests ts<Env> { a }\nval a = test(\"a\") { tx, env -> }\n‸val b = test(\"b\") { tx, env -> }", "val-type", "no tests list of this file names it: add it to the list"},
 		{kt + "tests ts<Env> { a }\nval a = test(\"a\") { tx, env -> }\n‸val b: Test<Env> = test(\"b\") { tx, env -> }", "test", "b is a test that no tests list of this file names, so kogo test would never run it"},
 		{"package kogo.test\nexternal class Test<E>\n---\nimport ‸kogo.test.Test", "test-import", "package kogo.test is for test files, those named _test.kg"},
-		{"package kotlin.test\nfun assertTrue(actual: Boolean) {\n}\n---\nfun f() {\n    ‸assertTrue(true)\n}", "test-only", "assertTrue is a test file's, one named _test.kg"},
+		{"package kogo.test\nfun assertTrue(actual: Boolean) {\n}\n---\nfun f() {\n    ‸assertTrue(true)\n}", "test-only", "assertTrue is a test file's, one named _test.kg"},
 		{"fun f(tx: Tx) {\n    tx.‸refusal(sql\"\")\n}", "test-only", "tx.refusal is a test file's, one named _test.kg"},
 		{"fun f(): Int = ‸g()\n---\n/*test*/fun g(): Int = 1", "not-visible", "g is declared in the test file f2_test.kg, which kogo emit leaves out"},
 	})

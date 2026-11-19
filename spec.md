@@ -933,8 +933,8 @@ its case. Kogo code does not build or change one.
 
 **Tests** (`kogo.test`; test files only, section 16).
 `kogo.test` has `Test<E>`, `test(sentence) { tx, env -> ... }` and
-`Refusal` (10.8), and Kotlin's assertions, from `kotlin.test`, each
-imported by name: `assertEquals(expected, actual)`, `assertNotEquals(illegal,
+`Refusal` (10.8), and `kotlin.test`'s assertions, each imported by
+name from `kogo.test`: `assertEquals(expected, actual)`, `assertNotEquals(illegal,
 actual)`, `assertTrue(actual)`, `assertFalse(actual)`,
 `assertNull(actual)`, `assertContains(list, element)`,
 `assertContains(string, other)` and `fail(message)`. Each takes a last

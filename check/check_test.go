@@ -209,10 +209,11 @@ func TestNames(t *testing.T) {
 		{"package a\nimport ‸b.g\n---\npackage c\nfun g(): Int = 1", "unknown-import", "no package b"},
 		{"package a\nimport ‸c.h\n---\npackage c\nfun g(): Int = 1", "unknown-import", "package c declares nothing named h"},
 		// Kotlin's imports, and the one Kogo has instead.
-		{"package a\nimport ‸java.time.Instant", "unknown-import", "no package java.time in Kogo: import kogo.time.Instant instead"},
-		{"package a\nimport ‸kotlin.test.assertEquals", "unknown-import", "no package kotlin.test in Kogo: import kogo.test.assertEquals instead"},
+		{"package a\nimport ‸java.time.Instant\n---\npackage kogo.time\nexternal class Instant", "unknown-import", "no package java.time in Kogo: import kogo.time.Instant instead"},
+		{"package a\nimport ‸kotlin.test.assertEquals\n---\npackage kogo.test\nexternal fun assertEquals(a: Int, b: Int)", "unknown-import", "no package kotlin.test in Kogo: import kogo.test.assertEquals instead"},
 		{"package a\nimport ‸java.util.UUID", "unknown-import", "Uuid needs no import: remove this one and write Uuid"},
 		{"package a\nimport ‸arrow.core.Either", "unknown-import", "Either needs no import: remove this one"},
+		{"package a\nimport ‸arrow.core.raise.ensure", "unknown-import", "ensure needs no import: remove this one"},
 		{"package a\nimport ‸kogo.time.seconds\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int", "member-import", "seconds is a member, in scope wherever a value of its receiver's type is: remove this import"},
 		// Section 13: only the prelude declares bindings, and an
 		// external object holds funs.
@@ -232,6 +233,15 @@ func TestNames(t *testing.T) {
 		{"fun f(x: Int): Int = x.‸apply { 1 }", "kotlin-scope-function", "name the value and call it"},
 		{"fun f(x: Int): Int? = x.‸takeUnless { it > 1 }", "kotlin-scope-function", "use takeIf"},
 	})
+	// A hint names only an import Kogo has.
+	for src, want := range map[string]string{
+		"package a\nimport java.time.OffsetDateTime\n---\npackage kogo.time\nexternal class Instant":          "there is no package java.time",
+		"package a\nimport kotlin.test.assertIs\n---\npackage kogo.test\nexternal fun assertTrue(b: Boolean)": "there is no package kotlin.test",
+	} {
+		if _, errs := run(t, src); len(errs) != 1 || errs[0].Message != want {
+			t.Errorf("%s\n got %v, want %s alone", src, errs, want)
+		}
+	}
 }
 
 // A program's file is not the prelude's for claiming its package.

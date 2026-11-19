@@ -182,8 +182,10 @@ Each entry: what was decided, why, and what would reopen it.
   is already true of `kogo.time`, and principle 3 says a Kotlin name means Kotlin's meaning
   wherever it is imported from.
   An agent writes Kotlin's import out of habit, so `unknown-import` on `java.time.X`,
-  `kotlin.test.X`, `java.util.UUID` or `arrow.core.X` names the fix: `kogo.time.X`,
-  `kogo.test.X`, or no import for `Uuid` and Arrow's names. Not taken: a hint for every
+  `kotlin.test.X`, `java.util.UUID` or `arrow.core.X` (and `arrow.core.raise.X`) names
+  the fix: `kogo.time.X`, `kogo.test.X`, or no import for `Uuid` and Arrow's names. It
+  does only when Kogo has that X, so a hint never leads to a second error
+  (`java.time.OffsetDateTime` gets the plain "there is no package"). Not taken: a hint for every
   package of Kotlin's and Java's, which is a table to keep for imports no port has
   written. Reopen if a port meets another such import more than once.
 - **`Console` is `kogo.io.Console`, imported** (15 Nov 2026; spec 12 and 14). Kotlin's

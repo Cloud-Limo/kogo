@@ -49,6 +49,23 @@ var kept = []struct{ names, from, to, why string }{
 	{"replace", `(no group in ".*" at \d+|No group with name \{.*\}|named capturing group .*)$`, "no such named group", "spec.md section 12: replace with a bad group"},
 }
 
+// refused are Kogo's limits (doc/design.md, principle 3): in a case
+// whose name matches names, where the same inputs' case input gives
+// Kotlin an ID that matches id, Kogo's result must be exactly limit.
+// Such a case is counted under why and does not fail the check; a
+// limit on any other input is a difference.
+var refused = []struct{ names, input, id, limit, why string }{
+	{"atZone|plusDays|atZoneEra|atStartOfDay", "zoneId", offsetID, zoneLimit, "spec.md section 12: ZoneId.of takes a region name"},
+	{"offsetOf", "offsetId", offsetID, zoneLimit, "spec.md section 12: ZoneId.of takes a region name"},
+}
+
+// offsetID is java.time's rule for an ID that ZoneId.of reads as an
+// offset: Z, a sign, or UTC, GMT or UT and then a sign.
+const (
+	offsetID  = `^(Z$|[+-]|(UTC|GMT|UT)[+-])`
+	zoneLimit = "panic: ZoneId.of takes a region name, such as Australia/Melbourne; offsets are not supported (spec 12)"
+)
+
 func main() {
 	if len(os.Args) == 3 && os.Args[1] == "gen" {
 		gen(os.Args[2])
@@ -148,12 +165,25 @@ func diff(cases, kogo, kotlin string) {
 		fmt.Printf("%d cases, but %d results from Kogo and %d from Kotlin\n", len(c), len(a), len(b))
 		os.Exit(1)
 	}
-	differ, names := map[string]int{}, map[string]bool{}
+	differ, refusals, names := map[string]int{}, map[string]int{}, map[string]bool{}
+	at := map[string]int{} // each case's line, by its name and inputs
+	for i := range c {
+		at[c[i]] = i
+	}
 	total := 0
 	for i := range c {
-		name, _, _ := strings.Cut(c[i], "\t")
+		name, in, _ := strings.Cut(c[i], "\t")
 		names[name] = true
 		if a[i] == b[i] {
+			continue
+		}
+		if r := refusal(name, a[i], func(input string) string {
+			if j, ok := at[input+"\t"+in]; ok {
+				return b[j]
+			}
+			return ""
+		}); r != "" {
+			refusals[r]++
 			continue
 		}
 		x, y, why := a[i], b[i], ""
@@ -175,10 +205,25 @@ func diff(cases, kogo, kotlin string) {
 		n := differ[name]
 		fmt.Printf("%s: %d differ\n", name, n)
 	}
+	for _, why := range slices.Sorted(maps.Keys(refusals)) {
+		fmt.Printf("refused, %s: %d cases\n", why, refusals[why])
+	}
 	fmt.Printf("%d cases of %d names, %d differ\n", len(c), len(names), total)
 	if total > 0 {
 		os.Exit(1)
 	}
+}
+
+// refusal is why Kogo's result kogo is a limit of refused's, or "".
+// kotlin gives Kotlin's result of another case on the same inputs.
+func refusal(name, kogo string, kotlin func(input string) string) string {
+	for _, r := range refused {
+		if regexp.MustCompile("^("+r.names+")$").MatchString(name) && kogo == r.limit &&
+			regexp.MustCompile(r.id).MatchString(kotlin(r.input)) {
+			return r.why
+		}
+	}
+	return ""
 }
 
 func lines(file string) []string {

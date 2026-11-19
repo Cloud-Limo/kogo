@@ -20,6 +20,12 @@ and is not part of `go test ./...`.
 - A difference is fixed in the prelude, or listed in `cases/main.go`'s
   `kept` with where `spec.md` states it: the cases it applies to and a
   rewrite of both results, which must then agree.
+- An input outside Kogo's subset (principle 3) is listed in
+  `cases/main.go`'s `refused`: the cases it applies to, the case that
+  gives their input (`zoneId`), the rule an input outside the subset
+  matches, and Kogo's limit message, which must be Kogo's whole result
+  on such an input. It is counted as refused; the limit on any other
+  input differs.
 
 - `deviations/*.kg` are Kogo's deliberate deviations (spec 1), one
   file each. kotlinc must refuse every one with an error on the line

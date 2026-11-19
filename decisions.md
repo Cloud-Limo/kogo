@@ -3487,6 +3487,75 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   for none of the prelude's, whose Go is hand-written. A `data object` has no chain.
 - **The clock does not go to the handler here**: none of the three reads it.
 
+## Taken building `ByteArray` and `kogo.mail` (DEV-988), not yet discussed
+
+- **A data class the prelude declares is written in Go by hand, as the emitter would write
+  it**: `Address`, `Attachment` and `Mail` in `prelude/kogo/mail`, as `HttpFailure` already is
+  in `prelude/kogo/http`. The emitter needed no change: it names a prelude type by its
+  package and writes a constructor call as a struct literal. What holds the two together is
+  the Go compiler, on any program that makes one (`examples/30_mail.kg`, in
+  `TestEmittedGoRuns`): a property renamed on one side alone does not build. Not taken:
+  emitting the prelude's data classes into a generated file beside the hand-written Go (a
+  build step and a file to keep fresh, about 40 code lines); a binding that takes the
+  properties as arguments, which changes what a Kogo program writes. An application's own
+  extension needs more, which is open (`doc/work.md`, "Open"): its Go is not in this module,
+  so either its author writes the struct by the same rule, which then has to be stated in
+  the spec with the tag and the name of each property, or the emitter writes the binding
+  file's data classes into the Go package it names. Reopen when extensions are built.
+- **`Mail` has `date: Instant`, after `messageId`. Awaiting Greg.** A message needs a `Date`
+  header and `eml` reads no clock. Not taken: the sender adds the date when it sends, so
+  the stored bytes have none: then what is sent is not what is stored, and a replay sends
+  another date under the same Message-ID.
+- **`text` and `html` are quoted-printable, by our own writer; attachments are base64**
+  (Ruling on PR 103, the lead, 20 Nov 2026; this replaces every body in base64). A stored
+  message reads with `convert_from(eml, 'UTF8')`, is nearer what the Kotlin's library
+  writes, and a text part is not sent as base64, which filters mark. The boundaries are
+  `=_kogo-mixed` and `=_kogo-alternative`, which neither encoding can write. Not taken:
+  every body in base64; Go's `mime/quotedprintable`, whose line breaks could move with a
+  release. A soft break comes before any character that would take a line past 75, so a
+  line of 76 is broken one short of where it need be: one rule, stated, over the best fit.
+- **`Bcc` is written into the bytes.** `Smtp.send(eml)` is given the bytes alone, so they
+  must say who gets the message. The sender, when it is built, reads the recipients from
+  `To`, `Cc` and `Bcc` and leaves the `Bcc` header out of what it sends. Not taken: no
+  `Bcc` header, which loses those recipients; a second column for the envelope, which
+  changes the row a port stores.
+- **`messageId` is written between `<` and `>` as given**: the application writes the whole
+  id, its `@` and domain included. Not taken: Kogo adding a domain, which it does not know.
+  A port whose Kotlin gives an id with no `@` has to say what its library wrote.
+- **A header's non-ASCII words are B-encoded, never Q**, 39 bytes a word so that one fits
+  after `Reply-To: `. An ASCII name or subject is folded at spaces and not encoded (Ruling
+  on PR 103), unless it holds `=?`, which a reader decodes even inside quotes, or a run of
+  over 60 characters with no space, which no fold fits: then it is encoded words. A header
+  is never folded before its first word. Not taken: Q-encoding as `net/mail` writes it.
+- **A control character in a name or subject is written as a space**, CR and LF
+  included, so that no reader gives one back to put in a header of its own. Not taken:
+  refusing it, which a person could then cause.
+- **An attachment's name not quoted fits is RFC 2231's pieces**, 60 characters each, a
+  line each, so no line passes 998. Not taken: encoded words in `filename=`, which RFC 2047
+  forbids though many write it.
+- **The address rule is stated as a regex in spec 12 and is a panic in `eml`** (Ruling,
+  Question 14 (a)): an ASCII addr-spec of atext and dots, one `@`, at most 254, for every
+  `Address.address` and for `messageId`. The application checks a typed address against
+  it at its form. Not taken: `eml` giving an `Either`, which every caller unwraps for a
+  failure its own check has ruled out. A `mimeType` is printable ASCII, a parameter
+  included. Non-ASCII addresses stay refused until a customer has one.
+- **`ByteArray`'s `==` is refused by its own code, `bytes-equality`**, through the walk that
+  finds a function (`function-equality`), since what to change differs. Where the checker
+  cannot see one, behind a type parameter or in `contains`, `in` or a `Set`, `rt.Equal`
+  panics on reaching it, as on a function (Review 1 on PR 103: the bytes answered `true`
+  where Kotlin answers `false`). Not taken: comparing the bytes there.
+- **A `ByteArray` in a template is refused, `bytes-text`**, since Kotlin writes its
+  identity; inside a data class's text it is Kotlin's signed bytes, `[97, 0, -1]`, checked
+  against kotlinc 2.4.21 by hand. Not taken: a form in `kotlin/`, which cannot make a
+  `ByteArray` in Kogo's shared text.
+- **The prelude's hand-written Go is held to its `.kg` by `prelude`'s `TestHandWritten`**,
+  which compares each data class's properties with its struct's fields and tags in order.
+  It compares no types: a program that uses a property holds those, through the Go
+  compiler.
+- **`kotlin/` gains nothing.** Its checks are that shared text means the same and that
+  kotlinc refuses each deviation. `a == b` on a `ByteArray` is valid Kotlin that Kogo
+  refuses, as `==` on a function is, and neither has a form there.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

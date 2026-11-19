@@ -309,6 +309,7 @@ var scalars = map[string]string{
 	"bool": "Boolean", "int4": "Int", "int8": "Long", "float8": "Double", "numeric": "Decimal",
 	"text": "String", "citext": "String", "varchar": "String", "uuid": "Uuid",
 	"timestamptz": "Instant", "date": "LocalDate", "time": "LocalTime", "interval": "Duration",
+	"bytea": "ByteArray",
 }
 
 // noKogoType is the name of a Postgres type outside section 10.4.

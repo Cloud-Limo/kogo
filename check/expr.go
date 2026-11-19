@@ -234,7 +234,9 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 		return tString
 	case *syntax.StringLit:
 		for _, p := range e.Parts {
-			c.expr(p, nil)
+			if t := c.expr(p, nil); t != nil && named(nonNull(t)) == c.prelude("ByteArray") {
+				c.errorf(p, "bytes-text", "a %s in a template is written as Kotlin writes its identity, [B@ and a number that changes every run: write a name or a size kept beside it, or what the bytes were made from", t)
+			}
 		}
 		return tString
 	case *syntax.SQL: // the parser reads one only as the argument of the five calls
@@ -1011,8 +1013,20 @@ func (c *checker) lambda(l *syntax.Lambda, params []Type, want Type) *FuncType {
 // either holds a function (spec.md 3). op says what compares them.
 func (c *checker) funcEquality(at syntax.Node, op string, x, y Type) {
 	for _, t := range []Type{x, y} {
-		where := holdsFunc(t, map[*TypeDecl]bool{})
+		where := holdsFunc(t, nil, map[*TypeDecl]bool{})
 		if where == "" {
+			// Nor is a ByteArray, which Kotlin compares by identity.
+			bytes := c.prelude("ByteArray")
+			if where = holdsFunc(t, bytes, map[*TypeDecl]bool{}); where != "" {
+				held := ", and " + where + " holds a ByteArray"
+				if where == "it" && named(nonNull(t)) == bytes {
+					held = ""
+				} else if where == "it" {
+					held = ", which holds a ByteArray"
+				}
+				c.errorf(at, "bytes-equality", "%s compares a %s%s, which Kotlin compares by identity, not by its bytes: compare the other properties, or what the bytes were made from", op, t, held)
+				return
+			}
 			continue
 		}
 		msg := "%s compares a %s, and " + where + " holds a function, which is never compared: compare the other properties"
@@ -1028,17 +1042,23 @@ func (c *checker) funcEquality(at syntax.Node, op string, x, y Type) {
 
 // holdsFunc names where a value of t holds a function (spec.md 3): a
 // declaration's property, "it" for t or a type argument itself, or ""
-// for nowhere. A declaration is read unsubstituted, once, and its type
+// for nowhere; or, given the ByteArray's declaration, where it holds
+// one of those instead. A declaration is read unsubstituted, once, and its type
 // arguments apart, so a type that refers to itself ends.
-func holdsFunc(t Type, seen map[*TypeDecl]bool) string {
+func holdsFunc(t Type, bytes *TypeDecl, seen map[*TypeDecl]bool) string {
 	switch t := t.(type) {
 	case *FuncType:
-		return "it"
+		if bytes == nil {
+			return "it"
+		}
 	case *Nullable:
-		return holdsFunc(t.Elem, seen)
+		return holdsFunc(t.Elem, bytes, seen)
 	case *Named:
+		if bytes != nil && t.Decl == bytes {
+			return "it"
+		}
 		for _, a := range t.Args {
-			if where := holdsFunc(a, seen); where != "" {
+			if where := holdsFunc(a, bytes, seen); where != "" {
 				return where
 			}
 		}
@@ -1047,12 +1067,12 @@ func holdsFunc(t Type, seen map[*TypeDecl]bool) string {
 		}
 		seen[t.Decl] = true
 		for _, v := range t.Decl.Variants {
-			if where := holdsFunc(&Named{Decl: v}, seen); where != "" {
+			if where := holdsFunc(&Named{Decl: v}, bytes, seen); where != "" {
 				return where
 			}
 		}
 		for _, p := range t.Decl.Props {
-			if where := holdsFunc(p.Type, seen); where == "it" {
+			if where := holdsFunc(p.Type, bytes, seen); where == "it" {
 				return t.Decl.Name + "'s property " + p.Name
 			} else if where != "" {
 				return where

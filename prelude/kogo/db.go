@@ -341,6 +341,20 @@ func (u *Uuid) ScanUUID(v pgtype.UUID) error {
 
 func (u Uuid) UUIDValue() (pgtype.UUID, error) { return pgtype.UUID{Bytes: u, Valid: true}, nil }
 
+// A ByteArray is Postgres's bytea: bytes that Kogo carries and never
+// reads or changes (spec.md 3). It is read into memory of its own,
+// since the driver's is lent, and a null is refused where a ByteArray
+// is wanted. One of no bytes is sent as that, never as NULL (bound).
+type ByteArray []byte
+
+func (b *ByteArray) ScanBytes(v []byte) error {
+	if v == nil {
+		return errors.New("null is not a ByteArray")
+	}
+	*b = append(ByteArray{}, v...)
+	return nil
+}
+
 type Decimal string
 
 func (d *Decimal) ScanNumeric(v pgtype.Numeric) error {

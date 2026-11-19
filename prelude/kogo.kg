@@ -9,6 +9,7 @@ external class Set<out T>
 external class Regex
 external class Uuid
 external class Decimal
+external class ByteArray
 
 external object Uuid {
     fun parseOrNull(text: String): Uuid?

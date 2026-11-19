@@ -73,6 +73,8 @@ func TestCheckExamples(t *testing.T) {
 		"28_session.kg:21:62 (it: Uuid) -> id: Uuid, csrf_token: String, expires_at: Instant",
 		"28_session.kg:26:26 (id: Uuid) -> id: Uuid, csrf_token: String, expires_at: Instant",
 		"28_session.kg:33:42 (it: Uuid) -> ",
+		"30_mail.kg:22:16 (id: Uuid, eml(mail): ByteArray) -> ",
+		"30_mail.kg:25:28 (id: Uuid) -> eml: ByteArray",
 	}
 	lines, code := kogoSQL(t, "check", "../../examples")
 	if code != 0 || len(lines) != len(want) {

@@ -197,6 +197,8 @@ func (p *parser) file() {
 	for p.tok.kind != tEOF {
 		if p.at("api") && p.peek(1).kind == tIdent {
 			f.APIs = append(f.APIs, p.api())
+		} else if p.at("tests") && p.peek(1).kind == tIdent {
+			f.Tests = append(f.Tests, p.tests())
 		} else {
 			f.Decls = append(f.Decls, p.decl(false))
 		}
@@ -215,6 +217,26 @@ func (p *parser) api() *API {
 		a.Funs = append(a.Funs, &Ident{pos, name})
 	})
 	return a
+}
+
+// tests reads a tests list, tests name<Env> { a, b }. tests is a name
+// like any other elsewhere.
+func (p *parser) tests() *Tests {
+	t := &Tests{Pos: p.tok.pos}
+	p.next()
+	_, t.Name = p.ident()
+	if !p.at("<") {
+		p.fail(p.tok.pos, "syntax", "a tests list names its environment's type: tests %s<Env> { ... }, with <Unit> for none (spec.md 16.1)", t.Name)
+	}
+	p.next()
+	t.Env = p.typ()
+	p.want(">")
+	p.want("{")
+	p.list("}", func() {
+		pos, name := p.ident()
+		t.Vals = append(t.Vals, &Ident{pos, name})
+	})
+	return t
 }
 
 // Modifiers that Kotlin has and Kogo does not, with the section 14 row
@@ -859,7 +881,7 @@ func (p *parser) prefix() Expr {
 	return p.postfix(p.primary())
 }
 
-var sqlCalls = map[string]bool{"query": true, "queryOne": true, "querySingle": true, "exists": false, "execute": false}
+var sqlCalls = map[string]bool{"query": true, "queryOne": true, "querySingle": true, "exists": false, "execute": false, "refusal": false}
 
 func (p *parser) postfix(x Expr) Expr {
 	for {
@@ -961,7 +983,7 @@ func (p *parser) call(fun Expr, pos Pos, typeArgs []Type) Expr {
 		_, hasSQL = c.Args[0].Value.(*SQL)
 	}
 	if hasSQL && typed != (len(typeArgs) == 1) || hasSQL && !typed && typeArgs != nil {
-		p.fail(pos, "sql-placement", "write tx.query<R>, queryOne<R> and querySingle<R> with the row type R, and exists and execute without one")
+		p.fail(pos, "sql-placement", "write tx.query<R>, queryOne<R> and querySingle<R> with the row type R, and exists, execute and a test's refusal without one")
 	}
 	if p.at("{") && !p.nl() {
 		if hasSQL {

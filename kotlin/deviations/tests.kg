@@ -1,0 +1,7 @@
+// kotlinc refuses line 5
+// A tests list (spec 16): kotlinc must refuse it.
+class Env
+
+tests ledger<Env> {
+    discount
+}

@@ -5,11 +5,12 @@ Read those two first, then `doc/measured.md` for the counts they rest
 on. All three record a discussion with Greg on 17 Nov 2026: agreed as
 the design to work from, not built, not in `spec.md`, no example run.
 
-## Not yet discussed
+## Deferred
 
 - **The name of the command that prints the table** of gates, queues
   and their tables (`doc/gates.md`, "The table is printed";
-  `doc/work.md`, "The list of work").
+  `doc/work.md`, "The list of work"): named when it is built
+  (`doc/roadmap.md`, "Settled for the ops site").
 
 ## Not yet filed
 
@@ -30,8 +31,9 @@ the design to work from, not built, not in `spec.md`, no example run.
 - **The ops site's tenant.** Agreed: the gates of sending an invite,
   accepting one and the suppliers page bind the storefront, and the
   model stops switching tenant (`doc/gates.md`, "The gate binds the
-  tenant"). `driverJobs` stays open until the loops over tenants are
-  replaced. Made in the Kotlin first.
+  tenant"). `driverJobs` becomes `operatorJobs`, one call per
+  operator under `driverJob`'s gate (19 Nov 2026, `doc/roadmap.md`,
+  "Settled for the ops site"). Made in the Kotlin first.
 - **cusoon2's runner.** Agreed: `done_at` and `not_after` among its
   columns, and no condition of a queue's own (`doc/work.md`, "Owed is
   the runner's rule"). The order stays the queue's: the charge's
@@ -106,11 +108,12 @@ Agreed subject to this review:
   tested"): the handler reads the system clock for the limit on
   reruns.
 - **What sits behind cusoon2's PDF extension** (`doc/work.md`, "An
-  application's own extensions"): a small writer of its own, or a
-  wrapped Go library. A survey named `fpdf`, now kept on Codeberg;
-  that its widths cover the standard fonts was from memory. Also
-  unchecked: whether PDFBox kerns when it measures a string, and the
-  Kotlin's 32-bit floats against Kogo's `Double` in the layout.
+  application's own extensions"): the roadmap plans a small writer
+  of cusoon2's own, about 380 lines of Go and font data
+  (`doc/roadmap.md`, "2. The rest of cusoon2"), over a wrapped Go
+  library such as `fpdf`. Still unchecked: whether PDFBox kerns
+  when it measures a string, and the Kotlin's 32-bit floats against
+  Kogo's `Double` in the layout.
 - **Reading Postgres's limit on a session idle in a transaction** when
   the server starts, as cusoon2's role is set.
 - **What the printed table and the gate's check miss.** A cascade, a
@@ -121,7 +124,9 @@ Agreed subject to this review:
   services") was a subagent's and was not checked again. Not
   established: when Google stopped enabling its legacy services for
   new projects, and the endpoints of its newer APIs.
-- **Every size.** None of this is sized as a whole. Guesses given: the
+- **Every size.** None of this was sized as a whole on 17 Nov; the
+  roadmap now sizes the work as a whole, by estimate
+  (`doc/roadmap.md`, "The work, in order"). Guesses given: the
   rule that a statement binds something of its proof, 30 to 50 lines
   of checker, and that a proof's transaction is used only before the
   dot, 20 to 30; the functions a gate reaches, for the read-only check,
@@ -162,20 +167,22 @@ Agreed subject to this review:
   effect"); the lanes are gone (`doc/work.md`, "Each queue is served
   on its own"); routes are Go (`doc/gates.md`, "Routes that are not
   operations").
-- **The test form.** How a test makes a call time out, so that the
+- **The test form.** Its shape is settled (`doc/roadmap.md`, "The
+  test form"; DEV-940); how a test makes a call time out, so that the
   rare path runs every day, waits on it; so does moving cusoon2's
   tests (DEV-893), and the record of Google's answers they replay
   (`GoogleMapsFileCache`, a test's files kept beside the code), which
   `kogo.http` would need a mode for.
-- **The order of the migration** (DEV-893): GraphQL to Kotlin RPC and
-  then to Kogo, or straight to Kogo; all at once or piece by piece.
-  Not discussed on 17 Nov. The gate and its work are the shape a
-  booker's operation would be written in either way, and adopting it
-  is mostly work in the model: each of some 150 functions of `Model`
-  says which proof it demands.
-- **What is built first.** Agreed only this far: the request side
-  before the list of work, since the rules that protect (no action in
-  a transaction, a key only from the runner) do not need the list.
+- **The order of the migration.** Settled 19 Nov 2026
+  (`doc/roadmap.md`, "How it moves"): two steps per area, GraphQL to
+  Kotlin RPC and then to Kogo (DEV-893); piece by piece, Go serving
+  each ported list beside the JVM on one database (DEV-930); an area's
+  Kotlin deleted once its Go has proven itself.
+- **What is built first.** Settled 19 Nov 2026 (`doc/roadmap.md`, "The
+  work, in order"; DEV-914): Kogo is built by the first port, the ops
+  site's 20 operations end to end, building only what they need; the
+  list of work and the runner come with the rest of cusoon2. This
+  keeps the request side before the list of work, as agreed earlier.
 
 ## What the spec and the design doc would say
 

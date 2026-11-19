@@ -1,0 +1,56 @@
+// Tests (spec.md 16): each a value, named in a tests list and run by
+// kogo test in a transaction that is rolled back when it ends. This
+// file is the layout of every test: a break after =, the sentence on
+// the next line, the body one level in.
+package example.ops
+
+import kogo.test.test
+import kotlin.test.assertContains
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+tests invoiceTests<OpsEnv> { readsWhatItWrote, startsFromNothing, refusesANumberTwice, refusesNoNumber }
+
+fun draft(tx: Tx, number: String, totalCents: Long?): Int =
+    tx.execute(sql"""
+        insert into invoice (id, number, total_cents, status)
+        values (${newId()}, $number, $totalCents, 'draft')
+    """)
+
+val readsWhatItWrote =
+    test("reads back the invoices it wrote, in the order of their numbers") { tx, env ->
+        draft(tx, "T-2", null)
+        draft(tx, "T-1", 250L)
+        val found = tx.query<InvoiceView>(sql"""
+            select number, status, total_cents from invoice where number like 'T-%' order by number
+        """)
+        assertEquals(listOf("T-1", "T-2"), found.map { it.number })
+        assertEquals(InvoiceView("T-1", InvoiceStatus.draft, 250L), found.first())
+        assertContains(found, InvoiceView("T-2", InvoiceStatus.draft, null))
+    }
+
+// The test before this one was rolled back: its rows are not here.
+val startsFromNothing =
+    test("finds nothing another test wrote, and reads its environment") { tx, env ->
+        assertNull(tx.queryOne<String>(sql"select number from invoice where number like 'T-%' limit 1"))
+        assertTrue(env.maxLooks > 0, "the environment allows no look")
+    }
+
+// A statement Postgres refuses is a value here, and the transaction
+// goes on after it: in application code it is a bug (spec.md 10.6).
+val refusesANumberTwice =
+    test("refuses a second invoice of one number, and keeps the first") { tx, env ->
+        assertNull(tx.refusal(sql"insert into invoice (id, number, status) values (${newId()}, 'T-1', 'draft')"))
+        val refusal = tx.refusal(sql"insert into invoice (id, number, status) values (${newId()}, 'T-1', 'sent')")
+        assertEquals("23505", refusal?.sqlState)
+        assertEquals("invoice_number_key", refusal?.constraint)
+        assertEquals(listOf(InvoiceStatus.draft), tx.query<InvoiceStatus>(sql"select status from invoice where number = 'T-1'"))
+    }
+
+val refusesNoNumber =
+    test("refuses an invoice with no number, by no constraint that has a name") { tx, env ->
+        val refusal = tx.refusal(sql"insert into invoice (id, number) values (${newId()}, null)")
+        assertEquals("23502", refusal?.sqlState)
+        assertNull(refusal?.constraint)
+    }

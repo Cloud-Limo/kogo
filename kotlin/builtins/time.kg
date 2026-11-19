@@ -1,0 +1,18 @@
+// The prelude's kogo.time functions (see lists.kg); for Kotlin,
+// time.kt names java.time's types kogo.time's. An instant's seconds
+// are clamped to java.time's range, so the edges reach its ends.
+package builtins
+
+import kogo.time.Duration
+import kogo.time.Instant
+
+fun time(f: String, x: Long, y: Long, n: Int, m: Int): String? = when (f) {
+    "ofEpochSecond" -> "${Instant.ofEpochSecond(x, n.toLong())} ${Duration.ofSeconds(y, m.toLong())}"
+    "isBefore" -> "${instant(x, n).isBefore(instant(y, m))} ${instant(x, n).isAfter(instant(y, m))} ${instant(x, n).isBefore(instant(x, n))}"
+    "plusDuration" -> "${instant(x, n).plus(Duration.ofSeconds(y, m.toLong()))}"
+    "minusDuration" -> "${instant(x, n).minus(Duration.ofSeconds(y, m.toLong()))}"
+    else -> null
+}
+
+fun instant(seconds: Long, nanos: Int): Instant =
+    Instant.ofEpochSecond(seconds.coerceAtLeast(-31557014167219200L).coerceAtMost(31556889864403199L), nanos.toLong())

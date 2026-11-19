@@ -1,8 +1,9 @@
 // Package check checks a Kogo program against spec.md sections 2 to
-// 11 and 15: names, types, type arguments, overloads, narrowing, when,
-// expected failures, SQL, markers and operations. It reads the
-// parser's trees, the prelude's among them, and the SQL pass's
-// signatures, and reports errors or gives the facts the emitter needs.
+// 11, 15 and 16: names, types, type arguments, overloads, narrowing,
+// when, expected failures, SQL, markers, operations and tests. It
+// reads the parser's trees, the prelude's among them, and the SQL
+// pass's signatures, and reports errors or gives the facts the emitter
+// needs.
 package check
 
 import (
@@ -62,6 +63,8 @@ type Info struct {
 	SQL map[*syntax.SQL]*Query
 	// APIs holds each api list (spec.md 15) with its operations.
 	APIs map[*syntax.API]*API
+	// Tests holds each tests list (spec.md 16) with its tests.
+	Tests map[*syntax.Tests]*TestList
 	// Core is the checker's own file, check/core.kg, as these tables
 	// know it: its declarations are package kogo's, with the prelude's.
 	Core *syntax.File

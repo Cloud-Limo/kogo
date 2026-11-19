@@ -114,6 +114,8 @@ func TestPostgres(t *testing.T) {
 		{rt.ToString(Duration{Seconds: -90}), "PT-1M-30S"},
 		{rt.ToString(Duration{Seconds: -3600, Nanos: 500_000_000}), "PT-59M-59.5S"},
 		{rt.ToString(Duration{Seconds: 7200}), "PT2H"},
+		{rt.ToString(Duration{Seconds: -2, Nanos: 4}), "PT-1.999999996S"},
+		{rt.ToString(Duration{Seconds: -1, Nanos: 999_999_999}), "PT-0.000000001S"},
 		{rt.ToString(clock), "09:05:00.250"},
 		{rt.ToString(LocalTime{NanoOfDay: 18 * 3600e9}), "18:00"},
 	} {

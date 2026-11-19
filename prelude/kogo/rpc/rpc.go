@@ -115,15 +115,16 @@ type Operation[Env any] struct {
 	run   func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered]
 }
 
-// Tx is the row of an operation that takes a Tx: it runs in one
-// SERIALIZABLE transaction, run again on a conflict for as long as
-// again says, which an answer commits and a refusal or a panic rolls
+// Tx is the row of an operation that takes a SerializableTx or a Tx,
+// as serializable says: it runs in one transaction at SERIALIZABLE or
+// at READ COMMITTED, run again on a conflict for as long as again
+// says, which an answer commits and a refusal or a panic rolls
 // back. The answer is written inside it, so that one that has no JSON
 // rolls back too.
-func Tx[Env, I, A any](name string, f func(kogo.Tx, Env, Request, I) kogo.Either[string, A]) Operation[Env] {
+func Tx[Env, I, A any](name string, serializable bool, f func(kogo.Tx, Env, Request, I) kogo.Either[string, A]) Operation[Env] {
 	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
 		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) answered {
-			return kogo.SerializableTx(db, again, func(tx kogo.Tx) answered {
+			return kogo.InTx(db, serializable, again, func(tx kogo.Tx) answered {
 				return answer(name, bind[A](f(tx, env, r, input.(I)), raise))
 			})
 		})
@@ -144,8 +145,9 @@ func Db[Env, I, A any](name string, f func(kogo.Db, Env, Request, I) kogo.Either
 // the gate first runs in a transaction of its own that is rolled
 // back, the step runs once with none open, and a new transaction
 // runs the gate again and then the work. A refusal of any of them is
-// the operation's, and rolls back.
-func Gated[Env, I, P, A any](name string, gate func(kogo.Tx, Env, Request, I) kogo.Either[string, P],
+// the operation's, and rolls back. Each transaction is of the kind
+// serializable says, as the gate's first parameter names.
+func Gated[Env, I, P, A any](name string, serializable bool, gate func(kogo.Tx, Env, Request, I) kogo.Either[string, P],
 	step func(Env, P, I) kogo.Either[string, rt.Unit], work func(Env, P, I) kogo.Either[string, A]) Operation[Env] {
 	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
 		in := input.(I)
@@ -153,14 +155,14 @@ func Gated[Env, I, P, A any](name string, gate func(kogo.Tx, Env, Request, I) ko
 			if step != nil {
 				var held kogo.Either[string, P]
 				kogo.Either_RaiseEToA(func(undo kogo.Raise[rt.Unit]) rt.Unit {
-					return kogo.SerializableTx(db, again, func(tx kogo.Tx) rt.Unit {
+					return kogo.InTx(db, serializable, again, func(tx kogo.Tx) rt.Unit {
 						held = gate(tx, env, r, in)
 						panic(kogo.Raise_Raise(undo, rt.Unit{}))
 					})
 				})
 				bind[rt.Unit](step(env, bind[P](held, raise), in), raise)
 			}
-			return kogo.SerializableTx(db, again, func(tx kogo.Tx) answered {
+			return kogo.InTx(db, serializable, again, func(tx kogo.Tx) answered {
 				proof := bind[P](gate(tx, env, r, in), raise)
 				return answer(name, bind[A](work(env, proof, in), raise))
 			})
@@ -171,12 +173,12 @@ func Gated[Env, I, P, A any](name string, gate func(kogo.Tx, Env, Request, I) ko
 // Outside is a gated row whose work is an action fun, so that it runs
 // with no transaction open (doc/gates.md, "An operation that runs
 // wholly outside"): the gate runs once, in a transaction that commits
-// before the work is called. A refusal of either is the operation's.
-func Outside[Env, I, P, A any](name string, gate func(kogo.Tx, Env, Request, I) kogo.Either[string, P], work func(Env, P, I) kogo.Either[string, A]) Operation[Env] {
+// before the work is called, of the kind serializable says. A refusal of either is the operation's.
+func Outside[Env, I, P, A any](name string, serializable bool, gate func(kogo.Tx, Env, Request, I) kogo.Either[string, P], work func(Env, P, I) kogo.Either[string, A]) Operation[Env] {
 	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
 		in := input.(I)
 		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) answered {
-			proof := kogo.SerializableTx(db, again, func(tx kogo.Tx) P { return bind[P](gate(tx, env, r, in), raise) })
+			proof := kogo.InTx(db, serializable, again, func(tx kogo.Tx) P { return bind[P](gate(tx, env, r, in), raise) })
 			return answer(name, bind[A](work(env, proof, in), raise))
 		})
 	}}

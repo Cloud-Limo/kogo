@@ -35,7 +35,7 @@ func (c *checker) acts(at syntax.Node, f *Func) {
 
 // keepsOut refuses an action fun that takes a Tx.
 func (c *checker) keepsOut(f *Func, d *syntax.FunDecl) {
-	isTx := func(t Type) bool { return t != nil && named(nonNull(t)) == c.prelude("Tx") }
+	isTx := func(t Type) bool { return t != nil && c.isTx(nonNull(t)) }
 	if !f.Action {
 		return
 	}

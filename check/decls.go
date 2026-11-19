@@ -648,6 +648,9 @@ func (c *checker) class(td *TypeDecl) {
 	d := td.Decl
 	c.open(td.Params)
 	defer c.pop()
+	if td.file == c.core && td.Name == "SerializableTx" { // it fits a Tx (spec.md 10.7)
+		td.Supers = []*Named{{Decl: c.prelude("Tx")}}
+	}
 	for _, s := range d.Supers {
 		st, ok := c.typ(s).(*Named)
 		switch sealed := ok && st.Decl.Kind == "sealed interface"; {

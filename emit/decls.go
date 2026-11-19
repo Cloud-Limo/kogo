@@ -220,6 +220,9 @@ func (e *emitter) table(d *syntax.API) {
 				kind, funs = "Outside", gate+", "+fun(op.Func)
 			}
 		}
+		if kind != "Db" { // the kind of transaction the server opens
+			funs = fmt.Sprint(op.Serializable) + ", " + funs
+		}
 		ops = append(ops, fmt.Sprintf("%s(%q, %s)", rpc(kind), op.Func.Name, funs))
 	}
 	for _, t := range a.Types {

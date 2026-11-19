@@ -197,7 +197,10 @@ Kogo holds nothing here: it knows no tenant. cusoon2's marker
 file alone, and in a port a binding in the work would run on a
 proof's transaction and bind nothing of it, which the rule on
 statements refuses. It is a habit and not yet a rule while
-`driverJobs` loops over tenants (Open). Agreed with Greg on 17 Nov
+`driverJobs` loops over tenants, and becomes a rule once
+`operatorJobs`, one call per operator, replaces it (DEV-945;
+`doc/roadmap.md`, "Settled for the ops site"); the checker's part
+is built with the rule on statements. Agreed with Greg on 17 Nov
 2026; made in cusoon2's Kotlin first.
 
 ### A gate that reads no input is shared
@@ -1126,14 +1129,13 @@ it: a habit of the application's code, not a rule.
 
 - How a binding spells `lookup`; an action is an `action fun`. The
   lists' words were settled on 18 Nov 2026 (DEV-894, `decisions.md`).
-- The printed table's command has no name.
-- **`driverJobs` has no shape here.** It binds each of a driver's
-  operators in turn and reads its jobs, gate and work in one loop
-  (`eachOperator`). Putting the loop in the gate makes the gate the
-  whole operation, which a gate is not for; the work may not bind. It
-  waits on replacing cusoon2's loops over tenants, this one and the
-  daemon's ("Discover, then enter" in `doc/work.md`), which Greg has
-  wanted on other grounds.
+- The printed table's command is deferred: named when it is built
+  (`doc/roadmap.md`, "Settled for the ops site").
+- **`driverJobs`**: settled 19 Nov 2026 as one call per operator,
+  `operatorJobs`, under `driverJob`'s gate (`doc/roadmap.md`,
+  "Settled for the ops site"). The daemon's loops over tenants
+  ("Discover, then enter" in `doc/work.md`) are cusoon2's to replace
+  on their own grounds.
 - Checked on paper against three fetchers only: setting a booking's
   notes, setting its driver, and submitting a booking. The work of
   adopting it is in the model: each of some 150 functions says which

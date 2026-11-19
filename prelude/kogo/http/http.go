@@ -270,7 +270,11 @@ func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 	if req.Header.Get("User-Agent") == "" {
 		req.Header.Set("User-Agent", "") // Go sends its own unless one is set, and none for an empty one
 	}
-	keyed := req.Header.Get("Idempotency-Key") != "" || req.Header.Get("X-Idempotency-Key") != ""
+	// Go takes a request for keyed when the header is there at all,
+	// empty or not, so the test here is the same.
+	_, k1 := req.Header["Idempotency-Key"]
+	_, k2 := req.Header["X-Idempotency-Key"]
+	keyed := k1 || k2
 	switch {
 	case again && !keyed:
 		// Go's own mark of a request it may repeat; an empty one is

@@ -107,13 +107,16 @@ func TestSecondSend(t *testing.T) {
 		{"perform under a key", func(h Http) any {
 			return Http_Perform(Http_WithHeader(h, "Idempotency-Key", "k1"), post, nil)
 		}, 2, "Either.Left(Unknown(why=EOF))", false},
+		{"perform of an empty DELETE under an empty key", func(h Http) any {
+			return Http_Perform(Http_WithHeader(h, "Idempotency-Key", ""), Action_String_String_String("DELETE", "/v1/things/", "t1"), nil)
+		}, 2, "Either.Left(Unknown(why=EOF))", false},
 		{"ask", func(h Http) any { return Http_Ask(h, look, nil) }, 3, "Either.Right({})", true},
 		{"ask by a POST", func(h Http) any { return Http_Ask(h, Lookup_String_String("POST", "/search"), nil) }, 3, "Either.Right({})", true},
 	} {
 		var seen atomic.Int32
 		h, log := serve(t, Service{}, func(w http.ResponseWriter, r *http.Request) {
 			io.Copy(io.Discard, r.Body)
-			if r.Header["Idempotency-Key"] != nil && r.Header.Get("Idempotency-Key") == "" {
+			if r.Header["Idempotency-Key"] != nil && r.Header.Get("Idempotency-Key") == "" && r.URL.Path != "/v1/things/t1" { // that one sets it empty
 				t.Errorf("%s: the empty Idempotency-Key was sent", c.what)
 			}
 			if seen.Add(1) == 2 {

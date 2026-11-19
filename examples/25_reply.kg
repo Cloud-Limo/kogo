@@ -1,0 +1,37 @@
+// A Reply (spec.md 15.2): an ungated operation answers with it to set
+// cookies. The server sends the answer as the JSON and each cookie as
+// a Set-Cookie header; a refusal sets none, and the TypeScript sees
+// the answer alone.
+package example.reply
+
+import kogo.rpc.Cookie
+import kogo.rpc.Reply
+import kogo.rpc.Request
+import kogo.rpc.SameSite
+
+api session unchecked {
+    signIn   ungated
+    signOut  ungated
+}
+
+data class SessionEnv(val secure: Boolean)
+
+data class SignIn(val name: String)
+
+data class Greeting(val text: String)
+
+// The application's own: which cookie, its name, path and flags. A
+// real one holds a session's token, not a name.
+fun sessionCookie(value: String, maxAgeSeconds: Long, env: SessionEnv): Cookie =
+    Cookie("session", value, "/", maxAgeSeconds, SameSite.Lax, env.secure, true)
+
+fun signIn(tx: Tx, env: SessionEnv, request: Request, input: SignIn): Either<String, Reply<Greeting>> = either {
+    ensure(!input.name.isBlank()) { "Say who you are." }
+    Reply(Greeting("Hello, ${input.name}."), listOf(sessionCookie(input.name, 3600L, env)))
+}
+
+// A Max-Age of 0 ends the cookie.
+fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<String, Reply<Unit>> = either {
+    ensure(request.cookie("session") != null) { "You are not signed in." }
+    Reply(Unit, listOf(sessionCookie("", 0L, env)))
+}

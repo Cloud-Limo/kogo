@@ -67,7 +67,7 @@ func TestCheckExamples(t *testing.T) {
 		"24_gates.kg:83:24 (invoice.number: String) -> ",
 		"24_gates.kg:89:22 (request.clientAddress: String) -> count: Int",
 		"24_gates.kg:93:16 (request.clientAddress: String) -> ",
-		"25_action.kg:31:22 (address: String) -> count: Int",
+		"26_action.kg:31:22 (address: String) -> count: Int",
 	}
 	lines, code := kogoSQL(t, "check", "../../examples")
 	if code != 0 || len(lines) != len(want) {

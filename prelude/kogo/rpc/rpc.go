@@ -53,12 +53,66 @@ func Request_ClientAddress(this Request) string {
 	return this.r.RemoteAddr
 }
 
+// SameSite, Cookie and Reply are prelude/rpc.kg's, written here as
+// the emitter would write them.
+type SameSite string
+
+const (
+	SameSite_Strict SameSite = "Strict"
+	SameSite_Lax    SameSite = "Lax"
+	SameSite_None   SameSite = "None"
+)
+
+var SameSite_entries = []SameSite{SameSite_Strict, SameSite_Lax, SameSite_None}
+
+type Cookie struct {
+	_             struct{} `kogo:"Cookie"`
+	Name          string   `kogo:"name"`
+	Value         string   `kogo:"value"`
+	Path          string   `kogo:"path"`
+	MaxAgeSeconds int64    `kogo:"maxAgeSeconds"`
+	SameSite      SameSite `kogo:"sameSite"`
+	Secure        bool     `kogo:"secure"`
+	HttpOnly      bool     `kogo:"httpOnly"`
+}
+
+type Reply[A any] struct {
+	_       struct{}          `kogo:"Reply"`
+	Answer  A                 `kogo:"answer"`
+	Cookies kogo.List[Cookie] `kogo:"cookies"`
+}
+
+func (r Reply[A]) reply() (reflect.Value, kogo.List[Cookie]) {
+	return reflect.ValueOf(&r.Answer).Elem(), r.Cookies
+}
+
+// browserRefuses says why a browser drops c, or "" when it keeps it.
+// Browsers read the prefixes in any case.
+func browserRefuses(c Cookie) string {
+	name := strings.ToLower(c.Name)
+	switch {
+	case c.SameSite == SameSite_None && !c.Secure:
+		return "SameSite None needs secure"
+	case strings.HasPrefix(name, "__secure-") && !c.Secure:
+		return "the prefix __Secure- needs secure"
+	case strings.HasPrefix(name, "__host-") && (!c.Secure || c.Path != "/"):
+		return `the prefix __Host- needs secure and the path "/"`
+	}
+	return ""
+}
+
+// An answered is an answer's JSON and the cookies it sets.
+type answered struct {
+	body    []byte
+	cookies []*http.Cookie
+}
+
 // An Operation is one row of a table: its name on the wire and its
 // fun, which Tx and Db take with its Go type, so that Go checks it.
 type Operation[Env any] struct {
 	Name  string
 	input reflect.Type
-	run   func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, []byte]
+	run   func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered]
 }
 
 // Tx is the row of an operation that takes a Tx: it runs in one
@@ -67,9 +121,9 @@ type Operation[Env any] struct {
 // back. The answer is written inside it, so that one that has no JSON
 // rolls back too.
 func Tx[Env, I, A any](name string, f func(kogo.Tx, Env, Request, I) kogo.Either[string, A]) Operation[Env] {
-	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, []byte] {
-		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) []byte {
-			return kogo.SerializableTx(db, again, func(tx kogo.Tx) []byte {
+	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
+		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) answered {
+			return kogo.SerializableTx(db, again, func(tx kogo.Tx) answered {
 				return answer(name, kogo.Either_Bind[string, A](f(tx, env, r, input.(I)), raise, func(s string) string { return s }))
 			})
 		})
@@ -79,17 +133,43 @@ func Tx[Env, I, A any](name string, f func(kogo.Tx, Env, Request, I) kogo.Either
 // Db is the row of an operation that takes a Db and runs in no
 // transaction of the server's.
 func Db[Env, I, A any](name string, f func(kogo.Db, Env, Request, I) kogo.Either[string, A]) Operation[Env] {
-	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, _ func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, []byte] {
-		return kogo.Either_Map[string](f(db, env, r, input.(I)), func(a A) []byte { return answer(name, a) })
+	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, _ func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
+		return kogo.Either_Map[string](f(db, env, r, input.(I)), func(a A) answered { return answer(name, a) })
 	}}
 }
 
-func answer[A any](op string, a A) []byte {
+// answer writes a, or the answer of a Reply with its cookies. A
+// cookie that HTTP cannot carry, or that a browser drops without a
+// word, is a bug, and panics. Max-Age is the
+// cookie's seconds, and 0 or less ends it.
+func answer[A any](op string, a A) answered {
 	var b bytes.Buffer
+	var cookies []*http.Cookie
+	v := reflect.ValueOf(&a).Elem()
+	if r, ok := any(a).(interface {
+		reply() (reflect.Value, kogo.List[Cookie])
+	}); ok {
+		var cs kogo.List[Cookie]
+		v, cs = r.reply()
+		for _, c := range cs {
+			hc := &http.Cookie{Name: c.Name, Value: c.Value, Path: c.Path, MaxAge: int(c.MaxAgeSeconds), Secure: c.Secure, HttpOnly: c.HttpOnly,
+				SameSite: map[SameSite]http.SameSite{SameSite_Strict: http.SameSiteStrictMode, SameSite_Lax: http.SameSiteLaxMode, SameSite_None: http.SameSiteNoneMode}[c.SameSite]}
+			if hc.MaxAge <= 0 {
+				hc.MaxAge = -1
+			}
+			if err := hc.Valid(); err != nil {
+				panic(fmt.Sprintf("the answer of %s sets a cookie HTTP cannot carry: %v", op, err))
+			}
+			if refused := browserRefuses(c); refused != "" {
+				panic(fmt.Sprintf("the answer of %s sets a cookie %s that a browser refuses: %s", op, c.Name, refused))
+			}
+			cookies = append(cookies, hc)
+		}
+	}
 	b.WriteString(`{"type":"ok","value":`)
-	write(&b, reflect.ValueOf(&a).Elem(), op, "value")
+	write(&b, v, op, "value")
 	b.WriteString("}")
-	return b.Bytes()
+	return answered{b.Bytes(), cookies}
 }
 
 // A Table is what the emitter writes for an api list: its operations
@@ -179,8 +259,11 @@ func (h *Handler[Env]) serve(w http.ResponseWriter, r *http.Request, name, id st
 	case kogo.Either_Left[string]:
 		w.Write([]byte(`{"type":"refused","message":` + quote(result.Value) + `}`))
 		return "refused"
-	case kogo.Either_Right[[]byte]:
-		w.Write(result.Value)
+	case kogo.Either_Right[answered]:
+		for _, c := range result.Value.cookies {
+			http.SetCookie(w, c)
+		}
+		w.Write(result.Value.body)
 	}
 	return "ok"
 }

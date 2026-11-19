@@ -769,7 +769,7 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
   that `E`, and `db.tx` then gives an `Either<E, A>` of the block's value
   `A`, wherever it is written; elsewhere it gives the block's value. It
   commits when the block finishes, and rolls back on a failure or a
-  panic.
+  panic. It is not rerun: a deadlock in it is a panic.
 - `db.tx(serializable = true) { ... }` runs at SERIALIZABLE and reruns the
   block from the start on a serialization failure or deadlock, so the
   block must have no effect outside the transaction.
@@ -782,7 +782,7 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
   a `SerializableTx`.
 
   ```
-  invoices.kg:40:19 needs-serializable: invoice takes a SerializableTx and this is a Tx, which is not rerun on a conflict: call a function that locks, or open the transaction with db.tx(serializable = true) (spec.md 10.7)
+  invoices.kg:40:19 needs-serializable: invoice takes a SerializableTx and this is a Tx, which is not rerun on a conflict: call a function that locks, take a SerializableTx, or open the transaction with db.tx(serializable = true) (spec.md 10.7)
   ```
 - `tx.atomically { ... }` runs a nested block in a savepoint and rolls
   back to it on a failure. The block is in the raise scope around it,
@@ -1258,8 +1258,8 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
 - The first parameter of the gate, or of an ungated operation that
   takes a transaction, names the kind the server opens (10.7): at
   SERIALIZABLE for a `SerializableTx`, at READ COMMITTED for a `Tx`.
-  Each transaction of a row, a step's and an `action fun`'s included,
-  is of that kind. A list's check takes a `Tx`.
+  Each transaction a row opens is of that kind: the gate's before a
+  step or an `action fun` too. A list's check takes a `Tx`.
 - An operation that takes a `SerializableTx` or a `Tx` runs in one
   transaction, which the server opens as above. An answer commits it.
   A refusal rolls it back, so a refused request has changed nothing. A

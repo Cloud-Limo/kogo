@@ -634,7 +634,7 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 			case wholeLiteral(a) && fits(tLong, pt):
 				c.expr(a, tLong)
 			case c.serializable(pt) && c.isTx(t):
-				c.errorf(a, "needs-serializable", "%s takes a SerializableTx and this is a Tx, which is not rerun on a conflict: call a function that locks, or open the transaction with db.tx(serializable = true) (spec.md 10.7)", f.Name)
+				c.errorf(a, "needs-serializable", "%s takes a SerializableTx and this is a Tx, which is not rerun on a conflict: call a function that locks, take a SerializableTx, or open the transaction with db.tx(serializable = true) (spec.md 10.7)", f.Name)
 			default:
 				c.mismatch(a, t, pt)
 			}

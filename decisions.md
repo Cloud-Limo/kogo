@@ -3107,8 +3107,8 @@ Each entry: what was decided, why, and what would reopen it.
   the emitter writes it as Go's `kogo.Tx`. Not taken: a Go type of its own, which would
   need a conversion wherever one is passed as a `Tx`.
 - **A plain `db.tx` is run once at READ COMMITTED, and a deadlock in it is a panic, as
-  before; a `Tx` the server opens is rerun on a deadlock** (`doc/gates.md`). Not taken:
-  rerunning a plain `db.tx`, which spec 10.7 did not say.
+  before; a `Tx` the server opens is rerun on a deadlock** (`doc/gates.md`). Spec 10.7
+  now says so of `db.tx`, and a test holds each. Not taken: rerunning a plain `db.tx`.
 - **A list's check takes a `Tx`, and a `SerializableTx` there is refused**: the server
   runs it read-only at the database's default and does not rerun it (DEV-964 owns
   `Handler.check`). Not taken: accepting one, which would let it read with no lock where
@@ -3118,10 +3118,15 @@ Each entry: what was decided, why, and what would reopen it.
   `rpc.Outside(name, serializable, ...)`. Not taken: a constructor for each kind, six in
   all.
 - **The refusal is `needs-serializable`, at the argument**, and names the called fun,
-  not the caller as `doc/gates.md`'s sample does: the checker has the call at hand.
+  not the caller as `doc/gates.md`'s sample does: the checker has the call at hand. It
+  offers taking a `SerializableTx` too, the change to make in a gate on a `Tx`.
 - **Not done here: the printed table's `runs serializable` / `runs plain` line**, which
-  waits for the printed table; **a test's block is handed a `Tx`**, so a `kogo test`
-  cannot call a fun that takes a `SerializableTx` yet.
+  waits for the printed table.
+- **Open: a `kogo test` block is handed a `Tx`**, so a test cannot call a fun that takes
+  a `SerializableTx`. The Review on PR 93 leans to `RolledBack` opening at SERIALIZABLE
+  and handing a `SerializableTx`; it is Greg's, brought to him before roadmap row 13. Not
+  taken now (the lead, 19 Nov 2026): building that here, which changes what a test may
+  call without his word.
 
 ## Spec gaps found by the leakage ports, unresolved
 

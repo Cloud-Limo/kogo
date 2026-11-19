@@ -184,7 +184,8 @@ func levelWork(_ env, l string, _ rt.Unit) kogo.Either[string, string] {
 }
 
 var table = Table[env]{Check: ours, Operations: []Operation[env]{
-	Tx("add", true, add), Tx("race", true, race), Tx("deadlocked", true, deadlocked), Db("login", login), Db("who", who), Tx("signIn", true, signIn),
+	Tx("add", true, add), Tx("race", true, race), Tx("deadlocked", true, deadlocked), Tx("deadlockedPlain", false, deadlocked),
+	Db("login", login), Db("who", who), Tx("signIn", true, signIn),
 	Gated("held", true, gate, nil, work), Gated("sent", true, gate, step, work), Gated("heldRace", true, raceGate, nil, raceWork), Outside("rung", true, gate, act),
 	Tx("plain", false, level), Tx("serializable", true, level), Gated("plainGated", false, level, nil, levelWork),
 	Gated("serializableGated", true, level, nil, levelWork), Outside("plainOutside", false, level, levelWork),
@@ -293,8 +294,10 @@ func TestHandler(t *testing.T) {
 		t.Errorf("the gate ran %d times, want 12", n)
 	}
 	h.Limit = 50 * time.Millisecond
-	if status, body := post("POST", "deadlocked", ""); status != 503 || !strings.HasPrefix(body, "request ") {
-		t.Errorf("reruns past the limit answer %d %s", status, body)
+	for _, name := range []string{"deadlocked", "deadlockedPlain"} {
+		if status, body := post("POST", name, ""); status != 503 || !strings.HasPrefix(body, "request ") {
+			t.Errorf("%s: reruns past the limit answer %d %s", name, status, body)
+		}
 	}
 	h.Limit = time.Minute
 	h.env.ready.Add(2)
@@ -346,14 +349,15 @@ func TestHandler(t *testing.T) {
 	if !checkWrote {
 		t.Error("a check that writes is not refused by Postgres")
 	}
-	if len(ids) != 39 || strings.Contains(log.String(), "secret") {
+	if len(ids) != 40 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
 	causes := map[string]bool{}
 	for id, cause := range reruns {
 		causes[ids[id]+" "+cause] = true
 	}
-	if !causes["race ok serialization failure"] || !causes["deadlocked 503 deadlock"] {
+	if !causes["race ok serialization failure"] || !causes["deadlocked 503 deadlock"] ||
+		!causes["deadlockedPlain 503 deadlock"] {
 		t.Errorf("reruns are logged as %v", reruns)
 	}
 }

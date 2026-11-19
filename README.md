@@ -1,6 +1,6 @@
 # Kogo
 
-A small language in Kotlin's syntax that compiles to Go, for Postgres
+A small language in Kotlin®'s syntax that compiles to Go, for Postgres
 backends that serve web front ends. SQL is written as SQL and checked
 against the real schema at build time.
 
@@ -22,6 +22,7 @@ mise exec -- go build -o bin/kogo ./cmd/kogo
 bin/kogo check <dir>
 bin/kogo emit <dir> <out>
 bin/kogo ts <dir> <out>
+bin/kogo test <dir> <out> <main>
 ```
 
 `kogo check` checks the `.kg` files under a directory as one program and
@@ -42,6 +43,16 @@ that file or emit into another directory. Every other file in `<out>`,
 such as your own `main.go`, is left alone.
 `kogo ts` checks them and then writes `<out>/<name>.ts` for each `api`
 list: its wire types and an interface of its operations (spec.md 15.6).
+`kogo test` checks them with their test files, those named `_test.kg`,
+which `emit` and `ts` leave out; writes the Go, tests included, under
+`<out>`; and builds and runs the Go main package in `<main>`, the
+application's, which makes the pool and the environments and hands
+them to `test.Run` of `kogo/prelude/kogo/test`, which runs every `tests`
+list the main links in
+(`cmd/kogo/testdata/testmain.go` is one). Each test runs in a
+transaction that is rolled back, and each that failed is one JSON line
+(spec.md 16.2); exit 1 when one failed. Give it an `<out>` of its own,
+not the server's: the Go there holds the tests.
 
 ```
 mise exec -- go build -o bin/kogo-sql ./cmd/kogo-sql
@@ -51,3 +62,9 @@ DATABASE_URL=postgres://kogo:kogo@127.0.0.1/kogo_test bin/kogo-sql check example
 `kogo-sql check` prints each `sql"""` literal's signature, or its error, as one JSON
 object a line. It needs Postgres 18. `mise run testdb` creates the database the
 tests use; a test that runs statements does so in a schema of its own there.
+
+Copyright 2026 Gregory Tod. Licensed under the Apache License,
+Version 2.0, as Kotlin is: see `LICENSE`.
+
+Kotlin® is a registered trademark of the Kotlin Foundation. Kogo is not
+affiliated with or endorsed by JetBrains or the Kotlin Foundation.

@@ -24,7 +24,10 @@ is building it because he wants to; do not argue whether it is practical.
 1. The eight principles in `doc/design.md` settle design questions. The
    two that bite most: Postgres is the type checker for SQL (never
    re-implement SQL typing), and nothing specific to cusoon2 enters this
-   repo's code or tests.
+   repo's code or tests. Kogo is public: docs may use cusoon2 as the
+   worked example, but no secrets, personal data, prices or commercial
+   terms go anywhere, PR comments included. `mise run leaks` looks
+   for secrets.
 2. Refuse features the task does not need. Every line costs, tests
    included; give sizes (code / tests) with any proposal.
 3. Each component (SQL pass, parser, checker, emitter) is a separate Go

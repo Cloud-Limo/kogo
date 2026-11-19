@@ -247,8 +247,10 @@ On `Fixed:`, or on a `Review:` or `Ruling:` that leaves nothing to
 change and that you agree with, in the issue's worktree, fast-forwarded
 (created from `origin/<branch>` when missing, as in Code review): read
 any fix commits against the Review and its Rulings, then run
-`mise run testdb` and `mise exec -- go test ./...`. Unless the PR
-changes only `.md` files, run two more checks:
+`mise run testdb`, `mise exec -- go test ./...` and `mise run leaks`
+(after `mise install`), which ends `no leaks found` twice: Kogo is
+public, so a secret on `main` is published. Unless the PR changes only
+`.md` files, run two more checks:
 
 - `mise run kotlin`, in the worktree after `mise install` there. It
   compares every built-in with Kotlin's, takes about ten seconds and
@@ -266,8 +268,9 @@ counts no cases, run it once on `main` (in `~/Dev/kogo`, or with
 `KOGO=~/Dev/kogo`): if `main` fails the same way, the PR is not the
 cause, so it waits and you tell Greg.
 
-If they match and pass, nothing is Open and both checks end
-`0 differ` with a case count above zero, or were skipped,
+If they match and pass, `leaks` found nothing, nothing is Open and
+both checks end `0 differ` with a case count above zero, or were
+skipped,
 `gh pr merge --merge`, which moves the issue to Done, post
 `Merged: <sha>`, the built-ins check's last line and the comparison's
 `N cases` with `0 differ` (or "checks skipped") in full on the PR and

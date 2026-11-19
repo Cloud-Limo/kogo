@@ -1,0 +1,13 @@
+// What a test file is written with (spec.md 16): a test is a value,
+// and a statement Postgres refuses is one too. tx.refusal is the
+// checker's own code, as the five calls of section 10.2 are.
+package kogo.test
+
+external class Test<E>
+external class Refusal
+
+external fun <E> test(sentence: String, body: (Tx, E) -> Unit): Test<E>
+
+external val Refusal.sqlState: String
+external val Refusal.constraint: String?
+external val Refusal.message: String

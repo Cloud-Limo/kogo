@@ -136,6 +136,10 @@ above. Check a claim against the code before passing it on.
 - To have the next step in Zed, post a `Lead:` comment naming it,
   after the Ruling and before the label goes: the clerk acts on no
   `Lead:`. To hold every step of an issue, label it `lead` yourself.
+- `Clerk: the clerk for DEV-NNN exited N: ...` is the poller's, for a
+  step that failed, and no choice. Read its last lines and tell Greg
+  the cause. Once the cause is gone, put "Clerk DEV-NNN", said by hand
+  in `~/Dev/kogo`, in You can do now: the poller starts no step twice.
 
 ## Talking to Greg
 
@@ -229,9 +233,9 @@ Launching a run in `doc/clerk.md` says, and you do not wait for it.
 
 A speculative run (cusoon2's `doc/plans/async-agent-runs.md`) takes
 `lin launch --no-label`; at the end of the day you label up to three,
-those whose answer changes tomorrow's work, with `issueAddLabel` as
-that file says. Its comment must stay the newest until then; to change
-it, edit it.
+those whose answer changes tomorrow's work, with `lin label DEV-NNN
+agent`. Its comment must stay the newest until then; to change it,
+edit it.
 
 ## Ending
 

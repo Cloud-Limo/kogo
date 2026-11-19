@@ -6,17 +6,31 @@ to the lead (`doc/lead.md`); you run the pipeline between the sessions
 that do the work, for both repositories, Kogo and cusoon2. `AGENTS.md`
 has the steps every session follows and the `lin` shorthand used here.
 
-`lin clerk`, a poller in this VM, says it, as `claude -p "Clerk
-DEV-NNN" --model claude-opus-5-5 --effort medium --max-budget-usd 5`:
-when an issue's newest comment becomes `Handoff:`, `Review:`, `Ruling:`
-or `Fixed:`, from a run or a Zed session alike, and when its PR merges.
+`lin clerk`, a poller in this VM, says it, as:
+
+```
+claude -p "Clerk DEV-NNN" --model claude-opus-5-5 --effort medium \
+  --max-budget-usd 5 --permission-mode auto --allowedTools \
+  "Bash(gh pr merge https://github.com/Cloud-Limo/kogo/pull/* --merge --match-head-commit *)"
+```
+
+Auto mode refuses a merge no person approved unless a rule allows it,
+and this rule allows Kogo's PRs only: a cusoon2 PR stays Greg's.
+
+It says it when an issue's newest comment becomes `Handoff:`,
+`Review:`, `Ruling:` or `Fixed:`, from a run or a Zed session alike,
+and when the issue turns Done, which is how it sees a PR merge. So a
+PR without "Fixes DEV-NNN" starts no clerk at its merge, and an issue
+moved to Done by hand starts one, which fits no row and is handed on.
 It pulls `~/Dev/kogo` before it starts a clerk, so this file is
 `main`'s, and its first poll records what is there and starts none.
 It runs one clerk at a time, since two merges would share `kogo_test`.
 It leaves alone an issue labelled `lead` or `agent`, but for a merge,
 and takes it up from its newest comment when the label goes. For a
-clerk that fails, the cap included, it hands on itself, as Handing on
-says. Anyone may say "Clerk DEV-NNN" by hand.
+clerk that fails, the cap included, it labels the issue `lead` under
+a comment of its own, not in the form of Handing on: `Clerk: the clerk
+for DEV-NNN exited N: <its last line>`, then the command and its last
+lines. Anyone may say "Clerk DEV-NNN" by hand.
 
 You launch runs, check, merge and tidy. You write no code and make no
 commit, you run no Pickup, Code review or Fix yourself, and you make no
@@ -128,11 +142,16 @@ Review and its Rulings left standing, and change no `spec.md` but as
 a Fix or a Ruling said; the Fixed has nothing under Open that a later
 Ruling has not answered; the tests pass and `leaks` found nothing;
 both checks end `0 differ` with a case count above zero, or were
-skipped. Then `gh pr merge --merge`, which moves the issue to
-Done, and post `Merged: <sha>`, the built-ins check's last line and
-the comparison's `N cases` with `0 differ` (or "checks skipped") in
-full on the PR and its first line on the issue. Otherwise hand on,
-with what failed or differed.
+skipped. Then `gh pr merge <PR url> --merge --match-head-commit
+<sha>`, the sha being the head the checks ran on: a run's wrapper may
+push what was left in its tree after the `Fixed:` is posted, and you
+merge only what you tested. Run it as a command of its own, with no
+`cd`, `&&` or pipe, since the rule that allows it matches that form
+alone. It moves the issue to Done. Post `Merged: <sha>`, the built-ins
+check's last line and the comparison's `N cases` with `0 differ` (or
+"checks skipped") in full on the PR and its first line on the issue.
+Otherwise hand on, with what failed or differed, as when the merge is
+refused because the head moved.
 
 A cusoon2 PR is Greg's to merge. On the same comments, in a worktree
 at its pushed head, `~/Dev/cusoon2-dev-NNN`: made when missing with
@@ -164,8 +183,13 @@ it is. A worktree that is not clean stays: hand on, naming it.
 Then `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list backlog`:
 move to Todo each issue whose `Lead:` line waits on this merge, with
 `echo "Clerk: Todo: DEV-NNN merged" | lin comment DEV-MMM --state
-Todo`. The lead starts it from the board. Last, take `lead` off this
+Todo`. The lead starts it from the board. Then take `lead` off this
 issue if it is on: `lin label DEV-NNN lead --remove`.
+
+When the merged PR changed cusoon2's `mise-tasks/linear-clerk`, hand
+on with `Clerk: Greg's: systemctl --user restart lin-clerk`: the
+poller runs the old file until then, and a clerk that restarted it
+would stop itself.
 
 ## Handing on
 

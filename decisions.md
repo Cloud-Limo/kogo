@@ -657,8 +657,8 @@ Each entry: what was decided, why, and what would reopen it.
   - The poller pulls `~/Dev/kogo` before it starts a clerk, and its first poll records
     what is there and starts none (Greg's Ruling 10): else a change to `doc/clerk.md` is
     read one event late, and starting the poller starts a clerk for every open issue.
-  - The sizes stand (Ruling 8): `doc/lead.md` 242 lines for about 170, `doc/clerk.md`
-    about 190 for about 120. What is over is written once and repeats nothing. Not taken:
+  - The sizes stand (Ruling 8): `doc/lead.md` 246 lines for about 170, `doc/clerk.md`
+    214 for about 120, Rulings 11 to 16 included. What is over is written once and repeats nothing. Not taken:
     cutting the cusoon2 paragraph of Merging or Talking to Greg.
   - This PR waits for DEV-1000 and the two merge on one day (Ruling 9), since
     `doc/clerk.md` describes a poller not yet built: DEV-1000 is built to this branch,
@@ -666,6 +666,19 @@ Each entry: what was decided, why, and what would reopen it.
     clerk's own command line, run once by hand, merges this PR. Not taken: merging now
     and saying "Clerk DEV-NNN" by hand, with `main` naming three things that do not
     exist.
+  - Building the poller (cusoon2 PR 1543) changed six things, Greg's Rulings 11 to 16 of
+    20 Nov. The clerk runs with `--permission-mode auto` and one allowed command, `gh pr
+    merge` of a Kogo PR URL with `--merge --match-head-commit`: auto mode refuses a merge
+    no person approved, and the rule lets through Kogo's PRs alone. Not taken: `Bash(gh pr
+    merge *)`, which would merge a cusoon2 PR; the alias `opus` for the model, which
+    changes it with nobody deciding. The merge names the sha its checks ran on, since a
+    run's wrapper may push after its `Fixed:`, and a head that moved is handed on. The
+    poller sees a merge as the issue turning Done, so a PR without "Fixes DEV-NNN" starts
+    no clerk and a Done set by hand is handed on. For a clerk that fails the poller posts
+    its own `Clerk:` comment, the exit and the last lines, which the lead reads as a
+    failed step and Greg restarts by hand, as the poller starts no step twice. A
+    speculative run is labelled with `lin label`. A merge that changes the poller's own
+    file is handed to Greg to restart it: a clerk that did would stop itself.
   It changes five entries besides "The lead merges": in "Kogo's async runs" the table is
   now in `doc/clerk.md`; in "The side-by-side run" the clerk runs the comparison, under
   `doc/clerk.md`, "Merging"; in "The lead lists Greg's next moves in two lists" nobody

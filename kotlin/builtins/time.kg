@@ -25,6 +25,11 @@ fun time(f: String, s: String, t: String, x: Long, y: Long, n: Int, m: Int): Str
     "atStartOfDay" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().atStartOfDay(ZoneId.of(zone(n * 10 + m)))} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().atStartOfDay(ZoneId.of(zone(n * 10 + m))).toInstant()}"
     "fraction" -> "${Instant.ofEpochSecond(x % 100000000000L, n.toLong() % 1000L * 1000000L)} ${Instant.ofEpochSecond(x % 100000000000L, n.toLong() % 1000L * 1000L + 1000000L)}"
     "startOfChangedDay" -> "${Instant.ofEpochSecond(changeAt(m), 0L).atZone(ZoneId.of(changeZone(m))).toLocalDate().atStartOfDay(ZoneId.of(changeZone(m)))}"
+    "ofDays" -> "${Duration.ofDays(n.toLong())} ${Duration.ofDays(n.toLong()).seconds}"
+    "ofDaysLong" -> "${Duration.ofDays(x).seconds}"
+    "between" -> "${Duration.between(instant(x, n), instant(y, m))} ${Duration.between(instant(y, m), instant(x, n))}"
+    "betweenSeconds" -> "${Duration.between(instant(x, n), instant(y, m)).seconds} ${Duration.between(instant(x, n), instant(x, n))}"
+    "durationSeconds" -> "${Duration.ofSeconds(x, y).seconds} ${Duration.ofSeconds(x, m.toLong()).seconds}"
     "parseOrNull" -> "${Uuid.parseOrNull(uuid(n))} ${Uuid.parseOrNull(s + uuid(m))} ${Uuid.parseOrNull("${Uuid.parseOrNull(uuid(n))}") == Uuid.parseOrNull(uuid(n))}"
     "parseOrNull32" -> "${Uuid.parseOrNull("01934f2abcde7f0189abcdef0123456" + s)}"
     else -> null

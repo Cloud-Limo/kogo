@@ -22,10 +22,10 @@ fun tokenMatches(tx: Tx, request: Request): Either<String, Unit> = either {
     ensure(row == null || row.csrfToken == (request.header("X-CSRF-Token") ?: "")) { "Invalid CSRF token" }
 }
 
-private fun session(tx: Tx, id: Uuid): Session? =
+private fun session(tx: SerializableTx, id: Uuid): Session? =
     tx.queryOne<Session>(sql"select * from session where id = $id")
 
-fun liveSession(tx: Tx, env: CounterEnv, request: Request): Session? =
+fun liveSession(tx: SerializableTx, env: CounterEnv, request: Request): Session? =
     sessionId(request)?.let { session(tx, it) }?.takeIf { env.clock.now().isBefore(it.expiresAt) }
 
 // Signing out reads no row and no token.

@@ -41,7 +41,7 @@ fun isOurOrigin(tx: Tx, settings: Settings, origin: String): Boolean =
 
 // The check has passed, so a session's token matched: this compares
 // nothing.
-fun whoAmI(tx: Tx, env: CounterEnv, request: Request, input: Unit): Either<String, String> = either {
+fun whoAmI(tx: SerializableTx, env: CounterEnv, request: Request, input: Unit): Either<String, String> = either {
     liveSession(tx, env, request)?.let { "session ${it.id}" } ?: "nobody"
 }
 

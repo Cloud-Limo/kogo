@@ -47,6 +47,9 @@ func serve(t *testing.T, s Service, handler http.HandlerFunc) (Http, *bytes.Buff
 	if s.Encoding == 0 {
 		s.Encoding = Form
 	}
+	if s.Timeout == 0 {
+		s.Timeout = 5 * time.Second
+	}
 	h, err := New(s)
 	if err != nil {
 		t.Fatal(err)
@@ -142,7 +145,7 @@ func TestNoRedirectIsFollowed(t *testing.T) {
 	})
 	asked, performed := both(h)
 	want(t, "ask", asked, "Either.Left(Refused(status=302, body=null))")
-	want(t, "perform", performed, "Either.Left(Refused(status=302, body=null))")
+	want(t, "perform", performed, "Either.Left(Unknown(why=the service answered 302))") // a 303 says it acted
 	if followed.Load() != 0 {
 		t.Errorf("%d redirects were followed", followed.Load())
 	}
@@ -152,7 +155,7 @@ func TestNoRedirectIsFollowed(t *testing.T) {
 }
 
 func TestNoProxyFromTheEnvironment(t *testing.T) {
-	h, err := New(Service{Address: "http://service.invalid", Encoding: Form, MaxAnswer: 10})
+	h, err := New(Service{Address: "http://service.invalid", Encoding: Form, MaxAnswer: 10, Timeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,15 +165,15 @@ func TestNoProxyFromTheEnvironment(t *testing.T) {
 }
 
 func TestAnswerPastTheLimit(t *testing.T) {
-	long := `{"a":"` + strings.Repeat("x", 100) + `"}`
+	long := `{"a":"` + strings.Repeat("x", 400) + `"}`
 	h, _ := serve(t, Service{MaxAnswer: int64(len(long))}, answer(200, long))
 	asked, performed := both(h)
 	want(t, "ask at the limit", asked, "Either.Right("+long+")")
 	want(t, "perform at the limit", performed, "Either.Right("+long+")")
 	h, _ = serve(t, Service{MaxAnswer: int64(len(long)) - 1}, answer(200, long))
 	asked, performed = both(h)
-	want(t, "ask", asked, "Either.Left(Failed(why=the answer is longer than 107 bytes))")
-	want(t, "perform", performed, "Either.Left(Unknown(why=the answer is longer than 107 bytes))")
+	want(t, "ask", asked, "Either.Left(Failed(why=the answer is longer than 407 bytes))")
+	want(t, "perform", performed, "Either.Left(Unknown(why=the answer is longer than 407 bytes))")
 }
 
 func TestLongIsExact(t *testing.T) {
@@ -229,6 +232,32 @@ func TestPath(t *testing.T) {
 	panics(t, `an id in a path is not ""`, func() { Action_String_String_String("DELETE", "/v1/things/", "") })
 	panics(t, `an endpoint's method is GET, POST, PUT, PATCH or DELETE, not "get"`, func() { Lookup_String_String("get", "/a") })
 	panics(t, `an endpoint's path begins with /: "a"`, func() { Lookup_String_String("GET", "a") })
+	// A written part with something to escape would have Go escape
+	// the whole path again, and an id's / with it.
+	panics(t, `an endpoint's path is written as it is sent, and "roles?expand=1" is not: "/v1/users//roles?expand=1"`, func() { Lookup_String_String_String_String("GET", "/v1/users/", "x/../../admin", "/roles?expand=1") })
+	panics(t, `an endpoint's path is written as it is sent, and "my users" is not: "/v1/my users/"`, func() { Action_String_String_String("POST", "/v1/my users/", "x/../../admin") })
+	panics(t, `an endpoint's path is written as it is sent, and "100%zz" is not: "/v1/100%zz"`, func() { Lookup_String_String("GET", "/v1/100%zz") })
+	panics(t, `an endpoint's path is written as it is sent, and "a%2Fb" is not: "/v1/a%2Fb"`, func() { Lookup_String_String("GET", "/v1/a%2Fb") })
+}
+
+// Go adds nothing to what is sent and reads no more than the limit: no
+// Accept-Encoding, so an answer is not unpacked; no User-Agent of its
+// own; and an answer's headers are held to the limit too.
+func TestWhatGoWouldAdd(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/headers" {
+			w.Header().Set("X-Long", strings.Repeat("x", 1<<10))
+		}
+		w.Header().Set("Content-Encoding", "gzip")
+		fmt.Fprintf(w, `{"encoding": %q, "agent": %q}`, r.Header["Accept-Encoding"], r.Header["User-Agent"])
+	}
+	h, _ := serve(t, Service{}, handler)
+	want(t, "ask", rt.ToString(Http_Ask(h, look, nil)), `Either.Right({"encoding": [], "agent": []})`)
+	want(t, "perform", rt.ToString(Http_Perform(h, post, nil)), `Either.Right({"encoding": [], "agent": []})`)
+	want(t, "long headers", rt.ToString(Http_Perform(h, Action_String_String("POST", "/headers"), nil)),
+		"Either.Left(Unknown(why=net/http: HTTP/1.x transport connection broken: net/http: server response headers exceeded 1024 bytes; aborted))")
+	stated, _ := serve(t, Service{Headers: map[string]string{"User-Agent": "main's"}}, handler)
+	want(t, "main's User-Agent", rt.ToString(Http_Ask(stated, look, nil)), `Either.Right({"encoding": [], "agent": ["main's"]})`)
 }
 
 // What reaches the server: the path with its id still one piece, the
@@ -303,6 +332,13 @@ func TestFailures(t *testing.T) {
 			t.Errorf("the handle's query is logged:\n%s", log)
 		}
 	}
+	// A long refusal is logged to 4 KiB, and says so.
+	long := `{"echo": "` + strings.Repeat("x", 5000) + `"}`
+	h, log := serve(t, Service{MaxAnswer: 1 << 13}, answer(400, long))
+	want(t, "a long refusal", rt.ToString(Http_Ask(h, look, nil)), "Either.Left(Refused(status=400, body="+long+"))")
+	if !strings.Contains(log.String(), strings.Repeat("x", 4086)+" [cut: the first 4096 of 5012 bytes]") {
+		t.Errorf("a long refused body is not cut at 4096 bytes:\n%s", log)
+	}
 	// A slow service: the call left, so an action's end is unknown.
 	slow, _ := serve(t, Service{Timeout: 50 * time.Millisecond, Query: map[string]string{"key": "secret"}}, func(w http.ResponseWriter, r *http.Request) { time.Sleep(200 * time.Millisecond) })
 	asked, performed := both(slow)
@@ -318,10 +354,11 @@ func TestFailures(t *testing.T) {
 
 func TestNewRefuses(t *testing.T) {
 	for _, s := range []Service{
-		{Address: "http://a.example", Encoding: Form},
-		{Address: "http://a.example", MaxAnswer: 1},
-		{Address: "a.example", Encoding: JSON, MaxAnswer: 1},
-		{Address: "http://a.example/v1", Encoding: JSON, MaxAnswer: 1},
+		{Address: "http://a.example", Encoding: Form, Timeout: time.Second},
+		{Address: "http://a.example", MaxAnswer: 1, Timeout: time.Second},
+		{Address: "http://a.example", Encoding: Form, MaxAnswer: 1},
+		{Address: "a.example", Encoding: JSON, MaxAnswer: 1, Timeout: time.Second},
+		{Address: "http://a.example/v1", Encoding: JSON, MaxAnswer: 1, Timeout: time.Second},
 	} {
 		if _, err := New(s); err == nil {
 			t.Errorf("New(%+v) gave no error", s)

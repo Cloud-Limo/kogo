@@ -989,8 +989,9 @@ sameSite: SameSite, secure, httpOnly)`, with `SameSite` one of
 **An outside service** (`kogo.http`). The prelude's one outbound call.
 An `Http` is a handle for one service, made in `main` with its address,
 the headers and query fields that go with every call (its credentials:
-Kogo code holds no secret), its encoding and the most bytes of an
-answer it reads. `examples/29_http.kg` has each form.
+Kogo code holds no secret), its encoding, the most bytes of an answer
+it reads and the longest one call may take. `examples/29_http.kg` has
+each form.
 
 - An endpoint is declared once, with its kind: `lookup(method, path):
   Lookup` asks and changes nothing, and `action(method, path): Action`
@@ -1006,7 +1007,9 @@ answer it reads. `examples/29_http.kg` has each form.
   are joined as written and the id alone is escaped, so one that holds
   a `/` or a `?` stays one piece of the path. It panics (section 8)
   where `before` does not end in `/`, where `after` does not begin
-  with one, and for an id that is empty, `.` or `..`.
+  with one, and for an id that is empty, `.` or `..`. A written part
+  of a path is written as it is sent: one that holds what a path
+  escapes (a `?`, a space, a `%`) panics, with or without an id.
 - A field is a name and a value: `field(name, value)` of a `String`, a
   `Long`, a `Double` (written as `toString()` writes it; `NaN` and an
   infinity panic) or a `Boolean`; `field(name, values: List<String>)`;
@@ -1027,14 +1030,16 @@ answer it reads. `examples/29_http.kg` has each form.
   string that holds digits is not a number. `json.raw(): String` is the
   object's text untouched, and `Json.parse(text): Json?` is `null` for
   text that is not one JSON object. A 2xx answer with no body reads as
-  an object with no keys.
+  an object with no keys, and a 2xx answer that is anything else than
+  one JSON object is a failure.
 - A failed `perform` is a `SendFailure`, by how far the call got and
   its status alone: `NotSent(why)` when no connection was made;
-  `Refused(status: Int, body: Json?)` for a 3xx or a 4xx, the body
-  `null` when it is not a JSON object; `Unknown(why)` for a 5xx, no
-  answer, or one that cannot be read, since the service may have
-  acted. A failed `ask` is an `HttpError`: the same `Refused(status,
-  body)`, or `Failed(why)` for anything else. What a refusal means is
+  `Refused(status: Int, body: Json?)` for a 4xx, the body `null` when
+  it is not a JSON object; `Unknown(why)` for a 3xx, a 5xx, no answer,
+  or one that cannot be read, since the service may have acted: a
+  `303` says it did. A failed `ask` is an `HttpError`:
+  `Refused(status, body)` for a 3xx or a 4xx, or `Failed(why)` for
+  anything else. What a refusal means is
   the client's to say.
 
 Where Go's HTTP client would decide, Kogo states it:
@@ -1042,14 +1047,17 @@ Where Go's HTTP client would decide, Kogo states it:
 | What | Kogo's rule |
 | --- | --- |
 | A second send | `perform` is never sent twice. `ask` may be, at once, when a kept connection fails before any answer; each second send is logged. |
-| A redirect | None is followed: a 3xx is `Refused`, as a 4xx is. |
+| A redirect | None is followed: a 3xx is `Refused` for a lookup, as a 4xx is, and `Unknown` for an action. |
 | A proxy | None: nothing of the environment says where a call goes. |
-| An answer's length | One past the handle's limit is a failure: `Unknown` for an action. |
+| An answer's length | One past the handle's limit is a failure: `Unknown` for an action. Its headers are held to the same limit, apart from its body. |
+| An answer's form | No `Accept-Encoding` is sent, so an answer is read as the service wrote it, never unpacked. |
+| `User-Agent` | None is sent unless `main` states one among the handle's headers. |
 | A JSON number | `long` is exact, and `null` for a number written with a fraction or an exponent, or past a `Long`. `double` is the nearest `Double`. |
-| A time limit | The handle's own, where `main` states one, from the call's start to the end of its answer; past it a call that left is `Unknown`. |
+| A time limit | The handle's own, which `main` must state, from the call's start to the end of its answer; past it a call that left is `Unknown`. |
 
-Every refused send is logged in Go, with its method, path, status and
-body. A handle's own headers and query fields are never logged.
+Every 3xx and 4xx is logged in Go, with its method, path, status and
+body, the body's first 4 KiB with a mark where it is cut. A handle's
+own headers and query fields are never logged.
 
 **Tests** (`kogo.test`; test files only, section 16).
 `kogo.test` has `Test<E>`, `test(sentence) { tx, env -> ... }` and

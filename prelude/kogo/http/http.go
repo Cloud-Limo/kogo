@@ -41,7 +41,7 @@ type Service struct {
 	Address   string // scheme and host, with no path: "https://api.example.com"
 	Encoding  Encoding
 	MaxAnswer int64             // the most bytes of an answer that are read
-	Timeout   time.Duration     // of one call, from its start to the end of its answer; 0 is none
+	Timeout   time.Duration     // of one call, from its start to the end of its answer
 	Headers   map[string]string // sent with every call
 	Query     map[string]string // added to every call's query
 	Log       *slog.Logger      // where a refused send is written; nil is slog.Default()
@@ -55,8 +55,6 @@ type Http struct {
 	headers http.Header
 }
 
-func (h Http) String() string { return "Http(" + h.s.Address + ")" }
-
 // New makes a handle. It checks what it is given and touches no
 // network.
 func New(s Service) (Http, error) {
@@ -68,6 +66,8 @@ func New(s Service) (Http, error) {
 		return Http{}, fmt.Errorf("kogo.http: %s states no encoding: Form or JSON", s.Address)
 	case s.MaxAnswer <= 0:
 		return Http{}, fmt.Errorf("kogo.http: %s states no MaxAnswer, the most bytes of an answer to read", s.Address)
+	case s.Timeout <= 0:
+		return Http{}, fmt.Errorf("kogo.http: %s states no Timeout, the longest one call may take", s.Address)
 	}
 	base.Path = ""
 	if s.Log == nil {
@@ -80,11 +80,13 @@ func New(s Service) (Http, error) {
 	// A Transport of our own and not Go's default one, whose Proxy
 	// reads HTTP_PROXY and its kin: here Proxy is nil, so nothing of
 	// the environment says where a call goes. HTTP/1.1 only: the rules
-	// for a second send below are that protocol's.
+	// for a second send below are that protocol's. No Accept-Encoding
+	// is added, so an answer arrives as the service wrote it, and its
+	// headers are held to the answer's limit, not Go's 10 MiB.
 	protocols := new(http.Protocols)
 	protocols.SetHTTP1(true)
 	client := &http.Client{
-		Transport: &http.Transport{Proxy: nil, Protocols: protocols, TLSHandshakeTimeout: 10 * time.Second, IdleConnTimeout: 90 * time.Second},
+		Transport: &http.Transport{Proxy: nil, Protocols: protocols, DisableCompression: true, MaxResponseHeaderBytes: s.MaxAnswer},
 		// No redirect is followed: a 3xx is the answer.
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
@@ -112,8 +114,15 @@ type Lookup struct{ endpoint }
 type Action struct{ endpoint }
 
 // path joins the parts as written and escapes the id alone, so an id
-// that holds a / or a ? stays one piece of the path.
+// that holds a / or a ? stays one piece of the path. A written part
+// holds nothing to escape: Go would otherwise escape the whole path
+// again, the id's %2F by then a /.
 func path(method, before string, id *string, after string) endpoint {
+	for piece := range strings.SplitSeq(before+after, "/") {
+		if piece != url.PathEscape(piece) {
+			panic(fmt.Sprintf("an endpoint's path is written as it is sent, and %q is not: %q", piece, before+after))
+		}
+	}
 	switch method {
 	case "GET", "POST", "PUT", "PATCH", "DELETE":
 	default:
@@ -201,21 +210,27 @@ func Http_Ask(this Http, endpoint Lookup, fields kogo.List[Field]) kogo.Either[H
 	return kogo.Either_Left[HttpError]{Value: HttpError_Failed{Why: f.why}}
 }
 
-// Http_Perform sends an action, once: never left is NotSent, a 3xx or
-// a 4xx is Refused, and a 5xx or no answer that can be read is
-// Unknown, since the service may have acted.
+// Http_Perform sends an action, once: never left is NotSent, a 4xx is
+// Refused, and a 3xx, a 5xx or no answer that can be read is Unknown,
+// since the service may have acted: a 303 says it did.
 func Http_Perform(this Http, endpoint Action, fields kogo.List[Field]) kogo.Either[SendFailure, Json] {
 	answer, f := this.send(endpoint.endpoint, fields, false)
 	switch {
 	case f == nil:
 		return kogo.Either_Right[Json]{Value: *answer}
-	case f.refused:
+	case f.refused && f.status >= 400:
 		return kogo.Either_Left[SendFailure]{Value: SendFailure_Refused{Status: f.status, Body: f.body}}
+	case f.refused:
+		return kogo.Either_Left[SendFailure]{Value: SendFailure_Unknown{Why: fmt.Sprintf("the service answered %d", f.status)}}
 	case !f.left:
 		return kogo.Either_Left[SendFailure]{Value: SendFailure_NotSent{Why: f.why}}
 	}
 	return kogo.Either_Left[SendFailure]{Value: SendFailure_Unknown{Why: f.why}}
 }
+
+// maxLogged is the most of a refused body that is logged: it may echo
+// what was sent, a person's name or email with it.
+const maxLogged = 4 << 10
 
 // A failed send: refused with the service's status and body, or why,
 // and whether it left.
@@ -229,11 +244,8 @@ type failed struct {
 
 func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *failed) {
 	u := *h.base
-	u.Path = "/" // RawPath keeps an escaped id as it was written
-	u.RawPath = e.path
-	if p, err := url.PathUnescape(e.path); err == nil {
-		u.Path = p
-	}
+	u.RawPath = e.path // keeps an escaped id as it was written
+	u.Path, _ = url.PathUnescape(e.path)
 	var query, body []byte
 	for _, name := range slices.Sorted(maps.Keys(h.s.Query)) {
 		query = pair(query, name, h.s.Query[name])
@@ -249,12 +261,9 @@ func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 	}
 	u.RawQuery = string(query)
 
-	ctx, sends := context.Background(), 0
-	if h.s.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, h.s.Timeout)
-		defer cancel()
-	}
+	sends := 0
+	ctx, cancel := context.WithTimeout(context.Background(), h.s.Timeout)
+	defer cancel()
 	// A send has left once it has a connection to write on.
 	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { sends++ }})
 	req, err := http.NewRequestWithContext(ctx, e.method, u.String(), bytes.NewReader(body))
@@ -265,6 +274,9 @@ func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Set("User-Agent", "") // Go sends its own unless one is set, and none for an empty one
+	}
 	keyed := req.Header.Get("Idempotency-Key") != "" || req.Header.Get("X-Idempotency-Key") != ""
 	switch {
 	case again && !keyed:
@@ -272,7 +284,7 @@ func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 		// not sent on the wire.
 		req.Header["Idempotency-Key"] = []string{}
 	case again:
-	case len(body) > 0 || keyed || e.method == "GET" || e.method == "DELETE":
+	case len(body) > 0 || keyed || e.method == "GET":
 		// Go repeats a request that failed on a kept connection when
 		// it can make its body again and takes it for safe: a GET, or
 		// one with an Idempotency-Key header. With a body it cannot
@@ -300,7 +312,11 @@ func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 	answer := Json_Parse(string(text))
 	switch status := resp.StatusCode; {
 	case status >= 300 && status < 500:
-		h.s.Log.Warn("kogo.http: refused", "method", e.method, "path", e.path, "status", status, "body", string(text))
+		logged := string(text)
+		if len(logged) > maxLogged {
+			logged = fmt.Sprintf("%s [cut: the first %d of %d bytes]", logged[:maxLogged], maxLogged, len(logged))
+		}
+		h.s.Log.Warn("kogo.http: refused", "method", e.method, "path", e.path, "status", status, "body", logged)
 		return nil, &failed{refused: true, status: int32(status), body: answer}
 	case status < 200 || status >= 500:
 		return nil, &failed{left: true, why: fmt.Sprintf("the service answered %d", status)}

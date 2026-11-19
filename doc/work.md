@@ -265,8 +265,8 @@ fun timeZone(google: Http, at: LatLng, now: Instant): Either<HttpError, ZoneId> 
     val answer = google.ask(TIME_ZONE, listOf(
         field("location", "${at.lat},${at.lng}"),
         field("timestamp", now.epochSeconds))).bind()
-    ensure(answer.string("status") == "OK") { unreadable("status") }
-    zoneOf(answer.string("timeZoneId") ?: raise(unreadable("timeZoneId")))
+    ensure(answer.string("status") == "OK") { HttpError.Failed("the answer's status is not OK") }
+    zoneOf(answer.string("timeZoneId") ?: raise(HttpError.Failed("the answer has no timeZoneId")))
 }
 ```
 
@@ -292,8 +292,8 @@ fun chargeFields(charge: ChargeFields): List<Field> =
 action fun charge(stripe: Http, key: EffectKey, fields: ChargeFields): Either<SendFailure, PaymentIntent> = either {
     val intent = stripe.performOnce(key, CHARGE, chargeFields(fields)).bind()
     PaymentIntent(
-        intent.string("id") ?: raise(unreadable("id")),
-        intent.string("status") ?: raise(unreadable("status")))
+        intent.string("id") ?: raise(SendFailure.Unknown("the answer has no id")),
+        intent.string("status") ?: raise(SendFailure.Unknown("the answer has no status")))
 }
 
 action fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<SendFailure, Unit> = either {
@@ -401,10 +401,13 @@ an answer. No line of Kogo would have written that second send.
 | Go's default | Kogo's rule |
 | --- | --- |
 | Sends a keyed request again when a kept connection fails | `performOnce` may be sent a second time; `perform` never is; `ask` may be |
-| Follows up to 10 redirects, a redirected `POST` as a `GET` with no body | No redirect is followed: a 3xx is reported with its status, as a 4xx is |
+| Follows up to 10 redirects, a redirected `POST` as a `GET` with no body | No redirect is followed: a 3xx to `ask` is reported with its status, as a 4xx is, and one to `perform` is `Unknown`, since a `303` after a `POST` says the service acted (built so on 19 Nov 2026 while Greg is asked) |
 | Takes a proxy from `HTTP_PROXY` and its kin in the environment | No proxy unless `main` states one: the environment is ambient state (spec 7) |
 | Reads an answer of any length | An answer past a limit set in `main` is a failure: for an action, `Unknown` |
 | Reads every JSON number as a `float64` | `Json.long` is exact, and `null` for a number that is not whole or does not fit |
+| Adds `Accept-Encoding: gzip` and unpacks the answer | No `Accept-Encoding` is sent: an answer is read as the service wrote it |
+| Sends `User-Agent: Go-http-client/1.1` | None is sent unless `main` states one |
+| Reads up to 10 MiB of an answer's headers | The headers are held to the answer's limit, apart from its body |
 
 **The second send is kept, and stated.** A `performOnce` may be sent
 again, at once and under the same key, when a kept connection fails
@@ -443,7 +446,9 @@ handler and the prelude) and `kogo.mail`. Agreed with Greg on 17 Nov
 2026.
 
 **Every refused send is logged.** The binding logs a 3xx or a 4xx in
-Go, with its method, path, status and body, so a decline's code and
+Go, with its method, path, status and body (the body's first 4 KiB,
+with a mark that says it was cut and how long it was: it may echo
+what was sent), so a decline's code and
 request id reach support and what a queue stores for a payer stays
 fixed words (Q9, `decisions.md`).
 
@@ -514,9 +519,9 @@ fun stripeError(body: Json?): String? = body?.at("error")?.string("type")
 ```
 
 The binding sorts a failed send by how far it got and by status
-alone, for every service: never left is `NotSent`; a 3xx or a 4xx
-is `Refused(status, body)`; a 5xx or no answer is `Unknown`, since
-the service may have acted. What a refusal means is the client's: for
+alone, for every service: never left is `NotSent`; a 4xx is
+`Refused(status, body)`; a 5xx, no answer or, for an action, a 3xx
+is `Unknown`, since the service may have acted. What a refusal means is the client's: for
 Stripe a 409 or an `idempotency_error` may have charged
 (`StripeQueues.kt`, DEV-714 there), a `card_error` is a decline, and
 any other 4xx was not processed. Agreed with Greg on 17 Nov 2026.
@@ -1268,9 +1273,9 @@ built once. Agreed with Greg on 17 Nov 2026.
 
 - Errors a service puts in its body: Stripe's `card_error`, legacy
   Google's `status`. Each client reads its own.
-- What of a refused body is safe to log for every service, when
-  `kogo.http`'s log of refused sends is built ("What Go would decide,
-  Kogo states").
+- What of a refused body is safe to log at all, for every service:
+  `kogo.http` logs its first 4 KiB ("What Go would decide, Kogo
+  states").
 - The name of the column a waiting payer's charge is stamped with:
   cusoon2's to choose. `payer_waiting_since` is the sketches' name.
 - Reading Postgres's idle limit at start, as the role is set there.

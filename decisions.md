@@ -1097,6 +1097,8 @@ Each entry: what was decided, why, and what would reopen it.
   its method, path, status and body. So a decline's code and request id reach support with
   no word from the application, and what is stored for the payer stays fixed words.
   - To settle when built: what of a refused body is safe to log for every service.
+    Built on 19 Nov 2026 (DEV-978) with the body's first 4 KiB, by the lead's Ruling on
+    PR 97: see "Taken building `kogo.http`". What is safe to log at all stays open.
   - Not taken: `Act.Refused(words, detail)`, with the runner storing `detail` in
     `last_error`: it widens `Act` for one caller.
   - No reopen condition was given.
@@ -3192,7 +3194,9 @@ Each entry: what was decided, why, and what would reopen it.
 
 - **`HttpError` is `Refused(status, body)` or `Failed(why)`**, a sealed interface as
   `SendFailure` is. `doc/work.md` names the type and gives it no shape, and its samples
-  make one in a client (`unreadable("status")`), so Kogo code must be able to. A lookup
+  made one in a client (`unreadable("status")`, raised into both failure types, which
+  these two cannot share: the samples now write `HttpError.Failed(...)` and
+  `SendFailure.Unknown(...)`, as `examples/29_http.kg` does), so Kogo code must be able to. A lookup
   changes nothing, so it does not tell never left from no answer. Not taken: one data
   class of a nullable status, body and reason; `SendFailure` for both calls. It changes
   what a client looks like, so it is Greg's to confirm: reopen on his word.
@@ -3219,12 +3223,19 @@ Each entry: what was decided, why, and what would reopen it.
   not read, so its status is not trusted either. Not taken: `Refused` with a `null` body.
 - **`Json.long` reads digits only**: `1.0` and `1e3` are `null`, though each is a whole
   number, and `double` reads them. Not taken: exact arithmetic on the exponent, which a
-  hostile answer can make as large as it likes.
+  hostile answer can make as large as it likes. Reopen when a service on the roadmap
+  writes a whole number another way (Ruling on PR 97).
 - **A 2xx answer with no body is an object with no keys**, since a service may answer an
   action with nothing; a 2xx body that is not a JSON object is a failure. Not taken:
   `Json?` as the answer.
 - **An id that is empty, `.` or `..` panics, and so does a method that is not one of
-  five and a path that does not begin with `/`.** The Scope names two panics, for the
+  five, a path that does not begin with `/`, and a written part of a path that holds
+  what a path escapes** (a `?`, a space, a `%`, a non-ASCII byte: each piece between
+  `/` must be its own `url.PathEscape`). Go sends the path as written only when it is
+  a valid escaping; when it is not, it escapes the unescaped path again, and an id's
+  `%2F` has by then become a `/`, so an id from a browser could name another endpoint
+  (Review of PR 97, Fix 1). Not taken: escaping the written parts for the author, which
+  sends a path the declaration does not show. The Scope names two panics, for the
   text around an id. `..` from a browser is escaped to itself and names the path above:
   the same hole the escaping closes. An endpoint is made where the program starts or
   from an id, so a wrong one is found at once.
@@ -3232,14 +3243,35 @@ Each entry: what was decided, why, and what would reopen it.
   as on one of `main`'s. Not taken: the later value wins.
 - **A form's and a query's fields keep the order written**, and `main`'s query fields go
   first, by name. A `Json` field in a form is its text.
-- **`Service.Timeout` is optional and none is the default**, since `doc/main.md` makes a
-  handle without one and the design's limit is the outer edge's ("Time limits"), not
-  built. Until it is, a handle with no `Timeout` waits as long as the service does.
-  Not taken: requiring it, as `MaxAnswer` is. Reopen when the deadline is carried.
-- **A refused body is logged whole, up to the handle's `MaxAnswer`**, at `Warn`, with the
-  method, the path and the status. `doc/work.md` leaves open what of a body is safe to
-  log for every service: that stays open, and this is the behaviour until it is settled.
-  The query is not logged, nor any header: a credential may be in either.
+- **`Service.Timeout` is required, as `MaxAnswer` is** (Ruling on PR 97, the lead, 19 Nov
+  2026), until the one deadline of `doc/work.md`, "Time limits", is built: `New` gives
+  an error without it, as it does without `MaxAnswer`, and `doc/main.md`'s three handles
+  each state a placeholder. Not taken: optional, where a silent service holds a
+  goroutine and, in a transaction, a connection, for ever. Reopen when the deadline is
+  carried.
+- **A refused body is logged up to 4 KiB**, cut with a mark that says it was cut and how
+  long it was (Ruling on PR 97, the lead, 19 Nov 2026; it narrows the "status and body"
+  of Q9 above), at `Warn`, with the method, the path and the status. Not taken: whole,
+  which puts up to `MaxAnswer` of a service's echo of personal data in one log line; a
+  choice for each handle, which no application has asked for. What of a body is safe
+  to log at all stays open in `doc/work.md`. The query is not logged, nor any header: a
+  credential may be in either.
+- **A 3xx to `perform` is `Unknown`, and a 3xx to `ask` stays `Refused`** (Ruling on PR
+  97, 19 Nov 2026: built so meanwhile, the choice is Greg's and he is asked). A `303`
+  after a `POST` means the service acted, and `doc/charge.md` reads `Refused` as nothing
+  done. It is still logged with its status and body. Not taken, unless Greg takes it:
+  the design's "a 3xx is reported with its status, as a 4xx is" for both calls.
+- **Three more of Go's defaults are off** (Review of PR 97, Fix 2): no `Accept-Encoding`
+  is sent, so an answer is never unpacked on the way to the limit; no `User-Agent`
+  unless `main` states one among the headers; and an answer's headers are held to
+  `MaxAnswer`, on their own count and not in one sum with the body, where Go reads 10
+  MiB. Not taken: one count over headers and body, which needs a reader of our own
+  under Go's; a floor for small limits, one more figure nobody stated. A handle whose
+  `MaxAnswer` is under a service's few hundred bytes of headers fails every call.
+- **`Http` has no `String`, a `DELETE` is not marked against a second send (Go repeats
+  none), and the transport copies no timeouts of Go's default one** (Ruling on PR 97,
+  13): a kept connection now idles until the service closes it, and a TLS handshake
+  is bounded by the handle's `Timeout` alone.
 - **`Json` is its text**, read again at each call, so `raw()` is untouched and a value
   of it compares and prints as its text. Not taken: a parsed tree, which is faster on an
   answer read many times and loses the text.

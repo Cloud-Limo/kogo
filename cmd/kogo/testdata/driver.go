@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"time"
 
 	"ROOT/cusoon/invoice"
 	"ROOT/cusoon/model"
@@ -340,7 +341,7 @@ func main() {
 		}
 	}))
 	defer server.Close()
-	service := khttp.Service{Address: server.URL, Encoding: khttp.JSON, MaxAnswer: 1 << 10,
+	service := khttp.Service{Address: server.URL, Encoding: khttp.JSON, MaxAnswer: 1 << 10, Timeout: 5 * time.Second,
 		Headers: map[string]string{"Authorization": "Bearer of main"}, Log: slog.New(slog.DiscardHandler)}
 	theDepot, err := khttp.New(service)
 	if err != nil {

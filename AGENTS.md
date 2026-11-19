@@ -70,11 +70,21 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   `git -C ~/Dev/kogo fetch origin`, then `git worktree add -b <branch>
   ~/Dev/kogo-dev-NNN origin/main`; a later step that finds it missing
   fetches and makes it from `origin/<branch>`. `~/Dev/kogo` stays on
-  `main` for Greg and the lead: never edit, commit or switch branch
-  there, and never work in another issue's worktree.
+  `main` for Greg, the lead and the clerk: never edit, commit or
+  switch branch there, and never work in another issue's worktree.
 - **Lead.** "Lead", said in `~/Dev/kogo`, starts the session Greg
-  talks to: read Kogo's `doc/lead.md` and follow it. No other session
-  needs that file.
+  talks to: read Kogo's `doc/lead.md` and follow it. It decides, and
+  answers what the clerk hands on; it waits on no run and merges
+  nothing. No other session needs that file.
+- **Clerk.** "Clerk DEV-NNN", said in `~/Dev/kogo`, takes one step of
+  the pipeline for that issue and exits: read Kogo's `doc/clerk.md`
+  and follow it. `lin clerk` says it when an issue's newest comment
+  becomes `Handoff:`, `Review:`, `Ruling:` or `Fixed:`, from a run or
+  a Zed session alike, or its PR merges, so no session reports a step
+  back. It launches the Code review and the Fix, checks and tidies.
+  What it cannot settle it hands to the lead: a `Clerk:` comment and
+  the label `lead`, which wait for Greg's next "Lead". It leaves an
+  issue labelled `lead` alone.
 - **File.** `lin file --project <project> --state <state> "Title" <
   desc.md`, into the project of the repository the work lands in, and
   in Todo if it is ready to start, in Backlog if it waits on something
@@ -129,17 +139,18 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   raised. Post it on the PR, and its first line alone on the issue
   with `head -1 fixed.md | lin comment DEV-NNN` (no `--state`: it
   stays In Review), print it, and stop. Do not merge: see Who merges.
-- **Who merges.** Kogo: the lead, and no other session. After Code
-  review and Fix it reads the fixes, runs the checks `doc/lead.md`
-  names and merges. Greg does not review Kogo's PRs on GitHub: review
-  is the Code review step, and the lead answers for the quality of
-  what merges.
-- **Async runs.** The lead starts one with `lin launch DEV-NNN <
-  brief.md`, which posts the launch comment and then adds the `agent`
-  label; Greg may add or remove the label too. A run has no Linear
-  access and its clone is its worktree. It clones the repository of its
-  issue's project: Kogo for Kogo, cusoon2 for any other. Work that
-  lands in another repository than its issue's project's runs in Zed.
+- **Who merges.** Kogo: the clerk, and no other session. After Code
+  review and Fix it reads the fixes and runs the checks `doc/clerk.md`
+  names. It merges when every one passes and nothing is Open, and
+  otherwise hands the PR to the lead. Greg does not review Kogo's PRs
+  on GitHub: review is the Code review step.
+- **Async runs.** The lead or the clerk starts one with `lin launch
+  DEV-NNN < brief.md`, which posts the launch comment and then adds
+  the `agent` label; Greg may add or remove the label too. A run has
+  no Linear access and its clone is its worktree. It clones the
+  repository of its issue's project: Kogo for Kogo, cusoon2 for any
+  other. Work that lands in another repository than its issue's
+  project's runs in Zed.
   Post the step's comment on the PR yourself, under the marker line the
   run's prompt gives, and write the same, in full, as the run's
   `answer.md`. The wrapper posts on the issue the first line when the
@@ -148,7 +159,8 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   is left is pushed to the PR's branch. No run merges.
 - A comment with no PR to hold it stays on the issue in full: a
   launch comment, a `Lead:` comment, an answer of Greg's given before
-  a PR exists.
+  a PR exists. A `Clerk:` comment does too, PR or none: the lead reads
+  the issue.
 - Never rebase or force-push a pushed branch: reviews hold its shas.
 - A PR description is three parts and nothing else: one or two
   sentences of what it does, verb first, carrying "Fixes DEV-NNN"; one

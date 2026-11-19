@@ -127,11 +127,12 @@ changes every run. Inside a data class's text it is written as Kotlin's
 `toString` writes it, its bytes signed: `F(name=x, data=[97, 0, -1])`.
 It is in no operation's input or answer (15.4).
 
-A `String` counts as Kotlin's does: `length`, `substring`, `padStart`
-and reading it as `Char`s count UTF-16 units, so `"😀".length` is 2. It
-never holds half of a surrogate pair, though Kotlin's can: an operation
-that would leave one, as `"😀".substring(0, 1)`, leaves U+FFFD in its
-place, which also counts as one unit.
+A `String` counts as Kotlin's does: `length`, `substring`, `take`,
+`padStart` and reading it as `Char`s count UTF-16 units, so
+`"😀".length` is 2. It never holds half of a surrogate pair, though
+Kotlin's can: an operation that would leave one, as
+`"😀".substring(0, 1)` or `"😀".take(1)`, leaves U+FFFD in its place,
+which also counts as one unit.
 
 ### 3.1 Data classes
 
@@ -517,8 +518,8 @@ outside the list panics with `Index <i> out of bounds for length <size>`
 `Requested element count <n> is less than zero.` (`take(-1)`:
 `Requested element count -1 is less than zero.`); an `n` past the end
 takes or drops every element. A `String`'s `take(n)`, counted in UTF-16
-units, panics with `Requested character count <n> is less than zero.` `substring` outside the string, counted
-in UTF-16 units, panics with
+units, panics with `Requested character count <n> is less than zero.`
+`substring` outside the string, counted in UTF-16 units, panics with
 `Range [<start>, <end>) out of bounds for length <length>`, where
 `substring(start)` ends at the string's length
 (`"abc".substring(5, 3)`: `Range [5, 3) out of bounds for length 3`).
@@ -973,8 +974,8 @@ nanos)`, `isBefore`, `isAfter`, `plus(duration)`, `minus(duration)`),
 `toLocalDate`, `plusSeconds`, `toInstant`), `Duration` (`ofDays`,
 `ofMinutes`, `Duration.ofSeconds(seconds, nanos)`,
 `Duration.between(start, end)`, `seconds`), `Clock.now()`.
-`ofEpochSecond`, `ofSeconds`, `ofDays`, `plus`, `minus`, `atZone`, `plusDays`
-and `ZoneId.of` panic where `java.time`'s throw, with its message:
+`ofEpochSecond`, `ofSeconds`, `ofDays`, `plus`, `minus`, `atZone`,
+`plusDays` and `ZoneId.of` panic where `java.time`'s throw, with its message:
 `Instant exceeds minimum or maximum instant`, `long overflow`, `Invalid
 value for EpochDay` past a `LocalDate`'s years ±999,999,999, or
 `Unknown time-zone ID: X`. `ZoneId.of` takes a region name of the tz

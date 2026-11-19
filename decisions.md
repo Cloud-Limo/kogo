@@ -843,9 +843,9 @@ Each entry: what was decided, why, and what would reopen it.
   - Respelt `action fun` on 18 Nov 2026 (DEV-894, below), which reopened it.
 - **Only a binding that acts is marked: a binding says `action` or nothing** (20 Nov 2026,
   Greg, in the design session on outside calls; DEV-984; spec 7.1 and 13; `doc/gates.md`,
-  "Only a binding that acts is marked"). It reverses 17 Nov 2026's "A binding says what
-  kind of call it is", which put `lookup` before `external` on a binding that asks and
-  changes nothing. Greg: "remove lookup with no test", "And no new words".
+  "Only a binding that acts is marked"). It reverses `doc/gates.md`'s bullet of 17 Nov
+  2026, "A binding says what kind of call it is", which put `lookup` before `external` on
+  a binding that asks and changes nothing. Greg: "remove lookup with no test", "And no new words".
   - **Why.** The checker asks one thing of a binding, whether it may run in a transaction
     that can be rolled back and run again, and `action` answers it. Nothing read `lookup`;
     it put the clock, the console and a network call under one word; and the forced

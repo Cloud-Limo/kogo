@@ -392,7 +392,10 @@ func (p *parser) annotation() *Annotation {
 func (p *parser) decl(abstract bool) Decl {
 	pos := p.tok.pos
 	m := p.modifiers()
+	next := p.peek(1).text
 	switch {
+	case p.tok.kind == tIdent && !p.at("fun") && !p.at("val") && (next == "external" || next == "fun" || next == "val"):
+		p.fail(p.tok.pos, "syntax", "%s is no word of Kogo's before %s: leave it out, or write one that is (private, internal, override, const, external, action)", p.tok.text, next)
 	case m.Calls != "" && !p.at("fun"):
 		p.fail(pos, "syntax", "%s goes before fun, and before nothing else: %s fun", m.Calls, m.Calls)
 	case m.External && (p.at("class") || p.at("object")):
@@ -435,9 +438,6 @@ func (p *parser) decl(abstract bool) Decl {
 			}
 			return p.classDecl(&ClassDecl{Pos: pos, Mods: m, Kind: k})
 		}
-	}
-	if next := p.peek(1).text; p.tok.kind == tIdent && (next == "external" || next == "fun" || next == "val") {
-		p.fail(p.tok.pos, "syntax", "%s is no word of Kogo's before %s: leave it out", p.tok.text, next)
 	}
 	p.fail(p.tok.pos, "syntax", "expected a declaration (fun, val, data class, interface, ...), found %s", describe(p.tok))
 	return nil

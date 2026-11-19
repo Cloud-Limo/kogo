@@ -94,3 +94,4 @@ external fun check(value: Boolean, lazyMessage: () -> String)
 external fun error(message: String): Nothing
 
 external fun newId(): Uuid
+external fun randomString(length: Int): String

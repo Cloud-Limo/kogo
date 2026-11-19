@@ -261,6 +261,43 @@ func TestMakeIdsWith(t *testing.T) {
 	panics("after an id was made")
 }
 
+// randomString gives its length in letters and digits, each of the 62
+// within 6 deviations of n/62 over 200,000 draws, a new string each
+// call, and panics on a negative length (spec.md 12). A byte taken
+// modulo 62 makes a to h 5/256 likely, about 4,000 draws against
+// 3,226, and a rejection bound of 247 or 249 for 248 moves 9 or a
+// about as far; a fair draw fails about once in 10 million runs.
+func TestRandomString(t *testing.T) {
+	const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	if s := RandomString(0); s != "" {
+		t.Errorf("randomString(0) = %q", s)
+	}
+	if RandomString(20) == RandomString(20) {
+		t.Error("two calls gave the same string")
+	}
+	seen, n := map[rune]int{}, 200000.0
+	for range 10000 {
+		s := RandomString(20)
+		if len(s) != 20 || strings.Trim(s, alphabet) != "" {
+			t.Fatalf("randomString(20) = %q", s)
+		}
+		for _, c := range s {
+			seen[c]++
+		}
+	}
+	for _, c := range alphabet {
+		if math.Abs(float64(seen[c])-n/62) > 6*math.Sqrt(n/62*61/62) {
+			t.Errorf("%c drawn %d of %.0f", c, seen[c], n)
+		}
+	}
+	defer func() {
+		if r := recover(); r != "randomString's length -1 is negative" {
+			t.Errorf("randomString(-1) panics with %v", r)
+		}
+	}()
+	RandomString(-1)
+}
+
 // Uuid.parseOrNull reads what a template writes, hex of either case, and
 // nothing else: anything else is null, never a panic (spec.md 12).
 func TestUuidParseOrNull(t *testing.T) {

@@ -638,6 +638,19 @@ Each entry: what was decided, why, and what would reopen it.
   every function that writes a row and moves every port a step from its Kotlin. The
   side-by-side run of DEV-853 compares rows without pinning ids, by pairing each side's own.
   Reopen if a test needs fixed ids and cannot pair them.
+- **`randomString(n)` is a prelude function, the second exception to "no ambient state"**
+  (20 Nov 2026, Greg; DEV-994; spec 7, 12). A session's token is a secret that the page sends
+  back, and `newId()` is an id, not one. It passes the test `newId()` was let in by, that its
+  value never changes what a program does, so it is no new kind; the application's Kotlin and
+  its tokens stay as they are. Not taken: the token made by Postgres in the statement that
+  inserts it (`replace(gen_random_uuid()::text, '-', '')`), which needs no change to Kogo but
+  changes the application's Kotlin first and the token's form, though it has the precedent of
+  ids made in Postgres by a function both sides call (16 Nov). Each character is drawn by
+  rejection: a byte of 248 or more, past four times 62, is read again, so each of the 62 is
+  as likely as any other; a byte modulo 62 would make `a` to `h` a quarter likelier. Not
+  taken: Go's `rand.Int(rand.Reader, 62)` per character, even too but a big integer each
+  time. Reopen if a program needs another alphabet, random numbers or bytes, or a test needs
+  a fixed token.
 - **Ids are UUID version 7, whatever an application used before** (16 Nov 2026). cusoon2's
   ids are its own layout, 65.5 µs ticks since 23 Feb 2018 in the first 48 bits, made for
   index locality, which version 7 gives; Postgres 18 has `uuidv7()`. The two never sort

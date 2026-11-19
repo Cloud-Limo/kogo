@@ -643,7 +643,36 @@ Each entry: what was decided, why, and what would reopen it.
     Greg merged. Not taken: tidying when a lead starts, which no longer happens daily.
   - The cap is `--max-budget-usd 5`, a guess at several times a merge step; set it from
     the first days' log.
-  - `lin label DEV-NNN <label> [--remove]` is named and not yet written: DEV-1000's.
+  - The clerk hands on a Fix it doubts as well as a Won't fix, where the issue named only
+    the second: a wrong Fix is made by the next run, a wrong Won't fix only left.
+  - No statusline, which the issue left optional: nothing here could show that Zed's
+    agent panel draws one, and the poller's log can give each clerk's cost.
+  - A step's comment counts only from an owner, member or collaborator, and only when its
+    first line is the one on the issue (the Review, 20 Nov): Kogo is public, anyone may
+    comment on its PRs, and the clerk quotes a Ruling into a brief and merges unattended.
+    Any other is handed on. Not taken: trusting the PR's comments as a lead reading them
+    did. A run reading its PR has the same hole, which is cusoon2's launcher's.
+  - An issue that fits no row of the clerk's table is handed on, so none is nobody's
+    (the Review): the table's last row had taken anything else and exited.
+  - The poller pulls `~/Dev/kogo` before it starts a clerk, and its first poll records
+    what is there and starts none (Greg's Ruling 10): else a change to `doc/clerk.md` is
+    read one event late, and starting the poller starts a clerk for every open issue.
+  - The sizes stand (Ruling 8): `doc/lead.md` 242 lines for about 170, `doc/clerk.md`
+    about 190 for about 120. What is over is written once and repeats nothing. Not taken:
+    cutting the cusoon2 paragraph of Merging or Talking to Greg.
+  - This PR waits for DEV-1000 and the two merge on one day (Ruling 9), since
+    `doc/clerk.md` describes a poller not yet built: DEV-1000 is built to this branch,
+    what the build proves wrong comes back here as a second Ruling and Fix, and the
+    clerk's own command line, run once by hand, merges this PR. Not taken: merging now
+    and saying "Clerk DEV-NNN" by hand, with `main` naming three things that do not
+    exist.
+  It changes five entries besides "The lead merges": in "Kogo's async runs" the table is
+  now in `doc/clerk.md`; in "The side-by-side run" the clerk runs the comparison, under
+  `doc/clerk.md`, "Merging"; in "The lead lists Greg's next moves in two lists" nobody
+  says when a Not yet move is ready, a fresh "Lead" shows it; in "The lead does not run
+  other sessions' steps" Greg starts only the steps kept in Zed, and the clerk launches
+  the review and the fix; in "Greg answers the lead with numbers and letters" `884 back`
+  is gone, the clerk seeing a Zed session's comment.
   Reopen if what is handed on waits too long for a "Lead", or the clerk merges what a
   lead would have stopped.
 - **The emitted Go names its source inline, by a relative path** (15 Nov 2026). Each line of

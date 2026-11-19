@@ -46,8 +46,9 @@ list: its wire types and an interface of its operations (spec.md 15.6).
 `kogo test` checks them with their test files, those named `_test.kg`,
 which `emit` and `ts` leave out; writes the Go, tests included, under
 `<out>`; and builds and runs the Go main package in `<main>`, the
-application's, which makes the pool and the environment and hands each
-`tests` list to `test.Run` of `kogo/prelude/kogo/test`
+application's, which makes the pool and the environments and hands
+them to `test.Run` of `kogo/prelude/kogo/test`, which runs every `tests`
+list the main links in
 (`cmd/kogo/testdata/testmain.go` is one). Each test runs in a
 transaction that is rolled back, and each that failed is one JSON line
 (spec.md 16.2); exit 1 when one failed. Give it an `<out>` of its own,

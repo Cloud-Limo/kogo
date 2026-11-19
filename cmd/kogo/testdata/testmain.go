@@ -1,7 +1,7 @@
 // The test main of TestKogoTest: what an application writes in Go to
 // run its Kogo tests. It makes the pool and the environment and hands
-// each tests list to the runner. ROOT stands for the import path of
-// the directory the Go is written to, and LISTS for the lists run.
+// it to the runner, which runs every tests list linked in. ROOT stands
+// for the import path of the directory the Go is written to.
 package main
 
 import (
@@ -16,7 +16,7 @@ import (
 func main() {
 	ctx := context.Background()
 	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
-	failed := test.Run(ctx, pool, ops.OpsEnv{MaxLooks: 2}, os.Stdout, LISTS)
+	failed := test.Run(ctx, pool, os.Stdout, ops.OpsEnv{MaxLooks: 2})
 	drop()
 	if failed > 0 {
 		os.Exit(1)

@@ -763,6 +763,14 @@ assertEquals("invoice_number_key", refusal?.constraint)
 - The statement runs in a savepoint. A refusal rolls back to it, so
   the transaction goes on and holds nothing of the statement; an
   accepted statement's changes stay.
+- A statement Postgres stopped, rather than refused, is a panic: a
+  timeout, a serialization failure or deadlock, a lost connection, a
+  lack of resources or a system error (SQLSTATE classes 08, 40, 53,
+  57, 58, XX).
+- Row-level security hides rows rather than refusing a statement: an
+  update or delete of another tenant's rows is accepted and touches
+  none, so a test asserts that `execute` gives 0. Only a write that
+  breaks a policy's `with check` is refused (`42501`).
 - The literal is checked when the test is compiled, as `execute`'s is
   and with its columns discarded: a statement that does not parse or
   type is a compile error, not a `Refusal`.
@@ -1245,11 +1253,21 @@ val cardDiscount =
   files and, when it passes, writes its Go under `<out>` as `kogo
   emit` does, tests included, then builds and runs the Go main
   package in `<main>`. That main is the application's: it makes the
-  pool and the environment, as the server's main does, and hands the
-  lists to the runner. Each list is a Go value named as the list is.
+  pool and the environments, as the server's main does, and hands
+  them to the runner, `test.Run`. The runner runs every list the main
+  links in, each with the environment of its type; a list with no
+  environment of its type, or in a package the main does not import,
+  fails with code `no-env` or `not-linked`.
 - Each test runs in a transaction of its own, which is rolled back
   when the test ends, however it ends. A test sees the rows the
   database began with and those it wrote, never another test's.
+  The rollback covers `tx`; a `Db` the environment holds commits as
+  it does in the program.
+- The transaction never commits, so a deferred constraint never fires
+  in a test: a test that wants it to runs
+  `tx.execute(sql"set constraints all immediate")` first. A value
+  taken from a sequence is not rolled back, so a test does not assert
+  one.
 - A test passes when its block returns. A panic fails it: a failed
   assertion (section 12), a bug in the code it calls, a statement
   Postgres refuses. Nothing catches a panic (section 8) but the
@@ -1258,7 +1276,8 @@ val cardDiscount =
   compare its `Left` (section 9). A statement that Postgres must
   refuse is seen with `tx.refusal` (10.8).
 - Each test that failed is printed as one JSON object a line: `file`,
-  `line` and `column` of the test's val, `code` (`test-failed`),
+  `line` and `column` of the test's val, `code` (`test-failed`, or
+  the list's `no-env` or `not-linked`),
   `test` (its sentence), `message` (the panic's) and `at`, the file
   and line the panic came from. The exit status is 0 when every test
   passed, 1 when one failed, 2 when the tests could not be run.

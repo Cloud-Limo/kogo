@@ -302,7 +302,7 @@ import kogo.test.test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-tests failing<OpsEnv> { wrongSum, bug, clean }
+tests failing<OpsEnv> { wrongSum, bug, timedOut, clean }
 
 val wrongSum =
     test("adds one and one") { tx, env ->
@@ -314,6 +314,12 @@ val bug =
     test("writes one number twice") { tx, env ->
         draft(tx, "F-2", null)
         draft(tx, "F-2", null)
+    }
+
+val timedOut =
+    test("is stopped, not refused") { tx, env ->
+        tx.execute(sql"set local statement_timeout = 50")
+        assertEquals("57014", tx.refusal(sql"select pg_sleep(1)")?.sqlState)
     }
 
 val clean =
@@ -339,25 +345,34 @@ func TestKogoTest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	test := func(lists string, files map[string]string) (int, string) {
-		text := strings.NewReplacer("ROOT", "kogo/cmd/kogo/"+filepath.Base(dir), "LISTS", lists).Replace(string(main))
+	text := strings.ReplaceAll(string(main), "ROOT", "kogo/cmd/kogo/"+filepath.Base(dir))
+	test := func(files map[string]string) (int, string) {
 		if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(text), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		return kogo(t, files, dir, dir)
 	}
 	files := examples(t, "22_api.kg", "23_test.kg")
-	if code, out := test("ops.InvoiceTests", files); code != 0 || out != "" {
+	if code, out := test(files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0 and no output\n%s", code, out)
 	}
 	files["failing_test.kg"] = failing
-	code, out := test("ops.Failing, ops.InvoiceTests", files)
+	// A list whose environment the main gives none of, and one in a
+	// package the main does not import.
+	files["unit_test.kg"] = "package example.ops\n\nimport kogo.test.test\n\ntests units<Unit> { one }\n\nval one =\n    test(\"runs\") { tx, env -> }\n"
+	files["lone_test.kg"] = "package example.lone\n\nimport kogo.test.test\n\ntests lone<Unit> { one }\n\nval one =\n    test(\"runs\") { tx, env -> }\n"
+	code, out := test(files)
 	want := `{"file":"failing_test.kg","line":9,"column":1,"code":"test-failed","test":"adds one and one","message":"the sum. Expected <3>, actual <2>.","at":"failing_test.kg:12"}
 {"file":"failing_test.kg","line":15,"column":1,"code":"test-failed","test":"writes one number twice","message":"ERROR: duplicate key value violates unique constraint \"invoice_number_key\" (SQLSTATE 23505)","at":"23_test.kg:16"}
+{"file":"failing_test.kg","line":21,"column":1,"code":"test-failed","test":"is stopped, not refused","message":"ERROR: canceling statement due to statement timeout (SQLSTATE 57014)","at":"failing_test.kg:24"}
+{"file":"unit_test.kg","line":5,"column":1,"code":"no-env","test":"example.ops.units","message":"the test main gives test.Run no environment of the type that tests list example.ops.units takes: pass one","at":""}
+{"file":"lone_test.kg","line":5,"column":1,"code":"not-linked","test":"example.lone.lone","message":"the test main does not import the package of tests list example.lone.lone, so its tests did not run: import it, as _ if need be","at":""}
 `
 	if code != 1 || out != want {
 		t.Errorf("exit %d, want 1\n got %s\nwant %s", code, out, want)
 	}
+	delete(files, "lone_test.kg") // its package's Go is stale once emit leaves it out
+	os.RemoveAll(filepath.Join(dir, "example/lone"))
 	if code, out := kogo(t, files, dir); code != 0 || out != "" {
 		t.Fatalf("exit %d, want 0\n%s", code, out)
 	}

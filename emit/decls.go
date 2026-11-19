@@ -224,7 +224,8 @@ func (e *emitter) tests(d *syntax.Tests) {
 		at := v.Decl.At()
 		tests = append(tests, fmt.Sprintf("%s(%s, %q, %d, %d)", e.qualify("kogo.test", "At"), e.names[v], e.file.Name, at.Line, at.Column))
 	}
-	env := e.typ(l.Env)
-	e.w("var %s = %s[%s]{Name: %q, Tests: []%s[%s]{%s}}",
-		e.names[d], e.qualify("kogo.test", "List"), env, d.Name, e.qualify("kogo.test", "Placed"), env, strings.Join(tests, ", "))
+	env, at := e.typ(l.Env), d.At()
+	e.w("var %s = %s(%s[%s]{Name: %q, File: %q, Line: %d, Column: %d, Tests: []%s[%s]{%s}})",
+		e.names[d], e.qualify("kogo.test", "Register"), e.qualify("kogo.test", "List"), env, e.file.Package.Name+"."+d.Name,
+		e.file.Name, at.Line, at.Column, e.qualify("kogo.test", "Placed"), env, strings.Join(tests, ", "))
 }

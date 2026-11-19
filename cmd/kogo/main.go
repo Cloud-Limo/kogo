@@ -192,6 +192,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		tests := exec.Command(filepath.Join(dir, "tests"))
 		tests.Dir, tests.Stdout, tests.Stderr = args[3], stdout, stderr
+		var lists []string // each list the runner must find linked: name, file, line, column
+		for _, f := range files {
+			for _, d := range f.Tests {
+				lists = append(lists, fmt.Sprintf("%s.%s\t%s\t%d\t%d", f.Package.Name, d.Name, f.Name, d.At().Line, d.At().Column))
+			}
+		}
+		tests.Env = append(os.Environ(), "KOGO_TEST_LISTS="+strings.Join(lists, "\n"))
 		var exit *exec.ExitError
 		if err := tests.Run(); errors.As(err, &exit) {
 			return exit.ExitCode()

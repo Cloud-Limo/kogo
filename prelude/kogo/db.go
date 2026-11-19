@@ -148,7 +148,7 @@ func Tx_Refusal(this Tx, sql string, args ...any) *Refusal {
 	savepoint := must(this.tx.Begin(this.ctx))
 	_, err := savepoint.Exec(this.ctx, sql, bound(args)...)
 	var refused *pgconn.PgError
-	if !errors.As(err, &refused) {
+	if !errors.As(err, &refused) || stopped(refused.Code) {
 		must(0, err)
 		must(0, savepoint.Commit(this.ctx))
 		return nil
@@ -159,6 +159,14 @@ func Tx_Refusal(this Tx, sql string, args ...any) *Refusal {
 		r.Constraint = &refused.ConstraintName
 	}
 	return r
+}
+
+// stopped says whether an SQLSTATE is Postgres stopping a statement
+// rather than refusing it: a lost connection (08), a serialization
+// failure or deadlock (40), resources (53), an operator or a timeout
+// (57), a system error (58, XX). tx.refusal panics on these.
+func stopped(code string) bool {
+	return slices.Contains([]string{"08", "40", "53", "57", "58", "XX"}, code[:min(2, len(code))])
 }
 
 // A Scan reads the row at hand into what its arguments point to, one

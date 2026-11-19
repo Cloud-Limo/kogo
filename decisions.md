@@ -2675,18 +2675,22 @@ Each entry: what was decided, why, and what would reopen it.
   nothing behind, as the server's rollback does. Not taken: every application wrapping each
   call in `tx.atomically`. Not built in DEV-940: a test cannot call an operation until
   `kogo.test.request` exists, and that issue builds this with it.
+- **The list names its environment: `tests name<Env> { a, b }`** (Greg, 19 Nov 2026, the
+  ruling on PR 76's review). A list of bare names holds no type to infer a test's from, so
+  the list states it once, read as Kotlin's type argument. Not taken: `tests name: Env { }`;
+  the type on the first test only; one environment per program, which rules out a second
+  environment for the stand-in servers. The list's separator stays as built: commas in
+  lists are revisited across Kogo in an issue of their own.
+- **A `Db` in a test's environment commits** (Greg, 19 Nov 2026): the rollback covers `tx`,
+  and spec 16.2 says so. **Owed with `kogo.test.request`:** whether the checker refuses a
+  `tests` list whose environment holds a `Db`, directly or in a field, decided when tests
+  can call operations in-process. Not taken now: the refusal, before any test needs a `Db`.
+- **The refusals buried in application code and the panics tests expect** (three and two,
+  found in cusoon2's tests by DEV-940's handoff) are decided file by file when cusoon2's
+  tests are translated (Greg, 19 Nov 2026).
 
 ## Taken building the test form (DEV-940), not yet discussed
 
-- **The list names its environment: `tests name<Env> { a, b }`.** Greg's decision has the
-  checker infer the environment "from the list", and a list of bare names holds no type to
-  infer from: unlike an operation, a test's block states none. So the list states it, once,
-  where `Test<Env>` on every val would state it N times. Not taken: `tests name: Env { }`,
-  which reads as the list's own type; the type on the first test's lambda (`{ tx, env: Env
-  -> }`), which makes one test unlike the rest; one environment type for a whole program,
-  found from the `api` lists, which a program with two lists of two environments breaks.
-  **This spells new syntax and is Greg's to confirm.** Reopen: if he chose another spelling
-  in DEV-938, it is one parser function and the example.
 - **A list names vals of its own file, each in one list.** A cusoon2 test file is one
   class of tests, and a failure is reported with the file the list is in. Not taken: any
   val in scope, as `api` names funs, which needs each val's file carried to the emitter and
@@ -2697,11 +2701,25 @@ Each entry: what was decided, why, and what would reopen it.
   makes the list decoration.
 - **`kogo test <dir> <out> <main>` builds and runs the application's Go test main.** The
   environment holds handles only Go can make (a clock, the stand-in servers), so a Go main
-  must exist, as the server's does; it calls `test.Run(ctx, pool, env, out, lists...)` and
+  must exist, as the server's does; it calls `test.Run(ctx, pool, out, envs...)` and
   exits 1 on a failure. `kogo test` checks, emits with the tests, builds that main and
   runs it. Not taken: `kogo test` writing a main itself, which could build no environment
   but `Unit`; `kogo test` only emitting, leaving the run to the user, which the issue's
   "runs each test" rules out.
+- **The runner finds the lists; the main gives only environments** (the review of PR 76).
+  Each emitted list registers itself as its var is initialized, and `test.Run` runs every
+  list registered with the first environment of its type. `kogo test` hands the test main
+  every list's name and place (`KOGO_TEST_LISTS`), so a list in a package the main does not
+  import fails as `not-linked`, and a list with no environment of its type as `no-env`.
+  Not taken: the main naming each list, which runs a list it leaves out nowhere and says
+  nothing; `kogo test` writing a Go file that imports every package with tests, which the
+  main would still have to import.
+- **`tx.refusal` panics on a statement Postgres stopped rather than refused** (the review
+  of PR 76): SQLSTATE classes 08, 40, 53, 57, 58 and XX. Otherwise a test checking only
+  `refusal != null` passes on a timeout. Not taken: a list of the refusals (classes 22, 23,
+  42, P0), which would make a new raise in a trigger a panic until added.
+- **An unimported assertion, outside a test file, is `test-only`**, not "add import
+  kotlin.test.…", which the checker then refuses (the review of PR 76).
 - **`kogo check` reads test files; `emit` and `ts` do not.** The checker refuses a use of
   a test file's declaration from another file (`not-visible`) and an import of `kogo.test`
   or `kotlin.test` there (`test-import`), so `check` and `emit` agree about the program.

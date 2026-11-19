@@ -179,10 +179,18 @@ var notKogo = map[string][2]string{
 // program declares it.
 func (c *checker) missing(at syntax.Node, name string) Type {
 	var homes []string
+	tested := false // a name only a test file's package declares
 	for _, p := range c.pkgs {
 		if p.named(name) != nil {
+			if testOnly[p.name] && !c.file.IsTest() {
+				tested = true
+				continue
+			}
 			homes = append(homes, p.name+"."+name)
 		}
+	}
+	if homes == nil && tested {
+		return c.errorf(at, "test-only", "%s is a test file's, one named _test.kg: use it there (spec.md 16)", name)
 	}
 	if slices.Sort(homes); homes != nil {
 		return c.errorf(at, "unknown-name", "%s is not in scope: add import %s", name, strings.Join(homes, " or import "))

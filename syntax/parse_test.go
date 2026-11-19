@@ -189,6 +189,12 @@ func TestDeclarations(t *testing.T) {
 	if got := show(f.APIs); got != `[(API l [(Ident a) (Ident b) (Ident c) (Ident d)])]` {
 		t.Errorf("an api list of commas and new lines mixed: %s", got)
 	}
+	// A blank line or a comment between entries still separates them,
+	// and a list may be empty.
+	f = parse(t, "api l {\n\n    a // c\n\n    b /* x */, c,\n}\napi e { }")
+	if got := show(f.APIs); got != `[(API l [(Ident a) (Ident b) (Ident c)]) (API e)]` {
+		t.Errorf("blank lines, comments and an empty list: %s", got)
+	}
 }
 
 func TestExpressions(t *testing.T) {

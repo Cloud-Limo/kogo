@@ -701,10 +701,11 @@ work daemon alertedBy opsAlert {  // "An alert is the application's to send" bel
 The work list names its alert in its head, `alertedBy`, and its
 queues as a list, whose entries are separated by a comma, a new line
 or both, as every list's are (spec 15.1; Greg, 19 Nov 2026, DEV-947).
-An effect's and a job's lines come in the order they
-run, and the checker refuses any other: the settings `find`, `fair`,
-`soonest`, `attempts`; the steps `enter`, `prepare`, `act`, `record`;
-on failure `failed`, `recovery`. A job's are `next`, `run`, `failed`,
+A job's and an effect's parts are not a list: they stand one a line,
+with no commas. They come in the order they run, and the checker
+refuses any other: the settings `find`, `fair`, `soonest`,
+`attempts`; the steps `enter`, `prepare`, `act`, `record`; on failure
+`failed`, `recovery`. A job's are `next`, `run`, `failed`,
 `recovery`. Agreed with Greg on 18 Nov 2026 (DEV-894). Perhaps
 10 / 10.
 
@@ -726,9 +727,10 @@ The checker holds that:
 - an effect's and a job's lines are in the order they run;
 - every `work` list is `alertedBy` an `action fun` that takes the
   environment and an `Alert`;
-- every `job` and `effect` is named in some `work` list. One that is not is refused, with a message that says to add
-  it to a list, so no queue's rows pile up unserved and unseen. A
-  declared queue cannot be parked switched off. Perhaps 10 / 10.
+- every `job` and `effect` is named in some `work` list. One that is
+  not is refused, with a message that says to add it to a list, so no
+  queue's rows pile up unserved and unseen. A declared queue cannot
+  be parked switched off. Perhaps 10 / 10.
   Agreed with Greg on 17 Nov 2026 (`doc/lists-assessment.md`, choice
   D), over allowing it and never running it.
 

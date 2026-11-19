@@ -2626,7 +2626,8 @@ Each entry: what was decided, why, and what would reopen it.
     outcomes as a comment above `act`. The work list keeps its `queue` lines and choice D's
     error, so the copy is checked. Not taken: the alert alone with every queue run, the one
     place something would run without being named; the alert passed in Go, which the
-    checker could not see.
+    checker could not see. *The `queue` lines are superseded 19 Nov 2026 by "The work list
+    names its alert in its head" (DEV-947, DEV-948) below; choice D's error stands.*
 
 ## Taken recording DEV-894 (DEV-931), not yet discussed
 
@@ -2771,13 +2772,13 @@ Each entry: what was decided, why, and what would reopen it.
   DEV-947). One helper in `syntax/parse.go` reads the `api` and the `tests` list; spec
   15.1 states it and 16.1 points there. An entry of more than one word (a row with
   `gatedBy`, `after`, `ungated`) stays on one line, since a line end ends it. Supersedes
-  DEV-894's "no commas in any list". Not taken: B, no commas and one entry a line, as
-  DEV-894 had it, which the built lists and spec 15.1 did not follow; C, commas always, as
-  built, which the designs' one-entry-a-line lists did not follow. Reopen if a row of
-  words needs to run over a line.
+  DEV-894's "no commas in any list". A job's or an effect's parts are not a list: they
+  stand one a line, with no commas. Not taken: B, commas only between bare names, which
+  needs an exception for rows with words; C, commas only within a line, with no trailing
+  comma. Reopen if a row of words needs to run over a line.
 - **The work list names its alert in its head**: `work daemon alertedBy opsAlert { ... }`,
   its queues a list of names, in the shape of `api name checkedBy check { ... }` (Greg, 19
-  Nov 2026, DEV-947). Not taken: the `alert` line and a `queue` word on each line, which
+  Nov 2026, DEV-947). Not taken: the `alert` line and the repeated `queue` lines, which
   only a list without commas needed. Respelt in the docs alone; no work list is parsed yet.
 - **A missing separator says so**: `api ops { a b }` is "expected , or a new line between a
   list's entries" at `b` (DEV-948), where it said "expected }". Not taken: the old message,

@@ -1162,6 +1162,8 @@ func TestHandWrittenMain(t *testing.T) {
 		{"two steps exchanged", "(type t.Note_needsTo has no field or method Text)", []string{`.To("Ann").Text("hi")`, `.Text("hi").To("Ann")`}, routes},
 		{"a property renamed in Kogo", "(type t.Note_needsRecipient has no field or method To)", nil, strings.ReplaceAll(routes, "to", "recipient")},
 		{"an input of another type", "does not match inferred type", []string{"rpc.Call(calls, r, t.Note_op, in)", "rpc.Call(calls, r, t.Note_op, env)"}, routes},
+		{"calls served to a browser", "cannot convert calls", []string{"in))", "in))\n\tfmt.Println((*rpc.Handler[t.Env])(calls))"}, routes},
+		{"a checked list's operation", "undefined: t.Note_op", []string{"(t.Routes,", "(rpc.NewUnserved(t.Routes.Operations, t.Routes.Enums),"}, strings.Replace(routes, "unchecked", "checkedBy allow", 1) + "fun allow(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }\n"},
 	} {
 		if got := try(c.source, c.edits...); !strings.Contains(got, c.want) || c.edits == nil && c.source == routes && got != c.want {
 			t.Errorf("%s gives\n%s\nwant %s", c.what, got, c.want)

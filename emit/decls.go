@@ -249,9 +249,10 @@ func (e *emitter) chains() {
 // name on the wire and its fun, or its gate, step and work, in the
 // list's order, and the entries of each enum the operations reach, by
 // which the server reads an input's enum. An unchecked list is an
-// rpc.Unserved, which no handler takes. Beside it goes each
-// operation's rpc.Op, the typed value that rpc.Call runs it by: its
-// environment, its input and what its fun answers, a Reply whole.
+// rpc.Unserved, which no handler takes. Beside it goes each of its
+// operations' rpc.Op, the typed value that rpc.Call runs it by: its
+// environment, its input and what its fun answers, a Reply whole. A
+// checked list's operations have none: only a browser calls them.
 func (e *emitter) table(d *syntax.API) {
 	defer e.enter(d)()
 	a := e.info.APIs[d]
@@ -283,7 +284,9 @@ func (e *emitter) table(d *syntax.API) {
 			funs = fmt.Sprint(op.Serializable) + ", " + funs
 		}
 		ops = append(ops, fmt.Sprintf("%s(%q, %s)", rpc(kind), op.Func.Name, funs))
-		e.w("var %s = %s[%s, %s, %s](%q)", e.names[opValue{op}], rpc("NewOp"), e.typ(a.Env), e.typ(op.Input), e.typ(op.Func.Result.(*check.Named).Args[1]), op.Func.Name)
+		if a.Check == nil {
+			e.w("var %s = %s[%s, %s, %s](%q)", e.names[opValue{op}], rpc("NewOp"), e.typ(a.Env), e.typ(op.Input), e.typ(op.Func.Result.(*check.Named).Args[1]), op.Func.Name)
+		}
 	}
 	for _, t := range a.Types {
 		if t.Kind == "enum class" {

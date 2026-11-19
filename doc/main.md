@@ -14,9 +14,10 @@ and the prelude's handle, command and runner APIs, which no design has
 given a Go form yet. `X-Storefront` is the name of the session that
 settled the questions and is provisional. Built since (DEV-986), under
 the session's names: `rpc.Call`, `rpc.NewCalls` and `rpc.Calls`,
-`rpc.SetCookies`, each operation's `_op` value, the chain with a
+`rpc.SetCookies`, the `_op` value of each operation of a list that
+names no check, the chain with a
 step's type such as `DeliveryFailure_needsRcpt`, and
-`rpc.ReadSettings`. One line below is ahead of them: `rpc.NewCalls`
+`rpc.ReadSettings`. Two lines below are ahead of them: `rpc.NewCalls`
 and `rpc.NewHandler` take no clock yet (Q8). `rpc.Call`'s error is an
 `rpc.Refused` for a refusal, and otherwise the status and text a
 browser would get.
@@ -438,8 +439,10 @@ login (`doc/gates.md`, "Routes that are not operations"), so
 ## Two ways a route calls an operation
 
 **b is the way** (Q1): by the emitted types, as written above. The
-emitter writes, for each operation, a typed value beside the table
-(`routes.Logout_op`, of `rpc.Op[Env, I, A]`), and `rpc.Call(h, r, op,
+emitter writes, for each operation of a list that names no check, a
+typed value beside the table (`routes.Logout_op`, of `rpc.Op[Env, I,
+A]`; a checked list's operations have none, so a route that names one
+does not compile), and `rpc.Call(h, r, op,
 input I) (A, error)` runs it through a handler `main` does not mount,
 checking the input's enums against their entries as the strict reader
 does. A renamed property or a removed operation is a compile error,
@@ -478,7 +481,8 @@ of them:
   `rpc.NewUnserved`, and `rpc.SetCookies` (Q1, Q4);
   `rpc.ReadSettings` (settings); `khttp.New`, with a handle's query
   fields (Q2). `rpc.Request` stays impossible to make outside `rpc`.
-- **Added to the emitter**: an `_op` value for each operation (Q1),
+- **Added to the emitter**: an `_op` value for each operation of an
+  unchecked list (Q1),
   the chain for each list's environment and each data class an input
   reaches (Q13), and a list that names no check as a type of its own
   (Q4).

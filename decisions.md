@@ -3431,14 +3431,25 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   `rpc.NewOp[Env, I, A]("logout")`, which `rpc.Call` looks up in the list of its `Calls`.
   Where two lists of a package hold one name, each is spelled with its list,
   `Routes_Logout_op`. `A` is what the fun answers, a `Reply<A>` whole, so that a route
-  has the cookies. It is written for every list, checked ones too, though only an
-  unchecked list has a `Calls`: the decision says each operation, and it costs a line.
-  Not taken: an `Op` that holds the row's functions, which would need the four row
-  constructors to return a second type; the types are the checker's either way.
-- **`rpc.Calls` is a `Handler` without `ServeHTTP`** (`type Calls[Env] Handler[Env]`):
-  one `run` serves a browser's call and `rpc.Call`, so the id, the `served` line, the
-  limit and the reruns cannot drift apart. The `served` line is now logged before the
-  answer is written, not after. Not taken: a second struct that copies the handler's.
+  has the cookies. It is written for the operations of a list that names no check, and
+  for no other (the lead's ruling on the review, 20 Nov 2026; Greg is told, since it
+  narrows "a typed value for each operation" of 18 Nov): a checked list's operation
+  has no caller but a browser, its value let hand-written Go run it with its check
+  skipped, and without the value a route that names one is a compile error where it
+  was a 404 at run time. Not taken: a value for each operation, as first built. Nor an
+  `Op` that holds the row's functions, which would need the four row constructors to
+  return a second type; the types are the checker's either way.
+- **`rpc.Calls` and `rpc.Handler` share an unexported server** (`Handler` is
+  `struct{ *server }`, `Calls` is `struct{ *server; _ struct{} }`): one `run` serves a
+  browser's call and `rpc.Call`, so the id, the `served` line, the limit and the reruns
+  cannot drift apart, and `Limit` is promoted to both. `Calls` is a type of its own and
+  not a named `Handler` because a named `Handler` has a `Handler`'s underlying type:
+  `(*rpc.Handler[Env])(calls)` would then compile outside `rpc` and mount an unchecked
+  list for a browser with no check at all (the review of PR 101 did, and was answered
+  200). The blank field makes the two types' structs differ, so Go refuses the
+  conversion; `TestHandWrittenMain` holds it. The `served` line is now logged before
+  the answer is written, not after. Not taken: a second struct that copies the
+  handler's; a named `Handler`, as first built.
 - **`rpc.Call`'s error** is an `rpc.Refused` with the refusal's words, or the status and
   text a browser would get: `400 op: input.kind is not one of ...` for an enum that is
   no entry, `404` for an operation not of the list, `500 request <id>` for a panic,

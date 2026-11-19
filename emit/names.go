@@ -18,9 +18,10 @@ import (
 // them is spelled in full, with its receiver's type arguments and its
 // parameters' types, each val adds _val and each api list's table
 // _api; a type keeps its name, and so does an enum's entries,
-// Kind_entries. What hand-written Go calls an operation by is its
-// name with _op, Logout_op, after its list's name where two lists of
-// a package hold the name: Routes_Logout_op. The chain that builds a
+// Kind_entries. What hand-written Go calls an operation of an
+// unchecked list by is its name with _op, Logout_op, after its list's
+// name where two lists of a package hold the name: Routes_Logout_op.
+// A checked list's operations have no value. The chain that builds a
 // data class starts at its name with _, Env_(), which no other
 // declaration ends in, and each step's type is named for the property
 // it needs: Env_needsClock.
@@ -189,6 +190,9 @@ func (e *emitter) name(files []*syntax.File) {
 		for _, d := range f.APIs {
 			add(d, d, "", export(d.Name), export(d.Name)+"_api")
 			for i, op := range e.info.APIs[d].Ops {
+				if e.info.APIs[d].Check != nil {
+					break // only an unchecked list's operations have a value
+				}
 				add(opValue{op}, d.Rows[i].Op, "", export(op.Func.Name)+"_op", export(d.Name)+"_"+export(op.Func.Name)+"_op")
 			}
 		}

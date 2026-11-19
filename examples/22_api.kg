@@ -1,14 +1,14 @@
-// Operations (spec.md 15): an api list, served over HTTP. A Tx
-// operation runs in one transaction, which a refusal rolls back; a Db
-// operation opens its own, and one it has committed stays.
+// Operations (spec.md 15): an api list of ungated rows, served over
+// HTTP. A Tx operation runs in one transaction, which a refusal rolls
+// back; a Db operation opens its own, and one it has committed stays.
 package example.ops
 
 import kogo.rpc.Request
 
-api ops {
-    invoices
-    setStatus
-    lookUp
+api ops unchecked {
+    invoices   ungated
+    setStatus  ungated
+    lookUp     ungated
 }
 
 data class OpsEnv(val maxLooks: Int)

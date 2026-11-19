@@ -11,12 +11,14 @@ import (
 )
 
 // Operations (spec.md 15): an api list names top-level funs, each of
-// the shape of 15.2, whose input and answer cross the wire (15.4).
+// the shape its place in the list gives it (15.2), and an operation's
+// input and answer cross the wire (15.4).
 
 // An API is an api list as the checker read it.
 type API struct {
-	Env Type  // the environment every operation of the list takes
-	Ops []*Op // in the list's order
+	Env   Type  // the environment every fun of the list takes
+	Check *Func // the list's check; nil in an unchecked list
+	Ops   []*Op // in the list's order
 	// Types holds the wire types the operations reach, enums and data
 	// classes, in the order first reached.
 	Types []*TypeDecl
@@ -25,10 +27,36 @@ type API struct {
 // An Op is an operation.
 type Op struct {
 	Func   *Func
-	Tx     bool // it takes a Tx; otherwise a Db
-	Input  Type // Unit for none
-	Answer Type // the A of its Either<String, A>
+	Tx     bool  // ungated, it takes a Tx; otherwise a Db
+	Gate   *Func // nil for an ungated operation
+	Proof  Type  // what the gate gives and the work takes
+	After  *Func // the step between the gate and the work; nil for none
+	Input  Type  // Unit for none
+	Answer Type  // the A of its Either<String, A>
 }
+
+// A role is the shape of a fun that an api list names (spec.md 15.2).
+type role struct {
+	code  string
+	what  string   // as a message names it
+	kinds []string // of its parameters: tx, handle (a Tx or a Db), env, request, or "" for any type
+	as    string   // its parameters as an author writes them, and what else a message says
+	gives string   // what it returns
+}
+
+var (
+	ungatedRole = &role{"operation", "an ungated operation", []string{"handle", "env", "request", ""},
+		"tx: Tx, env: Env, request: Request, input: Input), with a Db for the Tx to open its own transactions and Unit for no input; work that takes a gate's proof names the gate in its row, with gatedBy", "Either<String, A>"}
+	workRole = &role{"operation", "gated work", []string{"env", "", ""},
+		"env: Env, proof: Proof, input: Input), with what its gate gives for the proof and Unit for no input: the gate has read the Request, and the proof is the work's only handle on the database", "Either<String, A>"}
+	gateRole = &role{"gate", "a gate", []string{"tx", "env", "request"},
+		"tx: Tx, env: Env, request: Request), and its operation's input fourth where it reads it", "Either<String, Proof>"}
+	inputGateRole = &role{"gate", "a gate", []string{"tx", "env", "request", ""}, gateRole.as, gateRole.gives}
+	checkRole     = &role{"check-shape", "a list's check", []string{"tx", "env", "request"},
+		"tx: Tx, env: Env, request: Request)", "Either<String, Unit>"}
+	stepRole = &role{"step", "a step named with after", []string{"env", "", ""},
+		"env: Env, proof: Proof, input: Input), with its gate's proof and its operation's input", "Either<String, Unit>"}
+)
 
 // apis checks the api lists of the program.
 func (c *checker) apis(program []*syntax.File) {
@@ -48,27 +76,45 @@ func (c *checker) apis(program []*syntax.File) {
 			if Interface(d.Name) == "Outcome" {
 				c.errorf(d, "wire-name", "api %s's interface in TypeScript would be Outcome, the answer's own type: rename the list (spec.md 15.1)", d.Name)
 			}
-			if len(d.Funs) == 0 {
-				c.errorf(d, "operation", "api %s names no fun: name its operations, as api %s { f, g } (spec.md 15.1)", d.Name, d.Name)
+			if len(d.Rows) == 0 {
+				c.errorf(d, "operation", "api %s names no fun: name its operations, as api %s unchecked { f ungated } (spec.md 15.1)", d.Name, d.Name)
+			}
+			if d.Check == nil && !d.Unchecked {
+				c.errorf(d, "no-check", "api %s names no check: write api %s checkedBy <check>, with the fun the server runs before every row, or api %s unchecked for a list that no browser calls (spec.md 15.1)", d.Name, d.Name, d.Name)
 			}
 			a := &API{}
 			c.info.APIs[d] = a
+			// env holds every fun of the list to one environment: the
+			// first that states one sets it.
+			var envOf *syntax.Ident
+			env := func(id *syntax.Ident, f *Func, r *role) {
+				if t := f.Params[slices.Index(r.kinds, "env")].Type; envOf == nil {
+					a.Env, envOf = t, id
+				} else if !same(t, a.Env) {
+					c.errorf(id, r.code, "%s takes the environment %s, and %s takes %s: the funs of one list take one environment type (spec.md 15.2)", id.Name, t, envOf.Name, a.Env)
+				}
+			}
+			if d.Check != nil {
+				if f, gives := c.shaped(d.Check, checkRole); f != nil {
+					if env(d.Check, f, checkRole); !is(gives, tUnit) && gives != unknown {
+						c.errorf(d.Check, "check-shape", "%s returns %s: a list's check returns Either<String, Unit>, a refusal or nothing (spec.md 15.2)", d.Check.Name, f.Result)
+					}
+					a.Check = f
+				}
+			}
 			w := &reach{API: a, list: d.Name, seen: map[*TypeDecl]bool{}, names: map[string]*TypeDecl{}}
-			named := map[string]bool{}
-			for _, id := range d.Funs {
-				if named[id.Name] {
+			listed := map[string]bool{}
+			gates := map[*Func]string{} // by gate, the first operation that names it
+			for _, row := range d.Rows {
+				id := row.Op
+				if listed[id.Name] {
 					c.errorf(id, "duplicate", "%s is already in api %s: a fun's name is its operation's name on the wire, so name it once", id.Name, d.Name)
 					continue
 				}
-				named[id.Name] = true
-				op := c.operation(id)
+				listed[id.Name] = true
+				op := c.operation(row, env, gates)
 				if op == nil {
 					continue
-				}
-				if env := op.Func.Params[1].Type; a.Ops == nil {
-					a.Env = env
-				} else if !fits(env, a.Env) || !fits(a.Env, env) {
-					c.errorf(id, "operation", "%s takes the environment %s, and %s takes %s: the funs of one list take one environment type (spec.md 15.2)", id.Name, env, a.Ops[0].Func.Name, a.Env)
 				}
 				a.Ops = append(a.Ops, op)
 				if !is(op.Input, tUnit) {
@@ -82,9 +128,85 @@ func (c *checker) apis(program []*syntax.File) {
 	}
 }
 
-// operation finds the fun an api list names and checks that it has
-// an operation's shape. It gives nil where it reports an error.
-func (c *checker) operation(id *syntax.Ident) *Op {
+// same reports whether a and b are one type.
+func same(a, b Type) bool { return fits(a, b) && fits(b, a) }
+
+// operation checks a row: that each fun it names has its role's
+// shape, and that what one stage gives is what the next takes. env
+// holds a fun to the list's environment, and gates has the list's
+// gates so far. It gives nil where it reports an error.
+func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *role), gates map[*Func]string) *Op {
+	id, errs := row.Op, len(c.errs)
+	if row.Gate == nil {
+		f, answer := c.shaped(id, ungatedRole)
+		if f == nil {
+			return nil
+		}
+		env(id, f, ungatedRole)
+		return &Op{Func: f, Tx: named(f.Params[0].Type) == c.prelude("Tx"), Input: f.Params[3].Type, Answer: answer}
+	}
+	g, proof := c.shaped(row.Gate, gateRole)
+	f, answer := c.shaped(id, workRole)
+	if g == nil || f == nil {
+		return nil
+	}
+	env(row.Gate, g, gateRole)
+	env(id, f, workRole)
+	op := &Op{Func: f, Gate: g, Proof: proof, Input: f.Params[2].Type, Answer: answer}
+	if d := named(proof); d != nil && (d == c.prelude("Tx") || d == c.prelude("Db") || d.Pkg == "kogo.rpc" && d.Name == "Request") {
+		c.errorf(row.Gate, "gate", "%s gives a %s: a gate gives a proof, not the handle, so give a data class that holds the Tx and what the gate read (spec.md 15.2)", g.Name, proof)
+	}
+	if t := f.Params[1].Type; !same(t, proof) {
+		c.errorf(id, "operation", "%s takes a %s second, and its gate %s gives a %s: gated work takes its gate's proof, so take a %s or name the gate that gives a %s (spec.md 15.2)", id.Name, t, g.Name, proof, proof, t)
+	}
+	if len(g.Params) == 4 {
+		if t := g.Params[3].Type; !same(t, op.Input) {
+			c.errorf(row.Gate, "gate", "%s reads a %s, and %s's input is a %s: a gate that reads an input takes its operation's (spec.md 15.2)", g.Name, t, id.Name, op.Input)
+		}
+		if other, ok := gates[g]; ok {
+			c.errorf(row.Gate, "gate", "%s is %s's gate too, and it reads an input: a gate that more than one row names reads none, so write %s a gate of its own or take the input out of %s (spec.md 15.2)", g.Name, other, id.Name, g.Name)
+		}
+	}
+	if _, ok := gates[g]; !ok {
+		gates[g] = id.Name
+	}
+	if row.After != nil {
+		s, gives := c.shaped(row.After, stepRole)
+		if s == nil {
+			return nil
+		}
+		env(row.After, s, stepRole)
+		if t := s.Params[1].Type; !same(t, proof) {
+			c.errorf(row.After, "step", "%s takes a %s second, and %s's gate %s gives a %s: a step takes its row's gate's proof (spec.md 15.2)", s.Name, t, id.Name, g.Name, proof)
+		}
+		if t := s.Params[2].Type; !same(t, op.Input) {
+			c.errorf(row.After, "step", "%s takes a %s third, and %s's input is a %s: a step takes its operation's input (spec.md 15.2)", s.Name, t, id.Name, op.Input)
+		}
+		if !is(gives, tUnit) && gives != unknown {
+			c.errorf(row.After, "step", "%s returns %s: a step named with after returns Either<String, Unit>, a refusal or nothing, and the work gives the answer (spec.md 15.2)", s.Name, s.Result)
+		}
+		op.After = s
+	}
+	if len(c.errs) > errs {
+		return nil
+	}
+	return op
+}
+
+// named gives the declaration of a named type, or nil.
+func named(t Type) *TypeDecl {
+	if n, ok := t.(*Named); ok {
+		return n.Decl
+	}
+	return nil
+}
+
+// shaped finds the one fun that an api list names at id and checks
+// that it has the shape of r, but for a gate's fourth parameter and
+// what a check or a step gives, which the list fits. It gives the fun
+// and the A of its Either<String, A>, or nil where it reports an
+// error.
+func (c *checker) shaped(id *syntax.Ident, r *role) (*Func, Type) {
 	var fs []*Func
 	for _, f := range c.funcs(id.Name) {
 		if f.Kind == Fun && f.Receiver == nil {
@@ -93,66 +215,63 @@ func (c *checker) operation(id *syntax.Ident) *Op {
 	}
 	if len(fs) != 1 {
 		c.noOperation(id, len(fs))
-		return nil
+		return nil, nil
 	}
 	f, errs := fs[0], len(c.errs)
 	c.info.Uses[id] = f
+	if r == gateRole && len(f.Params) == 4 {
+		r = inputGateRole
+	}
 	bad := func(format string, args ...any) {
-		c.errorf(id, "operation", "%s "+format+" (spec.md 15.2)", append([]any{id.Name}, args...)...)
+		c.errorf(id, r.code, "%s "+format+" (spec.md 15.2)", append([]any{id.Name}, args...)...)
 	}
 	if len(f.TypeParams) > 0 {
-		bad("has type parameters: an operation has none, so write its types out")
+		bad("has type parameters: %s has none, so write its types out", r.what)
 	}
 	for _, p := range f.Decl.(*syntax.FunDecl).Params {
 		if p.Default != nil {
-			bad("gives %s a default value: an operation has none, so remove it", p.Name)
+			bad("gives %s a default value: %s has none, so remove it", p.Name, r.what)
 		}
 	}
-	if len(f.Params) != 4 {
-		bad("takes %d parameters: an operation takes four, as fun %s(tx: Tx, env: Env, request: Request, input: Input), with a Db for the Tx to open its own transactions and Unit for no input", len(f.Params), id.Name)
-		return nil
+	if len(f.Params) != len(r.kinds) {
+		bad("takes %d parameters: %s takes %s, as fun %s(%s", len(f.Params), r.what, [...]string{3: "three", 4: "four"}[len(r.kinds)], id.Name, r.as)
+		return nil, nil
 	}
-	op := &Op{Func: f, Input: f.Params[3].Type}
-	decl := func(t Type) *TypeDecl {
-		if n, ok := t.(*Named); ok {
-			return n.Decl
+	for i, kind := range r.kinds {
+		t, nth := f.Params[i].Type, [...]string{"first", "second", "third"}[min(i, 2)]
+		d := named(t)
+		switch {
+		case t == unknown || kind == "":
+		case kind == "handle" && d != c.prelude("Tx") && d != c.prelude("Db"):
+			bad("takes a %s %s: %s takes a Tx, or a Db to open its own transactions", t, nth, r.what)
+		case kind == "tx" && d != c.prelude("Tx"):
+			bad("takes a %s %s: %s takes a Tx, the transaction the server runs it in", t, nth, r.what)
+		case kind == "env" && (d == nil || d.Kind != "data class"):
+			bad("takes a %s %s: %s takes the list's environment there, a data class of the application's, of what lives as long as the server", t, nth, r.what)
+		case kind == "request" && (d == nil || d.Pkg != "kogo.rpc" || d.Name != "Request"):
+			bad("takes a %s %s: %s takes a Request, with import kogo.rpc.Request", t, nth, r.what)
 		}
-		return nil
 	}
-	switch t := f.Params[0].Type; decl(t) {
-	case c.prelude("Tx"):
-		op.Tx = true
-	case c.prelude("Db"):
-	default:
-		if t != unknown {
-			bad("takes a %s first: an operation takes a Tx, or a Db to open its own transactions", t)
-		}
-	}
-	if t := f.Params[1].Type; t != unknown && (decl(t) == nil || decl(t).Kind != "data class") {
-		bad("takes a %s second: an operation's environment is a data class of the application's, of what lives as long as the server", t)
-	}
-	if t := f.Params[2].Type; t != unknown && (decl(t) == nil || decl(t).Pkg != "kogo.rpc" || decl(t).Name != "Request") {
-		bad("takes a %s third: an operation takes a Request, with import kogo.rpc.Request", t)
-	}
+	var gives Type = unknown
 	fd := f.Decl.(*syntax.FunDecl)
 	if e := c.either(f.Result); e != nil && is(e, tString) {
-		op.Answer = f.Result.(*Named).Args[1]
+		gives = f.Result.(*Named).Args[1]
 	} else if fd.Result == nil && fd.Expr != nil {
-		bad("does not state its return type: an operation returns Either<String, A>, so write it, fun %s(...): Either<String, A>", id.Name)
+		bad("does not state its return type: %s returns %s, so write it, fun %s(...): %s", r.what, r.gives, id.Name, r.gives)
 	} else if f.Result != unknown {
-		bad("returns %s: an operation returns Either<String, A>, its refusal in words; turn any other failure into words with mapLeft", f.Result)
+		bad("returns %s: %s returns %s, its refusal in words; turn any other failure into words with mapLeft", f.Result, r.what, r.gives)
 	}
 	if len(c.errs) > errs {
-		return nil
+		return nil, nil
 	}
-	return op
+	return f, gives
 }
 
 // noOperation reports a name in an api list that is not one fun in
 // scope: n funs of the name are.
 func (c *checker) noOperation(id *syntax.Ident, n int) {
 	if n > 1 {
-		c.errorf(id, "operation", "%d funs called %s are in scope, and an operation's name is its name on the wire: rename all but one", n, id.Name)
+		c.errorf(id, "operation", "%d funs called %s are in scope, and an api list names a fun by its name alone: rename all but one", n, id.Name)
 		return
 	}
 	notFun := func() {

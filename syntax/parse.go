@@ -220,17 +220,65 @@ func (p *parser) file() {
 	}
 }
 
-// api reads an api list. api is a name like any other elsewhere.
+// api reads an api list: its head, api name checkedBy check or api
+// name unchecked, and its rows (spec.md 15.1). api and the words of a
+// list are names like any other elsewhere.
 func (p *parser) api() *API {
 	a := &API{Pos: p.tok.pos}
 	p.next()
 	_, a.Name = p.ident()
-	p.want("{")
-	p.entries("}", func() {
+	if p.got("checkedBy") {
 		pos, name := p.ident()
-		a.Funs = append(a.Funs, &Ident{pos, name})
-	})
+		a.Check = &Ident{pos, name}
+	} else {
+		a.Unchecked = p.got("unchecked")
+	}
+	p.want("{")
+	p.entries("}", func() { a.Rows = append(a.Rows, p.row()) })
 	return a
+}
+
+// row reads one row of an api list: op gatedBy gate, op gatedBy gate
+// after step, or op ungated, on one line.
+func (p *parser) row() *Row {
+	pos, op := p.ident()
+	r := &Row{Op: &Ident{pos, op}}
+	// word reports whether the row goes on with w, and steps past it.
+	// A line that begins with w goes on the row above, unless it is
+	// itself the row of an operation named w.
+	word := func(w string) bool {
+		next := p.peek(1)
+		if !p.at(w) || p.tok.nl && !next.nl && (next.text == "gatedBy" || next.text == "ungated") {
+			return false
+		}
+		p.sameLine(op)
+		p.next()
+		return true
+	}
+	name := func() *Ident {
+		p.sameLine(op)
+		pos, name := p.ident()
+		return &Ident{pos, name}
+	}
+	if word("gatedBy") {
+		r.Gate = name()
+	} else if !word("ungated") {
+		p.fail(pos, "syntax", "%s names no gate: a row is %s gatedBy <gate>, or %s ungated for an operation that finds out who is asking itself (spec.md 15.1)", op, op, op)
+	}
+	if at := p.tok.pos; word("after") {
+		if r.Gate == nil {
+			p.fail(at, "syntax", "%s is ungated, and after names a step between a gate and its work: remove after and its step, or give %s a gate (spec.md 15.1)", op, op)
+		}
+		r.After = name()
+	}
+	return r
+}
+
+// sameLine requires the token to stand on the line of the row of op.
+func (p *parser) sameLine(op string) {
+	if p.tok.nl {
+		p.fail(p.tok.pos, "syntax", "a row stays on one line: move %s onto %s's line (spec.md 15.1)", p.tok.text, op)
+	}
 }
 
 // tests reads a tests list, tests name<Env> { a, b }. tests is a name

@@ -1,0 +1,91 @@
+// Gates (spec.md 15.1, 15.2): a list names its check, and each row
+// its gate or says ungated. A gate finds out who is asking and gives
+// a proof, which the work takes where an ungated operation takes the
+// request. The compiler checks these forms and does not serve them
+// yet: 22_api.kg is served.
+package example.gates
+
+import kogo.rpc.Request
+
+api desk checkedBy fromOurPage {
+    statusOf    gatedBy clerk                             // a shared gate: it reads no input
+    unpaid      gatedBy clerk
+    markPaid    gatedBy markPaidGate                      // a gate of its own, which reads the input
+    sendInvoice gatedBy sendInvoiceGate after tellPrinter // a step between the gate and the work
+    looks       ungated
+}
+
+api hooks unchecked {
+    forgetLooks ungated
+}
+
+data class DeskEnv(val printer: String)
+
+data class InvoiceRef(val number: String)
+
+data class Sent(val number: String, val printer: String)
+
+// What a gate gives: who asked, or the invoice they may change, and
+// the transaction the gate read it in.
+data class Clerk(val address: String, val tx: Tx)
+
+data class OpenInvoice(val number: String, val totalCents: Long, val tx: Tx)
+
+// The check runs before every row of desk, looks included.
+fun fromOurPage(tx: Tx, env: DeskEnv, request: Request): Either<String, Unit> = either {
+    ensure(request.cookie("desk") != null) { "Open the desk's page first." }
+}
+
+fun clerk(tx: Tx, env: DeskEnv, request: Request): Either<String, Clerk> = either {
+    val misses = tx.queryOne<Int>(sql"select count from look where address = ${request.clientAddress}") ?: 0
+    ensure(misses == 0) { "This address may not use the desk." }
+    Clerk(request.clientAddress, tx)
+}
+
+fun statusOf(env: DeskEnv, clerk: Clerk, input: InvoiceRef): Either<String, String> = either {
+    clerk.tx.queryOne<String>(sql"""
+        select status::text as "status!" from invoice where number = ${input.number}
+    """) ?: raise("There is no invoice ${input.number}.")
+}
+
+fun unpaid(env: DeskEnv, clerk: Clerk, input: Unit): Either<String, List<String>> = either {
+    clerk.tx.query<String>(sql"select number from invoice where status <> 'paid' order by number")
+}
+
+fun openInvoice(tx: Tx, number: String): Either<String, OpenInvoice> = either {
+    val total = tx.queryOne<Long>(sql"""
+        select total_cents as "total_cents!" from invoice where number = $number and status <> 'paid' and total_cents is not null
+    """) ?: raise("Invoice $number cannot be changed.")
+    OpenInvoice(number, total, tx)
+}
+
+fun markPaidGate(tx: Tx, env: DeskEnv, request: Request, input: InvoiceRef): Either<String, OpenInvoice> =
+    openInvoice(tx, input.number)
+
+fun markPaid(env: DeskEnv, invoice: OpenInvoice, input: InvoiceRef): Either<String, Long> = either {
+    invoice.tx.execute(sql"update invoice set status = 'paid' where number = ${invoice.number}")
+    invoice.totalCents
+}
+
+fun sendInvoiceGate(tx: Tx, env: DeskEnv, request: Request, input: InvoiceRef): Either<String, OpenInvoice> =
+    openInvoice(tx, input.number)
+
+// The step takes the gate's proof and the operation's input, and
+// may refuse before the work writes anything.
+fun tellPrinter(env: DeskEnv, invoice: OpenInvoice, input: InvoiceRef): Either<String, Unit> = either {
+    ensure(env.printer != "") { "No printer is set up." }
+}
+
+fun sendInvoice(env: DeskEnv, invoice: OpenInvoice, input: InvoiceRef): Either<String, Sent> = either {
+    invoice.tx.execute(sql"update invoice set status = 'sent' where number = ${invoice.number}")
+    Sent(invoice.number, env.printer)
+}
+
+// Ungated: today's four parameters, and no proof.
+fun looks(tx: Tx, env: DeskEnv, request: Request, input: Unit): Either<String, Int> = either {
+    tx.queryOne<Int>(sql"select count from look where address = ${request.clientAddress}") ?: 0
+}
+
+fun forgetLooks(tx: Tx, env: DeskEnv, request: Request, input: Unit): Either<String, Unit> = either {
+    tx.execute(sql"delete from look where address = ${request.clientAddress}")
+}

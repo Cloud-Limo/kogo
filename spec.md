@@ -1049,7 +1049,11 @@ program names its operations in an `api` list, and from the list the
 compiler writes the server's table and the browser's TypeScript types.
 
 ```kotlin
-api ops { me, updateJob, completeLogin }
+api ops unchecked {
+    me             ungated
+    updateJob      ungated
+    completeLogin  ungated
+}
 
 fun updateJob(tx: Tx, env: OpsEnv, request: Request, input: UpdateJobInput): Either<String, DriverJob> = either {
     val driver = requireDriver(tx, request).bind()
@@ -1062,45 +1066,103 @@ fun updateJob(tx: Tx, env: OpsEnv, request: Request, input: UpdateJobInput): Eit
 
 ### 15.1 The list
 
-- `api name { f, g, h }` is a top-level declaration, the third thing
-  Kogo adds to Kotlin. It names top-level funs that are in scope where
-  it is written, its own package's or imported ones.
-- A list's entries are separated by a comma, a new line or both, as
+```kotlin
+api desk checkedBy fromOurPage {
+    unpaid       gatedBy clerk
+    markPaid     gatedBy markPaidGate
+    sendInvoice  gatedBy sendInvoiceGate after tellPrinter
+    looks        ungated
+}
+
+api hooks unchecked {
+    forgetLooks  ungated
+}
+```
+
+- `api name checkedBy check { rows }` is a top-level declaration, the
+  third thing Kogo adds to Kotlin. Its words are bare: `api`,
+  `checkedBy`, `unchecked`, `gatedBy`, `after` and `ungated` are names
+  like any other elsewhere, a fun's in a list among them.
+- Every fun a list names is a top-level fun in scope where the list
+  is written, its own package's or an imported one, and one fun: not
+  two funs of that name in scope.
+- The head names the list's check, `checkedBy f`: the fun that is to
+  run before every row of the list, ungated ones included. A list
+  with no check says `unchecked` in its place. A head with neither is
+  a compile error.
+- A row is an operation and who may call it, in one of three forms:
+
+  | Row | What it says |
+  | --- | --- |
+  | `op gatedBy gate` | `gate` decides who may call `op`, and gives it a proof |
+  | `op gatedBy gate after step` | the same, and `step` runs between the gate and `op` |
+  | `op ungated` | no gate decides: `op` finds out who is asking itself |
+
+  A row that neither names a gate nor says `ungated` is a compile
+  error, and so is `after` in an ungated row.
+- A list's rows are separated by a comma, a new line or both, as
   Kotlin separates a collection's, with a comma allowed after the
-  last; an entry of more than one word, as a row naming its gate with
-  `gatedBy`, `after` or `ungated` will be (`doc/gates.md`), stays on
-  one line.
-- A fun's name is its operation's name on the wire, so a list holds no
-  name twice, and the name is one fun's: not two funs of that name in
-  scope. A fun may stand in more than one list.
-- A list names at least one fun. Its name is its TypeScript file's
-  (15.6), so no two lists of a program have one name, or names that
-  differ only in case, which are one file where case is ignored. No
-  list is named `outcome` or `Outcome`, whose interface would take the
-  answer's type's name.
-- An operation is an ordinary fun: any code may call it, and nothing
+  last. A row stays on one line: a line that begins with `gatedBy`,
+  `after` or `ungated`, or with a gate's or a step's name, is a
+  compile error that says which row to move it onto. A line that
+  begins with one of the three words and goes on with `gatedBy` or
+  `ungated` is the row of an operation of that name.
+- An operation's fun's name is its name on the wire, so a list holds
+  no operation twice. A fun may stand in more than one list, and a
+  gate that reads no input in more than one row (15.2).
+- A list names at least one operation. Its name is its TypeScript
+  file's (15.6), so no two lists of a program have one name, or names
+  that differ only in case, which are one file where case is ignored.
+  No list is named `outcome` or `Outcome`, whose interface would take
+  the answer's type's name.
+- Each of these is an ordinary fun: any code may call it, and nothing
   but the list marks it.
+- `kogo check` and `kogo ts` read every form. `kogo emit` writes a
+  list that is `unchecked` and whose rows are `ungated`, and refuses a
+  check or a gated row (`not-yet-emitted`) until the server runs them:
+  15.3 and 15.5 are an ungated operation's.
 
-### 15.2 An operation's shape
+### 15.2 The shapes
 
-An operation takes four parameters, in this order, and returns
-`Either<String, A>`:
+Each fun a list names has the shape of its place in the list. Every
+one returns an `Either` whose `Left` is a refusal in words:
 
-| Parameter | What it is |
-| --- | --- |
-| a `Tx` or a `Db` | the database; which of the two decides who runs the transaction (15.3) |
-| the environment | one type of the application's, the same for every fun of a list: a data class of what lives as long as the server, the clock and the handles of outbound calls (sections 7 and 13) |
-| a `Request` | `kogo.rpc.Request` (section 12): the caller's cookies, headers and address |
-| the input | a wire type (15.4), or `Unit` for none |
+| Place | Parameters, in this order | Returns |
+| --- | --- | --- |
+| the check | a `Tx`, the environment, a `Request` | `Either<String, Unit>` |
+| a gate | a `Tx`, the environment, a `Request`, and the operation's input if it reads it | `Either<String, P>`, with `P` its proof |
+| gated work, the `op` of a gated row | the environment, the proof, the input | `Either<String, A>` |
+| a step | the environment, the proof, the input | `Either<String, Unit>` |
+| an ungated operation | a `Tx` or a `Db` (15.3), the environment, a `Request`, the input | `Either<String, A>` |
 
-- The parameters' names are the author's. An operation has no type
-  parameters and no default values.
-- `A` is a wire type, or `Unit` for an operation with nothing to say.
-- A `Left` is a refusal: words for the person using the page. An
-  operation turns any other failure into words, with `mapLeft`, before
-  it returns.
-- Nothing runs before an operation. It finds out who is asking in its
-  own first lines, from the `Request` it was given.
+- The environment is one type of the application's, the same for
+  every fun of a list, its check, gates and steps included: a data
+  class of what lives as long as the server, the clock and the handles
+  of outbound calls (sections 7 and 13).
+- A `Request` is `kogo.rpc.Request` (section 12): the caller's
+  cookies, headers and address.
+- The input is a wire type (15.4), or `Unit` for none, and `A` is a
+  wire type, or `Unit` for an operation with nothing to say.
+- What one fun gives, the next takes. The proof that gated work and a
+  step take is the very type their row's gate gives; a step's input
+  and the input of a gate that reads one are the operation's input
+  type. Anything else is a compile error.
+- A gate that reads no input may stand in many rows, whose operations
+  have no gate of their own. A gate that reads an input stands in one
+  row of a list.
+- Gated work takes no `Request`, `Tx` or `Db`: its gate has read the
+  request, and the proof is all it is handed. So a proof is none of
+  the three either: a gate gives a data class of the application's
+  that holds the `Tx` and what it read. An ungated operation takes no
+  proof.
+- The parameters' names are the author's. None of these funs has type
+  parameters or default values.
+- A `Left` is a refusal: words for the person using the page. Each
+  turns any other failure into words, with `mapLeft`, before it
+  returns.
+- Nothing but the list's check runs before an ungated operation. It
+  finds out who is asking in its own first lines, from the `Request`
+  it was given.
 
 ### 15.3 The transaction
 

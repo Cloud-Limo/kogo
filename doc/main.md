@@ -189,14 +189,17 @@ func environment(c Config, clock ktime.Clock) (app.Env, error) {
 	// in the file: this line never changes. It refuses a setting that is
 	// missing and reports, on stderr, a key Settings does not have.
 	settings, e0 := rpc.ReadSettings[app.Settings](c.Settings, os.Stderr)
+	// Each handle's Timeout is a placeholder for the application to set.
 	stripe, e1 := khttp.New(khttp.Service{Address: "https://api.stripe.com", Encoding: khttp.Form, MaxAnswer: 1 << 20,
+		Timeout: 30 * time.Second,
 		Headers: map[string]string{"Authorization": "Bearer " + c.StripeConfig.SecretKey, "Stripe-Version": stripekg.ApiVersion}})
 	google, e2 := khttp.New(khttp.Service{Address: or(c.GoogleAddress, "https://maps.googleapis.com"), Encoding: khttp.Form,
-		MaxAnswer: 1 << 20, Query: map[string]string{"key": c.GooglePlaceAPIKey}}) // Q2
+		MaxAnswer: 1 << 20, Timeout: 10 * time.Second, Query: map[string]string{"key": c.GooglePlaceAPIKey}}) // Q2
 	// The identity service's public address is a setting, and the handle's
 	// when the file gives no internal one: which owns it is the settings' issue's.
 	idp, e3 := khttp.New(khttp.Service{Address: strings.TrimRight(or(c.AuthConfig.FaInternalURL, settings.IdpAddress), "/"),
-		Encoding: khttp.JSON, MaxAnswer: 1 << 20, Headers: map[string]string{"Authorization": c.AuthConfig.APIKey}})
+		Encoding: khttp.JSON, MaxAnswer: 1 << 20, Timeout: 10 * time.Second,
+		Headers: map[string]string{"Authorization": c.AuthConfig.APIKey}})
 	smtp, e4 := mail.NewSmtp(mail.Server{Host: c.SmtpConfig.Server, Port: c.SmtpConfig.Port,
 		Security: c.SmtpConfig.Transport, Username: c.SmtpConfig.Username, Password: c.SmtpConfig.Password})
 	// The emitter's chain: a step for each property of Env, in its order,
@@ -355,7 +358,7 @@ days after a deploy). **Never** means no test sees it.
 | | | | a secret declared as a setting | never: a reviewer's rule |
 | [2] the handles | 9 | a service: 2 | a wrong address or encoding | use: the first call fails, as a `Left` |
 | | | | a credential in the wrong header | use: 401 from the service |
-| | | | no limit on an answer's length | start: `khttp.New` requires `MaxAnswer` (Q2) |
+| | | | no limit on an answer's length, or on a call's time | start: `khttp.New` requires `MaxAnswer` (Q2) and `Timeout` |
 | [2] the environment | 3 | a handle: a step | a step left out, misplaced or misnamed | build (Q13) |
 | | | | `app.Env{}` in place of the chain | never: it compiles. A reviewer holds `main` to the chain; nothing checks it |
 | [3] the pool | 13 | nothing | a URL pgx cannot read; a database that is down | start (`Ping`) |
@@ -421,7 +424,9 @@ login (`doc/gates.md`, "Routes that are not operations"), so
   paper of 17 Nov trimmed it in `load` for `Env` too. The trim's owner
   is the settings issue.
 - `upstreamTimeouts` is read and dropped: `doc/work.md` sets nothing
-  for Stripe, Google or mail, one deadline at the outer edge.
+  for Stripe, Google or mail, one deadline at the outer edge. Until
+  that deadline is built `khttp.New` requires a `Timeout` of each
+  handle, and the three figures above are placeholders.
 - `--config f` before the mode replaces `-Dcusoon.configurationFile`,
   and the mode or command replaces `--op X`.
 

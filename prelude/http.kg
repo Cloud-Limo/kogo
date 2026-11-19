@@ -1,0 +1,50 @@
+// The one outbound binding (spec.md section 12, "An outside service"):
+// a handle for one service, made in main with its address, credentials
+// and encoding; endpoints, each declared once with its kind; fields;
+// and an answer read by key.
+package kogo.http
+
+external class Http
+external class Lookup
+external class Action
+external class Field
+external class Json
+
+external fun lookup(method: String, path: String): Lookup
+external fun lookup(method: String, before: String, id: String): Lookup
+external fun lookup(method: String, before: String, id: String, after: String): Lookup
+external fun action(method: String, path: String): Action
+external fun action(method: String, before: String, id: String): Action
+external fun action(method: String, before: String, id: String, after: String): Action
+
+external fun field(name: String, value: String): Field
+external fun field(name: String, value: Long): Field
+external fun field(name: String, value: Double): Field
+external fun field(name: String, value: Boolean): Field
+external fun field(name: String, values: List<String>): Field
+external fun field(name: String, json: Json): Field
+external fun group(name: String, fields: List<Field>): Field
+
+lookup external fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpFailure, Json>
+action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<HttpFailure, Json>
+external fun Http.withHeader(name: String, value: String): Http
+
+external fun Json.string(key: String): String?
+external fun Json.long(key: String): Long?
+external fun Json.double(key: String): Double?
+external fun Json.boolean(key: String): Boolean?
+external fun Json.at(key: String): Json?
+external fun Json.list(key: String): List<Json>?
+external fun Json.raw(): String
+
+external object Json {
+    fun parse(text: String): Json?
+}
+
+// Why a call gave no answer, by how far it got.
+sealed interface HttpFailure {
+    data class NotSent(val why: String) : HttpFailure                    // it never left
+    data class Unknown(val why: String) : HttpFailure                    // it left and no answer came: an action may have been done
+    data class Refused(val status: Int, val body: Json?) : HttpFailure   // the service said no: a 4xx
+    data class Unreadable(val why: String) : HttpFailure                 // the service said yes, and the answer cannot be read
+}

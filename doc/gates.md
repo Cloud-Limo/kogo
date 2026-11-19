@@ -795,7 +795,7 @@ calls is:
 
 ```kotlin
 // kogo.http
-action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
+action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<HttpFailure, Json>
 
 // The application.
 action fun setUserEmail(idp: Http, userId: String, email: String): Boolean { ... }   // calls perform

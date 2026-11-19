@@ -2799,16 +2799,17 @@ Each entry: what was decided, why, and what would reopen it.
 ## Taken checking `kogo.time` and `Either` against Kotlin (DEV-933), not yet discussed
 
 - **Kotlin's `Either` is Arrow 2.2.3's `arrow-core-jvm`, fetched by `mise run kotlin`
-  from Maven Central into `~/.cache/kogo` and checked by its sha256**, the version in
-  this VM's Gradle cache (cusoon2's, unchecked). `kotlin/arrow.kt`, in the shared
-  source's package, names it and its extension functions as the prelude does, since Kogo
+  from Maven Central into `~/.cache/kogo` and checked by its sha256**, the version
+  cusoon2 builds with (`backend/build.gradle.kts` on `renew`). `kotlin/arrow.kt`, in
+  the shared source's package, names it and its extension functions as the prelude does, since Kogo
   imports neither and Kotlin has no default import to add. Not taken: a Kotlin `Either`
   written here, which would test Kogo against itself; a Gradle build.
 - **The time cases keep to known zones and to dates a million days inside `LocalDate`'s
   range**, as three differences found there are left to a fix of their own: an unknown
   zone's message, `plusDays`' message past the range, and `atZone` past year
   ±999,999,999, where Kogo gives a date and Java throws. Not taken: listing them in
-  `kept`, which holds only the differences `spec.md` states. A fix widens the cases.
+  `kept`, which holds only the differences `spec.md` states. DEV-952 fixes them and
+  widens the cases.
 - **`Clock.now` has no case**: its value is the time of the run, and the prelude gives no
   way to build a fixed `Clock`. `Uuid.parse` and `atStartOfDay` are DEV-932's.
 

@@ -19,6 +19,9 @@ and is not part of `go test ./...`.
 - A difference is fixed in the prelude, or listed in `cases/main.go`'s
   `kept` with where `spec.md` states it: the cases it applies to and a
   rewrite of both results, which must then agree.
+- The time cases keep to known zones and to dates inside `LocalDate`'s
+  range, as `decisions.md` (DEV-933) says, until DEV-952 fixes the
+  differences there and removes this line.
 
 - `deviations/*.kg` are Kogo's deliberate deviations (spec 1), one
   file each. kotlinc must refuse every one with an error on the line

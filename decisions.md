@@ -3199,16 +3199,24 @@ Each entry: what was decided, why, and what would reopen it.
   and the model's files, where the two rules on the transaction are read; a marked `Tx`
   alone, which the design does not call a proof.
 - **A gate that gives a transaction gives a proof** (Greg's choice C, 20 Nov 2026, DEV-982):
-  a `P` that holds a `Tx` or a `SerializableTx` and is no proof is `gate-proof`, said once
-  per gate, at its first row; a `P` of facts alone stays a plain data class. "Holds"
-  reaches a property that is the transaction, and one that is a data class (or an
-  interface) that is no proof and holds one, at any depth: `box.tx`. A property that is
-  a proof, as `OpenInvoice`'s `desk: AtDesk`, ends the search, since its rules hold it.
-  Not taken: A, every gate gives a proof, which makes every gated program carry a marker
-  and an opt-in for facts that need none; B, as before, where a port that forgets the
-  marker gets no rules and no error, PR 91's 500 included. Not followed: a transaction in a
-  type argument, as `List<Plain>` or `Map<String, Tx>`; a nullable `Box?` is followed.
-  Reopen: a port that hands a transaction to work that way.
+  a `P` that holds a `Tx` or a `SerializableTx` anywhere but as a proof's own marked one
+  is `gate-proof`, said once per gate, at its first row; a `P` of facts alone stays a
+  plain data class. Not taken: A, every gate gives a proof, which makes every gated
+  program carry a marker and an opt-in for facts that need none; B, as before, where a
+  port that forgets the marker gets no rules and no error, PR 91's 500 included.
+- **"Holds" has no limit** (the lead's Ruling on PR 99, 20 Nov 2026): `heldTx` walks every
+  named type, its type arguments (`List<Plain>`, `Box<Tx>`, `Map<String, Tx>`), a sealed
+  interface's variants, a function type's result and nullables, at any depth, and does
+  not stop at a proof: it skips only the proof's own marked transaction. So a proof's
+  second, unmarked `Tx` (`Two(val other: Tx, @property:M val tx: Tx)`) and a plain class
+  inside a proof are refused too, since each hands work a transaction no rule holds,
+  the same hole by another door. A `P` that holds a `List` of proofs passes. This
+  reverses PR 99's first cut, which stopped at a proof and at type arguments. The error
+  names the type that holds the transaction, and says to mark an interface's `val`, a
+  data class's constructor and transaction, or take a proof's second one out. Not
+  taken: refusing in an `action fun` any `Tx` it did not open, which closes doors a gate
+  cannot see but is a rule on actions, not C. Reopen: a port whose gate must hand on a
+  transaction in a shape this refuses.
 - **`examples/24_gates.kg` moved to C**: `OpenInvoice` is a proof marked `@DeskOnly`, and
   `statusOf` and `unpaid` take a narrower proof, `AtDesk`, of the transaction alone, from
   a gate `atDesk` that calls `clerk` and binds its answer. Not taken: binding

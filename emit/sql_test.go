@@ -274,3 +274,32 @@ fun kept(db: Db): List<Letter> = db.tx { tx -> tx.query<Letter>(sql"select eml, 
 fun drafts(db: Db): List<ByteArray> = db.tx { tx -> tx.query<ByteArray>(sql"""select draft as "draft!" from letter""") }
 `)
 }
+
+// A ByteArray where check cannot see it compared, in a contains, an in,
+// a Set or behind a type parameter, panics, since Kotlin compares it by
+// identity and the bytes would answer otherwise; inside a data class's
+// text it is Kotlin's signed bytes (spec.md 3; kotlinc 2.4.21 gives
+// F(name=x, data=[97, 0, -1])).
+func TestBytesIdentity(t *testing.T) {
+	const bytes = "\nimport \"github.com/Cloud-Limo/kogo/prelude/kogo\"\nvar a, b = kogo.ByteArray(\"a\\x00\\xff\"), kogo.ByteArray(\"a\\x00\\xff\")\n"
+	identity := "panics: a ByteArray cannot be compared: Kotlin compares it by identity"
+	expectWith(t, bytes, "", [][2]string{
+		{"t.InList(a, b)", identity},
+		{"t.Contains(a, b)", identity},
+		{"t.InSet(a, b)", identity},
+		{"t.Same(a, b)", identity},
+		{"t.Boxed(a, b)", identity},
+		{"t.Text(a)", "F(name=x, data=[97, 0, -1])"},
+	}, `package t
+
+data class F(val name: String, val data: ByteArray)
+
+fun <T> same(a: T, b: T): Boolean = a == b
+
+fun inList(a: ByteArray, b: ByteArray): Boolean = b in listOf(a)
+fun contains(a: ByteArray, b: ByteArray): Boolean = listOf(a).contains(b)
+fun inSet(a: ByteArray, b: ByteArray): Boolean = b in setOf(a)
+fun boxed(a: ByteArray, b: ByteArray): Boolean = same(F("x", a), F("x", b))
+fun text(a: ByteArray): String = "${F("x", a)}"
+`)
+}

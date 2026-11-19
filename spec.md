@@ -117,8 +117,15 @@ and it cannot change. `==` and `!=` are an error (`bytes-equality`)
 where either side's type is or holds one, as for a function above and
 through the same types, since Kotlin compares a `ByteArray` by identity
 and a data class by its properties': compare the other properties, or
-what the bytes were made from. Comparing with `null` is allowed. It is
-in no operation's input or answer (15.4).
+what the bytes were made from. Comparing with `null` is allowed. Where
+check cannot see one compared, behind a type parameter or in
+`contains`, `in`, `distinct` or a `Set`'s or `Map`'s keys, `==` panics
+on reaching it, as on a function, where Kotlin would answer `false` for
+two arrays of the same bytes. In a template it is an error
+(`bytes-text`): Kotlin writes its identity, `[B@` and a number that
+changes every run. Inside a data class's text it is written as Kotlin's
+`toString` writes it, its bytes signed: `F(name=x, data=[97, 0, -1])`.
+It is in no operation's input or answer (15.4).
 
 A `String` counts as Kotlin's does: `length`, `substring`, `padStart`
 and reading it as `Char`s count UTF-16 units, so `"😀".length` is 2. It

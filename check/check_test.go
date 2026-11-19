@@ -430,6 +430,7 @@ func TestByteArray(t *testing.T) {
 		{file + "fun f(a: List<File?>, b: List<File?>): Boolean = a ‸== b", "bytes-equality", "File's property data holds a ByteArray"},
 		{"fun f(a: ByteArray): Int = a.‸size", "unknown-name", "a ByteArray has no property size"},
 		{"fun f(a: ByteArray): Int = a‸[0]", "no-overload", "this operator is not defined for a ByteArray"},
+		{"fun f(a: ByteArray?): String = \"x ${‸a}\"", "bytes-text", "a ByteArray? in a template is written as Kotlin writes its identity, [B@ and a number that changes every run: write a name or a size kept beside it"},
 	})
 }
 

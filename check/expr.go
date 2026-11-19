@@ -234,7 +234,9 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 		return tString
 	case *syntax.StringLit:
 		for _, p := range e.Parts {
-			c.expr(p, nil)
+			if t := c.expr(p, nil); t != nil && named(nonNull(t)) == c.prelude("ByteArray") {
+				c.errorf(p, "bytes-text", "a %s in a template is written as Kotlin writes its identity, [B@ and a number that changes every run: write a name or a size kept beside it, or what the bytes were made from", t)
+			}
 		}
 		return tString
 	case *syntax.SQL: // the parser reads one only as the argument of the five calls

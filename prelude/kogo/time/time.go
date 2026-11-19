@@ -246,20 +246,21 @@ func zoneOffset(id string) int {
 	if id == "Z" {
 		return 0
 	}
-	if len(id) == 2 {
-		id = id[:1] + "0" + id[1:]
+	u := utf16.Encode([]rune(id)) // Java counts and indexes UTF-16 units
+	if len(u) == 2 {
+		u = []uint16{u[0], '0', u[1]}
 	}
 	num := func(pos int, colon bool) int {
-		if colon && id[pos-1] != ':' {
-			panic("Invalid ID for ZoneOffset, colon not found when expected: " + id)
+		if colon && u[pos-1] != ':' {
+			panic("Invalid ID for ZoneOffset, colon not found when expected: " + string(utf16.Decode(u)))
 		}
-		if id[pos] < '0' || id[pos] > '9' || id[pos+1] < '0' || id[pos+1] > '9' {
-			panic("Invalid ID for ZoneOffset, non numeric characters found: " + id)
+		if u[pos] < '0' || u[pos] > '9' || u[pos+1] < '0' || u[pos+1] > '9' {
+			panic("Invalid ID for ZoneOffset, non numeric characters found: " + string(utf16.Decode(u)))
 		}
-		return int(id[pos]-'0')*10 + int(id[pos+1]-'0')
+		return int(u[pos]-'0')*10 + int(u[pos+1]-'0')
 	}
 	var h, m, s int
-	switch len(id) {
+	switch len(u) {
 	case 3:
 		h = num(1, false)
 	case 5:
@@ -273,7 +274,7 @@ func zoneOffset(id string) int {
 	default:
 		panic("Invalid ID for ZoneOffset, invalid format: " + id)
 	}
-	if id[0] == '-' {
+	if u[0] == '-' {
 		h, m, s = -h, -m, -s
 	}
 	for _, f := range []struct {
@@ -305,11 +306,12 @@ func (z ZonedDateTime) String() string {
 		layout += ":05"
 	}
 	text := year(t.Year()) + t.Format(layout) + fraction(z.Instant.Nanos)
-	if _, secs := t.Zone(); z.Zone.Offset {
-		return text + offsetText(secs)
-	} else {
-		return text + offsetText(secs) + "[" + z.Zone.Name + "]"
+	_, secs := t.Zone()
+	s := text + offsetText(secs)
+	if !z.Zone.Offset {
+		s += "[" + z.Zone.Name + "]"
 	}
+	return s
 }
 
 // offsetText writes an offset from UTC as java.time does: Z for none,

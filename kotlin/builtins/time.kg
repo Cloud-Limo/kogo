@@ -16,6 +16,8 @@ fun time(f: String, s: String, t: String, x: Long, y: Long, n: Int, m: Int): Str
     "minusDuration" -> "${instant(x, n).minus(Duration.ofSeconds(y, m.toLong()))}"
     "atZone" -> "${ZoneId.of(zone(m))} ${instant(x, n).atZone(ZoneId.of(zone(m)))} ${instant(x, n).atZone(ZoneId.of(zone(m))).toLocalDate()}"
     "plusDays" -> "${instant(x, n).atZone(ZoneId.of(zone(m))).toLocalDate().plusDays(y)}"
+    "plusDaysMax" -> "${Instant.ofEpochSecond(31556889832694400L - 86400L * (x % 8L), 0L).atZone(ZoneId.of("UTC")).toLocalDate().plusDays(y % 60L)}"
+    "offsetOf" -> "${ZoneId.of(offset(n * 10 + m))}"
     "zoneOf" -> "${ZoneId.of(s)} ${ZoneId.of(t)}"
     "atZoneEra" -> "${era(x, y, n).atZone(ZoneId.of(zone(m)))} ${era(x, y, n).atZone(ZoneId.of(zone(m))).toLocalDate()}"
     "atStartOfDay" -> "${era(x, y, n).atZone(ZoneId.of(zone(m))).toLocalDate().atStartOfDay(ZoneId.of(zone(m)))} ${era(x, y, n).atZone(ZoneId.of(zone(m))).toLocalDate().atStartOfDay(ZoneId.of(zone(m))).toInstant()}"
@@ -32,6 +34,14 @@ fun zone(m: Int): String =
         "UTC", "Australia/Sydney", "America/St_Johns", "Asia/Kolkata", "Pacific/Chatham", "Europe/Dublin", "America/Sao_Paulo",
         "Mars/Olympus", "+05:30", "GMT+1", "UTC-0", "-0930", "Z", "EST", "Factory",
     )[(m % 15 + 15) % 15]
+
+// Offsets that reach each of ZoneOffset.of's messages, in each form,
+// with characters that are one UTF-16 unit and two.
+fun offset(n: Int): String =
+    listOf(
+        "+1", "+19", "-18:01", "+18:00:01", "+05:60", "+05:30:60", "+0530x", "+05:3x", "+05_30", "+053015", "-09:30:15",
+        "+é", "+1é", "+é5", "+😀", "GMT+x", "UT+", "UTC+05:30:15", "-1", "+05:30:1",
+    )[(n % 20 + 20) % 20]
 
 // Texts around an id: as a template writes it, in capitals, a digit
 // short, a digit long, and with a letter that is not a hex digit.

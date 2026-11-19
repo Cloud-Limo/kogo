@@ -433,8 +433,8 @@ A function can only do what its parameters let it do.
   one exception, because an id's value never changes what a program
   does.
 - `Tx` is an open database transaction and `Db` is a connection pool
-  (section 10). A function that touches the database has one of them as a
-  parameter.
+  (section 10). A function that touches the database has one of them,
+  or a proof that holds a `Tx` (15.7), as a parameter.
 - `Clock` gives the time: `clock.now(): Instant`.
 
 ### 7.1 Actions
@@ -461,6 +461,11 @@ action fun announce(console: Console, message: String) {
   (`action-tx`): it takes a `Db` and acts between its transactions.
   It calls no action in a block that is handed a `Tx`, as `db.tx`'s
   is (`action-in-tx`).
+- An `action fun` takes a proof (15.7) only where an `api` list hands
+  it one: as a row's step or as its gated work, second
+  (`action-proof`). That proof's transaction has ended, so the fun
+  passes no proof to a call and runs no statement on one
+  (`outside-passes-proof`).
 - An action is not kept in a value (`action-kept`): there is no `::`
   reference to an `action fun`, no member of an interface or a data
   class is one, and a lambda that acts is passed straight to a fun of
@@ -838,12 +843,18 @@ annotation class UnscopedRead
 @UnscopedRead
 fun business(tx: Tx, id: ID): Business? = ...
 
-data class HeldBusiness @UnscopedRead constructor(val business: Business, val storefront: Tenant?)
+data class HeldBusiness @UnscopedRead constructor(val business: Business, val storefront: Tenant?, @property:UnscopedRead val tx: Tx)
 ```
 
 A file may use a marked function, property or constructor only if it
 begins with `@file:OptIn(UnscopedRead::class)`. Anything else is a
-compile error. A value of a data class is made four ways, each held to
+compile error. A `val` of an interface takes a marker before `val`. A
+property of a data class takes it as `@property:Marker`, as Kotlin has
+it: a bare `@Marker` there would mark the constructor's parameter,
+which Kotlin refuses, and so does Kogo (`syntax`). Either is read, by
+name or by destructuring (a `_` in its place included, as in Kotlin),
+and overridden, as is a marked `fun` of an interface, only in such a
+file. A value of a data class is made four ways, each held to
 a marked constructor: a call of it; a `copy` and a row read into one
 (10.3), which use it; and an operation's input, which is refused even
 where the file opts in (15.4). Only the file's opt-in counts: marking the function
@@ -1349,8 +1360,9 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   which the server rolls back; then the step, once, with no
   transaction open; then the gate again and the work, in one
   transaction as above. The step is handed the first proof for the
-  facts in it: that proof's `Tx` has ended, and a statement on it is a
-  panic. A refusal of the step has written nothing.
+  facts in it: that proof's `Tx` has ended, so a step passes no proof
+  on and runs no statement on one (15.7). A refusal of the step has
+  written nothing.
 - A gated row whose work is an `action fun` (7.1) runs its gate once,
   in a transaction of its own that the server commits, and then the
   work with no transaction open. The work's answer or refusal is the
@@ -1496,6 +1508,65 @@ export interface Ops {
 
 The code that calls `fetch` is the application's own, typed by this
 file.
+
+### 15.7 Proofs
+
+A proof is what a gate found and the transaction it found it in. The
+compiler knows one by its shape: a data class whose constructor is
+marked (section 11) and which has a marked property that is a `Tx` or
+a `SerializableTx`, its transaction; or an interface that declares
+such a `val`, for work done under several proofs.
+
+```kotlin
+// The gates' file and the model's opt in; an operation's does not.
+data class AtDesk @DeskOnly constructor(@property:DeskOnly val tx: Tx)
+
+data class OpenInvoice @DeskOnly constructor(
+    val number: String, val desk: AtDesk, @property:DeskOnly val tx: Tx)
+
+fun markPaid(invoice: OpenInvoice): Int =
+    invoice.tx.execute(sql"update invoice set status = 'paid' where number = ${invoice.number}")
+
+fun renumber(invoice: OpenInvoice, number: String): OpenInvoice {
+    invoice.tx.execute(sql"update invoice set number = $number where number = ${invoice.number}")
+    return OpenInvoice(number, invoice.desk, invoice.tx)
+}
+```
+
+So only a file that opts in makes a proof or reads its transaction,
+and in such a file three rules hold:
+
+- **A statement binds something of its proof.** One of the five calls
+  (10.2) whose receiver is a proof's transaction binds, in its
+  literal, another property of that proof, written as the transaction
+  is: `${invoice.number}` beside `invoice.tx`, or a property of such
+  a property. A value worked out from the proof and
+  kept in a `val` does not count, and nothing counts where the proof
+  has no name, as in `invoices.first().tx`: keep it in a `val` first.
+  Anything else is a compile error (`unbound-statement`). The compiler reads the receiver and the
+  values bound, not the SQL: that the value scopes the statement is
+  the author's. A proof with no property but its transaction, as
+  `AtDesk`, is not held to this: a fun that takes one acts for
+  everyone the gate let in.
+- **A proof's transaction is used only before the dot.** It is
+  written as the receiver of one of the five calls, or as an argument
+  of a proof's constructor or `copy` that fills that proof's own
+  transaction, so that making a thing gives its proof. Kept in a
+  `val`, returned, destructured to a name (a `_` takes nothing out),
+  or passed to anything else, it is a compile error
+  (`proof-tx-escapes`): pass the proof.
+- **A fun that runs outside uses no proof.** An `action fun` that
+  takes a proof (7.1) is handed one whose transaction has ended
+  (15.3). It reads the proof's facts, passes no proof to a call, as
+  an argument, as a receiver or in a block that takes or gives one,
+  and runs no statement on one (`outside-passes-proof`): what writes
+  belongs in the work, and what reads in the gate; where the fun is
+  itself the work, in the gate or in a `fun`, which runs in the
+  transaction.
+
+A data class that is not of this shape is held to none of the three,
+whatever a gate gives it for (15.2): mark a proof's constructor and
+its transaction.
 
 ## 16. Tests
 

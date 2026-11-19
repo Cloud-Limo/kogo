@@ -1240,7 +1240,7 @@ test reaches its 503 only by waiting.
   through a clock it is handed, and reaches the database and the
   network only through what it is handed. The runner's own SQL takes
   the time as a parameter from that clock and never says `now()`, as
-  the Kotlin's runner does. `newId()` stays the one exception.
+  the Kotlin's runner does. `newId()` is the one exception it uses.
 - **Every boundary can be made to fail in a test.** The clock is
   moved; the service is a local server that misbehaves on purpose
   ("What Go would decide, Kogo states"); and the runner's steps are

@@ -1021,7 +1021,11 @@ also reads 32 hex digits without hyphens; Kogo's gives `null` for them.
 characters, each drawn evenly from the 62 letters and digits (`a` to
 `z`, `A` to `Z`, `0` to `9`) by the operating system's cryptographic
 source, so it cannot be guessed: a session's token. Zero gives `""`;
-a negative `length` is a bug, and it panics naming it.
+a negative `length` is a bug, and it panics with
+`randomString's length <n> is negative`. A token goes in no message
+a `require`, `check` or `error` gives, in no operation's refusal and
+in no endpoint's path, since each may be logged, and is looked up by
+SQL's `=`, never read back to compare with `==`.
 
 **Requests** (`kogo.rpc`). A `Request` is what the server read of one
 HTTP request, passed to an operation (section 15):

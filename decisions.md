@@ -2903,6 +2903,48 @@ Each entry: what was decided, why, and what would reopen it.
   Ruling's "each new case fails with item 1's fix taken out" holds for `offsetOf` (64
   differ). Reopen if a case gets a wider index than `n`.
 
+## Kogo is a subset of Kotlin (DEV-957), agreed with Greg 19 Nov 2026
+
+- **Kogo is a subset of Kotlin and `java.time`, never a difference: choice (a)** (19 Nov
+  2026, Greg). "Kogo is a subset, never a difference. Where Kogo has a name, it means
+  exactly what Kotlin's or `java.time`'s means. Where Kogo stops short, it refuses: at
+  `kogo check` where it can, else a panic naming the limit. It never gives a different
+  answer. The spec states what Kogo supports in general terms, never in terms of cusoon2's
+  data; which parts get built follows the first port (DEV-914, 3a)."
+  - Not taken: **(b)**, every name matches Java on every input, error messages included,
+    which drew PR 85's 116-line offset parser and DEV-955 for zone IDs cusoon2 never stores
+    (it stores Google's region names).
+  - Not taken: **(c)**, zone arithmetic moved to Postgres, which turns every zone-touching
+    port into a SQL rewrite.
+  - So `ZoneId.of` takes region names only and refuses an offset ID with Kogo's own
+    message (spec 12); DEV-955 is canceled.
+
+## Taken refusing offset zones (DEV-957), not yet discussed
+
+- **An offset ID is `Z`, one starting `+` or `-`, or `UTC`, `GMT` or `UT` followed by `+`
+  or `-`**: exactly the IDs `java.time` hands to `ZoneOffset`. Bare `UTC`, `GMT` and `UT`
+  stay, being `java.time` regions; `UT`, which the tz database lacks, is UTC by a line of
+  its own. A one-character ID other than `Z` keeps Java's `Invalid ID for ZoneOffset,
+  invalid format` message, as `zoneOf` reaches it with ordinary text. Not taken: refusing
+  `UT` too, which Java accepts as a region.
+- **`mise run kotlin` counts a refusal by a `refused` rule beside `kept`, decided by the
+  input**: the cases `zoneId` and `offsetId` give Kotlin's own ID on the same inputs, and a
+  case named counts as refused only when Kogo's result is exactly the limit panic and that
+  ID is an offset ID by `java.time`'s rule; the limit on any other input differs (Review
+  1 and its Ruling). Not taken: deciding by Kotlin's output (refused unless Kotlin's
+  result is a panic inside the subset), which let a Kogo refusing a valid region pass.
+- **`kogo check` refuses `ZoneId.of` on a string literal that is an offset ID**, code
+  `zone-offset`, with the limit's message (the lead's Ruling, Fix 6); a literal is one with
+  no template. The rule is the prelude's, written again in `check` so neither package needs
+  the other (rule 3). Not taken: sharing one regexp between them.
+- **The zone cases index `zone()` by `n * 10 + m`**, as `offsetOf` does: by `m` alone
+  they never reached indices 8 to 12, the offsets, which DEV-952's cases therefore never
+  compared. Not taken: reordering the list, which `m`'s edges reach only 10 of 15 of.
+- **`LocalTime`'s text is tested in Go, not in `mise run kotlin`**: no prelude function
+  gives a `LocalTime`, so the shared source cannot make one. Not taken: adding
+  `ZonedDateTime.toLocalTime()` for the check alone. Reopen when a port needs a name that
+  gives one.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

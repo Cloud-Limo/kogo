@@ -198,6 +198,7 @@ func TestNames(t *testing.T) {
 	passes(t,
 		"package a\nimport b.Money\nimport b.double\nimport b.rate\nfun f(m: Money): Money = double(m) * rate\n---\npackage b\ntypealias Money = Long\nfun double(m: Money): Money = m * 2\nval rate: Long = 3",
 		"package a\nfun f(): Int = g()\ninternal fun g(): Int = 1\n---\npackage a\nprivate fun h(): Int = 2\nfun k(): Int = g() + h()\n---\npackage a\nprivate fun h(): Int = 3\nfun m(): Int = h()",
+		"package a\nimport kogo.time.ZoneId\nfun f(s: String): List<ZoneId> = listOf(ZoneId.of(\"Zulu\"), ZoneId.of(\"UTC\"), ZoneId.of(s), ZoneId.of(\"$s+1\"))\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}",
 		"package a\nimport kogo.time.Stamp\nfun f(s: Stamp, xs: List<Int>): Int = s.seconds() + xs.size\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int",
 		"package a\nimport b.Shape\nfun f(s: Shape): Int = when (s) {\n    is Shape.Dot -> 0\n    is Shape.Line -> s.length\n}\nfun g(): Shape = Shape.Line(2)\n---\npackage b\nsealed interface Shape {\n    data object Dot : Shape\n    data class Line(val length: Int) : Shape\n}",
 	)
@@ -214,6 +215,9 @@ func TestNames(t *testing.T) {
 		{"package a\nimport ‸java.util.UUID", "unknown-import", "Uuid needs no import: remove this one and write Uuid"},
 		{"package a\nimport ‸arrow.core.Either", "unknown-import", "Either needs no import: remove this one"},
 		{"package a\nimport ‸arrow.core.raise.ensure", "unknown-import", "ensure needs no import: remove this one"},
+		// Section 12: an offset ID written as a literal is outside the subset.
+		{"package a\nimport kogo.time.ZoneId\nfun f(): ZoneId = ZoneId.of(‸\"+05:30\")\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}", "zone-offset", "ZoneId.of takes a region name, such as Australia/Melbourne; offsets are not supported (spec 12)"},
+		{"package a\nimport kogo.time.ZoneId\nfun f(): ZoneId = ZoneId.of(‸\"Z\")\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}", "zone-offset", "offsets are not supported"},
 		{"package a\nimport ‸kogo.time.seconds\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int", "member-import", "seconds is a member, in scope wherever a value of its receiver's type is: remove this import"},
 		// Section 13: only the prelude declares bindings, and an
 		// external object holds funs.

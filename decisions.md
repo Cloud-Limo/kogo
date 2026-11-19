@@ -3161,6 +3161,33 @@ Each entry: what was decided, why, and what would reopen it.
 - **The example's cookie has one name, `SID`.** The design's `isSecure(request)` and
   the `__Host-` prefix are the application's and read nothing of the check's.
 
+## Taken showing an operation's five kinds in one table (DEV-970), not yet discussed
+
+- **An operation that must ask outside asks in its transaction and keeps its gate, unless
+  many requests would wait at once** (Greg, 19 Nov 2026). Spec 15.1 says so under the
+  table of the five kinds, which only gathers what 7.1, 15.2 and 15.3 already hold: a
+  lookup is allowed anywhere, and "never inside a transaction" is no rule of Kogo's. The
+  cost, a transaction and its connection held while the service answers and the question
+  asked again on a rerun, is taken over a gate written by hand. Not taken: the table at the
+  end of 15.3, which says 15.1's rows twice; trimming 15.3's bullets to remove the overlap
+  with the table's Transactions column, which rewords what the spec promises in a docs
+  change. Reopen on a measured wait that is felt on an operation asked rarely.
+- **The table's first bullet stays**: it names what serves a row (a worker, in
+  `doc/work.md`) without the word, since the spec has no workers yet. Not taken: leaving it
+  to the change that brings workers into the spec, which would drop the shape that most
+  changes outside should take from the one place that says which shape to pick. Reopen:
+  workers come into the spec.
+- **The ungated line with one transaction says "taking a `SerializableTx` or a `Tx`"**, where
+  the issue said "taking a `Tx`": 15.2 and 15.3 on `main` (DEV-965) allow either. Not
+  taken: "taking a `Tx`", which reads as refusing a `SerializableTx` that 15.2 allows.
+- **The last line's first cell adds "or asks outside with no transaction open"** (the
+  lead's Ruling on PR 94, 19 Nov 2026; Greg is told), so that "take the first that does
+  the job" lands a search box on the line the second bullet sends it to. Not taken:
+  leaving that case to the bullet alone.
+- **15.3's `completeLogin` is an `action fun`**: it calls `redeemCode`, which changes
+  something at another service, so written as `fun` it was `unmarked-action` by 7.1 (the
+  lead's Ruling on PR 94). Not taken: a docs issue of its own for one word.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

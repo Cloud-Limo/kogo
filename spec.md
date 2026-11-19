@@ -1141,18 +1141,31 @@ api hooks unchecked {
   with no check says `unchecked` in its place, and is served to no
   browser: its table is a Go type that the server's handler does not
   take. A head with neither is a compile error.
-- A row is an operation and who may call it, in one of three forms:
+- A row is an operation and who may call it, in one of three forms.
+  With what the operation's fun is (15.2), that is five kinds. Take
+  the first that does the job:
 
-  | Row | What it says |
-  | --- | --- |
-  | `op gatedBy gate` | `gate` decides who may call `op`, and gives it a proof |
-  | `op gatedBy gate after step` | the same, and `step` runs between the gate and `op` |
-  | `op ungated` | no gate decides: `op` finds out who is asking itself |
+  | The operation | Write | Transactions (15.3) | May ask outside | May change outside |
+  | -- | -- | -- | -- | -- |
+  | reads and writes our database | `op gatedBy gate` | one: the gate, then the work | in the gate or the work; the transaction waits | nowhere |
+  | changes something outside and writes nothing of ours | `op gatedBy gate`, with `op` an `action fun` | one for the gate; none for the work | anywhere | in the work |
+  | changes something outside, then writes | `op gatedBy gate after step` | one for the gate; none for the step; one for the gate again and the work | anywhere | in the step |
+  | finds out who is asking itself | `op ungated`, taking a `SerializableTx` or a `Tx` | one | in it; the transaction waits | nowhere |
+  | finds out who is asking itself, and must keep a write after a refusal or write what an action answered, or asks outside with no transaction open | `op ungated`, taking a `Db` | its own, each a `db.tx` | anywhere | between its transactions |
+
+  - A change outside that can wait, or must not be lost, is not made
+    by the request: the operation writes a row, as the first line
+    does, and what serves that row makes the change later.
+  - An operation that must ask outside asks in its transaction and
+    keeps its gate: the first line. The transaction and its
+    connection wait for the answer, and a rerun asks again. Where
+    many requests would wait so at once, as a search box asking on
+    each keystroke would, write the last line: ask between two
+    transactions, and find out who is asking by hand.
 
   A row that neither names a gate nor says `ungated` is a compile
-  error, and so is `after` in an ungated row. Gated work may be an
-  `action fun` (7.1), which runs with no transaction open (15.3); its
-  row has no step, and `after` there is a compile error.
+  error, and so is `after` in an ungated row or in one whose work is
+  an `action fun`.
 - A list's rows are separated by a comma, a new line or both, as
   Kotlin separates a collection's, with a comma allowed after the
   last. A row stays on one line: a line that begins with `gatedBy`,
@@ -1274,7 +1287,7 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   redeeming a code with another service must.
 
 ```kotlin
-fun completeLogin(db: Db, env: OpsEnv, request: Request, input: CompleteLoginInput): Either<String, DriverAccount> = either {
+action fun completeLogin(db: Db, env: OpsEnv, request: Request, input: CompleteLoginInput): Either<String, DriverAccount> = either {
     val attempts = db.tx { tx -> countAttempt(tx, request.clientAddress) }.bind()
     ensure(attempts <= 5) { "Too many attempts. Try again later." }
     val user = redeemCode(env.idp, input.oneTimeCode).bind()

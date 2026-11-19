@@ -14,29 +14,40 @@ fun time(f: String, s: String, t: String, x: Long, y: Long, n: Int, m: Int): Str
     "isBefore" -> "${instant(x, n).isBefore(instant(y, m))} ${instant(x, n).isAfter(instant(y, m))} ${instant(x, n).isBefore(instant(x, n))}"
     "plusDuration" -> "${instant(x, n).plus(Duration.ofSeconds(y, m.toLong()))}"
     "minusDuration" -> "${instant(x, n).minus(Duration.ofSeconds(y, m.toLong()))}"
-    "atZone" -> "${ZoneId.of(zone(m))} ${instant(x, n).atZone(ZoneId.of(zone(m)))} ${instant(x, n).atZone(ZoneId.of(zone(m))).toLocalDate()}"
-    "plusDays" -> "${instant(x, n).atZone(ZoneId.of(zone(m))).toLocalDate().plusDays(y)}"
+    "atZone" -> "${ZoneId.of(zone(n * 10 + m))} ${instant(x, n).atZone(ZoneId.of(zone(n * 10 + m)))} ${instant(x, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate()}"
+    "plusDays" -> "${instant(x, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().plusDays(y)}"
     "plusDaysMax" -> "${Instant.ofEpochSecond(31556889832694400L - 86400L * (x % 8L), 0L).atZone(ZoneId.of("UTC")).toLocalDate().plusDays(y % 60L)}"
     "offsetOf" -> "${ZoneId.of(offset(n * 10 + m))}"
     "zoneOf" -> "${ZoneId.of(s)} ${ZoneId.of(t)}"
-    "atZoneEra" -> "${era(x, y, n).atZone(ZoneId.of(zone(m)))} ${era(x, y, n).atZone(ZoneId.of(zone(m))).toLocalDate()}"
-    "atStartOfDay" -> "${era(x, y, n).atZone(ZoneId.of(zone(m))).toLocalDate().atStartOfDay(ZoneId.of(zone(m)))} ${era(x, y, n).atZone(ZoneId.of(zone(m))).toLocalDate().atStartOfDay(ZoneId.of(zone(m))).toInstant()}"
+    "atZoneEra" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m)))} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate()}"
+    "atStartOfDay" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().atStartOfDay(ZoneId.of(zone(n * 10 + m)))} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().atStartOfDay(ZoneId.of(zone(n * 10 + m))).toInstant()}"
+    "fraction" -> "${Instant.ofEpochSecond(x % 100000000000L, n.toLong() % 1000L * 1000000L)} ${Instant.ofEpochSecond(x % 100000000000L, n.toLong() % 1000L * 1000L + 1000000L)}"
+    "startOfChangedDay" -> "${Instant.ofEpochSecond(changeAt(m), 0L).atZone(ZoneId.of(changeZone(m))).toLocalDate().atStartOfDay(ZoneId.of(changeZone(m)))}"
     "parseOrNull" -> "${Uuid.parseOrNull(uuid(n))} ${Uuid.parseOrNull(s + uuid(m))} ${Uuid.parseOrNull("${Uuid.parseOrNull(uuid(n))}") == Uuid.parseOrNull(uuid(n))}"
     "parseOrNull32" -> "${Uuid.parseOrNull("01934f2abcde7f0189abcdef0123456" + s)}"
     else -> null
 }
 
 // Zones with a half hour, 45 minutes, a negative offset, a change at
-// midnight and summer time; offsets, alone and after a prefix; an
-// unknown name, and names the tz database has and java.time lacks.
+// midnight and summer time; an unknown name, and names the tz database
+// has and java.time lacks; and offsets, alone and after a prefix,
+// which Kogo refuses (spec 12).
 fun zone(m: Int): String =
     listOf(
         "UTC", "Australia/Sydney", "America/St_Johns", "Asia/Kolkata", "Pacific/Chatham", "Europe/Dublin", "America/Sao_Paulo",
         "Mars/Olympus", "+05:30", "GMT+1", "UTC-0", "-0930", "Z", "EST", "Factory",
     )[(m % 15 + 15) % 15]
 
-// Offsets that reach each of ZoneOffset.of's messages, in each form,
-// with characters that are one UTF-16 unit and two.
+// Days whose midnight a change of offset skips (Havana, Santiago, Sao
+// Paulo) or brings twice (Havana, Tunis), at 15:00 UTC.
+fun changeZone(m: Int): String =
+    listOf("America/Havana", "America/Havana", "America/Santiago", "Africa/Tunis", "America/Sao_Paulo")[(m % 5 + 5) % 5]
+
+fun changeAt(m: Int): Long =
+    listOf(1647183600L, 1667746800L, 1662908400L, 243961200L, 1541343600L)[(m % 5 + 5) % 5]
+
+// Offsets, which Kogo refuses (spec 12), in each form ZoneOffset.of
+// reads and malformed, with characters of one UTF-16 unit and two.
 fun offset(n: Int): String =
     listOf(
         "+1", "+19", "-18:01", "+18:00:01", "+05:60", "+05:30:60", "+0530x", "+05:3x", "+05_30", "+053015", "-09:30:15",

@@ -26,6 +26,10 @@ constraints) is worth typing.
      another name: Kotlin's own, where Kotlin has one
      (`Uuid.parseOrNull`). The rare corners listed in spec 12, which
      `mise run kotlin` holds, stay allowed.
+   - Kogo is a subset of Kotlin and `java.time`, never a difference.
+     Where Kogo stops short of a name's inputs, it refuses: at `kogo
+     check` where it can, else a panic naming the limit. It never gives
+     a different answer. Spec 12 states each limit in general terms.
    - Kogo's own forms are its deliberate deviations: the `sql` literal,
      bindings, the lists and `action fun`. Spec 1 lists them, and
      kotlinc refuses each, so no Kotlin habit applies to one unnoticed.

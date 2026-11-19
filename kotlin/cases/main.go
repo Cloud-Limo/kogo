@@ -49,6 +49,17 @@ var kept = []struct{ names, from, to, why string }{
 	{"replace", `(no group in ".*" at \d+|No group with name \{.*\}|named capturing group .*)$`, "no such named group", "spec.md section 12: replace with a bad group"},
 }
 
+// refused are Kogo's limits (doc/design.md, principle 3): in a case
+// whose name matches names, Kogo's result is exactly the panic with
+// its limit message, whatever Kotlin's is, and a panic of Kotlin's
+// that matches inside stays compared, being inside the subset. Such a
+// case is counted under why and does not fail the check.
+var refused = []struct{ names, limit, inside, why string }{
+	{"atZone|plusDays|atZoneEra|atStartOfDay|offsetOf",
+		"panic: ZoneId.of takes a region name, such as Australia/Melbourne; offsets are not supported (spec 12)",
+		`^panic: (Unknown time-zone ID|Invalid ID for region-based ZoneId)`, "spec.md section 12: ZoneId.of takes a region name"},
+}
+
 func main() {
 	if len(os.Args) == 3 && os.Args[1] == "gen" {
 		gen(os.Args[2])
@@ -156,6 +167,10 @@ func diff(cases, kogo, kotlin string) {
 		if a[i] == b[i] {
 			continue
 		}
+		if r := refusal(name, a[i], b[i]); r != "" {
+			differ["refused, "+r]++
+			continue
+		}
 		x, y, why := a[i], b[i], ""
 		for _, k := range kept {
 			if re := regexp.MustCompile(k.from); regexp.MustCompile("^("+k.names+")$").MatchString(name) && re.MatchString(x+y) {
@@ -179,6 +194,18 @@ func diff(cases, kogo, kotlin string) {
 	if total > 0 {
 		os.Exit(1)
 	}
+}
+
+// refusal is why Kogo's result kogo is a limit of refused's against
+// Kotlin's result kotlin, or "".
+func refusal(name, kogo, kotlin string) string {
+	for _, r := range refused {
+		if regexp.MustCompile("^("+r.names+")$").MatchString(name) && kogo == r.limit &&
+			!regexp.MustCompile(r.inside).MatchString(kotlin) {
+			return r.why
+		}
+	}
+	return ""
 }
 
 func lines(file string) []string {

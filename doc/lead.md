@@ -86,6 +86,12 @@ approve, recorded as above, and tell Greg in your report; an operator
 on a prelude type counts, as `compareTo` behind `<`. One that would be
 Kogo's own, or differ from Kotlin's in ordinary use, goes to Greg.
 
+Kogo is a subset of Kotlin and `java.time`, never a difference
+(`doc/design.md`, principle 3). A limit of the subset, stated in
+general terms in the spec and refused at `kogo check` or with a panic
+naming it, you approve. One that would give a different answer is not
+allowed.
+
 Bring Greg one choice at a time, never a list of choices:
 
 - two or three sentences of context that stand on their own;

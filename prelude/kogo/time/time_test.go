@@ -9,6 +9,8 @@ import (
 	"github.com/Cloud-Limo/kogo/rt"
 )
 
+const limit = "ZoneId.of takes a region name, such as Australia/Melbourne; offsets are not supported (spec 12)"
+
 // A date is read in a named zone, and each type writes itself as
 // java.time does.
 func TestTime(t *testing.T) {
@@ -33,11 +35,7 @@ func TestTime(t *testing.T) {
 		{rt.ToString(LocalDate_PlusDays(LocalDate{Year: 2028, Month: 2, Day: 28}, 1)), "2028-02-29"},
 		{rt.ToString(LocalDate_PlusDays(LocalDate{Year: 2026, Month: 12, Day: 30}, 33)), "2027-02-01"},
 		{rt.ToString(LocalDate_PlusDays(LocalDate{Year: 2026, Month: 3, Day: 1}, -1)), "2026-02-28"},
-		// Offsets, as java.time's ZoneId.of reads and writes them.
-		{rt.ToString(Instant_AtZone(Instant{Seconds: 1794753000}, ZoneId_Of("+0530"))), "2026-11-15T20:00+05:30"},
-		{rt.ToString(Instant_AtZone(Instant{Seconds: 1794753000}, ZoneId_Of("Z"))), "2026-11-15T14:30Z"},
-		{rt.ToString(Instant_AtZone(Instant{Seconds: 1794753000}, ZoneId_Of("GMT+1"))), "2026-11-15T15:30+01:00[GMT+01:00]"},
-		{ZoneId_Of("UTC-0").Name + " " + ZoneId_Of("-09:30:15").Name, "UTC -09:30:15"},
+		{rt.ToString(Instant_AtZone(Instant{Seconds: 1794753000}, ZoneId_Of("UT"))), "2026-11-15T14:30Z[UT]"},
 	} {
 		if c[0] != c[1] {
 			t.Errorf("got %s, want %s", c[0], c[1])
@@ -50,8 +48,9 @@ func TestTime(t *testing.T) {
 		t.Errorf("the system clock reads %v", now)
 	}
 	for id, want := range map[string]string{"Mars/Olympus": "Unknown time-zone ID: Mars/Olympus", "EST": "Unknown time-zone ID: EST",
-		"Factory": "Unknown time-zone ID: Factory", "+19": "Zone offset hours not in valid range: value 19 is not in the range -18 to 18",
-		"GMT+x": "Invalid ID for offset-based ZoneId: GMT+x", "a b": "Invalid ID for region-based ZoneId, invalid format: a b"} {
+		"Factory": "Unknown time-zone ID: Factory", "a b": "Invalid ID for region-based ZoneId, invalid format: a b",
+		// Offset IDs are outside the subset (spec 12): Kogo refuses them.
+		"Z": limit, "+05:30": limit, "-0930": limit, "GMT+1": limit, "UTC+10": limit, "UT-0": limit} {
 		func() {
 			defer func() {
 				if got := recover(); got != want {
@@ -131,6 +130,7 @@ func TestPostgres(t *testing.T) {
 		{rt.ToString(Duration{Seconds: -1, Nanos: 999_999_999}), "PT-0.000000001S"},
 		{rt.ToString(clock), "09:05:00.250"},
 		{rt.ToString(LocalTime{NanoOfDay: 18 * 3600e9}), "18:00"},
+		{rt.ToString(LocalTime{NanoOfDay: 86399e9}), "23:59:59"},
 	} {
 		if c[0] != c[1] {
 			t.Errorf("got %s, want %s", c[0], c[1])

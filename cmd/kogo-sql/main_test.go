@@ -68,6 +68,10 @@ func TestCheckExamples(t *testing.T) {
 		"24_gates.kg:99:22 (request.clientAddress: String) -> count: Int",
 		"24_gates.kg:103:16 (request.clientAddress: String) -> ",
 		"26_action.kg:31:22 (address: String) -> count: Int",
+		"27_origin.kg:40:19 (origin: String) -> ",
+		"28_session.kg:21:62 (it: Uuid) -> id: Uuid, csrf_token: String, expires_at: Instant",
+		"28_session.kg:26:26 (id: Uuid) -> id: Uuid, csrf_token: String, expires_at: Instant",
+		"28_session.kg:33:42 (it: Uuid) -> ",
 	}
 	lines, code := kogoSQL(t, "check", "../../examples")
 	if code != 0 || len(lines) != len(want) {

@@ -1,0 +1,34 @@
+// The session reader (doc/origin.md): the only file that reads the
+// session's cookie or selects a session. The list's check compares
+// the token (27_origin.kg), and liveSession compares nothing.
+package example.origin
+
+import kogo.rpc.Request
+import kogo.time.Instant
+
+// As `kogo schema` writes it:
+data class Session(val id: Uuid, val csrfToken: String, val expiresAt: Instant)
+
+// A cookie that is no UUID is no session.
+private fun sessionId(request: Request): Uuid? =
+    request.cookie("SID")?.let { Uuid.parseOrNull(it) }
+
+// A request that carries a session carries its token in X-CSRF-Token,
+// which a page of ours reads from an answer and another site's cannot.
+// The row is read by its id alone, expired or not; a missing header
+// reads as "", which is no row's token. No cookie, or no row, passes.
+fun tokenMatches(tx: Tx, request: Request): Either<String, Unit> = either {
+    val row = sessionId(request)?.let { tx.queryOne<Session>(sql"select * from session where id = $it") }
+    ensure(row == null || row.csrfToken == (request.header("X-CSRF-Token") ?: "")) { "Invalid CSRF token" }
+}
+
+private fun session(tx: SerializableTx, id: Uuid): Session? =
+    tx.queryOne<Session>(sql"select * from session where id = $id")
+
+fun liveSession(tx: SerializableTx, env: CounterEnv, request: Request): Session? =
+    sessionId(request)?.let { session(tx, it) }?.takeIf { env.clock.now().isBefore(it.expiresAt) }
+
+// Signing out reads no row and no token.
+fun endSession(tx: Tx, request: Request) {
+    sessionId(request)?.let { tx.execute(sql"delete from session where id = $it") }
+}

@@ -113,3 +113,15 @@ create table every_type (
 -- before it may still hold a null.
 alter table every_type add column pending text;
 alter table every_type add constraint pending_not_null not null pending not valid;
+
+-- The domains whose pages may call, and their visitors' sessions
+-- (examples/27_origin.kg, examples/28_session.kg).
+create table shop (
+    domain text primary key
+);
+
+create table session (
+    id uuid primary key,
+    csrf_token text not null,
+    expires_at timestamptz not null
+);

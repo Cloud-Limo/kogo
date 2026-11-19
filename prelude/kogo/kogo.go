@@ -95,6 +95,11 @@ func List_Get[T any](this List[T], index int32) T {
 
 func List_IsNotEmpty[T any](this List[T]) bool { return len(this) > 0 }
 
+// List_Contains compares as == does, by value.
+func List_Contains[T any](this List[T], element T) bool {
+	return slices.ContainsFunc(this, func(x T) bool { return rt.Equal(x, element) })
+}
+
 // ListT_FirstOrNull_fun, as every nullable result, is a copy: a
 // pointer into the list would hold all of it and could change it.
 func ListT_FirstOrNull_fun[T any](this List[T]) *T {
@@ -316,6 +321,7 @@ func String_IfEmpty(this string, defaultValue func() string) string {
 }
 
 func String_StartsWith(this, prefix string) bool { return strings.HasPrefix(this, prefix) }
+func String_EndsWith(this, suffix string) bool   { return strings.HasSuffix(this, suffix) }
 
 // String_FilterNot keeps the UTF-16 units that predicate refuses.
 func String_FilterNot(this string, predicate func(rt.Char) bool) string {

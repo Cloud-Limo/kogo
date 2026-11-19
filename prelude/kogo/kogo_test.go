@@ -302,6 +302,13 @@ func TestPortCalls(t *testing.T) {
 	if !String_StartsWith("+61 4", "+") || String_StartsWith("61", "+") || !List_IsNotEmpty(ListOf(1)) || List_IsNotEmpty(EmptyList[int]()) {
 		t.Error("startsWith or isNotEmpty")
 	}
+	if !String_EndsWith("a.test/", "/") || String_EndsWith("a.test", "/") || !String_EndsWith("", "") {
+		t.Error("endsWith")
+	}
+	// A list holds a value equal to one of its elements, as == has it.
+	if l := ListOf(rt.Ptr("a"), nil); !List_Contains(l, rt.Ptr("a")) || !List_Contains(l, nil) || List_Contains(l, rt.Ptr("b")) || List_Contains(EmptyList[string](), "") {
+		t.Error("contains on a list")
+	}
 	if EmptyList[int]() == nil || !math.IsInf(Decimal_ToDouble(Decimal("1e400")), 1) {
 		t.Error("emptyList is nil, or a numeric past Double is not Infinity")
 	}

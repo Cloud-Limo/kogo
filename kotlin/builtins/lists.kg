@@ -7,6 +7,7 @@ fun lists(f: String, xs: List<Long>, ys: List<Long>, n: Int, m: Int): String? = 
     "listOf" -> "${listOf(xs.size, n, m)} ${listOf<Long>()} ${emptyList<Long>()}"
     "listOfNotNull" -> "${listOfNotNull(xs.firstOrNull(), ys.lastOrNull(), xs.singleOrNull())}"
     "size" -> "${xs.size} ${xs.isNotEmpty()}"
+    "listContains" -> "${xs.firstOrNull()?.let { ys.contains(it) }} ${ys.lastOrNull()?.let { it in xs }}"
     "get" -> "${xs[n]}"
     "first" -> "${xs.first()}"
     "firstOrNull" -> "${xs.firstOrNull()}"

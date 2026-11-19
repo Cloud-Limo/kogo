@@ -3,7 +3,7 @@ package emit
 import "testing"
 
 // What the driver of a program that takes a Db declares: db, over a
-// schema of its own in the test database (kogo/internal/testdb).
+// schema of its own in the test database (internal/testdb).
 const withDB = `
 import (
 "context"

@@ -1869,8 +1869,8 @@ Each entry: what was decided, why, and what would reopen it.
   `<out>/a/b/kogo.go` in Go package `b`, and nothing else. The import path of `<out>` is
   read from the `go.mod` above it, and the Go imports `github.com/Cloud-Limo/kogo/rt` and
   `.../prelude/...`, so a program's module requires this one. Not taken: copying the
-  runtime into `<out>`, which would free a program from this repo and is about 40 lines. Reopen when a program
-  is built outside this repo.
+  runtime into `<out>`, which would free a program from this repo and is about 40 lines.
+  Reopen when a program is built outside this repo.
 - **`rt` apart from the prelude's Go** (principle 8). `rt` is what the core needs: `Unit`,
   `Nothing`, `Char`, the walk behind `==` and `toString()`, and the emitter's helpers.
   `prelude/kogo` and `prelude/kogo/time` are the Go of Kogo's packages `kogo` and

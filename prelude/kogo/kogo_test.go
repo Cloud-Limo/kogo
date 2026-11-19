@@ -208,7 +208,8 @@ func TestIds(t *testing.T) {
 }
 
 // Kogo's own ids increase within a process however fast they are
-// made, and ids made at once from several goroutines are all different.
+// made, and ids made at once from several goroutines are all different
+// and in order as each goroutine saw them.
 func TestOwnIdsIncrease(t *testing.T) {
 	last := NewId()
 	for range 100000 {
@@ -223,7 +224,11 @@ func TestOwnIdsIncrease(t *testing.T) {
 	for g := range ids {
 		wg.Go(func() {
 			for range 10000 {
-				ids[g] = append(ids[g], NewId())
+				id := NewId()
+				if n := len(ids[g]); n > 0 && id.String() <= ids[g][n-1].String() {
+					t.Errorf("%s then %s", ids[g][n-1], id)
+				}
+				ids[g] = append(ids[g], id)
 			}
 		})
 	}

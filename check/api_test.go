@@ -111,7 +111,7 @@ func TestOperationFacts(t *testing.T) {
 // and the Reply and its cookies are not. Nothing else crosses as one.
 func TestReply(t *testing.T) {
 	head := "package kogo.rpc\nexternal class Request\ndata class Cookie(val name: String)\ndata class Reply<A>(val answer: A, val cookies: List<Cookie>)\n---\n" +
-		"import kogo.rpc.Request\nimport kogo.rpc.Reply\ndata class Env(val n: Int)\ndata class Job(val n: Int)\ndata class P(val tx: Tx)\n" +
+		"import kogo.rpc.Request\nimport kogo.rpc.Reply\ndata class Env(val n: Int)\ndata class Job(val n: Int)\ndata class P(val n: Int)\n" +
 		"fun g(tx: Tx, env: Env, request: Request): Either<String, P> = either { raise(\"no\") }\n"
 	info, errs := run(t, head+"api ops unchecked { f ungated }\n"+op("Unit", "Reply<Job?>"))
 	if errs != nil {
@@ -181,7 +181,7 @@ action fun s(env: Env, p: P, input: In): Either<String, Unit> = either { ring() 
 		{fun("x(tx: Tx, env: E2, request: Request): Either<String, P>") + "api ops unchecked { me ungated, v gatedBy ‸x }", "gate", "x takes the environment E2, and me takes Env"},
 		{fun("x(tx: Tx, env: Env, request: Request, input: Unit): Either<String, P>") + "api ops unchecked { w gatedBy ‸x }", "gate", "x reads a Unit, and w's input is a In: a gate that reads an input takes its operation's"},
 		{fun("w2(env: Env, p: P, input: In): Either<String, Unit>") + "api ops unchecked { w gatedBy own, w2 gatedBy ‸own }", "gate", "own is w's gate too, and it reads an input: a gate that more than one row names reads none, so write w2 a gate of its own or take the input out of own"},
-		{fun("x(tx: Tx, env: Env, request: Request): Either<String, Tx>") + "fun y(env: Env, tx: Tx, input: Unit): Either<String, Unit> = either { }\n" + "api ops unchecked { y gatedBy ‸x }", "gate", "x gives a Tx: a gate gives a proof, not the handle, so give a data class that holds the Tx and what the gate read"},
+		{fun("x(tx: Tx, env: Env, request: Request): Either<String, Tx>") + "fun y(env: Env, tx: Tx, input: Unit): Either<String, Unit> = either { }\n" + "api ops unchecked { y gatedBy ‸x }", "gate", "x gives a Tx: a gate gives a proof, not the handle, so give a proof that holds the Tx and what the gate read (spec.md 15.7), or the facts alone"},
 		{fun("x(tx: Tx, env: Env, request: Request): Either<String, Db>") + "fun y(env: Env, db: Db, input: Unit): Either<String, Unit> = either { }\n" + "api ops unchecked { y gatedBy ‸x }", "gate", "x gives a Db: a gate gives a proof, not the handle"},
 		{fun("x(tx: Tx, env: Env, request: Request): Either<String, Request>") + "fun y(env: Env, r: Request, input: Unit): Either<String, Unit> = either { }\n" + "api ops unchecked { y gatedBy ‸x }", "gate", "x gives a Request: a gate gives a proof, not the handle"},
 		// Gated work.

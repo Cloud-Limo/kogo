@@ -2,18 +2,22 @@
 // its gate or says ungated. A gate finds out who is asking and gives
 // a proof, which the work takes where an ungated operation takes the
 // request. The server runs each in turn (15.3), and serves a list
-// that is unchecked to no browser.
+// that is unchecked to no browser. A gate that gives a transaction
+// gives it in a proof (15.7), which only a file that opts in to its
+// marker makes; one that gives facts alone gives a plain data class.
+@file:OptIn(DeskOnly::class)
+
 package example.gates
 
 import kogo.io.Console
 import kogo.rpc.Request
 
 api desk checkedBy fromOurPage {
-    statusOf    gatedBy clerk                             // a shared gate: it reads no input
-    unpaid      gatedBy clerk
+    statusOf    gatedBy atDesk                            // a shared gate: it reads no input
+    unpaid      gatedBy atDesk
     markPaid    gatedBy markPaidGate                      // a gate of its own, which reads the input
     sendInvoice gatedBy sendInvoiceGate after tellPrinter // a step between the gate and the work
-    testPrinter gatedBy clerk                             // an action fun: its gate, then it, with no transaction open
+    testPrinter gatedBy clerk                             // an action fun: its gate gives facts alone, then it runs with no transaction open
     looks       ungated
 }
 
@@ -27,31 +31,44 @@ data class InvoiceRef(val number: String)
 
 data class Sent(val number: String, val printer: String)
 
-// What a gate gives: who asked, or the invoice they may change, and
-// the transaction the gate read it in.
-data class Clerk(val address: String, val tx: Tx)
+@RequiresOptIn
+annotation class DeskOnly
 
-data class OpenInvoice(val number: String, val totalCents: Long, val tx: Tx)
+// What a gate gives: a proof, of the desk alone or of the invoice
+// the clerk may change, with the transaction the gate read it in; or
+// facts alone, who asked.
+data class AtDesk @DeskOnly constructor(@property:DeskOnly val tx: Tx)
+
+data class OpenInvoice @DeskOnly constructor(val number: String, val totalCents: Long, @property:DeskOnly val tx: Tx)
+
+data class Clerk(val address: String)
 
 // The check runs before every row of desk, looks included.
 fun fromOurPage(tx: Tx, env: DeskEnv, request: Request): Either<String, Unit> = either {
     ensure(request.cookie("desk") != null) { "Open the desk's page first." }
 }
 
+// A proof with nothing but its transaction: the work that takes it
+// acts for every invoice, as anyone at the desk may.
+fun atDesk(tx: Tx, env: DeskEnv, request: Request): Either<String, AtDesk> = either {
+    clerk(tx, env, request).bind()
+    AtDesk(tx)
+}
+
 fun clerk(tx: Tx, env: DeskEnv, request: Request): Either<String, Clerk> = either {
     val misses = tx.queryOne<Int>(sql"select count from look where address = ${request.clientAddress}") ?: 0
     ensure(misses == 0) { "This address may not use the desk." }
-    Clerk(request.clientAddress, tx)
+    Clerk(request.clientAddress)
 }
 
-fun statusOf(env: DeskEnv, clerk: Clerk, input: InvoiceRef): Either<String, String> = either {
-    clerk.tx.queryOne<String>(sql"""
+fun statusOf(env: DeskEnv, desk: AtDesk, input: InvoiceRef): Either<String, String> = either {
+    desk.tx.queryOne<String>(sql"""
         select status::text as "status!" from invoice where number = ${input.number}
     """) ?: raise("There is no invoice ${input.number}.")
 }
 
-fun unpaid(env: DeskEnv, clerk: Clerk, input: Unit): Either<String, List<String>> = either {
-    clerk.tx.query<String>(sql"select number from invoice where status <> 'paid' order by number")
+fun unpaid(env: DeskEnv, desk: AtDesk, input: Unit): Either<String, List<String>> = either {
+    desk.tx.query<String>(sql"select number from invoice where status <> 'paid' order by number")
 }
 
 fun openInvoice(tx: Tx, number: String): Either<String, OpenInvoice> = either {
@@ -87,7 +104,7 @@ fun sendInvoice(env: DeskEnv, invoice: OpenInvoice, input: InvoiceRef): Either<S
 
 // Gated work that is an action fun: the server runs the gate in a
 // transaction, ends it, and calls this with none open. The gate runs
-// once, and the proof is read for its facts alone.
+// once, and gives facts alone, with no transaction to have ended.
 action fun testPrinter(env: DeskEnv, clerk: Clerk, input: Unit): Either<String, String> = either {
     ensure(env.printer != "") { "No printer is set up." }
     env.console.println("${env.printer}: a test page for ${clerk.address}")

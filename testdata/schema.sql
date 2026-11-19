@@ -125,3 +125,9 @@ create table session (
     csrf_token text not null,
     expires_at timestamptz not null
 );
+
+-- What a gate must not touch but to read (doc/gates.md): a view to
+-- write through, a sequence, and a function that writes.
+create view people as select id, name, email from person;
+create sequence ticket;
+create function rename_all() returns void language sql as $$ update person set name = name $$;

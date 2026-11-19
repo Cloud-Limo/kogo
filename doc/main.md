@@ -11,10 +11,15 @@ the lead gave that day to its thirteen questions: Qn points into
 rule with its reasons. It is not built. Every Go name below that is
 not `net/http`'s, `slog`'s or pgx's is invented: the emitted packages,
 and the prelude's handle, command and runner APIs, which no design has
-given a Go form yet. Four are the names of the session that settled
-the questions and are provisional: `X-Storefront`, `rpc.NewCalls`
-(and `rpc.Calls`, what it returns), `rpc.ReadSettings`, and a step's
-type such as `DeliveryFailure_needsRcpt`.
+given a Go form yet. `X-Storefront` is the name of the session that
+settled the questions and is provisional. Built since (DEV-986), under
+the session's names: `rpc.Call`, `rpc.NewCalls` and `rpc.Calls`,
+`rpc.SetCookies`, each operation's `_op` value, the chain with a
+step's type such as `DeliveryFailure_needsRcpt`, and
+`rpc.ReadSettings`. One line below is ahead of them: `rpc.NewCalls`
+and `rpc.NewHandler` take no clock yet (Q8). `rpc.Call`'s error is an
+`rpc.Refused` for a refusal, and otherwise the status and text a
+browser would get.
 
 ## The file
 

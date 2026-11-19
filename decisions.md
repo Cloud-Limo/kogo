@@ -3381,6 +3381,46 @@ Each entry: what was decided, why, and what would reopen it.
 - **A binding that says neither kind is still not refused** (DEV-962's entry): nothing
   marks which bindings call outside. Not taken here: the rule is the checker's.
 
+## Taken building what `main` needs (DEV-986), not yet discussed
+
+The three entries of 18 Nov 2026 are built as they say. What they left open:
+
+- **The session's four Go names are kept**: `rpc.NewCalls`, `rpc.Calls`,
+  `rpc.ReadSettings`, and a step's type as `Class_needsProperty`. The chain starts at
+  `Class_()`, a name no declaration can have, since the naming rule ends no name in `_`;
+  a step's type and an operation's `_op` value go through the naming rule, so a clash
+  with a nested type or an enum's constant is a `go-name` error, not Go that fails to
+  build. Not taken: `rpc.NewRoutes` or `rpc.Unmounted` for `Calls`, which say no more.
+- **An `_op` value names its operation and carries its types**:
+  `rpc.NewOp[Env, I, A]("logout")`, which `rpc.Call` looks up in the list of its `Calls`.
+  Where two lists of a package hold one name, each is spelled with its list,
+  `Routes_Logout_op`. `A` is what the fun answers, a `Reply<A>` whole, so that a route
+  has the cookies. It is written for every list, checked ones too, though only an
+  unchecked list has a `Calls`: the decision says each operation, and it costs a line.
+  Not taken: an `Op` that holds the row's functions, which would need the four row
+  constructors to return a second type; the types are the checker's either way.
+- **`rpc.Calls` is a `Handler` without `ServeHTTP`** (`type Calls[Env] Handler[Env]`):
+  one `run` serves a browser's call and `rpc.Call`, so the id, the `served` line, the
+  limit and the reruns cannot drift apart. The `served` line is now logged before the
+  answer is written, not after. Not taken: a second struct that copies the handler's.
+- **`rpc.Call`'s error** is an `rpc.Refused` with the refusal's words, or the status and
+  text a browser would get: `400 op: input.kind is not one of ...` for an enum that is
+  no entry, `404` for an operation not of the list, `500 request <id>` for a panic,
+  which is logged as a browser's is, and `503 request <id>` past the limit. Not taken:
+  one plain error, where a route could not tell a refusal from a bug; a panic passed
+  on to the route, which would then lack the `served` line.
+- **The settings' reader is `rpc.ReadSettings[S](settings []byte, report io.Writer)
+  (S, error)`, in `prelude/kogo/rpc`**, since the strict reader is that package's and
+  unexported; the spec states it in 15.4, as one more thing read as an input is. A
+  nested class reports and ignores its unknown keys too. An enum, a class of the
+  prelude and a type that crosses no wire are each refused before the file is read,
+  by the property's name; a prelude class is told by its Go package. Not taken: a
+  package of its own, which would export the reader for one caller. Reopens with the
+  first setting that is an enum or a prelude class.
+- **A chain is written for a generic data class too**, with its type parameters, and
+  for none of the prelude's, whose Go is hand-written. A `data object` has no chain.
+- **The clock does not go to the handler here**: none of the three reads it.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

@@ -544,7 +544,8 @@ Each entry: what was decided, why, and what would reopen it.
   a choice it should not make has somewhere to stop, and an async fix run ends In Review
   like every other run. Not taken: the fixing session merges, as first written (DEV-858),
   which merges commits nobody else has read. Reopen if waiting for a lead session holds
-  merges up.
+  merges up. Reopened 20 Nov 2026: the clerk merges, below, and "the lead" of the next two
+  entries is now the clerk.
 - **The lead merges a PR with nothing left to change** (16 Nov 2026, lead's ruling on
   DEV-861). On a `Review:` or `Ruling:` that leaves nothing to change and that it agrees
   with, the lead runs the tests and merges at the reviewed sha, without a `Fixed:`. Not
@@ -609,6 +610,90 @@ Each entry: what was decided, why, and what would reopen it.
   work, or showing three of more rows. `lin list backlog` prints the parked issues as the
   board prints the open ones, which the lead took so that what brings each back is read,
   not remembered. Not taken: due dates, a milestone per day.
+- **A clerk runs the pipeline and merges; the lead decides** (20 Nov 2026, Greg; DEV-999).
+  The lead of 19 Nov made 283 calls in 3.5 hours and its context grew from 29k to 640k
+  tokens, each call reading all of it again; 55% of the calls were pipeline work set off
+  by background waits. So that work goes to a clerk, one `claude -p` on Opus at medium
+  effort for each event, started by a poller (`lin clerk`, DEV-1000) and following
+  `doc/clerk.md`; the lead lasts one sitting, is woken only by Greg and never waits.
+  Greg's: the clerk merges a Kogo PR when every check passes and nothing is Open, and
+  otherwise hands it on; a cusoon2 PR stays his to merge, after the clerk says it is
+  ready; what the clerk hands on carries the label `lead` and waits for his next "Lead",
+  with no notification. Taken here, where the issue was silent or said otherwise:
+  - `Ruling:` starts a clerk too, with `Handoff:`, `Review:` and `Fixed:`: the table's
+    rows after a Ruling are a Fix or a merge, both the clerk's. Not taken: the lead
+    launching the Fix, which leaves a Ruling with nothing to change no one to merge it.
+  - The clerk leaves alone an issue labelled `lead`, but for its PR merging, and takes it
+    up from its newest comment when the label goes. So the label has a rule: the lead can
+    post a Ruling and then a `Lead:` comment keeping the Fix in Zed with no clerk starting
+    between the two, and can hold a whole issue. Not taken: the newest comment alone,
+    which the poll can read between two posts.
+  - The clerk starts in `~/Dev/kogo`, not in the issue's worktree as the issue said: a
+    run's handoff has no worktree in this VM, a cusoon2 worktree has no `doc/clerk.md`,
+    and a branch's copy may be stale. It makes the worktree when it merges.
+  - One clerk at a time: two merges would share `kogo_test`. Not taken: a lock for each
+    issue, as DEV-1000 first said.
+  - What is handed on takes the place of the step, and is raised once, on the Review: the
+    review is always launched, and a Budget outgrown, a `spec.md` change and new work are
+    all in one `Clerk:` comment with the Questions, which one Ruling answers. Not taken:
+    raising them on the Handoff, which holds the review until Greg next says "Lead".
+  - A `Clerk:` comment is on the issue in full, where the lead reads it without the PR.
+  - A merge is its own event: the clerk that merges posts `Merged:` and exits, and the
+    clerk the merge starts tidies and moves to Todo what waited on it, the same for a PR
+    Greg merged. Not taken: tidying when a lead starts, which no longer happens daily.
+  - The cap is `--max-budget-usd 5`, a guess at several times a merge step; set it from
+    the first days' log.
+  - The clerk hands on a Fix it doubts as well as a Won't fix, where the issue named only
+    the second: a wrong Fix is made by the next run, a wrong Won't fix only left.
+  - No statusline, which the issue left optional: nothing here could show that Zed's
+    agent panel draws one, and the poller's log can give each clerk's cost.
+  - A step's comment counts only from an owner, member or collaborator, and only when its
+    first line is the one on the issue (the Review, 20 Nov): Kogo is public, anyone may
+    comment on its PRs, and the clerk quotes a Ruling into a brief and merges unattended.
+    Any other is handed on. Not taken: trusting the PR's comments as a lead reading them
+    did. A run reading its PR has the same hole, which is cusoon2's launcher's.
+  - An issue that fits no row of the clerk's table is handed on, so none is nobody's
+    (the Review): the table's last row had taken anything else and exited.
+  - The poller pulls `~/Dev/kogo` before it starts a clerk, and its first poll records
+    what is there and starts none (Greg's Ruling 10): else a change to `doc/clerk.md` is
+    read one event late, and starting the poller starts a clerk for every open issue.
+  - The sizes stand (Ruling 8): `doc/lead.md` 246 lines for about 170, `doc/clerk.md`
+    221 for about 120, Rulings 11 to 18 included. What is over is written once and repeats nothing. Not taken:
+    cutting the cusoon2 paragraph of Merging or Talking to Greg.
+  - This PR waits for DEV-1000 and the two merge on one day (Ruling 9), since
+    `doc/clerk.md` describes a poller not yet built: DEV-1000 is built to this branch,
+    what the build proves wrong comes back here as a second Ruling and Fix, and the
+    clerk's own command line, run once by hand, merges this PR. Not taken: merging now
+    and saying "Clerk DEV-NNN" by hand, with `main` naming three things that do not
+    exist.
+  - Building the poller (cusoon2 PR 1543) changed six things, Greg's Rulings 11 to 16 of
+    20 Nov. The clerk runs with `--permission-mode auto` and one allowed command, `gh pr
+    merge` of a Kogo PR URL with `--merge --match-head-commit`: auto mode refuses a merge
+    no person approved, and the rule lets through Kogo's PRs alone. Not taken: `Bash(gh pr
+    merge *)`, which would merge a cusoon2 PR; the alias `opus` for the model, which
+    changes it with nobody deciding. The merge names the sha its checks ran on, since a
+    run's wrapper may push after its `Fixed:`, and a head that moved is handed on. The
+    poller sees a merge as the issue turning Done, so a PR without "Fixes DEV-NNN" starts
+    no clerk and a Done set by hand is handed on. For a clerk that fails the poller posts
+    its own `Clerk:` comment, the exit and the last lines, which the lead reads as a
+    failed step and Greg restarts by hand, as the poller starts no step twice. A
+    speculative run is labelled with `lin label`. A merge that changes the poller's own
+    file is handed to Greg to restart it: a clerk that did would stop itself.
+  - The merge takes the full sha, from `git rev-parse HEAD` in the worktree after the
+    checks (Greg's Ruling 17, 20 Nov): `gh` matches the head against the whole one, and a
+    short sha from a step's comment would be refused and handed on as a head that moved.
+  - The clerk writes its comment and brief files under `/tmp`, in a `mktemp -d`
+    directory, never in a checkout (Ruling 18): one left in the worktree makes it not
+    clean, and the clerk that tidies after the merge would leave it and hand on.
+  It changes five entries besides "The lead merges": in "Kogo's async runs" the table is
+  now in `doc/clerk.md`; in "The side-by-side run" the clerk runs the comparison, under
+  `doc/clerk.md`, "Merging"; in "The lead lists Greg's next moves in two lists" nobody
+  says when a Not yet move is ready, a fresh "Lead" shows it; in "The lead does not run
+  other sessions' steps" Greg starts only the steps kept in Zed, and the clerk launches
+  the review and the fix; in "Greg answers the lead with numbers and letters" `884 back`
+  is gone, the clerk seeing a Zed session's comment.
+  Reopen if what is handed on waits too long for a "Lead", or the clerk merges what a
+  lead would have stopped.
 - **The emitted Go names its source inline, by a relative path** (15 Nov 2026). Each line of
   Go begins with its own position, `/*line ../../src/a.kg:26*/`, padded so that a file's
   code starts at one column, then indented a tab for each block or closure it is in. Nobody

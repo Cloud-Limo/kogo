@@ -619,8 +619,8 @@ func (c *checker) body(f *Func, d *syntax.FunDecl) {
 		c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda = r, l, e, n, b, bl, il
 	}(c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda)
 	c.result, c.loops, c.raise, c.raiseDepth, c.buried, c.buriedLoop, c.inLambda = f.Result, 0, raise, len(c.lambdas), false, false, false
-	defer func(a bool, n int) { c.acted, c.inTx = a, n }(c.acted, c.inTx)
-	c.acted, c.inTx = false, 0
+	defer func(a bool, n int, k map[*syntax.Lambda]string) { c.acted, c.inTx, c.acting = a, n, k }(c.acted, c.inTx, c.acting)
+	c.acted, c.inTx, c.acting = false, 0, map[*syntax.Lambda]string{}
 	errs := len(c.errs)
 	defer func() {
 		if c.actionKept(); f.Action && !f.External && !c.acted && len(c.errs) == errs {

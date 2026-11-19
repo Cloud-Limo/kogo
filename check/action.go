@@ -1,6 +1,10 @@
 package check
 
-import "github.com/Cloud-Limo/kogo/syntax"
+import (
+	"slices"
+
+	"github.com/Cloud-Limo/kogo/syntax"
+)
 
 // Actions (spec.md 7.1; doc/gates.md, "Outside calls"). An action fun
 // changes something outside, which no transaction rolls back. The
@@ -16,6 +20,8 @@ func (c *checker) acts(at syntax.Node, f *Func) {
 	switch owner, _ := c.owner.(*Func); {
 	case owner == nil || owner.Kind != Fun:
 		c.errorf(at, "unmarked-action", "%s is an action, and only an action fun calls one: move the call into an action fun (spec.md 7.1)", f.Name)
+	case !owner.Action && (owner.Owner != nil || !slices.Contains(c.file.Decls, syntax.Decl(owner.Decl.(*syntax.FunDecl)))):
+		c.errorf(at, "unmarked-action", "%s calls %s, an action, and only a top-level fun is an action fun: move the call out of %s, into the action fun around it (spec.md 7.1)", owner.Name, f.Name, owner.Name)
 	case !owner.Action:
 		c.errorf(at, "unmarked-action", "%s calls %s, an action: make %s an action fun, or move the call (spec.md 7.1)", owner.Name, f.Name, owner.Name)
 	case c.inTx > 0:

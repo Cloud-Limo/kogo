@@ -791,6 +791,8 @@ func (p *parser) stmt() Stmt {
 		return p.valDecl(Modifiers{}, false)
 	case p.at("fun"):
 		return p.funDecl(Modifiers{}, false)
+	case p.at("action") && p.peek(1).text == "fun" && !p.peek(1).nl:
+		p.fail(pos, "syntax", "action goes before a top-level fun only: declare the action fun at the top level, or leave the word out and move the action out of this fun")
 	case p.at("for"):
 		return p.forStmt()
 	case p.at("while"):

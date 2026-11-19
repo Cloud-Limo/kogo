@@ -44,7 +44,7 @@ func Emit(info *check.Info, prelude, program []*syntax.File, root, out string) (
 
 func emitAll(info *check.Info, prelude, program []*syntax.File, root, outDir string) (*emitter, map[string][]byte, []*syntax.Error) {
 	e := &emitter{
-		info: info, root: root, names: map[any]string{}, bound: map[string]bool{},
+		info: info, root: root, names: map[any]string{}, bound: map[string]bool{}, chained: map[*check.TypeDecl]bool{},
 		nullable: map[*check.TypeParam]bool{}, scanned: map[*check.Func]bool{},
 	}
 	bindings := append([]*syntax.File{info.Core}, prelude...)
@@ -56,6 +56,7 @@ func emitAll(info *check.Info, prelude, program []*syntax.File, root, outDir str
 			e.either = info.Classes[c]
 		}
 	}
+	e.chains()
 	e.name(bindings)
 	e.name(program)
 	var pkgs []string
@@ -134,6 +135,7 @@ type emitter struct {
 	errs     []*syntax.Error
 	names    map[any]string            // the Go name of each top-level type, fun, val, enum constant, enum's entries and api table
 	bound    map[string]bool           // the Kogo packages that Go implements: the prelude's
+	chained  map[*check.TypeDecl]bool  // the data classes that get a chain: see chains
 	nullable map[*check.TypeParam]bool // the type parameters used as T?
 	scanned  map[*check.Func]bool      // the funs whose signatures are read for that
 	either   *check.TypeDecl           // the core's Either

@@ -1,6 +1,6 @@
 # Kogo
 
-A small language in Kotlin's syntax that compiles to Go, for Postgres
+A small language in Kotlin®'s syntax that compiles to Go, for Postgres
 backends that serve web front ends. SQL is written as SQL and checked
 against the real schema at build time.
 
@@ -54,3 +54,6 @@ tests use; a test that runs statements does so in a schema of its own there.
 
 Copyright 2026 Gregory Tod. Licensed under the Apache License,
 Version 2.0, as Kotlin is: see `LICENSE`.
+
+Kotlin® is a registered trademark of the Kotlin Foundation. Kogo is not
+affiliated with or endorsed by JetBrains or the Kotlin Foundation.

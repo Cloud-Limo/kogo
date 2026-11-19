@@ -108,7 +108,8 @@ func run(t *testing.T, src string) (*Info, []*syntax.Error) {
 // Kind{x y} an enum of the constants x and y, and t(a: Int, b: Uuid?)
 // the composite type t of fields a and b. A literal holding « is
 // refused there. A word @person:update says the statement needs
-// update of the table person, and @person that it reads it.
+// update of the table person, and @person that it reads it;
+// @utility:LOCKSTMT that it is the utility statement Postgres tags so.
 func signature(lit *syntax.SQL) (*sqlpass.Statement, error) {
 	if i := strings.Index(lit.Text, "«"); i >= 0 {
 		return nil, &sqlpass.Error{Offset: i, Code: "sql-rejected", Message: "Postgres refused this"}
@@ -154,14 +155,16 @@ func signature(lit *syntax.SQL) (*sqlpass.Statement, error) {
 		}
 		return cols
 	}
-	text, tables := lit.Text, []sqlpass.Table(nil)
+	text, tables, utility := lit.Text, []sqlpass.Table(nil), ""
 	for _, w := range strings.Fields(text) {
-		if name, need, _ := strings.Cut(w, ":"); w[0] == '@' {
+		if name, need, _ := strings.Cut(w, ":"); name == "@utility" {
+			utility, text = need, strings.Replace(text, w, "", 1)
+		} else if w[0] == '@' {
 			tables, text = append(tables, sqlpass.Table{Name: name[1:], Needs: strings.Fields(need)}), strings.Replace(text, w, "", 1)
 		}
 	}
 	params, cols, _ := strings.Cut(text, "->")
-	st := &sqlpass.Statement{SQL: lit.Text, Columns: columns(cols), Tables: tables}
+	st := &sqlpass.Statement{SQL: lit.Text, Columns: columns(cols), Tables: tables, Utility: utility}
 	for _, p := range strings.Split(params, ",") {
 		if source, t, ok := strings.Cut(strings.TrimSpace(p), ": "); ok {
 			st.Params = append(st.Params, sqlpass.Param{Source: source, Type: typ(t)})

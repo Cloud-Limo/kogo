@@ -28,6 +28,7 @@ type env struct {
 	ready    *sync.WaitGroup // the two first attempts of race, each having read
 	attempts *atomic.Int32
 	gates    *atomic.Int32 // the runs of gate
+	xids     *sync.Map     // the transaction of each gate run, by name, as pg_current_xact_id gives it
 }
 
 type Person struct {
@@ -129,6 +130,7 @@ type Held struct {
 // inserts first: its refusal leaves no row.
 func gate(tx kogo.Tx, e env, _ Request, p Person) kogo.Either[string, Held] {
 	e.gates.Add(1)
+	e.xids.Store(p.Name, kogo.Tx_QuerySingle(tx, "select pg_current_xact_id()::text", func(s kogo.Scan) (x string) { s(&x); return }))
 	if strings.HasPrefix(p.Name, "nobody") {
 		return kogo.Either_Left[string]{Value: "secret gate"}
 	}
@@ -216,7 +218,7 @@ func TestHandler(t *testing.T) {
 	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
 	defer drop()
 	var log bytes.Buffer
-	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}}, slog.New(slog.NewJSONHandler(&log, nil)))
+	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}, &sync.Map{}}, slog.New(slog.NewJSONHandler(&log, nil)))
 	var cookies []string
 	post := func(method, name, body string) (int, string) {
 		w := httptest.NewRecorder()
@@ -308,11 +310,20 @@ func TestHandler(t *testing.T) {
 	// gate runs twice where the step passes and once where it or the
 	// gate refuses: 3 runs for held, and 1, 1, 2 and 2 for sent. The
 	// gate of work that is an action fun runs once, in a transaction
-	// that commits unless the gate refuses: 3 runs for rung.
+	// that commits unless the gate refuses: 3 runs for rung, and their
+	// transactions, by id, commit for rung and refused rung.
 	for name, want := range map[string]int{"held": 1, "refused held": 0, "refused sent": 0, "sent": 1, "checked": 0,
 		"bound updates": 0, "bound counts": 0, "bound binds": 1, "bound locks": 1} {
 		if rows(name) != want {
 			t.Errorf("%d rows of %q, want %d: a gated row keeps what it wrote, or a refusal does not roll back", rows(name), name, want)
+		}
+	}
+	for name, want := range map[string]string{"rung": "committed", "refused rung": "committed", "nobody rung": "aborted"} {
+		x, _ := h.env.xids.Load(name)
+		var got string
+		pool.QueryRow(ctx, "select pg_xact_status($1::text::xid8)", x).Scan(&got)
+		if got != want {
+			t.Errorf("the gate's transaction of %q is %q, want %q: the gate of an action fun commits before the work", name, got, want)
 		}
 	}
 	if n := h.env.gates.Swap(0); n != 12 {

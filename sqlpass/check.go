@@ -61,6 +61,7 @@ type Statement struct {
 	Params  []Param
 	Columns []Column
 	Tables  []Table
+	Utility string // Postgres's tag for a utility statement, as TRUNCATESTMT; empty for the rest
 }
 
 // A Checker checks literals against one database. It only prepares
@@ -167,6 +168,9 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 			spelling(params[i]), row)}
 	}
 	st := &Statement{SQL: sql, Params: params}
+	if query.num("commandType") == 6 { // CMD_UTILITY: its tree lists no table
+		st.Utility = query.field("utilityStmt").tag
+	}
 	if st.Tables, err = c.tables(ctx, query); err != nil {
 		return nil, err
 	}

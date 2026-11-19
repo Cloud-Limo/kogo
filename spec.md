@@ -1215,9 +1215,14 @@ one returns an `Either` whose `Left` is a refusal in words:
   and that inserts into, updates or deletes from a table or a view is
   a compile error, `gate-writes`, and so is one that locks rows (`for
   update`, `for share`) where the gate takes a `SerializableTx`; a
-  gate on a `Tx` may lock. Postgres says what each statement needs of
-  each table, as it types the statement (section 10). It does not say
-  what a function the statement calls writes, nor `nextval`: 15.3.
+  gate on a `Tx` may lock. So is a utility statement, as `truncate`
+  or `lock table`; a gate binds the tenant, a setting, with
+  `set_config`. Postgres
+  says what each statement needs of each table, as it types the
+  statement (section 10). It does not say what a function the
+  statement calls writes, nor `nextval`: 15.3. A call through a value
+  of an interface's type is not followed to the classes that override
+  the fun.
 - A gate that reads no input may stand in many rows, whose operations
   have no gate of their own. A gate that reads an input stands in one
   row of a list.
@@ -1281,10 +1286,14 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   releases before the work. There a write, one inside a function of
   the database's too, `nextval` and a row lock are each a bug, and a
   panic (section 8). A setting the gate makes with `set_config` is
-  allowed, and is still set in the work, which writes as before. A
-  gate on a `Tx` is not run so, since Postgres's read-only mode
-  refuses the lock such a gate may take: the compile error of 15.2
-  alone holds it.
+  allowed, and is still set in the work, which writes as before: a
+  gate binds the tenant so. An advisory lock and a write to a
+  temporary table pass, since Postgres's read-only mode allows them,
+  and neither this nor `gate-writes` refuses them. A gate on a `Tx` is not run so,
+  since Postgres's read-only mode refuses the lock such a gate may
+  take: the compile error of 15.2 alone holds it, and a write inside
+  a function of the database or `nextval` in such a gate is not
+  refused.
 - The first parameter of the gate, or of an ungated operation that
   takes a transaction, names the kind the server opens (10.7): at
   SERIALIZABLE for a `SerializableTx`, at READ COMMITTED for a `Tx`.

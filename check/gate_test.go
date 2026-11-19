@@ -26,6 +26,8 @@ fun seen(tx: Tx): Int = tx.execute(sql"@person @session:lock")
 			"gate-writes", "this statement inserts into person, and a gate only reads"},
 		{head + "fun g(tx: SerializableTx, env: Env, request: Request): Either<String, P> = either { P(tx.execute(‸sql\"@session:lock\")) }\napi ops unchecked { v gatedBy g }",
 			"gate-writes", "this statement locks session, and a gate on a SerializableTx only reads: lock it in the work"},
+		{head + "fun g(tx: Tx, env: Env, request: Request): Either<String, P> = either { P(tx.execute(‸sql\"@utility:LOCKSTMT\")) }\napi ops unchecked { v gatedBy g }",
+			"gate-writes", "this statement is a utility statement (Postgres's LOCKSTMT), and a gate only reads"},
 		// Through a fun it calls, in another file and reached by two
 		// rows: said once, where the statement is.
 		{rpc("import m.gone\n") + rest + "fun g(tx: SerializableTx, env: Env, request: Request): Either<String, P> = either { P(gone(tx)) }\napi ops unchecked { v gatedBy g }\napi more unchecked { v gatedBy g }\n---\npackage m\nfun gone(tx: Tx): Int = tx.execute(‸sql\"@session:delete\")",

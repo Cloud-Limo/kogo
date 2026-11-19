@@ -59,6 +59,7 @@ func TestCheckExamples(t *testing.T) {
 		"23_test.kg:45:34 (newId(): Uuid) -> ",
 		"23_test.kg:48:75 () -> status: InvoiceStatus",
 		"23_test.kg:53:34 (newId(): Uuid) -> ",
+		"23_test.kg:62:23 (prefix: String) -> count: Long",
 		"24_gates.kg:59:35 (request.clientAddress: String) -> count: Int",
 		"24_gates.kg:65:30 (input.number: String) -> status: String",
 		"24_gates.kg:71:27 () -> number: String",

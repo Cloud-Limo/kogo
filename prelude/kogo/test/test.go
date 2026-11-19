@@ -26,7 +26,7 @@ type Test[E any] struct {
 	body     func(kogo.Tx, E) rt.Unit
 }
 
-func Test_String_TxEToUnit[E any](sentence string, body func(kogo.Tx, E) rt.Unit) Test[E] {
+func Test_String_SerializableTxEToUnit[E any](sentence string, body func(kogo.Tx, E) rt.Unit) Test[E] {
 	return Test[E]{sentence, body}
 }
 

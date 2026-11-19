@@ -453,3 +453,25 @@ func TestPlainTxRunsOnce(t *testing.T) {
 		return rt.Unit{}
 	})
 }
+
+// A test's transaction is SERIALIZABLE, as RolledBack states it, and
+// is rolled back (spec.md 16.2).
+func TestRolledBackIsSerializable(t *testing.T) {
+	url := os.Getenv("KOGO_TEST_DATABASE_URL")
+	if url == "" {
+		url = "postgres://kogo:kogo@127.0.0.1/kogo_test"
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	var level string
+	RolledBack(NewDb(ctx, pool), func(tx Tx) {
+		must(0, tx.tx.QueryRow(ctx, "show transaction_isolation").Scan(&level))
+	})
+	if level != "serializable" {
+		t.Errorf("a test's transaction is at %q, want serializable", level)
+	}
+}

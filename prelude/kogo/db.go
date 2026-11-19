@@ -136,10 +136,12 @@ func Tx_Atomically[A any](this Tx, block func() A) A {
 	return a
 }
 
-// RolledBack runs block in a transaction that is rolled back when
-// block ends, however it ends: kogo test's, one for each test.
+// RolledBack runs block once in a transaction at SERIALIZABLE, as
+// stated and not left to the database's default, that is rolled back
+// when block ends, however it ends: kogo test's, one for each test,
+// whose block is handed a SerializableTx (spec.md 16.1).
 func RolledBack(db Db, block func(Tx)) {
-	tx := must(db.pool.Begin(db.ctx))
+	tx := must(db.pool.BeginTx(db.ctx, pgx.TxOptions{IsoLevel: pgx.Serializable}))
 	decimals(tx.Conn().TypeMap())
 	defer tx.Rollback(db.ctx)
 	block(Tx{db.ctx, tx})

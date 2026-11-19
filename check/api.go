@@ -7,7 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // Operations (spec.md 15): an api list names top-level funs, each of

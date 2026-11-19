@@ -6,7 +6,7 @@ import (
 	"math"
 	"strconv"
 
-	"kogo/rt"
+	"github.com/Cloud-Limo/kogo/rt"
 )
 
 // Plain is plain(value), the text of Java's

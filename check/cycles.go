@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // A step is what one file takes from another package: its imports

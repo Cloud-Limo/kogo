@@ -19,9 +19,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"kogo/check"
-	"kogo/sqlpass"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/check"
+	"github.com/Cloud-Limo/kogo/sqlpass"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }

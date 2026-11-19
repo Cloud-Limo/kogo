@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"kogo/prelude/kogo"
+	"github.com/Cloud-Limo/kogo/prelude/kogo"
 )
 
 // JSON as spec.md 15.4 has it, by one walk over the Go types the

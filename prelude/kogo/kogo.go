@@ -26,7 +26,7 @@ import (
 	"unicode"
 	"unicode/utf16"
 
-	"kogo/rt"
+	"github.com/Cloud-Limo/kogo/rt"
 )
 
 // A List is a slice that nothing changes once it is built.

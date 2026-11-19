@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"kogo/prelude/kogo"
-	"kogo/rt"
+	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	"github.com/Cloud-Limo/kogo/rt"
 )
 
 // Wire types as the emitter writes them: every row of spec.md 15.4.

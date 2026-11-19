@@ -1,4 +1,4 @@
-module kogo
+module github.com/Cloud-Limo/kogo
 
 go 1.27.4
 

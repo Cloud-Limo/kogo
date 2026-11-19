@@ -20,15 +20,15 @@ import (
 	"strconv"
 	"strings"
 
-	"kogo/check"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/check"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // The Go packages that emitted code imports: rt, and the prelude's,
 // one for each Kogo package of it.
 const (
-	rtPath      = "kogo/rt"
-	preludePath = "kogo/prelude/"
+	rtPath      = "github.com/Cloud-Limo/kogo/rt"
+	preludePath = "github.com/Cloud-Limo/kogo/prelude/"
 )
 
 // Emit gives the Go for a checked program: one file for each Kogo

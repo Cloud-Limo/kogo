@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"kogo/kotlin/_work/builtins"
+	"github.com/Cloud-Limo/kogo/kotlin/_work/builtins"
 )
 
 func main() {

@@ -17,8 +17,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"kogo/prelude/kogo"
-	"kogo/rt"
+	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	"github.com/Cloud-Limo/kogo/rt"
 )
 
 // A Request is what the server read of one HTTP request.

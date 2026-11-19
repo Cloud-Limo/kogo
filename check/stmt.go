@@ -1,6 +1,6 @@
 package check
 
-import "kogo/syntax"
+import "github.com/Cloud-Limo/kogo/syntax"
 
 // block checks a block's statements in a scope of their own, where
 // known holds. When used, its last statement is its value, checked

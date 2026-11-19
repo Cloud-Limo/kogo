@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"kogo/check"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/check"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // value gives the Go for x as a value of the type want.

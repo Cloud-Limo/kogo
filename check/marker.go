@@ -1,6 +1,6 @@
 package check
 
-import "kogo/syntax"
+import "github.com/Cloud-Limo/kogo/syntax"
 
 // Markers (spec.md section 11). A marker is declared @RequiresOptIn
 // annotation class Name; a fun, a val or a constructor that carries

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // call checks a call: of a value of a function type, of a local fun,

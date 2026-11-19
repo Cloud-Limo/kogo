@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // facts are what is known of names at some place: the type each is

@@ -66,12 +66,15 @@ Each entry: what was decided, why, and what would reopen it.
   Where it stops is spec 10.5: a reference is followed through a subquery in `from` and a
   `group by`, and no further. Reopen when a Postgres release changes the tree (`TestSignatures`
   fails) or when `"name!"` on CTE columns becomes a habit (following a CTE is about 15 lines).
-- **The module stays `module kogo` for now** (15 Nov 2026). Everything planned builds on
-  one machine, where a local override reaches it, and the rename to the remote's path is a
-  search and replace. The emitter keeps the import path of the prelude's Go in one place,
-  so the rename is one line there. Not taken: renaming at once, which collides with the
-  branches in flight. Reopen when emitted Go must build where a local override cannot
-  reach (CI, another machine), or when the repo's home changes.
+- **The module is `github.com/Cloud-Limo/kogo`** (19 Nov 2026), the repository's own
+  path, so that a program fetches it as an ordinary Go module pinned by commit. It was
+  `module kogo` from 15 Nov, while everything built on one machine where a `replace` to
+  a local checkout reached it; cusoon2 committing its emitted Go, built by CI, is what
+  reopened that. The emitter keeps the import paths of `rt` and the prelude's Go in two
+  constants in `emit/emit.go`. Not taken: a vanity path on a domain of its own, which
+  needs a server answering `?go-get=1` and gains only when the repository moves; or
+  keeping `kogo` with a `replace` in every program, which no `go build` away from a
+  local checkout can follow. Reopen when the repository moves.
 - **An application may have binding files of its own** (15 Nov 2026), in a directory it
   names to the compiler; the Go behind them lives with the application. Only the prelude
   may declare a binding today, and a Stripe client cannot go there (principle 8). Not
@@ -1864,9 +1867,9 @@ Each entry: what was decided, why, and what would reopen it.
   implement the interface.
 - **Layout.** `kogo emit <dir> <out>` writes one Go file for each Kogo package, `a.b`'s at
   `<out>/a/b/kogo.go` in Go package `b`, and nothing else. The import path of `<out>` is
-  read from the `go.mod` above it, and the Go imports `kogo/rt` and `kogo/prelude/...`, so
-  a program's module requires this one. Not taken: copying the runtime into `<out>`,
-  which would free a program from this repo and is about 40 lines. Reopen when a program
+  read from the `go.mod` above it, and the Go imports `github.com/Cloud-Limo/kogo/rt` and
+  `.../prelude/...`, so a program's module requires this one. Not taken: copying the
+  runtime into `<out>`, which would free a program from this repo and is about 40 lines. Reopen when a program
   is built outside this repo.
 - **`rt` apart from the prelude's Go** (principle 8). `rt` is what the core needs: `Unit`,
   `Nothing`, `Char`, the walk behind `==` and `toString()`, and the emitter's helpers.

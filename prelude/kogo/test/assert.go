@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"kogo/rt"
+	"github.com/Cloud-Limo/kogo/rt"
 )
 
 // said gives Kotlin's message: the caller's, a full stop and what the

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"kogo/prelude"
-	"kogo/sqlpass"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/prelude"
+	"github.com/Cloud-Limo/kogo/sqlpass"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // A prelude of the tests' own: spec.md section 13 lets the checker be

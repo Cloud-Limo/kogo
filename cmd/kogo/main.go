@@ -12,11 +12,11 @@
 // read it, and emit and ts leave it out of the program, as Go leaves
 // out a _test.go. test builds and runs <main>, the application's own
 // Go, which makes the environment and the pool and hands the tests
-// lists to test.Run of kogo/prelude/kogo/test. That program's output
-// is test's, one JSON object a line for each test that failed, and
-// so is its exit status, which it makes 1 when a test failed; a main
-// that does not build is 2. Give test an <out> of its own: the Go it
-// writes there holds the tests.
+// lists to test.Run of github.com/Cloud-Limo/kogo/prelude/kogo/test.
+// That program's output is test's, one JSON object a line for each
+// test that failed, and so is its exit status, which it makes 1 when a
+// test failed; a main that does not build is 2. Give test an <out> of
+// its own: the Go it writes there holds the tests.
 //
 // It prints one JSON object a line for each error (file, line, column,
 // code, message) and exits 0 when there are none, 1 when there are
@@ -27,12 +27,13 @@
 // none.
 //
 // emit writes one Go package for each Kogo package, a.b's at
-// <out>/a/b/kogo.go. The Go imports kogo/rt and kogo/prelude/..., and
-// its own packages by the import path of <out>, which is read from
-// the go.mod above it: so <out> lies in a Go module that requires
-// this one. emit refuses, writing nothing, when <out> holds a kogo.go
-// that it wrote, by its header, for a package the program no longer
-// has; it leaves every other file there alone.
+// <out>/a/b/kogo.go. The Go imports github.com/Cloud-Limo/kogo/rt and
+// github.com/Cloud-Limo/kogo/prelude/..., and its own packages by the
+// import path of <out>, which is read from the go.mod above it: so
+// <out> lies in a Go module that requires this one. emit refuses,
+// writing nothing, when <out> holds a kogo.go that it wrote, by its
+// header, for a package the program no longer has; it leaves every
+// other file there alone.
 package main
 
 import (
@@ -49,12 +50,12 @@ import (
 	"slices"
 	"strings"
 
-	"kogo/check"
-	"kogo/emit"
-	"kogo/prelude"
-	"kogo/sqlpass"
-	"kogo/syntax"
-	"kogo/ts"
+	"github.com/Cloud-Limo/kogo/check"
+	"github.com/Cloud-Limo/kogo/emit"
+	"github.com/Cloud-Limo/kogo/prelude"
+	"github.com/Cloud-Limo/kogo/sqlpass"
+	"github.com/Cloud-Limo/kogo/syntax"
+	"github.com/Cloud-Limo/kogo/ts"
 )
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
@@ -275,7 +276,7 @@ func importPath(out string) (string, error) {
 			}
 		}
 		if dir == filepath.Dir(dir) {
-			return "", fmt.Errorf("no go.mod lies above %s: write the Go inside a Go module that requires kogo, whose rt and prelude it imports", out)
+			return "", fmt.Errorf("no go.mod lies above %s: write the Go inside a Go module that requires github.com/Cloud-Limo/kogo, whose rt and prelude it imports", out)
 		}
 	}
 }

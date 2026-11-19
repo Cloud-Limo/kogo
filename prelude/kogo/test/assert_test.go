@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"kogo/rt"
+	"github.com/Cloud-Limo/kogo/rt"
 )
 
 // Each assertion that fails panics with the message Kotlin's

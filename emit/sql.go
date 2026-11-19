@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"kogo/check"
-	"kogo/sqlpass"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/check"
+	"github.com/Cloud-Limo/kogo/sqlpass"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // sql writes one of the five calls of spec.md 10.2 as a call of the

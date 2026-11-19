@@ -15,11 +15,11 @@ import (
 	"ROOT/example"
 	"ROOT/example/markers"
 	"ROOT/example/ops"
-	"kogo/internal/testdb"
-	"kogo/prelude/kogo"
-	"kogo/prelude/kogo/rpc"
-	ktime "kogo/prelude/kogo/time"
-	"kogo/rt"
+	"github.com/Cloud-Limo/kogo/internal/testdb"
+	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	"github.com/Cloud-Limo/kogo/prelude/kogo/rpc"
+	ktime "github.com/Cloud-Limo/kogo/prelude/kogo/time"
+	"github.com/Cloud-Limo/kogo/rt"
 )
 
 // The rows that examples 10 to 19, 21 and 22 read.

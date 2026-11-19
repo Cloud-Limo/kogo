@@ -179,7 +179,7 @@ fun endSession(tx: Tx, request: Request) {             // logout's: no row read,
 ## The emitted Go
 
 ```go
-// kogo/prelude/kogo/rpc
+// github.com/Cloud-Limo/kogo/prelude/kogo/rpc
 type Table[Env any] struct { // a list that names its check: what NewHandler takes
 	Check      func(kogo.Tx, Env, Request) kogo.Either[string, rt.Unit]
 	Operations []Operation[Env]

@@ -9,7 +9,7 @@ package check
 import (
 	"strings"
 
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // Info is what the checker learned about a program: tables keyed by

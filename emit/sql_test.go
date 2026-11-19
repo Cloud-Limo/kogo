@@ -7,8 +7,8 @@ import "testing"
 const withDB = `
 import (
 "context"
-"kogo/internal/testdb"
-"kogo/prelude/kogo"
+"github.com/Cloud-Limo/kogo/internal/testdb"
+"github.com/Cloud-Limo/kogo/prelude/kogo"
 )
 var ctx = context.Background()
 var pool, drop = testdb.Open(ctx, "../testdata/schema.sql")

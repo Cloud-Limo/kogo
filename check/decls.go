@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 //go:embed core.kg

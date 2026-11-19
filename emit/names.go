@@ -6,8 +6,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"kogo/check"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/check"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // The naming rule (decisions.md). A top-level Go name is the Kogo

@@ -241,7 +241,7 @@ external fun field(name: String, value: String): Field      // and Long, Double,
 external fun group(name: String, fields: List<Field>): Field
 external fun field(name: String, values: List<String>): Field   // Stripe's expand[]=a&expand[]=b, or a JSON array
 
-external lookup fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpFailure, Json>
+external fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpFailure, Json>
 action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<HttpFailure, Json>
 action external fun Http.performOnce(key: EffectKey, endpoint: KeyedAction, fields: List<Field>): Either<HttpFailure, Json>
 
@@ -369,8 +369,7 @@ action fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<
 
 Whether a call changes anything is still someone's word: the author of
 a service's list of endpoints, about 30 lines in Kogo, where it is read
-on one screen. An outbound binding that says neither `lookup` nor
-`action` is an error.
+on one screen.
 
 Weighed and not taken:
 
@@ -1270,8 +1269,8 @@ built once. Agreed with Greg on 17 Nov 2026.
 
 ## What it would change in the spec
 
-- **13:** an outbound binding says whether it is a lookup or an
-  action, the second an `action fun`. Application code holds no
+- **13:** an outbound binding that changes something says `action`,
+  and is an `action fun`; any other says nothing. Application code holds no
   `external`, as now.
 - **12, the prelude:** `kogo.http`, and `Act` and `EffectKey` with
   the runner's package. A handle's failure is its own package's:

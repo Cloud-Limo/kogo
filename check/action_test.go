@@ -6,10 +6,10 @@ import "testing"
 // takes no Tx, acts in no block that holds one, and is not kept in a
 // value.
 func TestActions(t *testing.T) {
-	head := "package kogo.io\nexternal class Bell\naction external fun Bell.ring()\nlookup external fun Bell.heard(): Boolean\n---\nimport kogo.io.Bell\n" +
+	head := "package kogo.io\nexternal class Bell\naction external fun Bell.ring()\nexternal fun Bell.heard(): Boolean\n---\nimport kogo.io.Bell\n" +
 		"action fun f(b: Bell) {\n    b.ring()\n}\n"
 	passes(t,
-		// The word is carried up, and a lookup is allowed anywhere.
+		// The word is carried up, and a binding that says nothing is allowed anywhere.
 		head+"action fun g(b: Bell) = f(b)\nfun h(tx: Tx, b: Bell): Boolean = b.heard()",
 		// It acts between its transactions, and in a block of the prelude's.
 		head+"action fun g(db: Db, b: Bell): Either<String, Int> = either {\n    val n = db.tx { tx -> tx.execute(sql\"\") }.bind()\n    f(b)\n    n\n}",

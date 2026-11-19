@@ -25,7 +25,7 @@ external fun field(name: String, values: List<String>): Field
 external fun field(name: String, json: Json): Field
 external fun group(name: String, fields: List<Field>): Field
 
-lookup external fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpFailure, Json>
+external fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpFailure, Json>
 action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<HttpFailure, Json>
 external fun Http.withHeader(name: String, value: String): Http
 

@@ -45,6 +45,7 @@ var kept = []struct{ names, from, to, why string }{
 	{"get", `Empty list doesn't contain element at index (-?\d+)\.`, "Index $1 out of bounds for length 0", "spec.md section 12: an index into Kotlin's empty list"},
 	{"replace", `[Ii]llegal group reference.*`, "illegal group reference", "spec.md section 12: replace with a bad group"},
 	{"replace", `No group (\d)`, "no group $1", "spec.md section 12: replace with a bad group"},
+	{"parseOrNull32", `[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}`, "null", "spec.md section 12: Uuid.parseOrNull of 32 hex digits"},
 	{"replace", `(no group in ".*" at \d+|No group with name \{.*\}|named capturing group .*)$`, "no such named group", "spec.md section 12: replace with a bad group"},
 }
 

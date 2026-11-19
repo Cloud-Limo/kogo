@@ -887,9 +887,13 @@ nanos)`, `isBefore`, `isAfter`, `plus(duration)`, `minus(duration)`),
 `ZonedDateTime` (`instant.atZone(zone)`, `hour`, `minute`,
 `toLocalDate`, `plusSeconds`, `toInstant`), `Duration` (`ofDays`,
 `ofMinutes`, `Duration.ofSeconds(seconds, nanos)`), `Clock.now()`.
-`ofEpochSecond`, `ofSeconds`, `plus` and `minus` panic where
-`java.time`'s throw, with its message: `Instant exceeds minimum or
-maximum instant`, or `long overflow`. There is no default zone: every
+`ofEpochSecond`, `ofSeconds`, `plus`, `minus`, `atZone`, `plusDays`
+and `ZoneId.of` panic where `java.time`'s throw, with its message:
+`Instant exceeds minimum or maximum instant`, `long overflow`, `Invalid
+value for EpochDay` past a `LocalDate`'s years ±999,999,999, or
+`Unknown time-zone ID: X`. `ZoneId.of` takes `java.time`'s IDs: a
+region of the tz database, or an offset (`+05:30`, `Z`, `GMT+1`, which
+writes itself `GMT+01:00`). There is no default zone: every
 conversion names its zone. `atStartOfDay(zone)` is the day's earliest
 time in the zone: where midnight is skipped, the end of the gap.
 Each writes itself as `java.time` does, in a template too: an

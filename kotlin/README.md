@@ -7,7 +7,8 @@ and is not part of `go test ./...`.
 
 - `builtins/*.kg` is the shared source: Kogo, and Kotlin unchanged
   (kotlinc is given the same bytes under a `.kt` name, `time.kt`,
-  which names `java.time`'s types `kogo.time`'s, and `arrow.kt`,
+  which names `java.time`'s types `kogo.time`'s, `kogo.kt`, which
+  names Kotlin's `Uuid` Kogo's, and `arrow.kt`,
   which gives Arrow's `Either` the names Kogo's prelude needs no
   import for; the task fetches Arrow's jar once). Each branch of
   a `when` is one case, calling prelude functions singly or in a short
@@ -19,9 +20,6 @@ and is not part of `go test ./...`.
 - A difference is fixed in the prelude, or listed in `cases/main.go`'s
   `kept` with where `spec.md` states it: the cases it applies to and a
   rewrite of both results, which must then agree.
-- The time cases keep to known zones and to dates inside `LocalDate`'s
-  range, as `decisions.md` (DEV-933) says, until DEV-952 fixes the
-  differences there and removes this line.
 
 - `deviations/*.kg` are Kogo's deliberate deviations (spec 1), one
   file each. kotlinc must refuse every one with an error on the line

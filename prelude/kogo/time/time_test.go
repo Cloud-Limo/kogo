@@ -33,6 +33,11 @@ func TestTime(t *testing.T) {
 		{rt.ToString(LocalDate_PlusDays(LocalDate{Year: 2028, Month: 2, Day: 28}, 1)), "2028-02-29"},
 		{rt.ToString(LocalDate_PlusDays(LocalDate{Year: 2026, Month: 12, Day: 30}, 33)), "2027-02-01"},
 		{rt.ToString(LocalDate_PlusDays(LocalDate{Year: 2026, Month: 3, Day: 1}, -1)), "2026-02-28"},
+		// Offsets, as java.time's ZoneId.of reads and writes them.
+		{rt.ToString(Instant_AtZone(Instant{Seconds: 1794753000}, ZoneId_Of("+0530"))), "2026-11-15T20:00+05:30"},
+		{rt.ToString(Instant_AtZone(Instant{Seconds: 1794753000}, ZoneId_Of("Z"))), "2026-11-15T14:30Z"},
+		{rt.ToString(Instant_AtZone(Instant{Seconds: 1794753000}, ZoneId_Of("GMT+1"))), "2026-11-15T15:30+01:00[GMT+01:00]"},
+		{ZoneId_Of("UTC-0").Name + " " + ZoneId_Of("-09:30:15").Name, "UTC -09:30:15"},
 	} {
 		if c[0] != c[1] {
 			t.Errorf("got %s, want %s", c[0], c[1])
@@ -44,12 +49,18 @@ func TestTime(t *testing.T) {
 	if now := Clock_Now(SystemClock()); now.Seconds < at.Seconds-400_000_000 {
 		t.Errorf("the system clock reads %v", now)
 	}
-	defer func() {
-		if recover() == nil {
-			t.Error("a zone the tz database lacks does not panic")
-		}
-	}()
-	ZoneId_Of("Mars/Olympus")
+	for id, want := range map[string]string{"Mars/Olympus": "Unknown time-zone ID: Mars/Olympus", "EST": "Unknown time-zone ID: EST",
+		"Factory": "Unknown time-zone ID: Factory", "+19": "Zone offset hours not in valid range: value 19 is not in the range -18 to 18",
+		"GMT+x": "Invalid ID for offset-based ZoneId: GMT+x", "a b": "Invalid ID for region-based ZoneId, invalid format: a b"} {
+		func() {
+			defer func() {
+				if got := recover(); got != want {
+					t.Errorf("ZoneId.of(%q) panics with %v, want %s", id, got, want)
+				}
+			}()
+			ZoneId_Of(id)
+		}()
+	}
 }
 
 // plusDays reaches java.time's last and first dates and panics past

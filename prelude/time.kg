@@ -26,7 +26,11 @@ external object Instant {
 
 external object Duration {
     fun ofSeconds(seconds: Long, nanoAdjustment: Long): Duration
+    fun ofDays(days: Long): Duration
+    fun between(startInclusive: Instant, endExclusive: Instant): Duration
 }
+
+external val Duration.seconds: Long
 
 external fun Instant.isBefore(otherInstant: Instant): Boolean
 external fun Instant.isAfter(otherInstant: Instant): Boolean

@@ -127,11 +127,12 @@ changes every run. Inside a data class's text it is written as Kotlin's
 `toString` writes it, its bytes signed: `F(name=x, data=[97, 0, -1])`.
 It is in no operation's input or answer (15.4).
 
-A `String` counts as Kotlin's does: `length`, `substring`, `padStart`
-and reading it as `Char`s count UTF-16 units, so `"😀".length` is 2. It
-never holds half of a surrogate pair, though Kotlin's can: an operation
-that would leave one, as `"😀".substring(0, 1)`, leaves U+FFFD in its
-place, which also counts as one unit.
+A `String` counts as Kotlin's does: `length`, `substring`, `take`,
+`padStart` and reading it as `Char`s count UTF-16 units, so
+`"😀".length` is 2. It never holds half of a surrogate pair, though
+Kotlin's can: an operation that would leave one, as
+`"😀".substring(0, 1)` or `"😀".take(1)`, leaves U+FFFD in its place,
+which also counts as one unit.
 
 ### 3.1 Data classes
 
@@ -516,8 +517,9 @@ outside the list panics with `Index <i> out of bounds for length <size>`
 `take(n)` and `drop(n)` of a negative `n` panic with
 `Requested element count <n> is less than zero.` (`take(-1)`:
 `Requested element count -1 is less than zero.`); an `n` past the end
-takes or drops every element. `substring` outside the string, counted
-in UTF-16 units, panics with
+takes or drops every element. A `String`'s `take(n)`, counted in UTF-16
+units, panics with `Requested character count <n> is less than zero.`
+`substring` outside the string, counted in UTF-16 units, panics with
 `Range [<start>, <end>) out of bounds for length <length>`, where
 `substring(start)` ends at the string's length
 (`"abc".substring(5, 3)`: `Range [5, 3) out of bounds for length 3`).
@@ -924,8 +926,9 @@ There are no mutable collections, sequences or arrays. Build a list with
 `map`/`filter`/`+`, or accumulate into a local `var` of an immutable list.
 
 **Strings.** `length`, `isEmpty`, `isBlank`, `isNotBlank`,
-`isNullOrBlank`, `ifEmpty`, `trim`, `trim(char)`, `lowercase`,
-`uppercase`, `startsWith`, `endsWith`, `contains`, `substring`, `replace`,
+`isNullOrBlank`, `ifEmpty`, `ifBlank`, `trim`, `trim(char)`, `trimEnd`,
+`lowercase`, `uppercase`, `startsWith`, `endsWith`, `contains`,
+`substring`, `substringAfter`, `take`, `replace`,
 `split`, `padStart`, `toIntOrNull`, `toLongOrNull`, `equals(other,
 ignoreCase = true)`, `filter`, `filterNot`, `map` (over `Char`), and on
 `Char`: `isWhitespace`, `isDigit`, `digitToInt`. `Regex(pattern)` with
@@ -969,9 +972,10 @@ nanos)`, `isBefore`, `isAfter`, `plus(duration)`, `minus(duration)`),
 `atStartOfDay(zone): ZonedDateTime`), `LocalTime`, `ZoneId.of(name)`,
 `ZonedDateTime` (`instant.atZone(zone)`, `hour`, `minute`,
 `toLocalDate`, `plusSeconds`, `toInstant`), `Duration` (`ofDays`,
-`ofMinutes`, `Duration.ofSeconds(seconds, nanos)`), `Clock.now()`.
-`ofEpochSecond`, `ofSeconds`, `plus`, `minus`, `atZone`, `plusDays`
-and `ZoneId.of` panic where `java.time`'s throw, with its message:
+`ofMinutes`, `Duration.ofSeconds(seconds, nanos)`,
+`Duration.between(start, end)`, `seconds`), `Clock.now()`.
+`ofEpochSecond`, `ofSeconds`, `ofDays`, `plus`, `minus`, `atZone`,
+`plusDays` and `ZoneId.of` panic where `java.time`'s throw, with its message:
 `Instant exceeds minimum or maximum instant`, `long overflow`, `Invalid
 value for EpochDay` past a `LocalDate`'s years ±999,999,999, or
 `Unknown time-zone ID: X`. `ZoneId.of` takes a region name of the tz

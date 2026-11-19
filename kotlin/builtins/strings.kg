@@ -9,6 +9,11 @@ fun strings(f: String, s: String, t: String, n: Int, m: Int): String? = when (f)
     "isBlank" -> "${s.isBlank()} ${s.isNotBlank()}"
     "isNullOrBlank" -> "${s.takeIf { n > m }.isNullOrBlank()} ${t.takeIf { n <= m }.isNullOrBlank()}"
     "ifEmpty" -> s.ifEmpty { t }
+    "ifBlank" -> s.ifBlank { t }
+    "substringAfter" -> "<${s.substringAfter(t)}> <${(s + t + s).substringAfter(t)}>"
+    "stringTake" -> "<${s.take(n)}>"
+    "trimEnd" -> "<${s.trimEnd()}>"
+    "error" -> if (n > m) error(s + t) else s
     "startsWith" -> "${s.startsWith(t)} ${(t + s).startsWith(t)}"
     "endsWith" -> "${s.endsWith(t)} ${(s + t).endsWith(t)}"
     "contains" -> "${s.contains(t)} ${(s + t + s).contains(t)}"

@@ -1240,7 +1240,7 @@ test reaches its 503 only by waiting.
   through a clock it is handed, and reaches the database and the
   network only through what it is handed. The runner's own SQL takes
   the time as a parameter from that clock and never says `now()`, as
-  the Kotlin's runner does. `newId()` stays the one exception.
+  the Kotlin's runner does. `newId()` is the one exception it uses.
 - **Every boundary can be made to fail in a test.** The clock is
   moved; the service is a local server that misbehaves on purpose
   ("What Go would decide, Kogo states"); and the runner's steps are
@@ -1317,8 +1317,6 @@ built once. Agreed with Greg on 17 Nov 2026.
   prelude's are written in Go by hand, as the emitter would write
   them (`kogo.mail`'s `Mail`; `decisions.md`, DEV-988); an
   application's extension is not settled.
-- A message's date. `Mail` was built with `date: Instant`, which the
-  sketch above lacks: for Greg (`decisions.md`, DEV-988).
 - A hash in the prelude. The run sheet's job keeps a SHA-1 of what it
   last sent, to see a change (`daemon.kt`, `sha1Hex`); Kogo has none.
 - For the runner's build, found on 20 Nov 2026:

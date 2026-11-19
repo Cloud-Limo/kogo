@@ -325,6 +325,29 @@ func TestImportCyclesAgainstPrelude(t *testing.T) {
 	}
 }
 
+// randomString is Kogo's own as newId is: no import, and its String
+// goes wherever a String does (spec.md 12).
+func TestRandomString(t *testing.T) {
+	pre, err := prelude.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range [][2]string{
+		{"data class S(val token: String)\nfun f(n: Int): Boolean {\n    val s = S(randomString(n))\n    return \"${randomString(2)}\".length + s.token.length > 0 && randomString(1) != \"a\"\n}\nfun g(): String = randomString(20).let { it + it }", ""},
+		{"fun f(): Int = randomString(1)", "t.kg:2:16: type-mismatch: this is a String where a Int"},
+		{"fun f(): String = randomString(\"1\")", "t.kg:2:32: type-mismatch: this is a String where a Int"},
+	} {
+		f, err := syntax.Parse("t.kg", []byte("package t\n"+c[0]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, errs := Check(pre, []*syntax.File{f}, nil)
+		if c[1] == "" && errs != nil || c[1] != "" && (len(errs) != 1 || !strings.HasPrefix(errs[0].Error(), c[1])) {
+			t.Errorf("%s\n got %v\nwant %q", c[0], errs, c[1])
+		}
+	}
+}
+
 // Section 3: the types, the number rules and what each declaration
 // may hold.
 func TestTypes(t *testing.T) {

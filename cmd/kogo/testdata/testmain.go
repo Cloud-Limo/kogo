@@ -9,8 +9,8 @@ import (
 	"os"
 
 	"ROOT/example/ops"
-	"kogo/internal/testdb"
-	"kogo/prelude/kogo/test"
+	"github.com/Cloud-Limo/kogo/internal/testdb"
+	"github.com/Cloud-Limo/kogo/prelude/kogo/test"
 )
 
 func main() {

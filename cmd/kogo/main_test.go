@@ -92,7 +92,7 @@ func TestEmittedGoRuns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	driver = bytes.ReplaceAll(driver, []byte("ROOT"), []byte("kogo/cmd/kogo/"+filepath.Base(dir)))
+	driver = bytes.ReplaceAll(driver, []byte("ROOT"), []byte("github.com/Cloud-Limo/kogo/cmd/kogo/"+filepath.Base(dir)))
 	if err := os.WriteFile(filepath.Join(dir, "main.go"), driver, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -345,7 +345,7 @@ func TestKogoTest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := strings.ReplaceAll(string(main), "ROOT", "kogo/cmd/kogo/"+filepath.Base(dir))
+	text := strings.ReplaceAll(string(main), "ROOT", "github.com/Cloud-Limo/kogo/cmd/kogo/"+filepath.Base(dir))
 	test := func(files map[string]string) (int, string) {
 		if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(text), 0o644); err != nil {
 			t.Fatal(err)

@@ -1,6 +1,6 @@
 package check
 
-import "kogo/syntax"
+import "github.com/Cloud-Limo/kogo/syntax"
 
 // Tests (spec.md 16): a tests list names top-level vals of its own
 // file, each a Test<E> of the list's one E.

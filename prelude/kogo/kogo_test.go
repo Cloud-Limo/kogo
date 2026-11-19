@@ -11,7 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"kogo/rt"
+	"github.com/Cloud-Limo/kogo/rt"
 )
 
 // A String counts UTF-16 units, as Kotlin's does, and an operation

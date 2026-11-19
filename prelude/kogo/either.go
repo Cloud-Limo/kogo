@@ -1,6 +1,6 @@
 package kogo
 
-import "kogo/rt"
+import "github.com/Cloud-Limo/kogo/rt"
 
 // Either and its two variants are check/core.kg's, written here as the
 // emitter would write that sealed interface. Each writes itself as

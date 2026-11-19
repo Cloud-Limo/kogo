@@ -17,9 +17,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"kogo/internal/testdb"
-	"kogo/prelude/kogo"
-	"kogo/rt"
+	"github.com/Cloud-Limo/kogo/internal/testdb"
+	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	"github.com/Cloud-Limo/kogo/rt"
 )
 
 // Operations as the emitter writes them, over the test database.

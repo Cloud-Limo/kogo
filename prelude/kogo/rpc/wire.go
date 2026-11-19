@@ -12,12 +12,12 @@ import (
 	"strconv"
 	"strings"
 
-	"kogo/prelude/kogo"
+	"github.com/Cloud-Limo/kogo/prelude/kogo"
 )
 
 // JSON as spec.md 15.4 has it, by one walk over the Go types the
 // emitter writes: a data class is a struct tagged with its Kogo names
-// (kogo/rt), T? a pointer, a List a slice, an enum a named string,
+// (rt), T? a pointer, a List a slice, an enum a named string,
 // Unit an empty struct. Go's reflection does not list an enum's
 // constants, so a table carries those.
 

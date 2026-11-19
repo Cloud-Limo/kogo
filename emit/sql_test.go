@@ -3,12 +3,12 @@ package emit
 import "testing"
 
 // What the driver of a program that takes a Db declares: db, over a
-// schema of its own in the test database (kogo/internal/testdb).
+// schema of its own in the test database (internal/testdb).
 const withDB = `
 import (
 "context"
-"kogo/internal/testdb"
-"kogo/prelude/kogo"
+"github.com/Cloud-Limo/kogo/internal/testdb"
+"github.com/Cloud-Limo/kogo/prelude/kogo"
 )
 var ctx = context.Background()
 var pool, drop = testdb.Open(ctx, "../testdata/schema.sql")

@@ -5,7 +5,7 @@ package prelude
 import (
 	"embed"
 
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 //go:embed *.kg

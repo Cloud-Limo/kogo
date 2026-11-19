@@ -11,8 +11,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"kogo/sqlpass"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/sqlpass"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // Signatures gives a sql literal's signature: the SQL pass's, or in a

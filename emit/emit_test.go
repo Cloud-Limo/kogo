@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"kogo/check"
-	"kogo/prelude"
-	"kogo/sqlpass"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/check"
+	"github.com/Cloud-Limo/kogo/prelude"
+	"github.com/Cloud-Limo/kogo/sqlpass"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 func must[T any](v T, err error) T {
@@ -82,7 +82,7 @@ func build(t *testing.T, files func(root string) map[string][]byte) string {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
-	root := "kogo/emit/" + filepath.Base(dir)
+	root := "github.com/Cloud-Limo/kogo/emit/" + filepath.Base(dir)
 	for name, text := range files(root) {
 		path := filepath.Join(dir, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -114,7 +114,7 @@ func run(t *testing.T, more, setup string, calls []string, sources ...string) []
 		if errs != nil {
 			t.Fatalf("%v", errs)
 		}
-		driver := "package main\nimport (\n\"fmt\"\n\"kogo/rt\"\n\"ROOT/t\"\n)\n" + more + `
+		driver := "package main\nimport (\n\"fmt\"\n\"github.com/Cloud-Limo/kogo/rt\"\n\"ROOT/t\"\n)\n" + more + `
 func show(value func() any) {
 defer func() {
 if p := recover(); p != nil {

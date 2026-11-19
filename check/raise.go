@@ -1,6 +1,6 @@
 package check
 
-import "kogo/syntax"
+import "github.com/Cloud-Limo/kogo/syntax"
 
 // Expected failures (spec.md section 9). A raise scope for E is a
 // block of type Raise<E>.() -> A, either's or db.tx's. A lambda inside

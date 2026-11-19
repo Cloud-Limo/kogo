@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"kogo/check"
+	"github.com/Cloud-Limo/kogo/check"
 )
 
 // Files gives the TypeScript of each api list of a checked program,

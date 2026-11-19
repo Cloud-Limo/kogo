@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"kogo/check"
-	"kogo/prelude"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/check"
+	"github.com/Cloud-Limo/kogo/prelude"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // files checks the Kogo sources, one file each, against the real

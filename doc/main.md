@@ -42,14 +42,14 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"kogo/prelude/kogo"
-	"kogo/prelude/kogo/command"
-	khttp "kogo/prelude/kogo/http"
-	"kogo/prelude/kogo/mail"
-	"kogo/prelude/kogo/rpc"
-	ktime "kogo/prelude/kogo/time"
-	"kogo/prelude/kogo/work"
-	"kogo/rt"
+	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	"github.com/Cloud-Limo/kogo/prelude/kogo/command"
+	khttp "github.com/Cloud-Limo/kogo/prelude/kogo/http"
+	"github.com/Cloud-Limo/kogo/prelude/kogo/mail"
+	"github.com/Cloud-Limo/kogo/prelude/kogo/rpc"
+	ktime "github.com/Cloud-Limo/kogo/prelude/kogo/time"
+	"github.com/Cloud-Limo/kogo/prelude/kogo/work"
+	"github.com/Cloud-Limo/kogo/rt"
 
 	"cusoon2/out/admin"  // commands admin
 	"cusoon2/out/app"    // data class Env, data class Settings

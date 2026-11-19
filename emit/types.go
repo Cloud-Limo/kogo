@@ -5,8 +5,8 @@ import (
 	"maps"
 	"strings"
 
-	"kogo/check"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/check"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // The Go type of each builtin type that Go has; the others are rt's.

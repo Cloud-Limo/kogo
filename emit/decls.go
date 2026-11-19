@@ -5,8 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	"kogo/check"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/check"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // decl writes a top-level declaration. A typealias is written

@@ -7,7 +7,7 @@ import (
 	goio "io"
 	"strings"
 
-	"kogo/rt"
+	"github.com/Cloud-Limo/kogo/rt"
 )
 
 // A Console is a program's standard input and output.

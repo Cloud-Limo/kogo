@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"kogo/check"
-	"kogo/syntax"
+	"github.com/Cloud-Limo/kogo/check"
+	"github.com/Cloud-Limo/kogo/syntax"
 )
 
 // A dest is where a value goes: nowhere, out of the Go function as

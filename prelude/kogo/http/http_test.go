@@ -144,8 +144,8 @@ func TestNoRedirectIsFollowed(t *testing.T) {
 		http.Redirect(w, r, "/elsewhere", http.StatusFound)
 	})
 	asked, performed := both(h)
-	want(t, "ask", asked, "Either.Left(Refused(status=302, body=null))")
-	want(t, "perform", performed, "Either.Left(Unknown(why=the service answered 302))") // a 303 says it acted
+	want(t, "ask", asked, "Either.Left(Unknown(why=the service answered 302))")
+	want(t, "perform", performed, "Either.Left(Unknown(why=the service answered 302))") // a 303 says an action was done
 	if followed.Load() != 0 {
 		t.Errorf("%d redirects were followed", followed.Load())
 	}
@@ -159,7 +159,7 @@ func TestNoProxyFromTheEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, sent := Http_Perform(h, post, nil).(kogo.Either_Left[SendFailure]).Value.(SendFailure_NotSent); !sent || proxied.Load() != 0 {
+	if _, sent := Http_Perform(h, post, nil).(kogo.Either_Left[HttpFailure]).Value.(HttpFailure_NotSent); !sent || proxied.Load() != 0 {
 		t.Errorf("a call to a host that does not exist: NotSent %v, and the environment's proxy was sent %d", sent, proxied.Load())
 	}
 }
@@ -172,7 +172,7 @@ func TestAnswerPastTheLimit(t *testing.T) {
 	want(t, "perform at the limit", performed, "Either.Right("+long+")")
 	h, _ = serve(t, Service{MaxAnswer: int64(len(long)) - 1}, answer(200, long))
 	asked, performed = both(h)
-	want(t, "ask", asked, "Either.Left(Failed(why=the answer is longer than 407 bytes))")
+	want(t, "ask", asked, "Either.Left(Unknown(why=the answer is longer than 407 bytes))")
 	want(t, "perform", performed, "Either.Left(Unknown(why=the answer is longer than 407 bytes))")
 }
 
@@ -304,23 +304,24 @@ func TestWhatIsSent(t *testing.T) {
 	panics(t, "field: rate is NaN, which no service reads", func() { Field_String_Double("rate", rt.Div(0.0, 0.0)) })
 }
 
-// A failed send is sorted by how far it got and by its status alone.
+// A failed send is sorted by how far it got and by its status alone,
+// whichever call made it.
 func TestFailures(t *testing.T) {
 	for _, c := range []struct {
-		status           int
-		body             string
-		asked, performed string
+		status int
+		body   string
+		want   string
 	}{
-		{402, `{"error": {"type": "declined"}}`, `Either.Left(Refused(status=402, body={"error": {"type": "declined"}}))`, `Either.Left(Refused(status=402, body={"error": {"type": "declined"}}))`},
-		{404, `not found`, `Either.Left(Refused(status=404, body=null))`, `Either.Left(Refused(status=404, body=null))`},
-		{503, `{}`, `Either.Left(Failed(why=the service answered 503))`, `Either.Left(Unknown(why=the service answered 503))`},
-		{200, `[1]`, `Either.Left(Failed(why=the answer is not a JSON object))`, `Either.Left(Unknown(why=the answer is not a JSON object))`},
-		{200, ``, `Either.Right({})`, `Either.Right({})`},
+		{402, `{"error": {"type": "declined"}}`, `Either.Left(Refused(status=402, body={"error": {"type": "declined"}}))`},
+		{404, `not found`, `Either.Left(Refused(status=404, body=null))`},
+		{503, `{}`, `Either.Left(Unknown(why=the service answered 503))`},
+		{200, `[1]`, `Either.Left(Unreadable(why=the answer is not a JSON object))`},
+		{200, ``, `Either.Right({})`},
 	} {
 		h, log := serve(t, Service{Query: map[string]string{"key": "secret"}}, answer(c.status, c.body))
 		asked, performed := both(h)
-		want(t, "ask", asked, c.asked)
-		want(t, "perform", performed, c.performed)
+		want(t, "ask", asked, c.want)
+		want(t, "perform", performed, c.want)
 		refused := c.status >= 300 && c.status < 500
 		if got := strings.Count(log.String(), "kogo.http: refused"); got != map[bool]int{true: 2}[refused] {
 			t.Errorf("%d: %d refused sends are logged:\n%s", c.status, got, log)
@@ -339,16 +340,18 @@ func TestFailures(t *testing.T) {
 	if !strings.Contains(log.String(), strings.Repeat("x", 4086)+" [cut: the first 4096 of 5012 bytes]") {
 		t.Errorf("a long refused body is not cut at 4096 bytes:\n%s", log)
 	}
-	// A slow service: the call left, so an action's end is unknown.
+	// A slow service: the call left, so its end is unknown.
 	slow, _ := serve(t, Service{Timeout: 50 * time.Millisecond, Query: map[string]string{"key": "secret"}}, func(w http.ResponseWriter, r *http.Request) { time.Sleep(200 * time.Millisecond) })
 	asked, performed := both(slow)
-	want(t, "ask of a slow service", asked, "Either.Left(Failed(why=context deadline exceeded))")
+	want(t, "ask of a slow service", asked, "Either.Left(Unknown(why=context deadline exceeded))")
 	want(t, "perform on a slow service", performed, "Either.Left(Unknown(why=context deadline exceeded))")
 	// A service that is not there: nothing left.
 	gone, _ := serve(t, Service{}, answer(200, "{}"))
 	gone.base.Host = "127.0.0.1:1"
-	if _, notSent := Http_Perform(gone, post, nil).(kogo.Either_Left[SendFailure]).Value.(SendFailure_NotSent); !notSent {
-		t.Errorf("perform on a closed port is not NotSent")
+	for what, sent := range map[string]kogo.Either[HttpFailure, Json]{"ask": Http_Ask(gone, look, nil), "perform": Http_Perform(gone, post, nil)} {
+		if _, notSent := sent.(kogo.Either_Left[HttpFailure]).Value.(HttpFailure_NotSent); !notSent {
+			t.Errorf("%s on a closed port is not NotSent", what)
+		}
 	}
 }
 

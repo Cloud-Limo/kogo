@@ -163,83 +163,76 @@ func Action_String_String_String_String(method, before, id, after string) Action
 	return Action{Lookup_String_String_String_String(method, before, id, after).endpoint}
 }
 
-// HttpError and SendFailure are prelude/http.kg's, written here as
-// the emitter would write them.
-type HttpError interface{}
+// HttpFailure is prelude/http.kg's, written here as the emitter would
+// write it.
+type HttpFailure interface{}
 
-type HttpError_Refused struct {
-	_      struct{} `kogo:"Refused"`
-	Status int32    `kogo:"status"`
-	Body   *Json    `kogo:"body"`
-}
-
-type HttpError_Failed struct {
-	_   struct{} `kogo:"Failed"`
-	Why string   `kogo:"why"`
-}
-
-type SendFailure interface{}
-
-type SendFailure_NotSent struct {
+type HttpFailure_NotSent struct {
 	_   struct{} `kogo:"NotSent"`
 	Why string   `kogo:"why"`
 }
 
-type SendFailure_Refused struct {
+type HttpFailure_Refused struct {
 	_      struct{} `kogo:"Refused"`
 	Status int32    `kogo:"status"`
 	Body   *Json    `kogo:"body"`
 }
 
-type SendFailure_Unknown struct {
+type HttpFailure_Unknown struct {
 	_   struct{} `kogo:"Unknown"`
+	Why string   `kogo:"why"`
+}
+
+type HttpFailure_Unreadable struct {
+	_   struct{} `kogo:"Unreadable"`
 	Why string   `kogo:"why"`
 }
 
 // Http_Ask sends a lookup. Go may send it a second time, at once,
 // when a kept connection fails before any answer: a lookup changes
 // nothing, so whatever its method it is marked as safe to repeat.
-func Http_Ask(this Http, endpoint Lookup, fields kogo.List[Field]) kogo.Either[HttpError, Json] {
-	answer, f := this.send(endpoint.endpoint, fields, true)
-	switch {
-	case f == nil:
-		return kogo.Either_Right[Json]{Value: *answer}
-	case f.refused:
-		return kogo.Either_Left[HttpError]{Value: HttpError_Refused{Status: f.status, Body: f.body}}
-	}
-	return kogo.Either_Left[HttpError]{Value: HttpError_Failed{Why: f.why}}
+func Http_Ask(this Http, endpoint Lookup, fields kogo.List[Field]) kogo.Either[HttpFailure, Json] {
+	return sorted(this.send(endpoint.endpoint, fields, true))
 }
 
-// Http_Perform sends an action, once: never left is NotSent, a 4xx is
-// Refused, and a 3xx, a 5xx or no answer that can be read is Unknown,
-// since the service may have acted: a 303 says it did.
-func Http_Perform(this Http, endpoint Action, fields kogo.List[Field]) kogo.Either[SendFailure, Json] {
-	answer, f := this.send(endpoint.endpoint, fields, false)
+// Http_Perform sends an action, once.
+func Http_Perform(this Http, endpoint Action, fields kogo.List[Field]) kogo.Either[HttpFailure, Json] {
+	return sorted(this.send(endpoint.endpoint, fields, false))
+}
+
+// sorted is a call's end by how far it got and its status alone,
+// whichever call it was: never left is NotSent; a 4xx is Refused; a
+// 2xx that is not a JSON object is Unreadable; and a 3xx, a 5xx or no
+// whole answer is Unknown, since an action may have been done: a 303
+// says it was.
+func sorted(answer *Json, f *failed) kogo.Either[HttpFailure, Json] {
 	switch {
 	case f == nil:
 		return kogo.Either_Right[Json]{Value: *answer}
-	case f.refused && f.status >= 400:
-		return kogo.Either_Left[SendFailure]{Value: SendFailure_Refused{Status: f.status, Body: f.body}}
 	case f.refused:
-		return kogo.Either_Left[SendFailure]{Value: SendFailure_Unknown{Why: fmt.Sprintf("the service answered %d", f.status)}}
+		return kogo.Either_Left[HttpFailure]{Value: HttpFailure_Refused{Status: f.status, Body: f.body}}
+	case f.unreadable:
+		return kogo.Either_Left[HttpFailure]{Value: HttpFailure_Unreadable{Why: f.why}}
 	case !f.left:
-		return kogo.Either_Left[SendFailure]{Value: SendFailure_NotSent{Why: f.why}}
+		return kogo.Either_Left[HttpFailure]{Value: HttpFailure_NotSent{Why: f.why}}
 	}
-	return kogo.Either_Left[SendFailure]{Value: SendFailure_Unknown{Why: f.why}}
+	return kogo.Either_Left[HttpFailure]{Value: HttpFailure_Unknown{Why: f.why}}
 }
 
 // maxLogged is the most of a refused body that is logged: it may echo
 // what was sent, a person's name or email with it.
 const maxLogged = 4 << 10
 
-// A failed send: refused with the service's status and body, or why,
-// and whether it left.
+// A failed send: refused, a 4xx, with the service's status and body;
+// or why, with whether it left and whether a 2xx came that is not a
+// JSON object.
 type failed struct {
-	refused bool
-	status  int32
-	body    *Json
-	left    bool
-	why     string
+	refused    bool
+	status     int32
+	body       *Json
+	left       bool
+	unreadable bool
+	why        string
 }
 
 func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *failed) {
@@ -310,20 +303,23 @@ func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 		return nil, &failed{left: true, why: fmt.Sprintf("the answer is longer than %d bytes", h.s.MaxAnswer)}
 	}
 	answer := Json_Parse(string(text))
-	switch status := resp.StatusCode; {
-	case status >= 300 && status < 500:
+	status := resp.StatusCode
+	if status >= 300 && status < 500 {
 		logged := string(text)
 		if len(logged) > maxLogged {
 			logged = fmt.Sprintf("%s [cut: the first %d of %d bytes]", logged[:maxLogged], maxLogged, len(logged))
 		}
 		h.s.Log.Warn("kogo.http: refused", "method", e.method, "path", e.path, "status", status, "body", logged)
+	}
+	switch {
+	case status >= 400 && status < 500:
 		return nil, &failed{refused: true, status: int32(status), body: answer}
-	case status < 200 || status >= 500:
+	case status < 200 || status >= 300:
 		return nil, &failed{left: true, why: fmt.Sprintf("the service answered %d", status)}
 	case len(bytes.TrimSpace(text)) == 0:
 		return &Json{"{}"}, nil // done, with nothing to say
 	case answer == nil:
-		return nil, &failed{left: true, why: "the answer is not a JSON object"}
+		return nil, &failed{left: true, unreadable: true, why: "the answer is not a JSON object"}
 	}
 	return answer, nil
 }

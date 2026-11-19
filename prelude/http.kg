@@ -25,8 +25,8 @@ external fun field(name: String, values: List<String>): Field
 external fun field(name: String, json: Json): Field
 external fun group(name: String, fields: List<Field>): Field
 
-lookup external fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpError, Json>
-action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
+lookup external fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpFailure, Json>
+action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<HttpFailure, Json>
 external fun Http.withHeader(name: String, value: String): Http
 
 external fun Json.string(key: String): String?
@@ -41,18 +41,10 @@ external object Json {
     fun parse(text: String): Json?
 }
 
-// Why a lookup gave no answer: the service refused it, or anything
-// else, from a send that never left to an answer that could not be
-// read.
-sealed interface HttpError {
-    data class Refused(val status: Int, val body: Json?) : HttpError
-    data class Failed(val why: String) : HttpError
-}
-
-// Why an action gave no answer, by how far it got: it never left, the
-// service refused it, or it left and the service may have acted.
-sealed interface SendFailure {
-    data class NotSent(val why: String) : SendFailure
-    data class Refused(val status: Int, val body: Json?) : SendFailure
-    data class Unknown(val why: String) : SendFailure
+// Why a call gave no answer, by how far it got.
+sealed interface HttpFailure {
+    data class NotSent(val why: String) : HttpFailure                    // it never left
+    data class Unknown(val why: String) : HttpFailure                    // it left and no answer came: an action may have been done
+    data class Refused(val status: Int, val body: Json?) : HttpFailure   // the service said no: a 4xx
+    data class Unreadable(val why: String) : HttpFailure                 // the service said yes, and the answer cannot be read
 }

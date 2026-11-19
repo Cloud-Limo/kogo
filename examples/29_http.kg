@@ -7,9 +7,8 @@ package example.depot
 
 import kogo.http.Action
 import kogo.http.Http
-import kogo.http.HttpError
+import kogo.http.HttpFailure
 import kogo.http.Lookup
-import kogo.http.SendFailure
 import kogo.http.action
 import kogo.http.field
 import kogo.http.group
@@ -25,26 +24,27 @@ data class Stock(val item: String, val count: Long)
 
 // A lookup: an ordinary fun, which may run in a transaction. A key
 // that is absent reads as null, and what that means is said here.
-fun stockOf(depot: Http, item: String): Either<HttpError, Stock> = either {
+fun stockOf(depot: Http, item: String): Either<HttpFailure, Stock> = either {
     val answer = depot.ask(STOCK, listOf(field("item", item))).bind()
-    Stock(answer.string("item") ?: raise(HttpError.Failed("the answer has no item")),
-          answer.long("count") ?: raise(HttpError.Failed("the answer has no count")))
+    Stock(answer.string("item") ?: raise(HttpFailure.Unreadable("the answer has no item")),
+          answer.long("count") ?: raise(HttpFailure.Unreadable("the answer has no count")))
 }
 
 // An action fun, since it calls perform. The shop is not a secret, so
 // it narrows the handle here.
-action fun reserved(depot: Http, shop: String, item: String, count: Long): Either<SendFailure, String> = either {
+action fun reserved(depot: Http, shop: String, item: String, count: Long): Either<HttpFailure, String> = either {
     val answer = depot.withHeader("X-Shop", shop).perform(reserve(item), listOf(
         field("count", count),
         group("for", listOf(field("name", "Ann"), field("gift", true))),
         field("notes", listOf("fragile", "this way up")))).bind()
-    answer.at("reservation")?.string("id") ?: raise(SendFailure.Unknown("the answer has no reservation"))
+    answer.at("reservation")?.string("id") ?: raise(HttpFailure.Unreadable("the answer has no reservation"))
 }
 
-// A failed action is one of three, by how far it got.
-fun said(failure: SendFailure): String =
+// A failed call is one of four, by how far it got.
+fun said(failure: HttpFailure): String =
     when (failure) {
-        is SendFailure.NotSent -> "not sent: ${failure.why}"
-        is SendFailure.Unknown -> "unknown: ${failure.why}"
-        is SendFailure.Refused -> "refused ${failure.status}: ${failure.body?.string("reason")}"
+        is HttpFailure.NotSent -> "not sent: ${failure.why}"
+        is HttpFailure.Unknown -> "unknown: ${failure.why}"
+        is HttpFailure.Refused -> "refused ${failure.status}: ${failure.body?.string("reason")}"
+        is HttpFailure.Unreadable -> "unreadable: ${failure.why}"
     }

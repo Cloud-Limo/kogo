@@ -130,9 +130,10 @@ action fun chargeInvoice(env: Env, key: EffectKey, fields: ChargeFields): Act<Ch
     stripe.charge(env.stripe.withHeader("Stripe-Account", fields.accountId), key, fields).fold(     // the client's package
         { failure ->
             when (failure) {
-                is SendFailure.NotSent -> Act.NotMade(failure.why)
-                is SendFailure.Unknown -> Act.Unknown(failure.why)
-                is SendFailure.Refused ->
+                is HttpFailure.NotSent -> Act.NotMade(failure.why)
+                is HttpFailure.Unknown -> Act.Unknown(failure.why)
+                is HttpFailure.Unreadable -> Act.Unknown("Stripe charged, and ${failure.why}")
+                is HttpFailure.Refused ->
                     if (failure.status == 409 || stripeError(failure.body) == "idempotency_error") Act.Unknown("Stripe may have charged")
                     else if (stripeError(failure.body) == "card_error") Act.Refused("Your card was declined")   // the binding logs Stripe's body (Q9)
                     else Act.NotMade("Stripe did not process it: ${failure.status}")

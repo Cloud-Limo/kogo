@@ -119,7 +119,15 @@ external fun eml(mail: Mail): ByteArray              // headers, parts, Message-
 external fun subjectOf(eml: ByteArray): String?      // for the bounce handler
 
 external class Smtp                                  // a handle, made in main with server, port and login
-action external fun Smtp.send(eml: ByteArray): Either<SendFailure, Unit>
+action external fun Smtp.send(eml: ByteArray): Either<SmtpFailure, Unit>
+
+// Mail's own failure, by how far the send got. Its name and cases are
+// settled when kogo.mail is built.
+sealed interface SmtpFailure {
+    data class NotSent(val why: String) : SmtpFailure
+    data class Unknown(val why: String) : SmtpFailure
+    data class Refused(val code: Int, val reply: String) : SmtpFailure   // the server's reply
+}
 ```
 
 ```kotlin
@@ -233,9 +241,9 @@ external fun field(name: String, value: String): Field      // and Long, Double,
 external fun group(name: String, fields: List<Field>): Field
 external fun field(name: String, values: List<String>): Field   // Stripe's expand[]=a&expand[]=b, or a JSON array
 
-external lookup fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpError, Json>
-action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
-action external fun Http.performOnce(key: EffectKey, endpoint: KeyedAction, fields: List<Field>): Either<SendFailure, Json>
+external lookup fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpFailure, Json>
+action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<HttpFailure, Json>
+action external fun Http.performOnce(key: EffectKey, endpoint: KeyedAction, fields: List<Field>): Either<HttpFailure, Json>
 
 external fun Http.withHeader(name: String, value: String): Http   // a new handle with one more header
 
@@ -261,12 +269,12 @@ with Greg on 17 Nov 2026.
 // google.kg: every Google endpoint the application uses.
 val TIME_ZONE: Lookup = lookup("GET", "/maps/api/timezone/json")
 
-fun timeZone(google: Http, at: LatLng, now: Instant): Either<HttpError, ZoneId> = either {
+fun timeZone(google: Http, at: LatLng, now: Instant): Either<HttpFailure, ZoneId> = either {
     val answer = google.ask(TIME_ZONE, listOf(
         field("location", "${at.lat},${at.lng}"),
         field("timestamp", now.epochSeconds))).bind()
-    ensure(answer.string("status") == "OK") { HttpError.Failed("the answer's status is not OK") }
-    zoneOf(answer.string("timeZoneId") ?: raise(HttpError.Failed("the answer has no timeZoneId")))
+    ensure(answer.string("status") == "OK") { HttpFailure.Unreadable("the answer's status is not OK") }
+    zoneOf(answer.string("timeZoneId") ?: raise(HttpFailure.Unreadable("the answer has no timeZoneId")))
 }
 ```
 
@@ -289,14 +297,14 @@ fun chargeFields(charge: ChargeFields): List<Field> =
     else
         listOf(group("payment_method_data", listOf(field("type", "card"), group("card", listOf(field("token", charge.paymentMethod))))))
 
-action fun charge(stripe: Http, key: EffectKey, fields: ChargeFields): Either<SendFailure, PaymentIntent> = either {
+action fun charge(stripe: Http, key: EffectKey, fields: ChargeFields): Either<HttpFailure, PaymentIntent> = either {
     val intent = stripe.performOnce(key, CHARGE, chargeFields(fields)).bind()
     PaymentIntent(
-        intent.string("id") ?: raise(SendFailure.Unknown("the answer has no id")),
-        intent.string("status") ?: raise(SendFailure.Unknown("the answer has no status")))
+        intent.string("id") ?: raise(HttpFailure.Unreadable("the answer has no id")),
+        intent.string("status") ?: raise(HttpFailure.Unreadable("the answer has no status")))
 }
 
-action fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<SendFailure, Unit> = either {
+action fun updateCustomerEmail(stripe: Http, id: String, email: String): Either<HttpFailure, Unit> = either {
     stripe.perform(customerEmail(id), listOf(field("email", email))).bind()
 }
 ```
@@ -401,9 +409,9 @@ an answer. No line of Kogo would have written that second send.
 | Go's default | Kogo's rule |
 | --- | --- |
 | Sends a keyed request again when a kept connection fails | `performOnce` may be sent a second time; `perform` never is; `ask` may be |
-| Follows up to 10 redirects, a redirected `POST` as a `GET` with no body | No redirect is followed: a 3xx to `ask` is reported with its status, as a 4xx is, and one to `perform` is `Unknown`, since a `303` after a `POST` says the service acted (built so on 19 Nov 2026 while Greg is asked) |
+| Follows up to 10 redirects, a redirected `POST` as a `GET` with no body | No redirect is followed: a 3xx is `Unknown`, whichever call it answers, since a `303` after a `POST` says the service acted |
 | Takes a proxy from `HTTP_PROXY` and its kin in the environment | No proxy unless `main` states one: the environment is ambient state (spec 7) |
-| Reads an answer of any length | An answer past a limit set in `main` is a failure: for an action, `Unknown` |
+| Reads an answer of any length | An answer past a limit set in `main` is `Unknown`, whatever its status |
 | Reads every JSON number as a `float64` | `Json.long` is exact, and `null` for a number that is not whole or does not fit |
 | Adds `Accept-Encoding: gzip` and unpacks the answer | No `Accept-Encoding` is sent: an answer is read as the service wrote it |
 | Sends `User-Agent: Go-http-client/1.1` | None is sent unless `main` states one |
@@ -505,9 +513,10 @@ action fun charge(env: Env, key: EffectKey, fields: ChargeFields): Act<PaymentIn
     charge(stripeFor(env.stripe, fields.accountId), key, fields).fold(
         { failure ->
             when (failure) {
-                is SendFailure.NotSent -> Act.NotMade(failure.why)       // it never left
-                is SendFailure.Unknown -> Act.Unknown(failure.why)       // a 5xx, or it left and no answer came
-                is SendFailure.Refused ->                                // a 4xx: Stripe's own rules sort it
+                is HttpFailure.NotSent -> Act.NotMade(failure.why)       // it never left
+                is HttpFailure.Unknown -> Act.Unknown(failure.why)       // a 3xx, a 5xx, or it left and no answer came
+                is HttpFailure.Unreadable -> Act.Unknown("Stripe charged, and ${failure.why}")   // a 2xx that cannot be read
+                is HttpFailure.Refused ->                                // a 4xx: Stripe's own rules sort it
                     if (failure.status == 409 || stripeError(failure.body) == "idempotency_error") Act.Unknown("Stripe may have charged")
                     else if (stripeError(failure.body) == "card_error") Act.Refused("Your card was declined")   // fixed words: the page is public
                     else Act.NotMade("Stripe did not process it: ${failure.status}")
@@ -518,13 +527,19 @@ action fun charge(env: Env, key: EffectKey, fields: ChargeFields): Act<PaymentIn
 fun stripeError(body: Json?): String? = body?.at("error")?.string("type")
 ```
 
-The binding sorts a failed send by how far it got and by status
-alone, for every service: never left is `NotSent`; a 4xx is
-`Refused(status, body)`; a 5xx, no answer or, for an action, a 3xx
-is `Unknown`, since the service may have acted. What a refusal means is the client's: for
-Stripe a 409 or an `idempotency_error` may have charged
-(`StripeQueues.kt`, DEV-714 there), a `card_error` is a decline, and
-any other 4xx was not processed. Agreed with Greg on 17 Nov 2026.
+The binding sorts a call that gave no answer by how far it got and by
+status alone, for every service and whichever call it was: never left
+is `NotSent`; a 4xx is `Refused(status, body)`; a 2xx that is not a
+JSON object is `Unreadable`, which a client also raises for an answer
+that lacks what the service always sends; a 3xx, a 5xx or no answer
+is `Unknown`, since an action may have been done. What a refusal
+means is the client's: for Stripe a 409 or an `idempotency_error` may
+have charged (`StripeQueues.kt`, DEV-714 there), a `card_error` is a
+decline, and any other 4xx was not processed. An `HttpFailure` is one
+call's, so a function that makes more than one call gives what the
+whole came to, as an `Act` does. Agreed with Greg on 17 Nov 2026; one
+type for both calls, `Unreadable`, and a 3xx as `Unknown` to `ask` too,
+on 20 Nov 2026 (`decisions.md`, "Taken building `kogo.http`").
 
 `prepare` and `record` hold a `Tx`, so neither can act. `act` is
 handed no `Tx` and no `Db`, and Kogo has no globals (spec 7), so it
@@ -944,7 +959,7 @@ data class Alert(val queue: String, val table: String?, val id: Uuid?,
                  val cause: String, val recovery: String?, val reset: String?)
 
 // The application's.
-action fun opsAlert(env: Env, alert: Alert): Either<SendFailure, Unit> =
+action fun opsAlert(env: Env, alert: Alert): Either<SmtpFailure, Unit> =
     env.smtp.send(eml(opsMail(env.operators, alert)))
 ```
 
@@ -1154,10 +1169,10 @@ A timeout almost never happens, so it has no path of its own.
 
 - A lookup that runs out of time is a failed lookup: a `Left` like any
   other, which its caller must handle.
-- An action can run out of time after it has left, so its failure has
-  three cases, `NotSent`, `Refused` and `Unknown`, and a `when` over
-  them covers all three or does not compile. The binding knows the
-  case by how far the call got.
+- An action can run out of time after it has left, so a failure has
+  four cases, `NotSent`, `Unknown`, `Refused` and `Unreadable`, and a
+  `when` over them covers all four or does not compile. The binding
+  knows the case by how far the call got.
 - A request whose own time runs out is answered 503, as one whose
   reruns run out is today.
 
@@ -1257,8 +1272,9 @@ built once. Agreed with Greg on 17 Nov 2026.
 - **13:** an outbound binding says whether it is a lookup or an
   action, the second an `action fun`. Application code holds no
   `external`, as now.
-- **12, the prelude:** `kogo.http`, and `Act`, `EffectKey` and
-  `SendFailure` with the runner's package.
+- **12, the prelude:** `kogo.http`, and `Act` and `EffectKey` with
+  the runner's package. A handle's failure is its own package's:
+  `HttpFailure` in `kogo.http`, mail's in `kogo.mail`.
 - **13:** an application's extensions: bindings with no effect, each
   marked, read from a directory it names.
 - **10.4 and 3:** `bytea` maps to `ByteArray`, which has no
@@ -1287,3 +1303,11 @@ built once. Agreed with Greg on 17 Nov 2026.
 - How a data class that a binding file declares reaches its Go.
 - A hash in the prelude. The run sheet's job keeps a SHA-1 of what it
   last sent, to see a change (`daemon.kt`, `sha1Hex`); Kogo has none.
+- For the runner's build, found on 20 Nov 2026:
+  - What a panic in `act` means after a send. In `prepare` it fails
+    the row as not made, which would be wrong there.
+  - `Act.Unknown` means "offer the row again", so mail's `act` gives
+    it for a send that never left: the name wants another look.
+  - Whether "an `act` makes one outside call" is held by a check.
+  - Three things are called `Refused`: a 4xx (`HttpFailure`), the
+    customer's no (`Act`) and the row's (`Failure`).

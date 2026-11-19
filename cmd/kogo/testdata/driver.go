@@ -336,6 +336,8 @@ func main() {
 		case strings.Contains(r.URL.Path, "anvil"):
 			w.WriteHeader(http.StatusConflict)
 			fmt.Fprint(w, `{"reason": "sold out"}`)
+		case strings.Contains(r.URL.Path, "ghost"):
+			fmt.Fprint(w, `{"reserved": true}`)
 		default:
 			fmt.Fprint(w, `{"reservation": {"id": "r-1"}}`)
 		}
@@ -349,8 +351,9 @@ func main() {
 	}
 	show("stock", depot.StockOf(theDepot, "bolt"))
 	show("reserved", depot.Reserved(theDepot, "acme", "nut/5?", 2))
-	show("sold out", kogo.Either_MapLeft[khttp.SendFailure, string](depot.Reserved(theDepot, "acme", "anvil", 1), depot.Said))
+	show("sold out", kogo.Either_MapLeft[khttp.HttpFailure, string](depot.Reserved(theDepot, "acme", "anvil", 1), depot.Said))
+	show("no id", kogo.Either_MapLeft[khttp.HttpFailure, string](depot.Reserved(theDepot, "acme", "ghost", 1), depot.Said))
 	service.Address = "http://127.0.0.1:1"
 	nowhere, _ := khttp.New(service)
-	show("nowhere", kogo.Either_MapLeft[khttp.SendFailure, string](depot.Reserved(nowhere, "acme", "bolt", 1), func(f khttp.SendFailure) bool { return rt.Is[khttp.SendFailure_NotSent](f) }))
+	show("nowhere", kogo.Either_MapLeft[khttp.HttpFailure, string](depot.Reserved(nowhere, "acme", "bolt", 1), func(f khttp.HttpFailure) bool { return rt.Is[khttp.HttpFailure_NotSent](f) }))
 }

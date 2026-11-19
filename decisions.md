@@ -3258,17 +3258,44 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken building `kogo.http` (DEV-978), not yet discussed
 
-- **`HttpError` is `Refused(status, body)` or `Failed(why)`**, a sealed interface as
-  `SendFailure` is. `doc/work.md` names the type and gives it no shape, and its samples
-  made one in a client (`unreadable("status")`, raised into both failure types, which
-  these two cannot share: the samples now write `HttpError.Failed(...)` and
-  `SendFailure.Unknown(...)`, as `examples/29_http.kg` does), so Kogo code must be able to. A lookup
-  changes nothing, so it does not tell never left from no answer. Not taken: one data
-  class of a nullable status, body and reason; `SendFailure` for both calls. It changes
-  what a client looks like, so it is Greg's to confirm: reopen on his word.
-- **`SendFailure.Refused` holds `status: Int` and `body: Json?`**, as `doc/charge.md`
-  reads them (`failure.status == 409`, `stripeError(failure.body)`), the body `null` when
-  it is not a JSON object.
+- **A call that gives no answer gives an `HttpFailure`, `ask` and `perform` alike**
+  (Greg, 20 Nov 2026; Ruling on PR 97): `NotSent(why)`, `Unknown(why)`, `Refused(status:
+  Int, body: Json?)` and `Unreadable(why)`, by how far the one call got. The failure is
+  the handle's, not the kind's: the kind decides which call takes an endpoint, where it
+  may be made and whether it may be sent twice, and a network fails one way for both.
+  What the kind changes is what a caller makes of `Unknown`, and the caller knows which
+  call it made. It replaces `HttpError` (`Refused` or `Failed`), which the run that built
+  this gave `ask`, and `SendFailure`, named when `perform` was still written `send`. Not
+  taken: the two types as built, renamed to pair (`LookupFailure`, `ActionFailure`), under
+  which a client of both kinds writes each helper twice; two that share `Refused` as a
+  top-level class.
+  - **One rule sorts an answer, whichever call made it**: no connection is `NotSent`; a
+    4xx is `Refused`, the body `null` when it is not a JSON object; a 2xx that is not a
+    JSON object is `Unreadable`; a 3xx, a 5xx, no answer, and an answer that broke off or
+    is past the limit whatever its status, is `Unknown`.
+  - **`Unreadable` is its own case**: the service said yes and the answer cannot be read.
+    A client raises it for an answer that lacks what the service always sends, in a lookup
+    and an action alike, and an `act` that sorts a failure faces it as a branch of its own.
+    Not taken: three cases with the client borrowing `Unknown`, which says "may have been
+    done" of a call that was answered; a panic, since what the runner makes of a panic in
+    `act` is not written.
+  - **An `HttpFailure` is one call's.** A function that makes more than one call gives
+    what the whole came to, in a type of its own, as an `Act` is: passed on from two
+    calls, a failure no longer says which call it was, and a lookup that cannot connect
+    after an action was done would read as `NotSent`. Spec 12 says so and nothing checks
+    it. Not taken: a check that a function giving an `HttpFailure` makes one call (a
+    guess of 15 / 15), left to the runner's build.
+  - **An endpoint's kind is its author's word** (spec 12). Not taken: refusing a `lookup`
+    by `PUT`, `PATCH` or `DELETE`, which cannot refuse `POST`, the method that charges.
+- **Mail does not share HTTP's failure**, which reverses 17 Nov 2026's `Smtp.send` giving
+  a `SendFailure` kept with the runner's package (Greg, 20 Nov 2026): "Absolutely a: SMTP
+  failures have their own disticnt shape from HTTP failures and it's silly to conflate
+  them. These are implementation level types: if we need consistency in higher level
+  code, someone can make a type or use and existing domain level type." The runner reads
+  an `Act`, which the application makes, and never a transport's failure, so nothing
+  holds both. `doc/work.md` shows mail's as `SmtpFailure`, with a `Refused(code, reply)`;
+  its name and cases are settled when `kogo.mail` is built. Not taken: one shared type in
+  a package of neither transport, whose `Refused` could not hold a `Json?`.
 - **A send has left once it has a connection**, so `NotSent` is a failure to make the
   request or to connect, and everything later is `Unknown`. Not taken: once its headers
   are written, which calls a write that failed half-way not sent.
@@ -3292,7 +3319,7 @@ Each entry: what was decided, why, and what would reopen it.
   hostile answer can make as large as it likes. Reopen when a service on the roadmap
   writes a whole number another way (Ruling on PR 97).
 - **A 2xx answer with no body is an object with no keys**, since a service may answer an
-  action with nothing; a 2xx body that is not a JSON object is a failure. Not taken:
+  action with nothing; a 2xx body that is not a JSON object is `Unreadable`. Not taken:
   `Json?` as the answer.
 - **An id that is empty, `.` or `..` panics, and so does a method that is not one of
   five, a path that does not begin with `/`, and a written part of a path that holds
@@ -3322,11 +3349,13 @@ Each entry: what was decided, why, and what would reopen it.
   choice for each handle, which no application has asked for. What of a body is safe
   to log at all stays open in `doc/work.md`. The query is not logged, nor any header: a
   credential may be in either.
-- **A 3xx to `perform` is `Unknown`, and a 3xx to `ask` stays `Refused`** (Ruling on PR
-  97, 19 Nov 2026: built so meanwhile, the choice is Greg's and he is asked). A `303`
-  after a `POST` means the service acted, and `doc/charge.md` reads `Refused` as nothing
-  done. It is still logged with its status and body. Not taken, unless Greg takes it:
-  the design's "a 3xx is reported with its status, as a 4xx is" for both calls.
+- **A 3xx is `Unknown`, to `ask` and to `perform`**, which reverses 17 Nov 2026's "a 3xx
+  is reported with its status, as a 4xx is" (Greg, 20 Nov 2026; Ruling on PR 97).
+  `Refused` is a 4xx and nothing else. A `303` after a `POST` says the service acted, and
+  `doc/charge.md` reads `Refused` as nothing done; one rule sorts both calls; and no
+  client can follow a redirect, since an answer's headers are not exposed. It is still
+  logged with its status and body. "No redirect is followed" stands. Not taken: as first
+  built here, `Refused` for `ask` and `Unknown` for `perform`; `Refused` for both.
 - **Three more of Go's defaults are off** (Review of PR 97, Fix 2): no `Accept-Encoding`
   is sent, so an answer is never unpacked on the way to the limit; no `User-Agent`
   unless `main` states one among the headers; and an answer's headers are held to

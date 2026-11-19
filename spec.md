@@ -1007,12 +1007,13 @@ each form.
 - An endpoint is declared once, with its kind: `lookup(method, path):
   Lookup` asks and changes nothing, and `action(method, path): Action`
   changes something outside. `http.ask(endpoint: Lookup, fields:
-  List<Field>): Either<HttpError, Json>` is a lookup and
+  List<Field>): Either<HttpFailure, Json>` is a lookup and
   `http.perform(endpoint: Action, fields: List<Field>):
-  Either<SendFailure, Json>` is an action (7.1), so `ask` of an
+  Either<HttpFailure, Json>` is an action (7.1), so `ask` of an
   `Action` is a type error. The kind is not the method, which is one
   of `GET`, `POST`, `PUT`, `PATCH` and `DELETE`: a lookup may be a
-  `POST`, as a search is.
+  `POST`, as a search is. Nothing checks an endpoint's kind: it is its
+  author's word.
 - An id in a path is an argument: `lookup(method, before, id)` and
   `lookup(method, before, id, after)`, and so for `action`. The parts
   are joined as written and the id alone is escaped, so one that holds
@@ -1042,25 +1043,29 @@ each form.
   object's text untouched, and `Json.parse(text): Json?` is `null` for
   text that is not one JSON object. A 2xx answer with no body reads as
   an object with no keys, and a 2xx answer that is anything else than
-  one JSON object is a failure.
-- A failed `perform` is a `SendFailure`, by how far the call got and
-  its status alone: `NotSent(why)` when no connection was made;
-  `Refused(status: Int, body: Json?)` for a 4xx, the body `null` when
-  it is not a JSON object; `Unknown(why)` for a 3xx, a 5xx, no answer,
-  or one that cannot be read, since the service may have acted: a
-  `303` says it did. A failed `ask` is an `HttpError`:
-  `Refused(status, body)` for a 3xx or a 4xx, or `Failed(why)` for
-  anything else. What a refusal means is
-  the client's to say.
+  one JSON object is `Unreadable`.
+- A call that gives no answer gives an `HttpFailure`, by how far it got
+  and its status alone, whichever call it was: `NotSent(why)` when no
+  connection was made; `Unknown(why)` when it left and no answer came
+  that can be used, a 3xx, a 5xx, no answer, or one that broke off or
+  is past the limit, so an action may have been done: a `303` says it
+  was; `Refused(status: Int, body: Json?)` for a 4xx, the body `null`
+  when it is not a JSON object; and `Unreadable(why)` for a 2xx that is
+  not one JSON object. What a refusal means is the client's to say, and
+  a client raises `Unreadable` itself for an answer that lacks what the
+  service always sends.
+- An `HttpFailure` is one call's: how far that call got. A function
+  that makes more than one call gives what the whole came to, in a
+  type of its own.
 
 Where Go's HTTP client would decide, Kogo states it:
 
 | What | Kogo's rule |
 | --- | --- |
 | A second send | `perform` is never sent twice. `ask` may be, at once, when a kept connection fails before any answer; each second send is logged. |
-| A redirect | None is followed: a 3xx is `Refused` for a lookup, as a 4xx is, and `Unknown` for an action. |
+| A redirect | None is followed: a 3xx is `Unknown`, whichever call it answers. |
 | A proxy | None: nothing of the environment says where a call goes. |
-| An answer's length | One past the handle's limit is a failure: `Unknown` for an action. Its headers are held to the same limit, apart from its body. |
+| An answer's length | One past the handle's limit is `Unknown`, whatever its status. Its headers are held to the same limit, apart from its body. |
 | An answer's form | No `Accept-Encoding` is sent, so an answer is read as the service wrote it, never unpacked. |
 | `User-Agent` | None is sent unless `main` states one among the handle's headers. |
 | A JSON number | `long` is exact, and `null` for a number written with a fraction or an exponent, or past a `Long`. `double` is the nearest `Double`. |
@@ -1094,8 +1099,8 @@ checker reads them like any other file, and so can an author.
 
 ```kotlin
 external class Http
-lookup external fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpError, Json>
-action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
+lookup external fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpFailure, Json>
+action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<HttpFailure, Json>
 
 external object Uuid {
     fun parseOrNull(text: String): Uuid?

@@ -243,6 +243,8 @@ the depot is sent: POST /v1/items/nut%2F5%3F/reservations? [Bearer of main acme]
 reserved: Either.Right(r-1)
 the depot is sent: POST /v1/items/anvil/reservations? [Bearer of main acme] {"count":1,"for":{"name":"Ann","gift":true},"notes":["fragile","this way up"]}
 sold out: Either.Left(refused 409: sold out)
+the depot is sent: POST /v1/items/ghost/reservations? [Bearer of main acme] {"count":1,"for":{"name":"Ann","gift":true},"notes":["fragile","this way up"]}
+no id: Either.Left(unreadable: the answer has no reservation)
 nowhere: Either.Left(true)
 `
 	if err != nil || string(out) != want {

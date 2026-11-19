@@ -1,0 +1,25 @@
+// Mail (spec.md section 12): a message is built as data, written as
+// the bytes of an EML file by eml, and kept in a bytea column for a
+// sender to send later. A ByteArray is named, passed, stored and read
+// back, and nothing else (spec.md section 3).
+package example.letters
+
+import kogo.mail.Address
+import kogo.mail.Attachment
+import kogo.mail.Mail
+import kogo.mail.eml
+import kogo.time.Instant
+
+// A receipt, with its file attached. The Message-ID and the date are
+// given, so the same order gives the same bytes every time.
+fun receipt(order: String, to: Address, now: Instant, file: ByteArray): Mail =
+    Mail("receipt-$order@shop.example", now, Address("Shop", "shop@shop.example"), null,
+         listOf(to), emptyList(), emptyList(),
+         "Your receipt for $order", "Thank you.\n", "<p>Thank you.</p>",
+         listOf(Attachment("receipt-$order.txt", "text/plain", file)))
+
+fun queue(tx: Tx, id: Uuid, mail: Mail): Int =
+    tx.execute(sql"insert into letter (id, eml) values ($id, ${eml(mail)})")
+
+fun queued(tx: Tx, id: Uuid): ByteArray? =
+    tx.queryOne<ByteArray>(sql"select eml from letter where id = $id")

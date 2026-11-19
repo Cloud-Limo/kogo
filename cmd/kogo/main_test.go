@@ -65,8 +65,8 @@ func examples(t *testing.T, patterns ...string) map[string]string {
 func TestExamples(t *testing.T) {
 	testDB(t)
 	files := examples(t, "*.kg")
-	if len(files) != 30 {
-		t.Fatalf("%d examples, want 30", len(files))
+	if len(files) != 31 {
+		t.Fatalf("%d examples, want 31", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)
@@ -76,7 +76,7 @@ func TestExamples(t *testing.T) {
 // The Go that kogo emit writes for the examples is built with
 // testdata/driver.go and run, 10 to 19, 21 and 22 against the test
 // database, 22, 24, 25, 27 and 28 served over HTTP, 29 calling a local
-// server: each result was worked out by hand
+// server, 30 keeping a message's bytes: each result was worked out by hand
 // from the Kogo and the rows the driver begins with.
 func TestEmittedGoRuns(t *testing.T) {
 	testDB(t)
@@ -246,6 +246,21 @@ sold out: Either.Left(refused 409: sold out)
 the depot is sent: POST /v1/items/ghost/reservations? [Bearer of main acme] {"count":1,"for":{"name":"Ann","gift":true},"notes":["fragile","this way up"]}
 no id: Either.Left(unreadable: the answer has no reservation)
 nowhere: Either.Left(true)
+queued: 1
+read back as eml wrote it: true
+  Message-ID: <receipt-7@shop.example>
+  Date: Mon, 16 Nov 2026 14:30:00 +0000
+  From: "Shop" <shop@shop.example>
+  To: "Ann" <ann@a.example>
+  Subject: Your receipt for 7
+  MIME-Version: 1.0
+  Content-Type: multipart/mixed; boundary=kogo-mixed
+  Content-Type: multipart/alternative; boundary=kogo-alternative
+  Content-Type: text/plain; charset=UTF-8
+  Content-Type: text/html; charset=UTF-8
+  Content-Type: text/plain
+  Content-Disposition: attachment; filename="receipt-7.txt"
+no letter: null
 `
 	if err != nil || string(out) != want {
 		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)

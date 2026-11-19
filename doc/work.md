@@ -1306,7 +1306,12 @@ built once. Agreed with Greg on 17 Nov 2026.
   does it by the clock it is handed ("How it is tested").
 - What sits behind cusoon2's PDF extension: a small writer of its
   own, or a wrapped library.
-- How a data class that a binding file declares reaches its Go.
+- How a data class that a binding file declares reaches its Go. The
+  prelude's are written in Go by hand, as the emitter would write
+  them (`kogo.mail`'s `Mail`; `decisions.md`, DEV-988); an
+  application's extension is not settled.
+- A message's date. `Mail` was built with `date: Instant`, which the
+  sketch above lacks: for Greg (`decisions.md`, DEV-988).
 - A hash in the prelude. The run sheet's job keeps a SHA-1 of what it
   last sent, to see a change (`daemon.kt`, `sha1Hex`); Kogo has none.
 - For the runner's build, found on 20 Nov 2026:

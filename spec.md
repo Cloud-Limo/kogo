@@ -1093,6 +1093,49 @@ Every 3xx and 4xx is logged in Go, with its method, path, status and
 body, the body's first 4 KiB with a mark where it is cut. A handle's
 own headers and query fields are never logged.
 
+**Mail** (`kogo.mail`). A message is data that Kogo builds, and
+`eml(mail: Mail): ByteArray` writes it as the bytes of an EML file, for
+a row to hold until a sender sends them. `examples/30_mail.kg` builds
+one and keeps it.
+
+```kotlin
+data class Address(val name: String, val address: String)
+data class Attachment(val name: String, val mimeType: String, val data: ByteArray)
+data class Mail(val messageId: String, val date: Instant, val from: Address, val replyTo: Address?,
+                val to: List<Address>, val cc: List<Address>, val bcc: List<Address>,
+                val subject: String, val text: String, val html: String?, val attachments: List<Attachment>)
+```
+
+`eml` reads no clock and makes nothing up: the same `Mail` gives the
+same bytes, every time, so a message stored twice is the same message.
+The application chooses the Message-ID and the date, and keeps each
+address once across `to`, `cc` and `bcc`. A name of `""` is no name.
+`bcc` is written into the bytes, as a `Bcc` header: they are all a
+sender is given, so it reads who the message goes to from them and
+leaves that header out of what it sends.
+
+Where Go's `net/mail` and `mime` packages would decide, Kogo writes
+the bytes itself and states them:
+
+| What | Kogo's rule |
+| --- | --- |
+| The headers' order | `Message-ID`, `Date`, `From`, `Reply-To`, `To`, `Cc`, `Bcc`, `Subject`, `MIME-Version: 1.0`, then the content's. One with nothing to say (no `replyTo`, an empty list) is not written. No other header is: no `User-Agent`, no `X-Mailer`. |
+| `Message-ID` | `<` `messageId` `>`, as given: the application writes the `@` and what follows it. |
+| `Date` | In UTC, to the second: `Mon, 16 Nov 2026 14:30:00 +0000`. |
+| An address | `"name" <address>`, or `<address>` with no name; a list has one address to a line. A name of printable ASCII, 60 characters at most, is quoted, with `\` before a `"` or a `\`; any other is encoded words. |
+| The subject | As it is when it is printable ASCII, its line is at most 78 characters and it holds no `=?`; if not, encoded words. |
+| Encoded words | `=?UTF-8?B?...?=`, each the base64 of at most 45 bytes of UTF-8 and of whole characters, one to a line. A line break in a subject or a name is inside its words, and ends no header. |
+| A body | Every part is base64, 76 characters to a line, text included: no line of a message is over 78 characters or outside ASCII. A text's line breaks are sent as CR LF. `text` is `text/plain; charset=UTF-8` and `html` is `text/html; charset=UTF-8`. |
+| The parts | `text` alone is the message's body. With `html`, a `multipart/alternative` of `text`, then `html`. With attachments, a `multipart/mixed` of that body, then each attachment in order. |
+| A boundary | `kogo-mixed` and `kogo-alternative`, always: every line of a body is base64, which has no hyphen, so no body holds one. |
+| An attachment | `Content-Type:` its `mimeType`, then `Content-Disposition: attachment; filename="name"`, quoted as a name is; a name not of printable ASCII is `filename*=UTF-8''` and its UTF-8, percent-encoded but for letters, digits, `.`, `-` and `_`. |
+| Line ends | CR LF, every one. |
+
+A `messageId`, an `address` or a `mimeType` that is empty or holds a
+space, an angle bracket, a control character or a character outside
+ASCII is a bug in the caller, and `eml` panics (section 8): each is
+written as it is, and would end its header.
+
 **Tests** (`kogo.test`; test files only, section 16).
 `kogo.test` has `Test<E>`, `test(sentence) { tx, env -> ... }` and
 `Refusal` (10.8), and `kotlin.test`'s assertions, each imported by

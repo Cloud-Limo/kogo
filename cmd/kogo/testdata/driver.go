@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	goio "io"
@@ -19,6 +20,7 @@ import (
 	"ROOT/example"
 	"ROOT/example/depot"
 	"ROOT/example/gates"
+	"ROOT/example/letters"
 	"ROOT/example/markers"
 	"ROOT/example/ops"
 	"ROOT/example/origin"
@@ -27,6 +29,7 @@ import (
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
 	khttp "github.com/Cloud-Limo/kogo/prelude/kogo/http"
 	"github.com/Cloud-Limo/kogo/prelude/kogo/io"
+	kmail "github.com/Cloud-Limo/kogo/prelude/kogo/mail"
 	"github.com/Cloud-Limo/kogo/prelude/kogo/rpc"
 	ktime "github.com/Cloud-Limo/kogo/prelude/kogo/time"
 	"github.com/Cloud-Limo/kogo/rt"
@@ -356,4 +359,18 @@ func main() {
 	service.Address = "http://127.0.0.1:1"
 	nowhere, _ := khttp.New(service)
 	show("nowhere", kogo.Either_MapLeft[khttp.HttpFailure, string](depot.Reserved(nowhere, "acme", "bolt", 1), func(f khttp.HttpFailure) bool { return rt.Is[khttp.HttpFailure_NotSent](f) }))
+
+	// 30: a message built, kept in a bytea column and read back as
+	// the bytes eml gave, of which the lines that say its shape.
+	receipt := letters.Receipt("7", kmail.Address{Name: "Ann", Address: "ann@a.example"}, ktime.Instant{Seconds: 1794839400}, kogo.ByteArray("paid\n"))
+	letter := kogo.NewId()
+	show("queued", in(db, func(tx kogo.Tx) int32 { return letters.Queue(tx, letter, receipt) }))
+	back := in(db, func(tx kogo.Tx) *kogo.ByteArray { return letters.Queued(tx, letter) })
+	show("read back as eml wrote it", bytes.Equal(*back, kmail.Eml(receipt)))
+	for _, line := range strings.Split(string(*back), "\r\n") {
+		if strings.Contains(line, ": ") && !strings.HasPrefix(line, "Content-Transfer") {
+			fmt.Println("  " + line)
+		}
+	}
+	show("no letter", in(db, func(tx kogo.Tx) *kogo.ByteArray { return letters.Queued(tx, kogo.NewId()) }))
 }

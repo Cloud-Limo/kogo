@@ -11,7 +11,11 @@ Source files end in `.kg`.
 ## 1. The one rule
 
 Where a construct is valid in both Kotlin and Kogo it means the same thing.
-A Kogo file need not compile as Kotlin. Kogo has four kinds of
+A Kogo file need not compile as Kotlin. A Kogo file imports only from
+its own application and from `kogo.` packages, whose names keep
+Kotlin's, `java.time`'s and Arrow's spelling and meaning:
+`kogo.time.Instant` is `java.time.Instant`, `kogo.test.assertEquals`
+is `kotlin.test.assertEquals`. Kogo has four kinds of
 deliberate deviation from Kotlin, its own forms, and kotlinc refuses
 each (`mise run kotlin` holds this). The one exception is a binding
 file of bare `external fun`s, which kotlinc takes for JNI functions;
@@ -49,7 +53,7 @@ import kogo.time.Instant
   packages, as `kogo.time`, are imported by name.
 - A file named `_test.kg` is a test file (section 16). It is in its
   package as any file is, but only a test file may name what one
-  declares, or import from `kogo.test` or `kotlin.test`.
+  declares, or import from `kogo.test`.
 
 ## 3. Types
 
@@ -927,10 +931,10 @@ HTTP request, passed to an operation (section 15):
 `request.clientAddress: String`. A header's name is matched whatever
 its case. Kogo code does not build or change one.
 
-**Tests** (`kogo.test`, `kotlin.test`; test files only, section 16).
+**Tests** (`kogo.test`; test files only, section 16).
 `kogo.test` has `Test<E>`, `test(sentence) { tx, env -> ... }` and
-`Refusal` (10.8). `kotlin.test` has Kotlin's assertions, each imported
-by name: `assertEquals(expected, actual)`, `assertNotEquals(illegal,
+`Refusal` (10.8), and `kotlin.test`'s assertions, each imported by
+name from `kogo.test`: `assertEquals(expected, actual)`, `assertNotEquals(illegal,
 actual)`, `assertTrue(actual)`, `assertFalse(actual)`,
 `assertNull(actual)`, `assertContains(list, element)`,
 `assertContains(string, other)` and `fail(message)`. Each takes a last
@@ -1010,6 +1014,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `suspend`, coroutines, `Flow`, threads | plain blocking code |
 | `Sequence`, `generateSequence`, `MutableList`, arrays | a `while` loop with a local `var`, or the list functions |
 | `java.time.*`, `java.util.UUID`, `BigDecimal` | `kogo.time.*`, `Uuid`, `Decimal` |
+| `kotlin.test.*` | `kogo.test.*` |
 | `BigDecimal.valueOf(x).stripTrailingZeros().toPlainString()` | `plain(x)`, from `kogo.text`, not `Decimal` |
 | `OffsetDateTime`, `LocalDateTime` | `Instant`, or `ZonedDateTime` with a named zone |
 | jOOQ (`ctx.select...`, records, `.store()`, `into(X::class.java)`) | `sql"""` and a data class |
@@ -1222,8 +1227,8 @@ that shows it. A test file names its tests in a `tests` list, and
 ```kotlin
 package cusoon.invoice
 
+import kogo.test.assertEquals
 import kogo.test.test
-import kotlin.test.assertEquals
 
 tests ledgerTests<Env> { cardDiscount, noDiscountOnAccount }
 

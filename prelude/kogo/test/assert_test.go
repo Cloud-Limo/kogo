@@ -6,7 +6,7 @@ import (
 	"kogo/rt"
 )
 
-// Each assertion that fails panics with the message kotlin.test's
+// Each assertion that fails panics with the message Kotlin's
 // gives (2.2, DefaultAsserter), and one that holds does nothing.
 func TestMessages(t *testing.T) {
 	said := rt.Ptr(rt.Ptr("the total"))

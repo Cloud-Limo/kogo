@@ -33,7 +33,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 		},
 		pkgs: map[string]*pkg{}, members: map[string][]*Func{}, imports: map[*syntax.File]map[string]*pkg{},
 		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{}, reads: map[Object][]Object{}, stmts: map[Object][]reached{}, acting: map[*syntax.Lambda]string{},
-		placed: map[*Func]bool{}, txReads: map[syntax.Expr]*Var{},
+		placed: map[*Func]*role{}, txReads: map[syntax.Expr]*Var{},
 	}
 	order := map[string]int{}
 	for i, f := range files {
@@ -84,7 +84,7 @@ type checker struct {
 	reads   map[Object][]Object                 // the top-level vals and the funs each val's value and each fun refers to
 	stmts   map[Object][]reached                // the sql literals in each val's value and each fun's body, for gate.go
 	tested  map[*syntax.ValDecl]Type            // the Test<E> of each val a tests list names
-	placed  map[*Func]bool                      // the funs an api list names as gated work or as a step
+	placed  map[*Func]*role                     // the funs an api list names as gated work or as a step, and as which
 
 	// Where the checker is.
 	owner      Object // the val whose value, or the fun whose body, is being read
@@ -774,6 +774,7 @@ func (c *checker) conform(td *TypeDecl) {
 				continue
 			}
 			used[td.Props[i]] = true
+			c.demand(td.Props[i].Decl, p.Name, p.vis)
 		}
 		for _, m := range s.Decl.Methods {
 			want := describe(m, b)
@@ -786,6 +787,7 @@ func (c *checker) conform(td *TypeDecl) {
 				continue
 			}
 			used[td.Methods[i]] = true
+			c.demand(td.Methods[i].Decl, m.Name, m.vis)
 		}
 	}
 	for _, v := range td.Props {

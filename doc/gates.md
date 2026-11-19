@@ -99,7 +99,7 @@ val EDITABLE_STATES: Set<BookingState> = setOf(
 
 data class HeldBooking @UnscopedRead constructor(
     val id: ID, val state: BookingState, val isAdmin: Boolean,
-    val tenant: AtTenant, @UnscopedRead val tx: SerializableTx)
+    val tenant: AtTenant, @property:UnscopedRead val tx: SerializableTx)
 
 fun booking(tx: SerializableTx, env: Env, request: Request, id: ID, roles: Set<BookingRole>,
             states: Set<BookingState>, action: String): Either<String, HeldBooking> = either { ... }
@@ -704,8 +704,8 @@ daemon (the names here are invented):
 ```kotlin
 interface InTenant { @UnscopedRead val tx: Tx }                // the tenant is bound; assume no more
 
-data class AtTenant @UnscopedRead constructor(@UnscopedRead override val tx: SerializableTx) : InTenant   // a request's
-data class WorkerTenant @UnscopedRead constructor(@UnscopedRead override val tx: Tx) : InTenant           // the daemon's, or a login's
+data class AtTenant @UnscopedRead constructor(@property:UnscopedRead override val tx: SerializableTx) : InTenant   // a request's
+data class WorkerTenant @UnscopedRead constructor(@property:UnscopedRead override val tx: Tx) : InTenant           // the daemon's, or a login's
 
 fun nextInvoiceNumber(at: AtTenant): Long = ...                // relies on serializable: a request alone calls it
 fun lockedInvoice(at: InTenant, id: ID): Invoice? = ...        // locks for itself: either calls it

@@ -366,7 +366,7 @@ func (p *parser) modifiers() Modifiers {
 func (p *parser) annotation() *Annotation {
 	pos := p.want("@")
 	if p.peek(1).text == ":" && !p.peek(1).nl {
-		p.notKogo(pos, "annotation", "an annotation with a target", "only markers exist, written @Marker")
+		p.notKogo(pos, "annotation", "an annotation with a target", "only markers exist, written @Marker, or @property:Marker before a data class's val")
 	}
 	_, name := p.ident()
 	a := &Annotation{Pos: pos, Name: name}
@@ -553,11 +553,21 @@ func (p *parser) params(ctor, external bool) []*Param {
 		p.list(")", func() {
 			pos := p.tok.pos
 			vararg := external && p.modifier() && p.got("vararg")
+			var marks []*Annotation
+			for ctor && p.at("@") && p.peek(1).text == "property" && p.peek(2).text == ":" {
+				p.i += 2
+				p.next()
+				at, name := p.ident()
+				marks = append(marks, &Annotation{Pos: at, Name: name})
+			}
 			m := p.modifiers()
-			if m.Annotations != nil && !ctor || m.Visibility != "" || m.Const || m.External || m.Calls != "" {
+			if ctor && m.Annotations != nil {
+				p.fail(m.Annotations[0].Pos, "syntax", "a marker on a data class's property is written @property:%s, as Kotlin has it; a bare @%s there marks the constructor's parameter", m.Annotations[0].Name, m.Annotations[0].Name)
+			}
+			if m.Annotations != nil || m.Visibility != "" || m.Const || m.External || m.Calls != "" {
 				p.fail(pos, "syntax", "a parameter takes no modifier")
 			}
-			par := &Param{Pos: pos, Override: m.Override, Val: p.got("val"), Vararg: vararg, Marks: m.Annotations}
+			par := &Param{Pos: pos, Override: m.Override, Val: p.got("val"), Vararg: vararg, Marks: marks}
 			if ctor && (!par.Val || p.at("var")) {
 				p.fail(pos, "syntax", "each property of a data class is a val: val name: Type")
 			}

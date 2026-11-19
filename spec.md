@@ -843,14 +843,18 @@ annotation class UnscopedRead
 @UnscopedRead
 fun business(tx: Tx, id: ID): Business? = ...
 
-data class HeldBusiness @UnscopedRead constructor(val business: Business, val storefront: Tenant?, @UnscopedRead val tx: Tx)
+data class HeldBusiness @UnscopedRead constructor(val business: Business, val storefront: Tenant?, @property:UnscopedRead val tx: Tx)
 ```
 
 A file may use a marked function, property or constructor only if it
 begins with `@file:OptIn(UnscopedRead::class)`. Anything else is a
-compile error. A property of a data class and a `val` of an interface
-take a marker before `val`, and are read, by name or by destructuring,
-only in such a file. A value of a data class is made four ways, each held to
+compile error. A `val` of an interface takes a marker before `val`. A
+property of a data class takes it as `@property:Marker`, as Kotlin has
+it: a bare `@Marker` there would mark the constructor's parameter,
+which Kotlin refuses, and so does Kogo (`syntax`). Either is read, by
+name or by destructuring (a `_` in its place included, as in Kotlin),
+and overridden, as is a marked `fun` of an interface, only in such a
+file. A value of a data class is made four ways, each held to
 a marked constructor: a call of it; a `copy` and a row read into one
 (10.3), which use it; and an operation's input, which is refused even
 where the file opts in (15.4). Only the file's opt-in counts: marking the function
@@ -1441,10 +1445,10 @@ such a `val`, for work done under several proofs.
 
 ```kotlin
 // The gates' file and the model's opt in; an operation's does not.
-data class AtDesk @DeskOnly constructor(@DeskOnly val tx: Tx)
+data class AtDesk @DeskOnly constructor(@property:DeskOnly val tx: Tx)
 
 data class OpenInvoice @DeskOnly constructor(
-    val number: String, val desk: AtDesk, @DeskOnly val tx: Tx)
+    val number: String, val desk: AtDesk, @property:DeskOnly val tx: Tx)
 
 fun markPaid(invoice: OpenInvoice): Int =
     invoice.tx.execute(sql"update invoice set status = 'paid' where number = ${invoice.number}")
@@ -1463,8 +1467,9 @@ and in such a file three rules hold:
   literal, another property of that proof, written as the transaction
   is: `${invoice.number}` beside `invoice.tx`, or a property of such
   a property. A value worked out from the proof and
-  kept in a `val` does not count. Anything else is a compile error
-  (`unbound-statement`). The compiler reads the receiver and the
+  kept in a `val` does not count, and nothing counts where the proof
+  has no name, as in `invoices.first().tx`: keep it in a `val` first.
+  Anything else is a compile error (`unbound-statement`). The compiler reads the receiver and the
   values bound, not the SQL: that the value scopes the statement is
   the author's. A proof with no property but its transaction, as
   `AtDesk`, is not held to this: a fun that takes one acts for
@@ -1473,14 +1478,17 @@ and in such a file three rules hold:
   written as the receiver of one of the five calls, or as an argument
   of a proof's constructor or `copy` that fills that proof's own
   transaction, so that making a thing gives its proof. Kept in a
-  `val`, returned, destructured, or passed to anything else, it is a
-  compile error (`proof-tx-escapes`): pass the proof.
+  `val`, returned, destructured to a name (a `_` takes nothing out),
+  or passed to anything else, it is a compile error
+  (`proof-tx-escapes`): pass the proof.
 - **A fun that runs outside uses no proof.** An `action fun` that
   takes a proof (7.1) is handed one whose transaction has ended
   (15.3). It reads the proof's facts, passes no proof to a call, as
-  an argument or a receiver, and runs no statement on one
-  (`outside-passes-proof`): what writes belongs in the work, and what
-  reads in the gate.
+  an argument, as a receiver or in a block that takes or gives one,
+  and runs no statement on one (`outside-passes-proof`): what writes
+  belongs in the work, and what reads in the gate; where the fun is
+  itself the work, in the gate or in a `fun`, which runs in the
+  transaction.
 
 A data class that is not of this shape is held to none of the three,
 whatever a gate gives it for (15.2): mark a proof's constructor and

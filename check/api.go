@@ -241,7 +241,9 @@ func (c *checker) shaped(id *syntax.Ident, r *role) (*Func, Type) {
 	}
 	f, errs := fs[0], len(c.errs)
 	c.info.Uses[id] = f
-	c.placed[f] = c.placed[f] || r == workRole || r == stepRole
+	if r == workRole || r == stepRole {
+		c.placed[f] = r
+	}
 	if r == gateRole && len(f.Params) == 4 {
 		r = inputGateRole
 	}

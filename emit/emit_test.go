@@ -1219,6 +1219,44 @@ func TestHandWrittenMain(t *testing.T) {
 	}
 }
 
+// newId() gives the ids of the maker a hand-written main hands over,
+// and version 7 when it hands none.
+func TestIdsHandedOver(t *testing.T) {
+	for _, c := range []struct{ maker, want string }{
+		{`kogo.MakeIdsWith(func() kogo.Uuid { n++; return kogo.Uuid{0: 0xab, 15: n} })`, "ab000000-0000-0000-0000-000000000001 ab000000-0000-0000-0000-000000000002\n"},
+		{``, "7 7 true\n"},
+	} {
+		got := build(t, func(root string) map[string][]byte {
+			_, files, errs := emit(t, root, "package t\nfun id(): Uuid = newId()\n")
+			if errs != nil {
+				t.Fatalf("%v", errs)
+			}
+			files["main.go"] = []byte(`package main
+import (
+	"fmt"
+	"ROOT/t"
+	"github.com/Cloud-Limo/kogo/prelude/kogo"
+)
+var n byte
+var _ = kogo.MakeIdsWith
+func main() {
+	` + c.maker + `
+	a, b := t.Id(), t.Id()
+	if a[6]>>4 == 7 {
+		fmt.Println(a[6]>>4, b[6]>>4, a.String() < b.String())
+		return
+	}
+	fmt.Println(a, b)
+}
+`)
+			return files
+		})
+		if got != c.want {
+			t.Errorf("handing over %q gives %s, want %s", c.maker, got, c.want)
+		}
+	}
+}
+
 const routes = `package t
 import kogo.rpc.Request
 api routes unchecked { note ungated }

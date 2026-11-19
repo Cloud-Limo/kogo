@@ -22,6 +22,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf16"
@@ -583,12 +585,58 @@ func Uuid_ParseOrNull(s string) *Uuid {
 	return &u
 }
 
-// NewId gives an id that sorts by when it was made and is random
-// after that: a version 7 UUID.
+// NewId gives an id no other call gives: by default a version 7
+// UUID, each sorting after the one before it in this process, or
+// else one from the maker an application's main handed MakeIdsWith.
 func NewId() Uuid {
+	m := idMaker.Load()
+	if m == nil {
+		idMaker.CompareAndSwap(nil, &ownIds)
+		m = idMaker.Load()
+	}
+	return (*m)()
+}
+
+// MakeIdsWith has newId() give maker's ids. A main calls it once, before
+// any id is made: how ids are made does not change while a program runs.
+func MakeIdsWith(maker func() Uuid) {
+	if !idMaker.CompareAndSwap(nil, &maker) {
+		if idMaker.Load() == &ownIds {
+			panic("kogo.MakeIdsWith after an id was made: call it first in main")
+		}
+		panic("kogo.MakeIdsWith twice: call it once in main")
+	}
+}
+
+var (
+	idMaker atomic.Pointer[func() Uuid]
+	ownIds  = ownId
+	lastId  struct {
+		sync.Mutex
+		ms, count uint64
+	}
+)
+
+// ownId is RFC 9562's method 1 (6.2): rand_a is a 12-bit counter, set
+// at random below 2048 in each new millisecond and counted up within
+// it, so a millisecond holds at least 2048 ids before it borrows the
+// next. The time never goes back from the last id's, so neither does
+// an id when the clock does.
+func ownId() Uuid {
 	var u Uuid
-	binary.BigEndian.PutUint64(u[:8], uint64(time.Now().UnixMilli())<<16)
 	rand.Read(u[6:])
-	u[6], u[8] = u[6]&0x0F|0x70, u[8]&0x3F|0x80
+	lastId.Lock()
+	ms := uint64(time.Now().UnixMilli())
+	switch {
+	case ms > lastId.ms:
+		lastId.ms, lastId.count = ms, uint64(binary.BigEndian.Uint16(u[6:]))&0x7FF
+	case lastId.count < 0xFFF:
+		lastId.count++
+	default:
+		lastId.ms, lastId.count = lastId.ms+1, uint64(binary.BigEndian.Uint16(u[6:]))&0x7FF
+	}
+	binary.BigEndian.PutUint64(u[:8], lastId.ms<<16|0x7000|lastId.count)
+	lastId.Unlock()
+	u[8] = u[8]&0x3F | 0x80
 	return u
 }

@@ -147,6 +147,13 @@ fun enqueueMail(at: AtTenant, id: ID, now: Instant, mail: Mail, label: String, n
   chosen (`"outbound-$id"`, as the Kotlin's). Go holds the MIME and
   the SMTP conversation, with a deadline on the connection, since Go's
   `net/smtp` takes none.
+- The stored bytes hold a `Bcc` header (spec 12), which `send` reads
+  for the envelope and leaves out of the DATA it sends: the outbox's
+  port has a test that the bytes it sends hold no `Bcc`, since Go's
+  `net/smtp.SendMail` sends them as they are. Nothing shows the stored
+  bytes to a person raw (a page, a download, a support person's
+  forward, a log of a failed send): each would show every recipient
+  the `Bcc` list. Ruling on PR 103 (DEV-988), 20 Nov 2026.
 - Perhaps 80 lines of Go and 20 of prelude. Weighed and not taken:
   the message's parts in columns, built into an EML when sent, which
   changes cusoon2's schema and outbox for nothing a replay or the

@@ -37,7 +37,7 @@ func TestOperations(t *testing.T) {
 		{rpc() + "api ops unchecked { me ungated, ‸me ungated }", "duplicate", "me is already in api ops"},
 		{rpc() + "fun me(s: String): Int = 1\napi ops unchecked { ‸me ungated }", "operation", "2 funs called me are in scope"},
 		{rpc() + "fun f(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }\napi ops unchecked { ‸f ungated }", "operation", "f takes 3 parameters: an ungated operation takes four"},
-		{rpc() + "fun f(s: String, env: Env, request: Request, input: Unit): Either<String, Unit> = either { }\napi ops unchecked { ‸f ungated }", "operation", "takes a String first: an ungated operation takes a Tx, or a Db"},
+		{rpc() + "fun f(s: String, env: Env, request: Request, input: Unit): Either<String, Unit> = either { }\napi ops unchecked { ‸f ungated }", "operation", "takes a String first: an ungated operation takes a SerializableTx or a Tx, or a Db"},
 		{rpc() + "fun f(tx: Tx, env: Env, request: Int, input: Unit): Either<String, Unit> = either { }\napi ops unchecked { ‸f ungated }", "operation", "takes a Int third: an ungated operation takes a Request"},
 		{rpc() + "fun f(tx: Tx, env: Env, request: Request, input: Unit): Either<Int, Unit> = either { }\napi ops unchecked { ‸f ungated }", "operation", "returns Either<Int, Unit>: an ungated operation returns Either<String, A>"},
 		{rpc() + "fun <T> f(tx: Tx, env: Env, request: Request, input: Unit): Either<String, Unit> = either { }\napi ops unchecked { ‸f ungated }", "operation", "has type parameters"},
@@ -139,7 +139,7 @@ data class In(val n: Int)
 data class E2(val n: Int)
 fun ours(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }
 fun g(tx: Tx, env: Env, request: Request): Either<String, P> = either { P(1) }
-fun own(tx: Tx, env: Env, request: Request, input: In): Either<String, P> = either { P(input.n) }
+fun own(tx: SerializableTx, env: Env, request: Request, input: In): Either<String, P> = either { P(input.n) }
 fun w(env: Env, p: P, input: In): Either<String, Int> = either { p.n }
 fun v(env: Env, p: P, input: Unit): Either<String, Unit> = either { }
 action fun s(env: Env, p: P, input: In): Either<String, Unit> = either { ring() }
@@ -151,11 +151,13 @@ action fun s(env: Env, p: P, input: In): Either<String, Unit> = either { ring() 
 	for d, a := range info.APIs {
 		got := fmt.Sprint(a.Check != nil, a.Env)
 		for _, op := range a.Ops {
-			got += fmt.Sprintf(" %s %v %v %v %v %v", op.Func.Name, op.Gate != nil, op.Proof, op.After != nil, op.Input, op.Tx)
+			got += fmt.Sprintf(" %s %v %v %v %v %v %v", op.Func.Name, op.Gate != nil, op.Proof, op.After != nil, op.Input, op.Tx, op.Serializable)
 		}
+		// The first parameter of the gate, or of an ungated fun, names
+		// the transaction the server opens.
 		want := map[string]string{
-			"ops":  "true Env w true P true In false v true P false Unit false me false <nil> false Unit true",
-			"more": "false Env w true P false In false v true P false Unit false",
+			"ops":  "true Env w true P true In false true v true P false Unit false false me false <nil> false Unit true false",
+			"more": "false Env w true P false In false false v true P false Unit false false",
 		}[d.Name]
 		if got != want {
 			t.Errorf("api %s:\n got %s\nwant %s", d.Name, got, want)
@@ -173,7 +175,8 @@ action fun s(env: Env, p: P, input: In): Either<String, Unit> = either { ring() 
 		// A gate.
 		{head + "api ops unchecked { w gatedBy ‸nope }", "unknown-name", "nothing named nope"},
 		{head + "fun x(tx: Tx, env: Env, request: Request): P = P(1)\napi ops unchecked { v gatedBy ‸x }", "gate", "x returns P: a gate returns Either<String, Proof>"},
-		{fun("x(db: Db, env: Env, request: Request): Either<String, P>") + "api ops unchecked { v gatedBy ‸x }", "gate", "x takes a Db first: a gate takes a Tx"},
+		{fun("x(db: Db, env: Env, request: Request): Either<String, P>") + "api ops unchecked { v gatedBy ‸x }", "gate", "x takes a Db first: a gate takes a SerializableTx or a Tx"},
+		{fun("x(tx: SerializableTx, env: Env, request: Request): Either<String, Unit>") + "api ops checkedBy ‸x { me ungated }", "check-shape", "x takes a SerializableTx first: a list's check takes a Tx"},
 		{fun("x(tx: Tx, env: Env): Either<String, P>") + "api ops unchecked { v gatedBy ‸x }", "gate", "x takes 2 parameters: a gate takes three, as fun x(tx: Tx, env: Env, request: Request), and its operation's input fourth where it reads it"},
 		{fun("x(tx: Tx, env: E2, request: Request): Either<String, P>") + "api ops unchecked { me ungated, v gatedBy ‸x }", "gate", "x takes the environment E2, and me takes Env"},
 		{fun("x(tx: Tx, env: Env, request: Request, input: Unit): Either<String, P>") + "api ops unchecked { w gatedBy ‸x }", "gate", "x reads a Unit, and w's input is a In: a gate that reads an input takes its operation's"},

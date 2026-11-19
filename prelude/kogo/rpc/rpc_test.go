@@ -173,9 +173,22 @@ func raceWork(e env, tx kogo.Tx, u rt.Unit) kogo.Either[string, int32] {
 	return race(tx, e, Request{}, u)
 }
 
+// level gives the isolation of the transaction it runs in, as a gate,
+// an ungated fun and work do.
+func level(tx kogo.Tx, _ env, _ Request, _ rt.Unit) kogo.Either[string, string] {
+	return kogo.Either_Right[string]{Value: kogo.Tx_QuerySingle(tx, "select current_setting('transaction_isolation')", func(s kogo.Scan) (l string) { s(&l); return })}
+}
+
+func levelWork(_ env, l string, _ rt.Unit) kogo.Either[string, string] {
+	return kogo.Either_Right[string]{Value: l}
+}
+
 var table = Table[env]{Check: ours, Operations: []Operation[env]{
-	Tx("add", add), Tx("race", race), Tx("deadlocked", deadlocked), Db("login", login), Db("who", who), Tx("signIn", signIn),
-	Gated("held", gate, nil, work), Gated("sent", gate, step, work), Gated("heldRace", raceGate, nil, raceWork), Outside("rung", gate, act),
+	Tx("add", true, add), Tx("race", true, race), Tx("deadlocked", true, deadlocked), Db("login", login), Db("who", who), Tx("signIn", true, signIn),
+	Gated("held", true, gate, nil, work), Gated("sent", true, gate, step, work), Gated("heldRace", true, raceGate, nil, raceWork), Outside("rung", true, gate, act),
+	Tx("plain", false, level), Tx("serializable", true, level), Gated("plainGated", false, level, nil, levelWork),
+	Gated("serializableGated", true, level, nil, levelWork), Outside("plainOutside", false, level, levelWork),
+	Outside("serializableOutside", true, level, levelWork),
 }}
 
 func TestHandler(t *testing.T) {
@@ -240,6 +253,13 @@ func TestHandler(t *testing.T) {
 		{"POST", "rung", `{"name":"rung"}`, `200 {"type":"ok","value":"secret answer"}`},
 		{"POST", "rung", `{"name":"nobody rung"}`, `200 {"type":"refused","message":"secret gate"}`},
 		{"POST", "rung", `{"name":"refused rung"}`, `200 {"type":"refused","message":"secret refusal"}`},
+		// Each row opens the kind of transaction it says.
+		{"POST", "plain", ``, `200 {"type":"ok","value":"read committed"}`},
+		{"POST", "serializable", ``, `200 {"type":"ok","value":"serializable"}`},
+		{"POST", "plainGated", ``, `200 {"type":"ok","value":"read committed"}`},
+		{"POST", "serializableGated", ``, `200 {"type":"ok","value":"serializable"}`},
+		{"POST", "plainOutside", ``, `200 {"type":"ok","value":"read committed"}`},
+		{"POST", "serializableOutside", ``, `200 {"type":"ok","value":"serializable"}`},
 	} {
 		if status, body := post(c.method, c.name, c.body); !strings.HasPrefix(fmt.Sprint(status, " ", body), c.want) {
 			t.Errorf("%s %s %s answers %d %s, want %s", c.method, c.name, c.body, status, body, c.want)
@@ -326,7 +346,7 @@ func TestHandler(t *testing.T) {
 	if !checkWrote {
 		t.Error("a check that writes is not refused by Postgres")
 	}
-	if len(ids) != 33 || strings.Contains(log.String(), "secret") {
+	if len(ids) != 39 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
 	causes := map[string]bool{}

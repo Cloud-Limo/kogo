@@ -762,7 +762,9 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
     }
 ```
 
-- `db.tx { tx -> ... }` runs the block in one transaction. The block is a
+- `db.tx { tx -> ... }` runs the block in one transaction at READ
+  COMMITTED, which the handle states and does not leave to the
+  database's default. The block is a
   raise scope when the enclosing function returns `Either<E, ...>`, for
   that `E`, and `db.tx` then gives an `Either<E, A>` of the block's value
   `A`, wherever it is written; elsewhere it gives the block's value. It
@@ -771,6 +773,17 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
 - `db.tx(serializable = true) { ... }` runs at SERIALIZABLE and reruns the
   block from the start on a serialization failure or deadlock, so the
   block must have no effect outside the transaction.
+- A transaction's kind is its handle's type. `Tx` is any transaction: a
+  function that takes one assumes nothing, and locks what it needs.
+  `SerializableTx` is one that is rerun on a conflict: a function that
+  takes one may read with no lock. A `SerializableTx` fits where a `Tx`
+  is wanted, and not the other way. The block of `db.tx` is handed a
+  `Tx`, and that of `db.tx(serializable = true)`, the literal `true`,
+  a `SerializableTx`.
+
+  ```
+  invoices.kg:40:19 needs-serializable: invoice takes a SerializableTx and this is a Tx, which is not rerun on a conflict: call a function that locks, or open the transaction with db.tx(serializable = true) (spec.md 10.7)
+  ```
 - `tx.atomically { ... }` runs a nested block in a savepoint and rolls
   back to it on a failure. The block is in the raise scope around it,
   as any lambda is.
@@ -1167,10 +1180,10 @@ one returns an `Either` whose `Left` is a refusal in words:
 | Place | Parameters, in this order | Returns |
 | --- | --- | --- |
 | the check | a `Tx`, the environment, a `Request` | `Either<String, Unit>` |
-| a gate | a `Tx`, the environment, a `Request`, and the operation's input if it reads it | `Either<String, P>`, with `P` its proof |
+| a gate | a `SerializableTx` or a `Tx`, the environment, a `Request`, and the operation's input if it reads it | `Either<String, P>`, with `P` its proof |
 | gated work, the `op` of a gated row | the environment, the proof, the input | `Either<String, A>` |
 | a step, an `action fun` (7.1) | the environment, the proof, the input | `Either<String, Unit>` |
-| an ungated operation | a `Tx` or a `Db` (15.3), the environment, a `Request`, the input | `Either<String, A>` or `Either<String, Reply<A>>` |
+| an ungated operation | a `SerializableTx`, a `Tx` or a `Db` (15.3), the environment, a `Request`, the input | `Either<String, A>` or `Either<String, Reply<A>>` |
 
 - The environment is one type of the application's, the same for
   every fun of a list, its check, gates and steps included: a data
@@ -1242,10 +1255,16 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   in a transaction of its own that the server commits, and then the
   work with no transaction open. The work's answer or refusal is the
   request's. Its proof's `Tx` has ended, as a step's has.
-- An operation that takes a `Tx` runs in one transaction, which the
-  server opens at SERIALIZABLE. An answer commits it. A refusal rolls
-  it back, so a refused request has changed nothing. A panic rolls it
-  back (section 8). On a serialization failure or a deadlock the server
+- The first parameter of the gate, or of an ungated operation that
+  takes a transaction, names the kind the server opens (10.7): at
+  SERIALIZABLE for a `SerializableTx`, at READ COMMITTED for a `Tx`.
+  Each transaction of a row, a step's and an `action fun`'s included,
+  is of that kind. A list's check takes a `Tx`.
+- An operation that takes a `SerializableTx` or a `Tx` runs in one
+  transaction, which the server opens as above. An answer commits it.
+  A refusal rolls it back, so a refused request has changed nothing. A
+  panic rolls it back (section 8). On a serialization failure or a
+  deadlock, which at READ COMMITTED is a deadlock alone, the server
   rolls back and calls the operation again from the start, so it must
   have no effect outside the transaction, as the block of
   `db.tx(serializable = true)` must not (10.7).

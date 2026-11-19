@@ -842,8 +842,14 @@ func TestTransactions(t *testing.T) {
 		"fun f(db: Db, n: Int): Either<String, Int> = db.tx { tx ->\n    tx.atomically {\n        ensure(n > 0) { \"not positive\" }\n        n\n    }\n}",
 		"fun f(tx: Tx): Int = tx.atomically { tx.execute(sql\"\") }",
 		"fun Db.f(): Either<String, Int> = tx { tx -> raise(\"no\") }",
+		// A SerializableTx fits a Tx, and db.tx(serializable = true)
+		// hands its block one, in either form.
+		"fun g(tx: Tx): Int = tx.execute(sql\"\")\nfun h(tx: SerializableTx): Int = g(tx) + tx.execute(sql\"\")\nfun f(db: Db): Int = db.tx(serializable = true) { tx -> h(tx) }",
+		"fun h(tx: SerializableTx): Int = 1\nfun f(db: Db): Either<String, Int> = db.tx(serializable = true) { tx -> ensure(h(tx) > 0) { \"no\" }\n    1\n}",
 	)
 	refused(t, [][3]string{
+		{"fun h(tx: SerializableTx): Int = 1\nfun f(tx: Tx): Int = h(‸tx)", "needs-serializable", "h takes a SerializableTx and this is a Tx"},
+		{"fun h(tx: SerializableTx): Int = 1\nfun f(db: Db): Int = db.tx { tx -> h(‸tx) }", "needs-serializable", "h takes a SerializableTx and this is a Tx"},
 		{"fun f(db: Db): Int = db.tx { tx -> ‸raise(\"no\") }", "raise-scope", "this is not a raise scope"},
 		{"fun f(db: Db): Either<String, Int> = db.tx { tx -> raise(‸1) }", "type-mismatch", "this is a Int where a String is wanted"},
 		{"fun f(db: Db): Either<String, Int> {\n    ‸db.tx { tx -> 1 }\n    return 1.right()\n}", "either-dropped", "this Either<String, Int> is dropped"},

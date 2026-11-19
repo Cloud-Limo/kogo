@@ -3096,6 +3096,33 @@ Each entry: what was decided, why, and what would reopen it.
 - **Open: a `kogo test` cannot call an `action fun` today**: a test is a `val`, and its
   block is handed a `Tx`. Decided in row 9 with the fake `Http`, and brought to Greg then.
 
+## Taken telling `SerializableTx` from `Tx` (DEV-965), not yet discussed
+
+- **Only the literal `true` makes `db.tx`'s block a `SerializableTx`.**
+  `db.tx(serializable = flag)` hands a `Tx`, which is true at either level. Not taken: a
+  second fun, `db.serializableTx { }`, which `doc/gates.md` did not write. Reopen if a
+  program wants the level from a value.
+- **`SerializableTx` is the checker's alone**: core.kg declares it beside `Tx`, the
+  checker makes it fit a `Tx` (an external class has no supertypes in the syntax), and
+  the emitter writes it as Go's `kogo.Tx`. Not taken: a Go type of its own, which would
+  need a conversion wherever one is passed as a `Tx`.
+- **A plain `db.tx` is run once at READ COMMITTED, and a deadlock in it is a panic, as
+  before; a `Tx` the server opens is rerun on a deadlock** (`doc/gates.md`). Not taken:
+  rerunning a plain `db.tx`, which spec 10.7 did not say.
+- **A list's check takes a `Tx`, and a `SerializableTx` there is refused**: the server
+  runs it read-only at the database's default and does not rerun it (DEV-964 owns
+  `Handler.check`). Not taken: accepting one, which would let it read with no lock where
+  nothing reruns it.
+- **The rows' constructors take the kind as a bool after the name**:
+  `rpc.Tx(name, serializable, f)`, `rpc.Gated(name, serializable, ...)`,
+  `rpc.Outside(name, serializable, ...)`. Not taken: a constructor for each kind, six in
+  all.
+- **The refusal is `needs-serializable`, at the argument**, and names the called fun,
+  not the caller as `doc/gates.md`'s sample does: the checker has the call at hand.
+- **Not done here: the printed table's `runs serializable` / `runs plain` line**, which
+  waits for the printed table; **a test's block is handed a `Tx`**, so a `kogo test`
+  cannot call a fun that takes a `SerializableTx` yet.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

@@ -26,13 +26,17 @@ type API struct {
 
 // An Op is an operation.
 type Op struct {
-	Func   *Func
-	Tx     bool  // ungated, it takes a Tx; otherwise a Db
-	Gate   *Func // nil for an ungated operation
-	Proof  Type  // what the gate gives and the work takes
-	After  *Func // the step between the gate and the work; nil for none
-	Input  Type  // Unit for none
-	Answer Type  // the A of its Either<String, A>, or of an ungated one's Reply<A>
+	Func *Func
+	Tx   bool // ungated, it takes a Tx; otherwise a Db
+	// Serializable says the transaction the server opens is a
+	// SerializableTx, as the first parameter of the gate, or of an
+	// ungated fun, names; otherwise it is at READ COMMITTED.
+	Serializable bool
+	Gate         *Func // nil for an ungated operation
+	Proof        Type  // what the gate gives and the work takes
+	After        *Func // the step between the gate and the work; nil for none
+	Input        Type  // Unit for none
+	Answer       Type  // the A of its Either<String, A>, or of an ungated one's Reply<A>
 }
 
 // reply gives A where t is kogo.rpc's Reply<A>, and nil otherwise.
@@ -151,7 +155,7 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 			return nil
 		}
 		env(id, f, ungatedRole)
-		op := &Op{Func: f, Tx: named(f.Params[0].Type) == c.prelude("Tx"), Input: f.Params[3].Type, Answer: answer}
+		op := &Op{Func: f, Tx: named(f.Params[0].Type) != c.prelude("Db"), Serializable: c.serializable(f.Params[0].Type), Input: f.Params[3].Type, Answer: answer}
 		if a := reply(answer); a != nil {
 			op.Answer = a
 		}
@@ -164,8 +168,8 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 	}
 	env(row.Gate, g, gateRole)
 	env(id, f, workRole)
-	op := &Op{Func: f, Gate: g, Proof: proof, Input: f.Params[2].Type, Answer: answer}
-	if d := named(proof); d != nil && (d == c.prelude("Tx") || d == c.prelude("Db") || d.Pkg == "kogo.rpc" && d.Name == "Request") {
+	op := &Op{Func: f, Gate: g, Serializable: c.serializable(g.Params[0].Type), Proof: proof, Input: f.Params[2].Type, Answer: answer}
+	if d := named(proof); d != nil && (c.isTx(proof) || d == c.prelude("Db") || d.Pkg == "kogo.rpc" && d.Name == "Request") {
 		c.errorf(row.Gate, "gate", "%s gives a %s: a gate gives a proof, not the handle, so give a data class that holds the Tx and what the gate read (spec.md 15.2)", g.Name, proof)
 	}
 	if t := f.Params[1].Type; !same(t, proof) {
@@ -260,10 +264,12 @@ func (c *checker) shaped(id *syntax.Ident, r *role) (*Func, Type) {
 		d := named(t)
 		switch {
 		case t == unknown || kind == "":
-		case kind == "handle" && d != c.prelude("Tx") && d != c.prelude("Db"):
-			bad("takes a %s %s: %s takes a Tx, or a Db to open its own transactions", t, nth, r.what)
-		case kind == "tx" && d != c.prelude("Tx"):
-			bad("takes a %s %s: %s takes a Tx, the transaction the server runs it in", t, nth, r.what)
+		case kind == "handle" && !c.isTx(t) && d != c.prelude("Db"):
+			bad("takes a %s %s: %s takes a SerializableTx or a Tx, or a Db to open its own transactions", t, nth, r.what)
+		case kind == "tx" && r == checkRole && named(t) != c.prelude("Tx"):
+			bad("takes a %s %s: %s takes a Tx, the transaction the server runs it in, which is not rerun on a conflict", t, nth, r.what)
+		case kind == "tx" && !c.isTx(t):
+			bad("takes a %s %s: %s takes a SerializableTx or a Tx, the transaction the server runs it in", t, nth, r.what)
 		case kind == "env" && (d == nil || d.Kind != "data class"):
 			bad("takes a %s %s: %s takes the list's environment there, a data class of the application's, of what lives as long as the server", t, nth, r.what)
 		case kind == "request" && (d == nil || d.Pkg != "kogo.rpc" || d.Name != "Request"):

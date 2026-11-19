@@ -7,3 +7,13 @@ external class Request
 external fun Request.header(name: String): String?
 external fun Request.cookie(name: String): String?
 external val Request.clientAddress: String
+
+// An ungated operation's answer with the cookies the server sets as it
+// sends it (spec.md 15.2): the answer goes as the JSON, each cookie as
+// one Set-Cookie header, and a refusal sets none.
+enum class SameSite { Strict, Lax, None }
+
+data class Cookie(val name: String, val value: String, val path: String, val maxAgeSeconds: Long,
+                  val sameSite: SameSite, val secure: Boolean, val httpOnly: Boolean)
+
+data class Reply<A>(val answer: A, val cookies: List<Cookie>)

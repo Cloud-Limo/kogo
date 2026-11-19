@@ -65,8 +65,8 @@ func examples(t *testing.T, patterns ...string) map[string]string {
 func TestExamples(t *testing.T) {
 	testDB(t)
 	files := examples(t, "*.kg")
-	if len(files) != 25 {
-		t.Fatalf("%d examples, want 25", len(files))
+	if len(files) != 26 {
+		t.Fatalf("%d examples, want 26", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)
@@ -198,6 +198,10 @@ look up again: 200 {"type":"ok","value":{"number":"INV-1","status":"paid","total
 look up a missing invoice: 200 {"type":"refused","message":"There is no invoice INV-9."}
 look up another missing invoice: 200 {"type":"refused","message":"There is no invoice INV-8."}
 look up after two misses: 200 {"type":"refused","message":"Too many looks. Try again later."}
+sign in: 200 ["session=Ann; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax"] {"type":"ok","value":{"text":"Hello, Ann."}}
+sign in refused: 200 [] {"type":"refused","message":"Say who you are."}
+sign out: 200 ["session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"] {"type":"ok","value":{}}
+sign out refused: 200 [] {"type":"refused","message":"You are not signed in."}
 `
 	if err != nil || string(out) != want {
 		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)
@@ -429,6 +433,12 @@ func TestTS(t *testing.T) {
 	}
 	if _, again := ts(prog); !maps.Equal(first, again) {
 		t.Errorf("wrote %v, then %v", first, again)
+	}
+	// A Reply's answer alone crosses: the page sees no Reply or Cookie.
+	reply := strings.NewReplacer("import kogo.rpc.Request\n", "import kogo.rpc.Request\nimport kogo.rpc.Reply\n",
+		"Either<String, State> = either { State.On }", "Either<String, Reply<State>> = either { Reply(State.On, listOf()) }").Replace(prog)
+	if code, written := ts(reply); code != 0 || written["ops.ts"] != first["ops.ts"] {
+		t.Errorf("a Reply: exit %d, wrote %v", code, written)
 	}
 	if code, written := ts(prog + "val v: Int = \"no\"\n"); code != 1 || len(written) != 0 {
 		t.Errorf("a program with errors: exit %d, wrote %v", code, written)

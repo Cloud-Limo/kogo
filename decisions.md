@@ -2991,10 +2991,31 @@ Each entry: what was decided, why, and what would reopen it.
   program, whose test asserts the refusal. Not taken: emitting the table without the
   check or the gate, which would serve the work with nothing before it.
 
+## Taken answering an ungated operation with `Reply` and cookies (DEV-963), not yet discussed
+
+- **`SameSite` is an enum of `kogo.rpc`, `Strict`, `Lax` and `None`**, which
+  `doc/gates.md` names and does not declare. Not taken: a `String`, which a typo would
+  pass.
+- **`maxAgeSeconds` of 0 or less ends the cookie (`Max-Age=0`)**, as HTTP reads it; a
+  cookie with no `Max-Age`, one that ends with the browser, cannot be written. Not
+  taken: Go's reading, where 0 leaves `Max-Age` out. Reopen when a cookie must last only
+  the browser's session.
+- **A cookie HTTP cannot carry panics** (500, and a `Tx` operation rolls back, since the
+  answer is written inside its transaction). Not taken: Go's `http.SetCookie`, which
+  drops it with a log line, so the browser silently goes without it.
+- **A `Reply` anywhere else on the wire is one `wire` error** that says only an ungated
+  operation's whole answer is one, gated work's answer included. Not taken: an
+  `operation` error for gated work, a second rule for the same fact.
+- **The server finds a `Reply` by a method of the Go type** (`answer` in
+  `prelude/kogo/rpc`), so the emitter writes `rpc.Tx` and `rpc.Db` as before. Not taken:
+  `rpc.TxReply` and `rpc.DbReply`, and an emitter that tells them apart.
+- **`examples/25_reply.kg` is a list of its own**, served by the driver, so 22 stays as
+  it was while DEV-961 and DEV-962 change the same files.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no
   design. (An application's own binding files stood here until 17 Nov 2026: `doc/work.md` has them,
   as extensions.)
-- Operations (spec 15) leave out, on purpose: how one sets a cookie, which a login needs;
-  Origin and CSRF checks; a limit on the reruns of a `db.tx` written in a `Db` operation.
+- Operations (spec 15) leave out, on purpose: Origin and CSRF checks; a limit on the
+  reruns of a `db.tx` written in a `Db` operation.

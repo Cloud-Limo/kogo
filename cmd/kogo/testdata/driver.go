@@ -15,6 +15,7 @@ import (
 	"ROOT/example"
 	"ROOT/example/markers"
 	"ROOT/example/ops"
+	"ROOT/example/reply"
 	"github.com/Cloud-Limo/kogo/internal/testdb"
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
 	"github.com/Cloud-Limo/kogo/prelude/kogo/rpc"
@@ -207,4 +208,19 @@ func main() {
 	post("look up a missing invoice", "lookUp", `{"number": "INV-9"}`)
 	post("look up another missing invoice", "lookUp", `{"number": "INV-8"}`)
 	post("look up after two misses", "lookUp", `{"number": "INV-1"}`)
+
+	// 25: an answer that sets cookies, and refusals that set none.
+	h2 := rpc.NewHandler(reply.Session, pool, reply.SessionEnv{Secure: true}, slog.New(slog.DiscardHandler))
+	cookies := func(what, op, cookie, body string) {
+		w, r := httptest.NewRecorder(), httptest.NewRequest("POST", "/"+op, strings.NewReader(body))
+		if cookie != "" {
+			r.Header.Set("Cookie", cookie)
+		}
+		h2.ServeHTTP(w, r)
+		fmt.Printf("%s: %d %q %s\n", what, w.Code, w.Header().Values("Set-Cookie"), strings.TrimSpace(w.Body.String()))
+	}
+	cookies("sign in", "signIn", "", `{"name": "Ann"}`)
+	cookies("sign in refused", "signIn", "", `{"name": " "}`)
+	cookies("sign out", "signOut", "session=Ann", "")
+	cookies("sign out refused", "signOut", "", "")
 }

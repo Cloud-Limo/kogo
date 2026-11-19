@@ -29,6 +29,26 @@ func (c *checker) proofTx(t Type) *Var {
 	return nil
 }
 
+// heldTx spells the property, as clerk.tx or desk.tx, by which the
+// type t that a gate gives holds a transaction outside any proof, or
+// gives "": a property that is a Tx, or a data class that is no proof
+// and holds one (spec.md 15.2).
+func (c *checker) heldTx(t Type, seen []*TypeDecl) string {
+	d := named(nonNull(t))
+	if d == nil || d.Kind != "data class" && d.Kind != "interface" || c.proofTx(t) != nil || slices.Contains(seen, d) {
+		return ""
+	}
+	for _, p := range d.Props {
+		if c.isTx(nonNull(p.Type)) {
+			return p.Name
+		}
+		if in := c.heldTx(p.Type, append(seen, d)); in != "" {
+			return p.Name + "." + in
+		}
+	}
+	return ""
+}
+
 // spell gives a name or a chain of properties as it is written:
 // booking.tx. Anything else is "".
 func spell(e syntax.Expr) string {

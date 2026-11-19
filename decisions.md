@@ -3196,10 +3196,23 @@ Each entry: what was decided, why, and what would reopen it.
   gate gives, which misses the proofs no gate gives (`AtTenant`, a new row's, an interface)
   and the model's files, where the two rules on the transaction are read; a marked `Tx`
   alone, which the design does not call a proof.
-- **A gate is not yet held to give a proof.** A `P` of any other shape still passes 15.2
-  and is held to none of the three rules, which spec 15.7 says. Holding it changes what
-  every gated program looks like (a marker, a file that opts in), so it is left to Greg.
-  `examples/24_gates.kg` is such a program and is unchanged: no rule refuses it.
+- **A gate that gives a transaction gives a proof** (Greg's choice C, 20 Nov 2026, DEV-982):
+  a `P` that holds a `Tx` or a `SerializableTx` and is no proof is `gate-proof`, said once
+  per gate, at its first row; a `P` of facts alone stays a plain data class. "Holds"
+  reaches a property that is the transaction, and one that is a data class (or an
+  interface) that is no proof and holds one, at any depth: `box.tx`. A property that is
+  a proof, as `OpenInvoice`'s `desk: AtDesk`, ends the search, since its rules hold it.
+  Not taken: A, every gate gives a proof, which makes every gated program carry a marker
+  and an opt-in for facts that need none; B, as before, where a port that forgets the
+  marker gets no rules and no error, PR 91's 500 included. Not followed: a transaction in a
+  type argument, as `List<Plain>` or `Map<String, Tx>`; a nullable `Box?` is followed.
+  Reopen: a port that hands a transaction to work that way.
+- **`examples/24_gates.kg` moved to C**: `OpenInvoice` is a proof marked `@DeskOnly`, and
+  `statusOf` and `unpaid` take a narrower proof, `AtDesk`, of the transaction alone, from
+  a gate `atDesk` that calls `clerk` and binds its answer. Not taken: binding
+  `${clerk.address}` in their statements, which would scope by nothing the SQL needs.
+  `clerk` now gives `Clerk(address)`, facts alone, to `testPrinter`, the action fun that
+  reads only facts: C's lighter half, shown.
 - **A marked property is built here** (spec 11): a marker on a data class's property was a
   syntax error, and an interface's marked `val` was read and not held. Both are now
   marked, and read only in a file that opts in, by name or by destructuring. The proof
@@ -3228,16 +3241,8 @@ Each entry: what was decided, why, and what would reopen it.
 - **Not seen by `action-proof`: a proof held in a list or in a plain data class**, as
   `xs: List<Held>` or `Box(val held: Held)`. Only a file that opts in can make one: a
   step or work that runs outside cannot, since building either passes the proof.
-- **Open, Greg's: must a gate give a proof of this shape?** Built as B meanwhile (the
-  Ruling on PR 98). A: every gate gives a proof, a new refusal ("gate gives Clerk, which
-  is no proof: mark its constructor and its tx"), so every gated program has a marker
-  and a gates' file that opts in, and a forgotten marker is a compile error. B: as now,
-  the rules hold only marked proofs, and a port that forgets the marker gets no rules
-  and no error. C: only a `P` that holds a `Tx` must be a proof, which closes PR 91's 500
-  and leaves a proof of facts alone light. A or C is its own issue, with
-  `examples/24_gates.kg` moved (its `statusOf` and `unpaid` bind nothing of `clerk`).
 - **The codes** are the design's `proof-tx-escapes` and `outside-passes-proof`, and two it
-  did not name: `unbound-statement` and `action-proof`.
+  did not name: `unbound-statement` and `action-proof`; DEV-982 adds `gate-proof`.
 - **"Written directly" is `proof.fact` or a property under it**, `${held.business.id}`,
   spelt on the same name as the receiver. Not taken: `proof.fact` alone, which refuses a
   proof that keeps its row as a data class, as spec 11's `HeldBusiness` does.

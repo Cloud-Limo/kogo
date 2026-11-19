@@ -172,6 +172,11 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 	if d := named(proof); d != nil && (c.isTx(proof) || d == c.prelude("Db") || d.Pkg == "kogo.rpc" && d.Name == "Request") {
 		c.errorf(row.Gate, "gate", "%s gives a %s: a gate gives a proof, not the handle, so give a data class that holds the Tx and what the gate read (spec.md 15.2)", g.Name, proof)
 	}
+	if _, seen := gates[g]; !seen {
+		if held := c.heldTx(proof, nil); held != "" {
+			c.errorf(row.Gate, "gate-proof", "%s gives %s, which holds a transaction, %s, and is no proof: mark the constructor and the transaction of %s with a marker the gates' file opts in to, as data class %s @M constructor(..., @property:M val tx: Tx), or give the facts alone (spec.md 15.7)", g.Name, proof, held, proof, named(proof).Name)
+		}
+	}
 	if t := f.Params[1].Type; !same(t, proof) {
 		c.errorf(id, "operation", "%s takes a %s second, and its gate %s gives a %s: gated work takes its gate's proof, so take a %s or name the gate that gives a %s (spec.md 15.2)", id.Name, t, g.Name, proof, proof, t)
 	}

@@ -111,7 +111,7 @@ func TestOperationFacts(t *testing.T) {
 // and the Reply and its cookies are not. Nothing else crosses as one.
 func TestReply(t *testing.T) {
 	head := "package kogo.rpc\nexternal class Request\ndata class Cookie(val name: String)\ndata class Reply<A>(val answer: A, val cookies: List<Cookie>)\n---\n" +
-		"import kogo.rpc.Request\nimport kogo.rpc.Reply\ndata class Env(val n: Int)\ndata class Job(val n: Int)\ndata class P(val tx: Tx)\n" +
+		"import kogo.rpc.Request\nimport kogo.rpc.Reply\ndata class Env(val n: Int)\ndata class Job(val n: Int)\ndata class P(val n: Int)\n" +
 		"fun g(tx: Tx, env: Env, request: Request): Either<String, P> = either { raise(\"no\") }\n"
 	info, errs := run(t, head+"api ops unchecked { f ungated }\n"+op("Unit", "Reply<Job?>"))
 	if errs != nil {

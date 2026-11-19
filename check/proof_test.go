@@ -28,6 +28,9 @@ func TestProofs(t *testing.T) {
 		model+"fun f(on: OnBooking): Boolean = on.tx.exists(sql\"${on.id}: Int\")",
 		// A data class that is no proof is held to none of it.
 		model+"data class Plain(val n: Int, val tx: Tx)\nfun f(p: Plain): Tx {\n    p.tx.execute(sql\"\")\n    return p.tx\n}",
+		// A gate gives a proof, or facts alone (spec.md 15.2).
+		model+"data class Facts(val n: Int, val at: AtTenant)\nfun g(tx: Tx, env: Env, request: Request): Either<String, Facts> = either { Facts(1, AtTenant(tx)) }\n"+
+			"fun w(env: Env, f: Facts, input: Unit): Either<String, Int> = either { f.n }\napi a unchecked { w gatedBy g }",
 		// A step and work that runs outside read the proof's facts.
 		model+"api a unchecked {\n    work gatedBy gate after step\n    out gatedBy gate\n}\n"+
 			"action fun step(env: Env, booking: Held, input: Unit): Either<String, Unit> = either {\n    ensure(booking.id > 0) { \"no\" }\n    env.bell.ring()\n}\n"+
@@ -63,10 +66,20 @@ func TestProofs(t *testing.T) {
 		{step + "    ‸retry { booking }\n}\nfun retry(f: () -> Held): Int = save(f(), 1)", "outside-passes-proof", "step passes a proof to retry"},
 		{model + "api a unchecked { out gatedBy gate }\naction fun out(env: Env, booking: Held, input: Unit): Either<String, Int> = either {\n    env.bell.ring()\n    ‸save(booking, 1)\n}", "outside-passes-proof",
 			"out passes booking to save, and work that runs outside has no transaction: move the call into the gate, or make out a fun, which runs in the transaction"},
+		// A gate that gives a transaction gives it in a proof.
+		{model + gives("data class Clerk(val n: Int, val tx: SerializableTx)"), "gate-proof", "g gives Clerk, which holds a transaction, tx, and is no proof: mark the constructor and the transaction of Clerk"},
+		{model + gives("data class Box(val n: Int, val tx: Tx)\ndata class Clerk(val n: Int, val box: Box?)"), "gate-proof", "g gives Clerk, which holds a transaction, box.tx, and is no proof"},
 		// A marked property is read, and overridden, only where the file opts in (section 11).
 		{model + "---\ndata class Fake(override val id: Int, ‸override val tx: Tx) : OnBooking", "opt-in", "tx is marked @M: begin this file with @file:OptIn(M::class)"},
 		{model + "interface Shown {\n    @M fun show(): Int\n}\n---\ndata class S(val n: Int) : Shown {\n    override ‸fun show(): Int = n\n}", "opt-in", "show is marked @M"},
 		{model + "---\nfun f(booking: Held): Int {\n    ‸val (id, tenant, _) = booking\n    return id\n}", "opt-in", "tx is marked @M"},
 		{model + "---\nfun f(booking: Held): Int = booking.id + booking.‸tx.execute(sql\"${booking.id}: Int\")", "opt-in", "tx is marked @M: begin this file with @file:OptIn(M::class)"},
 	})
+}
+
+// gives is a gate g that gives the Clerk that decl declares, and a
+// row that names it.
+func gives(decl string) string {
+	return decl + "\nfun g(tx: Tx, env: Env, request: Request): Either<String, Clerk> = either { raise(\"no\") }\n" +
+		"fun w(env: Env, c: Clerk, input: Unit): Either<String, Int> = either { 1 }\napi a unchecked { w gatedBy ‸g }"
 }

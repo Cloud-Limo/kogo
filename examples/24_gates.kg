@@ -1,8 +1,8 @@
 // Gates (spec.md 15.1, 15.2): a list names its check, and each row
 // its gate or says ungated. A gate finds out who is asking and gives
 // a proof, which the work takes where an ungated operation takes the
-// request. The compiler checks these forms and does not serve them
-// yet: 22_api.kg is served.
+// request. The server runs each in turn (15.3), and serves a list
+// that is unchecked to no browser.
 package example.gates
 
 import kogo.rpc.Request

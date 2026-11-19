@@ -4,8 +4,10 @@ Agreed with Greg in discussion on 17 Nov 2026, as the design to work
 from. `doc/work.md` has the rest of that day: workers, outside
 services and time limits; `doc/measured.md` has the counts both rest
 on. Of it, the list's head and rows are parsed and checked, and in
-spec 15.1 and 15.2 (DEV-950, `examples/24_gates.kg`). The rest is not
-built and not in `spec.md`: until it is, the spec stands as written.
+spec 15.1 and 15.2 (DEV-950, `examples/24_gates.kg`), and the server
+runs a check, a gate, a step and the work, spec 15.3 and 15.5
+(DEV-961). The rest is not built and not in `spec.md`: until it is,
+the spec stands as written.
 No example here has been through `kogo check`, the
 names in them are invented, and every size is a guess.
 

@@ -1049,7 +1049,7 @@ program names its operations in an `api` list, and from the list the
 compiler writes the server's table and the browser's TypeScript types.
 
 ```kotlin
-api ops unchecked {
+api ops checkedBy fromOurPage {
     me             ungated
     updateJob      ungated
     completeLogin  ungated
@@ -1088,8 +1088,9 @@ api hooks unchecked {
   two funs of that name in scope.
 - The head names the list's check, `checkedBy f`: the fun that is to
   run before every row of the list, ungated ones included. A list
-  with no check says `unchecked` in its place. A head with neither is
-  a compile error.
+  with no check says `unchecked` in its place, and is served to no
+  browser: its table is a Go type that the server's handler does not
+  take. A head with neither is a compile error.
 - A row is an operation and who may call it, in one of three forms:
 
   | Row | What it says |
@@ -1117,10 +1118,7 @@ api hooks unchecked {
   the answer's type's name.
 - Each of these is an ordinary fun: any code may call it, and nothing
   but the list marks it.
-- `kogo check` and `kogo ts` read every form. `kogo emit` writes a
-  list that is `unchecked` and whose rows are `ungated`, and refuses a
-  check or a gated row (`not-yet-emitted`) until the server runs them:
-  15.3 and 15.5 are an ungated operation's.
+- `kogo check`, `kogo ts` and `kogo emit` read every form.
 
 ### 15.2 The shapes
 
@@ -1166,6 +1164,20 @@ one returns an `Either` whose `Left` is a refusal in words:
 
 ### 15.3 The transaction
 
+- The list's check runs first, once for a request: before the
+  operation's name, the method and the body are read, in a transaction
+  of its own that Postgres holds to reading and the server rolls back.
+  Its refusal is not an operation's (15.5), and nothing else runs.
+- A gated row runs in one transaction, opened as an ungated
+  operation's `Tx` is: the gate, then the work with the gate's proof.
+  An answer commits it, a refusal of either rolls it back, and a rerun
+  runs the gate again.
+- A row with a step runs its gate first in a transaction of its own,
+  which the server rolls back; then the step, once, with no
+  transaction open; then the gate again and the work, in one
+  transaction as above. The step is handed the first proof for the
+  facts in it: that proof's `Tx` has ended, and a statement on it is a
+  panic. A refusal of the step has written nothing.
 - An operation that takes a `Tx` runs in one transaction, which the
   server opens at SERIALIZABLE. An answer commits it. A refusal rolls
   it back, so a refused request has changed nothing. A panic rolls it
@@ -1251,7 +1263,8 @@ application chooses.
 | What happened | Status | Body |
 | --- | --- | --- |
 | the operation answered | 200 | the `ok` object |
-| the operation refused | 200 | the `refused` object |
+| the operation, its gate or its step refused | 200 | the `refused` object |
+| the list's check refused, whatever else is wrong | 403 | the check's words, as text |
 | the input does not read (15.4) | 400 | the operation and the key, never the value |
 | no operation of that name | 404 | |
 | a method other than `POST` | 405 | |

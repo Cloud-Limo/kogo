@@ -1545,6 +1545,31 @@ Each entry: what was decided, why, and what would reopen it.
 - **Not asked, and still not** (the lead, 18 Nov 2026): the request's `Content-Type`, left
   "with the CSRF checks"; open in `doc/origin.md`.
 
+- **Serving a gated row** (19 Nov 2026, DEV-961's run, not Greg; `doc/gates.md`, spec 15.3
+  and 15.5). `rpc.Gated(name, gate, step, work)` is a gated row, and the handler runs the
+  list's check, then the gate and the work in one SERIALIZABLE transaction.
+  - **A step runs between the gate and the work, with no transaction open**, as
+    `doc/gates.md`, "The outside step": the gate in a transaction that is rolled back, the
+    step once, then the gate again and the work in one transaction. DEV-961's description
+    also says the step "runs once the work's transaction has committed", which a step that
+    may refuse before the work writes cannot do; the design was followed. Not taken: the
+    step after the work's commit. Reopen: Greg meant the sentence as written.
+  - **The gate's first transaction is rolled back, not committed.** A gate only reads, and
+    until a proof's rules hold it to that (roadmap row 6), a write of a gate whose step then
+    refuses is undone. Not taken: commit, one line fewer.
+  - **A step is handed a proof whose `Tx` has ended**, and a statement on it is a panic, a
+    500, until `action fun` (DEV-962) makes it `outside-passes-proof` at compile time. A
+    gated `action fun`, which runs with no transaction and its gate once, is DEV-962's too.
+  - **A gate's SERIALIZABLE `Tx` is not read-only**, as decided on 18 Nov 2026 for a gate on
+    a `Tx`; the check's is, by `kogo.ReadOnlyTx`, at READ COMMITTED.
+  - **An unchecked list is `rpc.NewUnserved(ops, enums)`**, as `doc/origin.md` has it, and
+    nothing takes one until `rpc.NewCalls` (roadmap row 11): its operations are compiled
+    and not run. So `examples/22_api.kg`, which the tests serve, names a check, which
+    refuses `Sec-Fetch-Site: cross-site`. Not taken: leaving 22 unchecked and unserved,
+    which loses the served test of a `Db` operation's emitted Go.
+  - **A shared gate is given its row's input by `rpc.Shared[I](gate)`**, so `Gated` has one
+    form. Not taken: a second constructor for a gate that reads no input.
+
 ## Taken in the v0 spec, not yet discussed
 
 - Markers (`@RequiresOptIn`, `@file:OptIn`) are the one annotation form, so the access walls

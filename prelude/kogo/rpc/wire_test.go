@@ -119,8 +119,8 @@ func TestStrict(t *testing.T) {
 	}
 }
 
-// A table that lacks an enum's entries that an input reaches fails
-// when the server starts, and one that has them, none though they
+// A table that has no check, or lacks an enum's entries that an input
+// reaches, fails when the server starts, and one that has them, none though they
 // are, does not.
 func TestCheck(t *testing.T) {
 	job := Db("job", func(kogo.Db, env, Request, Job) kogo.Either[string, rt.Unit] { return nil })
@@ -128,8 +128,9 @@ func TestCheck(t *testing.T) {
 		t    Table[env]
 		want string
 	}{
-		{Table[env]{[]Operation[env]{job}, nil}, "the table holds no constants of the enum rpc.State"},
-		{Table[env]{[]Operation[env]{job}, []any{[]State{}}}, ""},
+		{Table[env]{ours, []Operation[env]{job}, nil}, "the table holds no constants of the enum rpc.State"},
+		{Table[env]{ours, []Operation[env]{job}, []any{[]State{}}}, ""},
+		{Table[env]{nil, nil, nil}, "the table has no check: a list that a browser calls names one, api name checkedBy check"},
 	} {
 		func() {
 			defer func() {

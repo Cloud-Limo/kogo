@@ -85,13 +85,7 @@ func TestEmittedGoRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	// 24's check and gates are checked and not served yet, so emit
-	// refuses it: the rest are emitted without it.
 	files := examples(t, "*.kg")
-	if code, out := kogo(t, files, dir); code != 1 || !strings.Contains(out, `"file":"24_gates.kg","line":10,"column":20,"code":"not-yet-emitted"`) {
-		t.Fatalf("with 24_gates.kg: exit %d, want 1 and its check refused\n%s", code, out)
-	}
-	delete(files, "24_gates.kg")
 	if code, out := kogo(t, files, dir); code != 0 || out != "" {
 		t.Fatalf("exit %d, want 0\n%s", code, out)
 	}
@@ -198,6 +192,18 @@ look up again: 200 {"type":"ok","value":{"number":"INV-1","status":"paid","total
 look up a missing invoice: 200 {"type":"refused","message":"There is no invoice INV-9."}
 look up another missing invoice: 200 {"type":"refused","message":"There is no invoice INV-8."}
 look up after two misses: 200 {"type":"refused","message":"Too many looks. Try again later."}
+refused by the check: 403 Open the desk's page first.
+the check before the name: 403 Open the desk's page first.
+refused by a shared gate: 200 {"type":"refused","message":"This address may not use the desk."}
+ungated, after the check: 200 {"type":"ok","value":2}
+unpaid: 200 {"type":"ok","value":["INV-1","INV-2"]}
+refused by its own gate: 200 {"type":"refused","message":"Invoice INV-2 cannot be changed."}
+refused by the work: 200 {"type":"refused","message":"There is no invoice INV-9."}
+refused by the step: 200 {"type":"refused","message":"No printer is set up."}
+sent after the step: 200 {"type":"ok","value":{"number":"INV-1","printer":"front"}}
+mark paid: 200 {"type":"ok","value":1000}
+mark paid again: 200 {"type":"refused","message":"Invoice INV-1 cannot be changed."}
+status: 200 {"type":"ok","value":"paid"}
 `
 	if err != nil || string(out) != want {
 		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)

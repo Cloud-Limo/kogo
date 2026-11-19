@@ -3003,6 +3003,11 @@ Each entry: what was decided, why, and what would reopen it.
 - **A cookie HTTP cannot carry panics** (500, and a `Tx` operation rolls back, since the
   answer is written inside its transaction). Not taken: Go's `http.SetCookie`, which
   drops it with a log line, so the browser silently goes without it.
+- **A cookie a browser refuses panics too** (review of PR 89): `SameSite.None`, or a
+  `__Secure-` name, without `secure`, and a `__Host-` name without `secure` or the path
+  `/`. The prefixes are read in any case, as browsers read them. Not taken: only
+  `http.Cookie.Valid`, which lets these through to a browser that drops them, or a
+  case-sensitive prefix. `Domain` is not checked: `Cookie` has none.
 - **A `Reply` anywhere else on the wire is one `wire` error** that says only an ungated
   operation's whole answer is one, gated work's answer included. Not taken: an
   `operation` error for gated work, a second rule for the same fact.

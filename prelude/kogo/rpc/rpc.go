@@ -86,6 +86,21 @@ func (r Reply[A]) reply() (reflect.Value, kogo.List[Cookie]) {
 	return reflect.ValueOf(&r.Answer).Elem(), r.Cookies
 }
 
+// browserRefuses says why a browser drops c, or "" when it keeps it.
+// Browsers read the prefixes in any case.
+func browserRefuses(c Cookie) string {
+	name := strings.ToLower(c.Name)
+	switch {
+	case c.SameSite == SameSite_None && !c.Secure:
+		return "SameSite None needs secure"
+	case strings.HasPrefix(name, "__secure-") && !c.Secure:
+		return "the prefix __Secure- needs secure"
+	case strings.HasPrefix(name, "__host-") && (!c.Secure || c.Path != "/"):
+		return `the prefix __Host- needs secure and the path "/"`
+	}
+	return ""
+}
+
 // An answered is an answer's JSON and the cookies it sets.
 type answered struct {
 	body    []byte
@@ -124,7 +139,8 @@ func Db[Env, I, A any](name string, f func(kogo.Db, Env, Request, I) kogo.Either
 }
 
 // answer writes a, or the answer of a Reply with its cookies. A
-// cookie that HTTP cannot carry is a bug, and panics. Max-Age is the
+// cookie that HTTP cannot carry, or that a browser drops without a
+// word, is a bug, and panics. Max-Age is the
 // cookie's seconds, and 0 or less ends it.
 func answer[A any](op string, a A) answered {
 	var b bytes.Buffer
@@ -143,6 +159,9 @@ func answer[A any](op string, a A) answered {
 			}
 			if err := hc.Valid(); err != nil {
 				panic(fmt.Sprintf("the answer of %s sets a cookie HTTP cannot carry: %v", op, err))
+			}
+			if refused := browserRefuses(c); refused != "" {
+				panic(fmt.Sprintf("the answer of %s sets a cookie %s that a browser refuses: %s", op, c.Name, refused))
 			}
 			cookies = append(cookies, hc)
 		}

@@ -1177,7 +1177,10 @@ one returns an `Either` whose `Left` is a refusal in words:
   every operation that sets a cookie.
 - A cookie's `maxAgeSeconds` is its `Max-Age`; 0 or less ends it, as
   `Max-Age=0`. A cookie that HTTP cannot carry, such as one whose name
-  holds a space, is a bug, and panics (section 8).
+  holds a space, or one a browser refuses, such as `SameSite.None`, a
+  name that starts `__Secure-` or one that starts `__Host-` without
+  `secure` (`__Host-` needs the path `/` too), is a bug, and panics
+  (section 8).
 
 ```kotlin
 fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<String, Reply<Unit>> = either {

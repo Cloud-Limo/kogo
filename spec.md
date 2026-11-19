@@ -1047,8 +1047,8 @@ each form.
 - A call that gives no answer gives an `HttpFailure`, by how far it got
   and its status alone, whichever call it was: `NotSent(why)` when no
   connection was made; `Unknown(why)` when it left and no answer came
-  that can be used, a 3xx, a 5xx, no answer, or one that broke off or
-  is past the limit, so an action may have been done: a `303` says it
+  that can be used, any status that is not a 2xx or a 4xx, no answer,
+  or one that broke off or is past the limit, so an action may have been done: a `303` says it
   was; `Refused(status: Int, body: Json?)` for a 4xx, the body `null`
   when it is not a JSON object; and `Unreadable(why)` for a 2xx that is
   not one JSON object. What a refusal means is the client's to say, and
@@ -1067,7 +1067,7 @@ Where Go's HTTP client would decide, Kogo states it:
 | A proxy | None: nothing of the environment says where a call goes. |
 | An answer's length | One past the handle's limit is `Unknown`, whatever its status. Its headers are held to the same limit, apart from its body. |
 | An answer's form | No `Accept-Encoding` is sent, so an answer is read as the service wrote it, never unpacked. |
-| `User-Agent` | None is sent unless `main` states one among the handle's headers. |
+| `User-Agent` | None is sent unless the handle has one among its headers. |
 | A JSON number | `long` is exact, and `null` for a number written with a fraction or an exponent, or past a `Long`. `double` is the nearest `Double`. |
 | A time limit | The handle's own, which `main` must state, from the call's start to the end of its answer; past it a call that left is `Unknown`. |
 
@@ -1120,8 +1120,9 @@ external fun List<Long>.sum(): Long
   anywhere, and section 7 has effects arrive as parameters.
 - A binding with an effect, an outbound call, takes a handle: an
   external class such as `Http`, passed to the function that calls out
-  as `Tx` and `Db` are, so the signature shows it. The handle carries
-  the request's context. Nothing checks that a binding keeps to this;
+  as `Tx` and `Db` are, so the signature shows it. A handle will carry
+  the request's context once the one deadline of `doc/work.md`, "Time
+  limits", is built; `Http` today has its own `Timeout` alone. Nothing checks that a binding keeps to this;
   it is the rule for whoever writes one.
 - `external class Name<T>` names a type that Go implements. It has no
   body, and Kogo code cannot construct or implement it. An external

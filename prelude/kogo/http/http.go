@@ -300,6 +300,21 @@ func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 	}
 	defer resp.Body.Close()
 	text, err := io.ReadAll(io.LimitReader(resp.Body, h.s.MaxAnswer+1))
+	status := resp.StatusCode
+	// Logged before the answer is judged whole, so a refusal past the
+	// limit or broken off is logged too, with what was read: then the
+	// cut mark's "of N bytes" counts what was read, not the whole.
+	if status >= 300 && status < 500 {
+		msg := "kogo.http: refused"
+		if status < 400 {
+			msg = "kogo.http: redirect not followed"
+		}
+		logged := string(text)
+		if len(logged) > maxLogged {
+			logged = fmt.Sprintf("%s [cut: the first %d of %d bytes]", logged[:maxLogged], maxLogged, len(logged))
+		}
+		h.s.Log.Warn(msg, "method", e.method, "path", e.path, "status", status, "body", logged)
+	}
 	switch {
 	case err != nil:
 		return nil, &failed{left: true, why: "the answer broke off: " + reason(err)}
@@ -307,14 +322,6 @@ func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 		return nil, &failed{left: true, why: fmt.Sprintf("the answer is longer than %d bytes", h.s.MaxAnswer)}
 	}
 	answer := Json_Parse(string(text))
-	status := resp.StatusCode
-	if status >= 300 && status < 500 {
-		logged := string(text)
-		if len(logged) > maxLogged {
-			logged = fmt.Sprintf("%s [cut: the first %d of %d bytes]", logged[:maxLogged], maxLogged, len(logged))
-		}
-		h.s.Log.Warn("kogo.http: refused", "method", e.method, "path", e.path, "status", status, "body", logged)
-	}
 	switch {
 	case status >= 400 && status < 500:
 		return nil, &failed{refused: true, status: int32(status), body: answer}

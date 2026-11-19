@@ -152,8 +152,8 @@ func TestNoRedirectIsFollowed(t *testing.T) {
 	if followed.Load() != 0 {
 		t.Errorf("%d redirects were followed", followed.Load())
 	}
-	if !strings.Contains(log.String(), `msg="kogo.http: refused" method=POST path=/thing status=302`) {
-		t.Errorf("the refused send is not logged:\n%s", log)
+	if !strings.Contains(log.String(), `msg="kogo.http: redirect not followed" method=POST path=/thing status=302`) || strings.Contains(log.String(), "refused") {
+		t.Errorf("the redirect is not logged as one:\n%s", log)
 	}
 }
 
@@ -232,6 +232,7 @@ func TestPath(t *testing.T) {
 	panics(t, `the path after an id begins with /: "parts"`, func() { Action_String_String_String_String("POST", "/v1/things/", "id_1", "parts") })
 	panics(t, `the path after an id begins with /: ""`, func() { Action_String_String_String_String("POST", "/v1/things/", "id_1", "") })
 	panics(t, `an id in a path is not ".."`, func() { Action_String_String_String("DELETE", "/v1/things/", "..") })
+	panics(t, `an id in a path is not "."`, func() { Action_String_String_String("DELETE", "/v1/things/", ".") })
 	panics(t, `an id in a path is not ""`, func() { Action_String_String_String("DELETE", "/v1/things/", "") })
 	panics(t, `an endpoint's method is GET, POST, PUT, PATCH or DELETE, not "get"`, func() { Lookup_String_String("get", "/a") })
 	panics(t, `an endpoint's path begins with /: "a"`, func() { Lookup_String_String("GET", "a") })
@@ -318,6 +319,7 @@ func TestFailures(t *testing.T) {
 		{402, `{"error": {"type": "declined"}}`, `Either.Left(Refused(status=402, body={"error": {"type": "declined"}}))`},
 		{404, `not found`, `Either.Left(Refused(status=404, body=null))`},
 		{503, `{}`, `Either.Left(Unknown(why=the service answered 503))`},
+		{600, `{}`, `Either.Left(Unknown(why=the service answered 600))`},
 		{200, `[1]`, `Either.Left(Unreadable(why=the answer is not a JSON object))`},
 		{200, ``, `Either.Right({})`},
 	} {
@@ -325,7 +327,7 @@ func TestFailures(t *testing.T) {
 		asked, performed := both(h)
 		want(t, "ask", asked, c.want)
 		want(t, "perform", performed, c.want)
-		refused := c.status >= 300 && c.status < 500
+		refused := c.status >= 400 && c.status < 500
 		if got := strings.Count(log.String(), "kogo.http: refused"); got != map[bool]int{true: 2}[refused] {
 			t.Errorf("%d: %d refused sends are logged:\n%s", c.status, got, log)
 		}
@@ -342,6 +344,12 @@ func TestFailures(t *testing.T) {
 	want(t, "a long refusal", rt.ToString(Http_Ask(h, look, nil)), "Either.Left(Refused(status=400, body="+long+"))")
 	if !strings.Contains(log.String(), strings.Repeat("x", 4086)+" [cut: the first 4096 of 5012 bytes]") {
 		t.Errorf("a long refused body is not cut at 4096 bytes:\n%s", log)
+	}
+	// A refusal past the limit is logged, with what was read.
+	h, log = serve(t, Service{MaxAnswer: 1 << 10}, answer(404, long))
+	want(t, "a refusal past the limit", rt.ToString(Http_Perform(h, post, nil)), "Either.Left(Unknown(why=the answer is longer than 1024 bytes))")
+	if !strings.Contains(log.String(), `msg="kogo.http: refused" method=POST path=/thing status=404 body="{\"echo\": \"xxx`) {
+		t.Errorf("a refusal past the limit is not logged:\n%s", log)
 	}
 	// A slow service: the call left, so its end is unknown.
 	slow, _ := serve(t, Service{Timeout: 50 * time.Millisecond, Query: map[string]string{"key": "secret"}}, func(w http.ResponseWriter, r *http.Request) { time.Sleep(200 * time.Millisecond) })

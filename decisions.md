@@ -3348,7 +3348,12 @@ Each entry: what was decided, why, and what would reopen it.
   which puts up to `MaxAnswer` of a service's echo of personal data in one log line; a
   choice for each handle, which no application has asked for. What of a body is safe
   to log at all stays open in `doc/work.md`. The query is not logged, nor any header: a
-  credential may be in either.
+  credential may be in either. A 4xx is logged as `kogo.http: refused` and a 3xx as
+  `kogo.http: redirect not followed` (the lead's Ruling on PR 97, 20 Nov 2026), since
+  `Refused` is a 4xx and nothing else and a 3xx is `Unknown`. Not taken: `refused` for
+  both, the words of Q9, which say of a `302` what its value does not. Each is logged
+  before the answer is judged whole, so a refusal past the limit or broken off is
+  logged with what was read, and the cut mark's length counts what was read.
 - **A 3xx is `Unknown`, to `ask` and to `perform`**, which reverses 17 Nov 2026's "a 3xx
   is reported with its status, as a 4xx is" (Greg, 20 Nov 2026; Ruling on PR 97).
   `Refused` is a 4xx and nothing else. A `303` after a `POST` says the service acted, and

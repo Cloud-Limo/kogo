@@ -273,6 +273,7 @@ fun timeZone(google: Http, at: LatLng, now: Instant): Either<HttpFailure, ZoneId
     val answer = google.ask(TIME_ZONE, listOf(
         field("location", "${at.lat},${at.lng}"),
         field("timestamp", now.epochSeconds))).bind()
+    // What a no inside a 2xx is raised as is open: see Open.
     ensure(answer.string("status") == "OK") { HttpFailure.Unreadable("the answer's status is not OK") }
     zoneOf(answer.string("timeZoneId") ?: raise(HttpFailure.Unreadable("the answer has no timeZoneId")))
 }
@@ -1288,7 +1289,13 @@ built once. Agreed with Greg on 17 Nov 2026.
 ## Open
 
 - Errors a service puts in its body: Stripe's `card_error`, legacy
-  Google's `status`. Each client reads its own.
+  Google's `status`. Each client reads its own. What a client raises
+  for a no inside a 2xx is open, for Greg when Google's client is
+  ported. (a) `Unreadable`, with spec 12 widened to say a client
+  raises it for an answer that says no in a 2xx. (b) `Refused(200,
+  answer)`: but `Refused` is a 4xx and nothing else, an `act` reads a
+  `Refused` as "nothing done", and a no inside a 2xx may follow a
+  change. (c) A failure type of the client's own for that call.
 - What of a refused body is safe to log at all, for every service:
   `kogo.http` logs its first 4 KiB ("What Go would decide, Kogo
   states").

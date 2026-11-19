@@ -1077,7 +1077,7 @@ func TestPrelude(t *testing.T) {
 // and a val named as an enum's entries takes _val.
 func TestTables(t *testing.T) {
 	expect(t, [][2]string{
-		{"fmt.Sprint([]string{t.Ops.Operations[0].Name, t.Ops.Operations[1].Name, t.Ops.Operations[2].Name, t.Ops.Operations[3].Name}, t.Ops.Enums, t.Ops.Check != nil)", "[me f held sent] [[Alone Shared] [Open Done]] true"},
+		{"fmt.Sprint([]string{t.Ops.Operations[0].Name, t.Ops.Operations[1].Name, t.Ops.Operations[2].Name, t.Ops.Operations[3].Name, t.Ops.Operations[4].Name}, t.Ops.Enums, t.Ops.Check != nil)", "[me f held sent rung] [[Alone Shared] [Open Done]] true"},
 		{"fmt.Sprint([]string{t.Other_api.Operations[0].Name}, t.Other_api.Enums)", "[g] [[S M]]"},
 		{"fmt.Sprintf(\"%T\", t.Hooks)[:13]", "rpc.Unserved["},
 		{"fmt.Sprint(t.Other_Int(4), t.Kind_entries_val)", "4 3"},
@@ -1086,7 +1086,7 @@ import kogo.io.Console
 import kogo.rpc.Request
 import u.g
 import u.theirs
-api ops checkedBy ours { me ungated, f ungated, held gatedBy who, sent gatedBy asked after step }
+api ops checkedBy ours { me ungated, f ungated, held gatedBy who, sent gatedBy asked after step, rung gatedBy who }
 api other checkedBy theirs { g ungated }
 api hooks unchecked { me ungated }
 data class Who(val tx: Tx)
@@ -1094,6 +1094,7 @@ fun ours(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }
 fun who(tx: Tx, env: Env, request: Request): Either<String, Who> = either { Who(tx) }
 fun asked(tx: Tx, env: Env, request: Request, input: Ask): Either<String, Who> = either { Who(tx) }
 action fun step(env: Env, who: Who, input: Ask): Either<String, Unit> = either { env.console.println("") }
+action fun rung(env: Env, who: Who, input: Unit): Either<String, Unit> = either { env.console.println("") }
 fun held(env: Env, who: Who, input: Unit): Either<String, Unit> = either { }
 fun sent(env: Env, who: Who, input: Ask): Either<String, State> = either { State.Done }
 data class Env(val n: Int, val console: Console)

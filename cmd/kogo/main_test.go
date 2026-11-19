@@ -200,11 +200,14 @@ unpaid: 200 {"type":"ok","value":["INV-1","INV-2"]}
 refused by its own gate: 200 {"type":"refused","message":"Invoice INV-2 cannot be changed."}
 refused by the work: 200 {"type":"refused","message":"There is no invoice INV-9."}
 refused by the step: 200 {"type":"refused","message":"No printer is set up."}
-front: invoice INV-1
+refused by work that is an action: 200 {"type":"refused","message":"No printer is set up."}
+with 0 transactions open, front: invoice INV-1
 sent after the step: 200 {"type":"ok","value":{"number":"INV-1","printer":"front"}}
 mark paid: 200 {"type":"ok","value":1000}
 mark paid again: 200 {"type":"refused","message":"Invoice INV-1 cannot be changed."}
 status: 200 {"type":"ok","value":"paid"}
+with 0 transactions open, front: a test page for 192.0.2.1
+work that is an action: 200 {"type":"ok","value":"front"}
 sign in: 200 ["session=Ann; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax"] {"type":"ok","value":{"text":"Hello, Ann."}}
 sign in refused: 200 [] {"type":"refused","message":"Say who you are."}
 sign out: 200 ["session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"] {"type":"ok","value":{}}

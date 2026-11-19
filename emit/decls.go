@@ -214,7 +214,11 @@ func (e *emitter) table(d *syntax.API) {
 			if op.After != nil {
 				step = fun(op.After)
 			}
-			kind, funs = "Gated", gate+", "+step+", "+funs
+			if kind, funs = "Gated", gate+", "+step+", "+funs; op.Func.Action {
+				// Work that is an action fun runs after its gate's
+				// transaction, with none open; it has no step.
+				kind, funs = "Outside", gate+", "+fun(op.Func)
+			}
 		}
 		ops = append(ops, fmt.Sprintf("%s(%q, %s)", rpc(kind), op.Func.Name, funs))
 	}

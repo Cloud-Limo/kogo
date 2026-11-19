@@ -56,6 +56,16 @@ func panics(what string, f func()) {
 	f()
 }
 
+// inUse is the console of 24's actions: it prints, before what an
+// action prints, how many of the pool's connections are in use then,
+// which is none where no transaction is open.
+type inUse func() int32
+
+func (n inUse) Write(b []byte) (int, error) {
+	fmt.Printf("with %d transactions open, %s", n(), b)
+	return len(b), nil
+}
+
 func main() {
 	// 01: what a job is worth and what the supplier is paid.
 	extras := []model.BookingExtraCharge{{Amount: 500}}
@@ -222,7 +232,7 @@ func main() {
 	// The address has two looks, which its gate refuses; hooks, an
 	// unchecked list, is a value that no handler takes.
 	var _ rpc.Unserved[gates.DeskEnv] = gates.Hooks
-	console := io.NewConsole(os.Stdin, os.Stdout)
+	console := io.NewConsole(os.Stdin, inUse(func() int32 { return pool.Stat().AcquiredConns() }))
 	desk := func(printer string) {
 		h = rpc.NewHandler(gates.Desk, pool, gates.DeskEnv{Printer: printer, Console: console}, slog.New(slog.DiscardHandler))
 	}
@@ -239,11 +249,14 @@ func main() {
 	post("refused by its own gate", "markPaid", `{"number": "INV-2"}`)
 	post("refused by the work", "statusOf", `{"number": "INV-9"}`)
 	post("refused by the step", "sendInvoice", `{"number": "INV-1"}`)
+	post("refused by work that is an action", "testPrinter", "")
 	desk("front")
 	post("sent after the step", "sendInvoice", `{"number": "INV-1"}`)
 	post("mark paid", "markPaid", `{"number": "INV-1"}`)
 	post("mark paid again", "markPaid", `{"number": "INV-1"}`)
 	post("status", "statusOf", `{"number": "INV-1"}`)
+	post("work that is an action", "testPrinter", "")
+
 	// 25: an answer that sets cookies, and refusals that set none.
 	h2 := rpc.NewHandler(reply.Session, pool, reply.SessionEnv{Secure: true}, slog.New(slog.DiscardHandler))
 	cookies := func(what, op, cookie, body string) {

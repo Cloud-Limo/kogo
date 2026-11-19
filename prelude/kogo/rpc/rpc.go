@@ -168,6 +168,20 @@ func Gated[Env, I, P, A any](name string, gate func(kogo.Tx, Env, Request, I) ko
 	}}
 }
 
+// Outside is a gated row whose work is an action fun, so that it runs
+// with no transaction open (doc/gates.md, "An operation that runs
+// wholly outside"): the gate runs once, in a transaction that commits
+// before the work is called. A refusal of either is the operation's.
+func Outside[Env, I, P, A any](name string, gate func(kogo.Tx, Env, Request, I) kogo.Either[string, P], work func(Env, P, I) kogo.Either[string, A]) Operation[Env] {
+	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
+		in := input.(I)
+		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) answered {
+			proof := kogo.SerializableTx(db, again, func(tx kogo.Tx) P { return bind[P](gate(tx, env, r, in), raise) })
+			return answer(name, bind[A](work(env, proof, in), raise))
+		})
+	}}
+}
+
 // bind gives what e holds, or raises its refusal.
 func bind[A any](e kogo.Either[string, A], raise kogo.Raise[string]) A {
 	return kogo.Either_Bind[string, A](e, raise, func(s string) string { return s })

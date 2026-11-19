@@ -1558,8 +1558,27 @@ Each entry: what was decided, why, and what would reopen it.
     until a proof's rules hold it to that (roadmap row 6), a write of a gate whose step then
     refuses is undone. Not taken: commit, one line fewer.
   - **A step is handed a proof whose `Tx` has ended**, and a statement on it is a panic, a
-    500, until `action fun` (DEV-962) makes it `outside-passes-proof` at compile time. A
-    gated `action fun`, which runs with no transaction and its gate once, is DEV-962's too.
+    500, until a proof's rules (roadmap row 6) make it `outside-passes-proof` at compile
+    time. Gated work that is an `action fun` is handed one too.
+  - **Gated work that is an `action fun` is `rpc.Outside(name, gate, work)`** (Ruling on
+    PR 91, item 11; `doc/gates.md`, "An operation that runs wholly outside"): the gate
+    once, in a SERIALIZABLE transaction that commits, then the work with none open. The
+    emitter reads `Func.Action` and says which, since Go's types do not tell the two
+    apart. Not taken: a flag on `Gated`, which leaves a step's argument that such a row
+    never has.
+  - **The check keeps its own read-only transaction before such a row**, as before every
+    row. The Ruling's words are "the check and the gate in a transaction that commits";
+    read as the gate's transaction committing, since the check runs before the name is
+    looked up (`doc/origin.md`) and Postgres holds it to reading. Not taken: one
+    transaction for both, which gives the check a transaction that can write. Reopen: the
+    lead meant one transaction.
+  - **A row with both `after` and an `action fun` as its work is refused under `step`**
+    (Ruling on PR 91, item 10): no one has designed it. Not taken: serving gate, step and
+    work all outside.
+  - **`examples/25_reply.kg` names a check**, as 22 does, since the driver serves it;
+    `examples/26_action.kg` stays `unchecked`, which nothing serves. The gated `action
+    fun` that the tests serve is a row of `examples/24_gates.kg`, `testPrinter`. Not
+    taken: a gated row in 26, which needs a gate and a check there too.
   - **A gate's SERIALIZABLE `Tx` is not read-only**, as decided on 18 Nov 2026 for a gate on
     a `Tx`; the check's is, by `kogo.ReadOnlyTx`, at READ COMMITTED.
   - **An unchecked list is `rpc.NewUnserved(ops, enums)`**, as `doc/origin.md` has it, and
@@ -3067,12 +3086,9 @@ Each entry: what was decided, why, and what would reopen it.
   a local fun be one, which nothing needs.
 - **Left to row 6 (a proof's rules)**: that an `action fun` takes a proof only as a step
   or as gated work that runs wholly outside, and `outside-passes-proof`.
-- **Left to row 3 (DEV-961)**: serving a gated `action fun` with no transaction. `kogo
-  emit` still refuses every gated row; `Func.Action` on the row's operation is what the
-  server reads.
-- **A row with both `after` and an `action fun` as its work is refused under `step`, in
-  DEV-961** (Ruling on PR 90), where serving meets it; no cusoon2 operation has both. Not
-  taken: serving gate, step and work all outside.
+- **Serving a gated `action fun` with no transaction was left to DEV-961**, and so was
+  refusing a row with both `after` and an `action fun` as its work (Ruling on PR 90): both
+  are under "Serving a gated row" above.
 - **Open: whether printing is an action** is Greg's (Ruling on PR 90); it stays one
   meanwhile. If not, `Console`'s bindings and `examples/26_action.kg` change.
 - **Open: a `kogo test` cannot call an `action fun` today**: a test is a `val`, and its

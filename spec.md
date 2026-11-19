@@ -1137,7 +1137,9 @@ api hooks unchecked {
   | `op ungated` | no gate decides: `op` finds out who is asking itself |
 
   A row that neither names a gate nor says `ungated` is a compile
-  error, and so is `after` in an ungated row.
+  error, and so is `after` in an ungated row. Gated work may be an
+  `action fun` (7.1), which runs with no transaction open (15.3); its
+  row has no step, and `after` there is a compile error.
 - A list's rows are separated by a comma, a new line or both, as
   Kotlin separates a collection's, with a comma allowed after the
   last. A row stays on one line: a line that begins with `gatedBy`,
@@ -1236,6 +1238,10 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   transaction as above. The step is handed the first proof for the
   facts in it: that proof's `Tx` has ended, and a statement on it is a
   panic. A refusal of the step has written nothing.
+- A gated row whose work is an `action fun` (7.1) runs its gate once,
+  in a transaction of its own that the server commits, and then the
+  work with no transaction open. The work's answer or refusal is the
+  request's. Its proof's `Tx` has ended, as a step's has.
 - An operation that takes a `Tx` runs in one transaction, which the
   server opens at SERIALIZABLE. An answer commits it. A refusal rolls
   it back, so a refused request has changed nothing. A panic rolls it

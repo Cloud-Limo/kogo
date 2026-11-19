@@ -155,6 +155,14 @@ func work(e env, h Held, p Person) kogo.Either[string, string] {
 	return add(h.tx, e, Request{}, p)
 }
 
+// act is work that is an action fun: no transaction is open.
+func act(_ env, h Held, p Person) kogo.Either[string, string] {
+	if !ended(h.tx) || strings.HasPrefix(p.Name, "refused") {
+		return kogo.Either_Left[string]{Value: "secret refusal"}
+	}
+	return kogo.Either_Right[string]{Value: "secret answer"}
+}
+
 // raceGate counts its runs and gives its Tx, on which the work races.
 func raceGate(tx kogo.Tx, e env, _ Request, _ rt.Unit) kogo.Either[string, kogo.Tx] {
 	e.gates.Add(1)
@@ -167,7 +175,7 @@ func raceWork(e env, tx kogo.Tx, u rt.Unit) kogo.Either[string, int32] {
 
 var table = Table[env]{Check: ours, Operations: []Operation[env]{
 	Tx("add", add), Tx("race", race), Tx("deadlocked", deadlocked), Db("login", login), Db("who", who), Tx("signIn", signIn),
-	Gated("held", gate, nil, work), Gated("sent", gate, step, work), Gated("heldRace", raceGate, nil, raceWork),
+	Gated("held", gate, nil, work), Gated("sent", gate, step, work), Gated("heldRace", raceGate, nil, raceWork), Outside("rung", gate, act),
 }}
 
 func TestHandler(t *testing.T) {
@@ -229,6 +237,9 @@ func TestHandler(t *testing.T) {
 		{"POST", "sent", `{"name":"unsent"}`, `200 {"type":"refused","message":"secret step"}`},
 		{"POST", "sent", `{"name":"refused sent"}`, `200 {"type":"refused","message":"secret refusal"}`},
 		{"POST", "sent", `{"name":"sent"}`, `200 {"type":"ok","value":"secret answer"}`},
+		{"POST", "rung", `{"name":"rung"}`, `200 {"type":"ok","value":"secret answer"}`},
+		{"POST", "rung", `{"name":"nobody rung"}`, `200 {"type":"refused","message":"secret gate"}`},
+		{"POST", "rung", `{"name":"refused rung"}`, `200 {"type":"refused","message":"secret refusal"}`},
 	} {
 		if status, body := post(c.method, c.name, c.body); !strings.HasPrefix(fmt.Sprint(status, " ", body), c.want) {
 			t.Errorf("%s %s %s answers %d %s, want %s", c.method, c.name, c.body, status, body, c.want)
@@ -248,15 +259,18 @@ func TestHandler(t *testing.T) {
 	// A gated row: the gate and the work are one transaction, and a
 	// step's gate ran before it in one that was rolled back, so the
 	// gate runs twice where the step passes and once where it or the
-	// gate refuses: 3 runs for held, and 1, 1, 2 and 2 for sent.
+	// gate refuses: 3 runs for held, and 1, 1, 2 and 2 for sent. The
+	// gate of work that is an action fun runs once, in a transaction
+	// that commits unless the gate refuses: 3 runs for rung.
 	for name, want := range map[string]int{"held": 1, "gate held": 1, "gate nobody held": 0, "refused held": 0, "gate refused held": 0,
-		"gate nobody sent": 0, "gate unsent": 0, "refused sent": 0, "gate refused sent": 0, "sent": 1, "gate sent": 1, "checked": 0} {
+		"gate nobody sent": 0, "gate unsent": 0, "refused sent": 0, "gate refused sent": 0, "sent": 1, "gate sent": 1, "checked": 0,
+		"gate rung": 1, "gate nobody rung": 0, "gate refused rung": 1} {
 		if rows(name) != want {
 			t.Errorf("%d rows of %q, want %d: a gated row keeps what it wrote, or a refusal does not roll back", rows(name), name, want)
 		}
 	}
-	if n := h.env.gates.Swap(0); n != 9 {
-		t.Errorf("the gate ran %d times, want 9", n)
+	if n := h.env.gates.Swap(0); n != 12 {
+		t.Errorf("the gate ran %d times, want 12", n)
 	}
 	h.Limit = 50 * time.Millisecond
 	if status, body := post("POST", "deadlocked", ""); status != 503 || !strings.HasPrefix(body, "request ") {
@@ -312,7 +326,7 @@ func TestHandler(t *testing.T) {
 	if !checkWrote {
 		t.Error("a check that writes is not refused by Postgres")
 	}
-	if len(ids) != 30 || strings.Contains(log.String(), "secret") {
+	if len(ids) != 33 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
 	causes := map[string]bool{}

@@ -65,8 +65,8 @@ func examples(t *testing.T, patterns ...string) map[string]string {
 func TestExamples(t *testing.T) {
 	testDB(t)
 	files := examples(t, "*.kg")
-	if len(files) != 29 {
-		t.Fatalf("%d examples, want 29", len(files))
+	if len(files) != 30 {
+		t.Fatalf("%d examples, want 30", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)
@@ -75,7 +75,8 @@ func TestExamples(t *testing.T) {
 
 // The Go that kogo emit writes for the examples is built with
 // testdata/driver.go and run, 10 to 19, 21 and 22 against the test
-// database, 22, 24, 25, 27 and 28 served over HTTP: each result was worked out by hand
+// database, 22, 24, 25, 27 and 28 served over HTTP, 29 calling a local
+// server: each result was worked out by hand
 // from the Kogo and the rows the driver begins with.
 func TestEmittedGoRuns(t *testing.T) {
 	testDB(t)
@@ -236,6 +237,13 @@ a cookie that is no UUID: 200 {"type":"ok","value":"nobody"}
 a cookie of no session: 200 {"type":"ok","value":"nobody"}
 sign out: 200 {"type":"ok","value":{}}
 an ended session with no token: 200 {"type":"ok","value":"nobody"}
+the depot is sent: GET /v1/stock?item=bolt [Bearer of main ] 
+stock: Either.Right(Stock(item=bolt, count=9007199254740993))
+the depot is sent: POST /v1/items/nut%2F5%3F/reservations? [Bearer of main acme] {"count":2,"for":{"name":"Ann","gift":true},"notes":["fragile","this way up"]}
+reserved: Either.Right(r-1)
+the depot is sent: POST /v1/items/anvil/reservations? [Bearer of main acme] {"count":1,"for":{"name":"Ann","gift":true},"notes":["fragile","this way up"]}
+sold out: Either.Left(refused 409: sold out)
+nowhere: Either.Left(true)
 `
 	if err != nil || string(out) != want {
 		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)

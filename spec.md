@@ -986,6 +986,71 @@ List<Cookie>)`, each a `Cookie(name, value, path, maxAgeSeconds: Long,
 sameSite: SameSite, secure, httpOnly)`, with `SameSite` one of
 `Strict`, `Lax` and `None` (15.2).
 
+**An outside service** (`kogo.http`). The prelude's one outbound call.
+An `Http` is a handle for one service, made in `main` with its address,
+the headers and query fields that go with every call (its credentials:
+Kogo code holds no secret), its encoding and the most bytes of an
+answer it reads. `examples/29_http.kg` has each form.
+
+- An endpoint is declared once, with its kind: `lookup(method, path):
+  Lookup` asks and changes nothing, and `action(method, path): Action`
+  changes something outside. `http.ask(endpoint: Lookup, fields:
+  List<Field>): Either<HttpError, Json>` is a lookup and
+  `http.perform(endpoint: Action, fields: List<Field>):
+  Either<SendFailure, Json>` is an action (7.1), so `ask` of an
+  `Action` is a type error. The kind is not the method, which is one
+  of `GET`, `POST`, `PUT`, `PATCH` and `DELETE`: a lookup may be a
+  `POST`, as a search is.
+- An id in a path is an argument: `lookup(method, before, id)` and
+  `lookup(method, before, id, after)`, and so for `action`. The parts
+  are joined as written and the id alone is escaped, so one that holds
+  a `/` or a `?` stays one piece of the path. It panics (section 8)
+  where `before` does not end in `/`, where `after` does not begin
+  with one, and for an id that is empty, `.` or `..`.
+- A field is a name and a value: `field(name, value)` of a `String`, a
+  `Long`, a `Double` (written as `toString()` writes it; `NaN` and an
+  infinity panic) or a `Boolean`; `field(name, values: List<String>)`;
+  `group(name, fields)`; and `field(name, json: Json)`, a JSON object
+  sent as it is. Every name is a literal string of the service's. Kogo
+  code never says how fields travel: a `GET`'s are in the query, and
+  any other call's are the body, in the handle's encoding and the order
+  written. A form writes a group's field as `group[name]`, a list's
+  values each as `name[]` and a `Json` as its text; JSON writes a
+  group as an object and a list as an array.
+- `http.withHeader(name, value): Http` is a new handle with one more
+  header, for a value that is no secret. A header the handle already
+  has, from `main` or an earlier `withHeader`, panics.
+- An answer is one JSON object, read by key: `json.string(key)`,
+  `long`, `double`, `boolean`, `at(key): Json?` (a nested object) and
+  `list(key): List<Json>?` (an array of objects). A read gives `null`
+  where the key is absent, is JSON's `null` or holds another type: a
+  string that holds digits is not a number. `json.raw(): String` is the
+  object's text untouched, and `Json.parse(text): Json?` is `null` for
+  text that is not one JSON object. A 2xx answer with no body reads as
+  an object with no keys.
+- A failed `perform` is a `SendFailure`, by how far the call got and
+  its status alone: `NotSent(why)` when no connection was made;
+  `Refused(status: Int, body: Json?)` for a 3xx or a 4xx, the body
+  `null` when it is not a JSON object; `Unknown(why)` for a 5xx, no
+  answer, or one that cannot be read, since the service may have
+  acted. A failed `ask` is an `HttpError`: the same `Refused(status,
+  body)`, or `Failed(why)` for anything else. What a refusal means is
+  the client's to say.
+
+Where Go's HTTP client would decide, Kogo states it:
+
+| What | Kogo's rule |
+| --- | --- |
+| A second send | `perform` is never sent twice. `ask` may be, at once, when a kept connection fails before any answer; each second send is logged. |
+| A redirect | None is followed: a 3xx is `Refused`, as a 4xx is. |
+| A proxy | None: nothing of the environment says where a call goes. |
+| An answer's length | One past the handle's limit is a failure: `Unknown` for an action. |
+| A JSON number | `long` is exact, and `null` for a number written with a fraction or an exponent, or past a `Long`. `double` is the nearest `Double`. |
+| A time limit | The handle's own, where `main` states one, from the call's start to the end of its answer; past it a call that left is `Unknown`. |
+
+Every refused send is logged in Go, with its method, path, status and
+body. A handle's own headers and query fields are never logged.
+
 **Tests** (`kogo.test`; test files only, section 16).
 `kogo.test` has `Test<E>`, `test(sentence) { tx, env -> ... }` and
 `Refusal` (10.8), and `kotlin.test`'s assertions, each imported by
@@ -1009,9 +1074,9 @@ prelude is written as bindings, so its signatures are Kogo source: the
 checker reads them like any other file, and so can an author.
 
 ```kotlin
-@go("httpx")
 external class Http
-external fun Http.get(url: String): Either<HttpError, Response>
+lookup external fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpError, Json>
+action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<SendFailure, Json>
 
 external object Uuid {
     fun parseOrNull(text: String): Uuid?
@@ -1045,8 +1110,9 @@ external fun List<Long>.sum(): Long
   receiver, `out` on an external class's type parameter, and `vararg` on
   a parameter, which then takes any number of arguments.
 - `action external fun` and `lookup external fun` say the kind of a
-  binding that calls outside (7.1): `Console.println` is an action,
-  `Console.readln` and `Clock.now` are lookups.
+  binding that calls outside (7.1): `Console.println` and
+  `Http.perform` are actions, `Console.readln`, `Clock.now` and
+  `Http.ask` are lookups.
 - `@go("package")` names the Go package of the declaration it precedes.
 
 Bindings are written by whoever maintains the prelude. Application code

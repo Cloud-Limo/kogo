@@ -1,0 +1,50 @@
+// An outside service (spec.md section 12): a handle for it arrives as
+// a parameter, made in main with its address and credentials. An
+// endpoint is declared once, as a Lookup or an Action, and that kind
+// decides which call takes it. Every name of the service's is a
+// literal string, in the fields sent and where the answer is read.
+package example.depot
+
+import kogo.http.Action
+import kogo.http.Http
+import kogo.http.HttpError
+import kogo.http.Lookup
+import kogo.http.SendFailure
+import kogo.http.action
+import kogo.http.field
+import kogo.http.group
+import kogo.http.lookup
+
+val STOCK: Lookup = lookup("GET", "/v1/stock")
+
+// An id in the path is an argument where the endpoint is made, and
+// stays one piece of the path whatever it holds.
+fun reserve(item: String): Action = action("POST", "/v1/items/", item, "/reservations")
+
+data class Stock(val item: String, val count: Long)
+
+// A lookup: an ordinary fun, which may run in a transaction. A key
+// that is absent reads as null, and what that means is said here.
+fun stockOf(depot: Http, item: String): Either<HttpError, Stock> = either {
+    val answer = depot.ask(STOCK, listOf(field("item", item))).bind()
+    Stock(answer.string("item") ?: raise(HttpError.Failed("the answer has no item")),
+          answer.long("count") ?: raise(HttpError.Failed("the answer has no count")))
+}
+
+// An action fun, since it calls perform. The shop is not a secret, so
+// it narrows the handle here.
+action fun reserved(depot: Http, shop: String, item: String, count: Long): Either<SendFailure, String> = either {
+    val answer = depot.withHeader("X-Shop", shop).perform(reserve(item), listOf(
+        field("count", count),
+        group("for", listOf(field("name", "Ann"), field("gift", true))),
+        field("notes", listOf("fragile", "this way up")))).bind()
+    answer.at("reservation")?.string("id") ?: raise(SendFailure.Unknown("the answer has no reservation"))
+}
+
+// A failed action is one of three, by how far it got.
+fun said(failure: SendFailure): String =
+    when (failure) {
+        is SendFailure.NotSent -> "not sent: ${failure.why}"
+        is SendFailure.Unknown -> "unknown: ${failure.why}"
+        is SendFailure.Refused -> "refused ${failure.status}: ${failure.body?.string("reason")}"
+    }

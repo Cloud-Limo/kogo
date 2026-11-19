@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"fmt"
+	goio "io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 	"ROOT/cusoon/invoice"
 	"ROOT/cusoon/model"
 	"ROOT/example"
+	"ROOT/example/depot"
 	"ROOT/example/gates"
 	"ROOT/example/markers"
 	"ROOT/example/ops"
@@ -22,6 +24,7 @@ import (
 	"ROOT/example/reply"
 	"github.com/Cloud-Limo/kogo/internal/testdb"
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	khttp "github.com/Cloud-Limo/kogo/prelude/kogo/http"
 	"github.com/Cloud-Limo/kogo/prelude/kogo/io"
 	"github.com/Cloud-Limo/kogo/prelude/kogo/rpc"
 	ktime "github.com/Cloud-Limo/kogo/prelude/kogo/time"
@@ -320,4 +323,33 @@ func main() {
 	from("sign out", "same-origin", "https://shop.example", live, "live token")
 	op = "whoAmI"
 	from("an ended session with no token", "same-origin", "https://shop.example", live, "")
+
+	// 29: a lookup and an action, against a local server that prints
+	// what it is sent, through a handle made as main makes one.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := goio.ReadAll(r.Body)
+		fmt.Printf("the depot is sent: %s %s?%s [%s %s] %s\n", r.Method, r.URL.EscapedPath(), r.URL.RawQuery, r.Header.Get("Authorization"), r.Header.Get("X-Shop"), body)
+		switch {
+		case r.Method == "GET":
+			fmt.Fprintf(w, `{"item": %q, "count": 9007199254740993}`, r.URL.Query().Get("item"))
+		case strings.Contains(r.URL.Path, "anvil"):
+			w.WriteHeader(http.StatusConflict)
+			fmt.Fprint(w, `{"reason": "sold out"}`)
+		default:
+			fmt.Fprint(w, `{"reservation": {"id": "r-1"}}`)
+		}
+	}))
+	defer server.Close()
+	service := khttp.Service{Address: server.URL, Encoding: khttp.JSON, MaxAnswer: 1 << 10,
+		Headers: map[string]string{"Authorization": "Bearer of main"}, Log: slog.New(slog.DiscardHandler)}
+	theDepot, err := khttp.New(service)
+	if err != nil {
+		panic(err)
+	}
+	show("stock", depot.StockOf(theDepot, "bolt"))
+	show("reserved", depot.Reserved(theDepot, "acme", "nut/5?", 2))
+	show("sold out", kogo.Either_MapLeft[khttp.SendFailure, string](depot.Reserved(theDepot, "acme", "anvil", 1), depot.Said))
+	service.Address = "http://127.0.0.1:1"
+	nowhere, _ := khttp.New(service)
+	show("nowhere", kogo.Either_MapLeft[khttp.SendFailure, string](depot.Reserved(nowhere, "acme", "bolt", 1), func(f khttp.SendFailure) bool { return rt.Is[khttp.SendFailure_NotSent](f) }))
 }

@@ -3188,6 +3188,67 @@ Each entry: what was decided, why, and what would reopen it.
   something at another service, so written as `fun` it was `unmarked-action` by 7.1 (the
   lead's Ruling on PR 94). Not taken: a docs issue of its own for one word.
 
+## Taken building `kogo.http` (DEV-978), not yet discussed
+
+- **`HttpError` is `Refused(status, body)` or `Failed(why)`**, a sealed interface as
+  `SendFailure` is. `doc/work.md` names the type and gives it no shape, and its samples
+  make one in a client (`unreadable("status")`), so Kogo code must be able to. A lookup
+  changes nothing, so it does not tell never left from no answer. Not taken: one data
+  class of a nullable status, body and reason; `SendFailure` for both calls. It changes
+  what a client looks like, so it is Greg's to confirm: reopen on his word.
+- **`SendFailure.Refused` holds `status: Int` and `body: Json?`**, as `doc/charge.md`
+  reads them (`failure.status == 409`, `stripeError(failure.body)`), the body `null` when
+  it is not a JSON object.
+- **A send has left once it has a connection**, so `NotSent` is a failure to make the
+  request or to connect, and everything later is `Unknown`. Not taken: once its headers
+  are written, which calls a write that failed half-way not sent.
+- **`perform` is kept from a second send by a body Go cannot make again**
+  (`Request.GetBody` nil), which is what Go's transport asks before it repeats a request,
+  a `GET` or one under an `Idempotency-Key` included. An empty `POST`, `PUT` or `PATCH`
+  under no key is left alone: Go does not repeat one, and a body of unknown length is
+  sent chunked. Not taken: a new connection for every action, a handshake each time. **`ask` may be sent again whatever its method**:
+  it carries Go's own mark (an empty `Idempotency-Key`, which is not sent on the wire), so
+  the rule is the kind's and not the method's. Not taken: Go's default, under which a
+  lookup by `POST` is not sent again and one by `GET` is.
+- **HTTP/1.1 only.** The rule for a second send was read in that protocol's transport;
+  HTTP/2 has rules of its own for a stream the server refused. Reopen when a service
+  needs HTTP/2.
+- **No proxy can be stated.** The design's row is "no proxy unless `main` states one",
+  and no application has one to state: `Service` has no such field until one does.
+- **An answer past the limit is a failure whatever its status**, a 4xx included: it is
+  not read, so its status is not trusted either. Not taken: `Refused` with a `null` body.
+- **`Json.long` reads digits only**: `1.0` and `1e3` are `null`, though each is a whole
+  number, and `double` reads them. Not taken: exact arithmetic on the exponent, which a
+  hostile answer can make as large as it likes.
+- **A 2xx answer with no body is an object with no keys**, since a service may answer an
+  action with nothing; a 2xx body that is not a JSON object is a failure. Not taken:
+  `Json?` as the answer.
+- **An id that is empty, `.` or `..` panics, and so does a method that is not one of
+  five and a path that does not begin with `/`.** The Scope names two panics, for the
+  text around an id. `..` from a browser is escaped to itself and names the path above:
+  the same hole the escaping closes. An endpoint is made where the program starts or
+  from an id, so a wrong one is found at once.
+- **A header is set once**: `withHeader` panics on one that an earlier `withHeader` set,
+  as on one of `main`'s. Not taken: the later value wins.
+- **A form's and a query's fields keep the order written**, and `main`'s query fields go
+  first, by name. A `Json` field in a form is its text.
+- **`Service.Timeout` is optional and none is the default**, since `doc/main.md` makes a
+  handle without one and the design's limit is the outer edge's ("Time limits"), not
+  built. Until it is, a handle with no `Timeout` waits as long as the service does.
+  Not taken: requiring it, as `MaxAnswer` is. Reopen when the deadline is carried.
+- **A refused body is logged whole, up to the handle's `MaxAnswer`**, at `Warn`, with the
+  method, the path and the status. `doc/work.md` leaves open what of a body is safe to
+  log for every service: that stays open, and this is the behaviour until it is settled.
+  The query is not logged, nor any header: a credential may be in either.
+- **`Json` is its text**, read again at each call, so `raw()` is untouched and a value
+  of it compares and prints as its text. Not taken: a parsed tree, which is faster on an
+  answer read many times and loses the text.
+- **Section 13's sample binding is `Http.ask` and `perform`**, in place of an invented
+  `Http.get` in a Go package `httpx`, which the real `Http` would contradict. The sample
+  no longer shows `@go`; its bullet stays.
+- **A binding that says neither kind is still not refused** (DEV-962's entry): nothing
+  marks which bindings call outside. Not taken here: the rule is the checker's.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

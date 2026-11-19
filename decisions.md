@@ -3195,3 +3195,43 @@ Each entry: what was decided, why, and what would reopen it.
   as extensions.)
 - Operations (spec 15) leave out, on purpose: Origin and CSRF checks; a limit on the
   reruns of a `db.tx` written in a `Db` operation.
+- **A gate is held to reading (DEV-977, 19 Nov 2026).**
+  - **The read-only savepoint goes round a gate on a `SerializableTx` alone.** `doc/gates.md`,
+    "What a gate on a `Tx` loses": Postgres's read-only mode refuses a lock with a write,
+    and a gate on a `Tx` may lock, so `gate-writes` alone holds it. Not taken: the savepoint
+    round every gate, as the issue's "every constructor" could be read, which refuses the
+    lock the design allows.
+  - **A lock is told from an update by the tree**: Postgres asks update's privilege of a
+    table whose rows are locked and names no updated column. Not taken: reading the
+    statement's `rowMarks`, which says the same through each query's own range table.
+  - **`gate-writes` names the gate**, after the design's words: "(the gate g reaches it;
+    spec.md 15.3)", since the statement may be several calls from the gate, and a lock's
+    says "a gate on a SerializableTx only reads". A statement is refused once, for the
+    first gate that reaches it. Not taken: the design's sample to the letter.
+  - **`rpc_test.go`'s gate no longer inserts**, since Postgres now refuses it, so the rows
+    that showed which gate's transaction commits are gone. The gate records its
+    transaction's id (`pg_current_xact_id`, which read-only mode allows) and the test reads
+    `pg_xact_status`. Not taken: a kept setting or a released lock, neither of which tells
+    a commit from a rollback.
+  - **A gate on a `Tx` is held by `gate-writes` alone** (Ruling on PR 96, the lead). It
+    leaves a write inside a database function, and `nextval`, called from a `Tx` gate. Not
+    taken now: reading `sum(n_tup_ins + n_tup_upd + n_tup_del)` of
+    `pg_stat_xact_all_tables` before and after a `Tx` gate and panicking if it grew (about
+    8 code / 4 test lines; on 18.7 it stayed put across a row lock, grew across a function
+    that writes, inside a released savepoint too, did not see `nextval`, and took 0.6 ms a
+    read; it needs `track_counts`, on by default), which costs two queries on every run of
+    a gate no port has, as cusoon2's requests take no locks and its gates are on a
+    `SerializableTx`; roles or triggers, which are the application's schema. Reopen, and
+    take the read, when a port has a gate on a `Tx` that calls a database function.
+  - **A utility statement a gate reaches is refused**, by Postgres's own tag for it
+    (`commandType` 6, its `utilityStmt`): its tree lists no table, so `truncate` and `lock
+    table` passed, and read-only mode allows `lock table`. Nothing is lost: a gate binds a
+    setting with `set_config`. Not taken: leaving it as a named gap.
+  - **Gaps named, not closed**: a call through a value of an interface's type is not
+    followed to the overrides (the reach walk follows a data class's or object's alone);
+    an advisory lock and a write to a temporary table pass both halves. Not taken:
+    following every override of an interface's fun from a gate (about 6 code / 3 test
+    lines), which refuses a gate when any one implementation writes; refusing the
+    advisory-lock functions by name, which re-reads what Postgres allows. Reopen when a
+    port's gate calls through an interface or takes an advisory lock.
+  - Reopen if a port's gate must write, which the design gives to an ungated operation.

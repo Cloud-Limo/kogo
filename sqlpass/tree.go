@@ -101,6 +101,37 @@ func (n *node) params(seen map[int]bool) {
 	}
 }
 
+// Postgres's bits for what a statement needs of a table
+// (requiredPerms), and one of this package's for a row lock.
+var needs = []struct {
+	bit  int
+	name string
+}{{1, "insert"}, {4, "update"}, {8, "delete"}, {1 << 30, "lock"}}
+
+// perms records what the tree says the statement needs of each table
+// or view it lists, by oid, in a subquery or a with too: the bits of
+// each RTEPERMISSIONINFO. Postgres asks update's of a table whose rows
+// the statement locks and names no column updated, which is told
+// apart here as a lock.
+func (n *node) perms(seen map[int]int) {
+	if n == nil {
+		return
+	}
+	if n.tag == "RTEPERMISSIONINFO" {
+		p := n.num("requiredPerms")
+		if p&4 != 0 && len(n.field("updatedCols").items()) <= 1 { // (b) is no column
+			p = p&^4 | 1<<30
+		}
+		seen[n.num("relid")] |= p
+	}
+	for _, f := range n.fields {
+		f.perms(seen)
+	}
+	for _, v := range n.list {
+		v.perms(seen)
+	}
+}
+
 func (n *node) field(name string) *node {
 	if n == nil {
 		return nil

@@ -156,14 +156,14 @@ func Gated[Env, I, P, A any](name string, serializable bool, gate func(kogo.Tx, 
 				var held kogo.Either[string, P]
 				kogo.Either_RaiseEToA(func(undo kogo.Raise[rt.Unit]) rt.Unit {
 					return kogo.InTx(db, serializable, again, func(tx kogo.Tx) rt.Unit {
-						held = gate(tx, env, r, in)
+						held = reading(tx, serializable, func() kogo.Either[string, P] { return gate(tx, env, r, in) })
 						panic(kogo.Raise_Raise(undo, rt.Unit{}))
 					})
 				})
 				bind[rt.Unit](step(env, bind[P](held, raise), in), raise)
 			}
 			return kogo.InTx(db, serializable, again, func(tx kogo.Tx) answered {
-				proof := bind[P](gate(tx, env, r, in), raise)
+				proof := bind[P](reading(tx, serializable, func() kogo.Either[string, P] { return gate(tx, env, r, in) }), raise)
 				return answer(name, bind[A](work(env, proof, in), raise))
 			})
 		})
@@ -178,10 +178,29 @@ func Outside[Env, I, P, A any](name string, serializable bool, gate func(kogo.Tx
 	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
 		in := input.(I)
 		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) answered {
-			proof := kogo.InTx(db, serializable, again, func(tx kogo.Tx) P { return bind[P](gate(tx, env, r, in), raise) })
+			proof := kogo.InTx(db, serializable, again, func(tx kogo.Tx) P {
+				return bind[P](reading(tx, serializable, func() kogo.Either[string, P] { return gate(tx, env, r, in) }), raise)
+			})
 			return answer(name, bind[A](work(env, proof, in), raise))
 		})
 	}}
+}
+
+// reading runs a gate held to reading (doc/gates.md, "A gate reads
+// and decides; it does not write"): in a savepoint that Postgres
+// holds read-only, where it refuses a write, nextval and a row lock,
+// and a panic is the gate's bug. The savepoint is released before the
+// work, which writes again, and a setting the gate made stays. A gate
+// on a Tx may lock, which Postgres's read-only mode refuses with a
+// write, so it runs as it is, held by kogo check alone.
+func reading[P any](tx kogo.Tx, serializable bool, gate func() kogo.Either[string, P]) kogo.Either[string, P] {
+	if !serializable {
+		return gate()
+	}
+	return kogo.Tx_Atomically(tx, func() kogo.Either[string, P] {
+		kogo.Tx_Execute(tx, "set local transaction_read_only = on")
+		return gate()
+	})
 }
 
 // bind gives what e holds, or raises its refusal.

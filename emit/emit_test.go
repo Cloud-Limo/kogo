@@ -1015,6 +1015,8 @@ func TestPrelude(t *testing.T) {
 			for _, p := range f.Params {
 				if d := p.Decl.(*syntax.Param); d.Vararg {
 					params = append(params, "..."+e.typ(p.Type))
+				} else if d.Default != nil { // null when the call leaves it out
+					params = append(params, "*"+e.typ(p.Type))
 				} else {
 					params = append(params, e.typ(p.Type))
 				}

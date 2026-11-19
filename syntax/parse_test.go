@@ -64,11 +64,11 @@ func write(b *strings.Builder, v reflect.Value) {
 }
 
 // Every example parses, to the tree in testdata/examples.tree: one
-// line a declaration, then one an api list.
+// line a declaration, then one an api or a tests list.
 func TestExamples(t *testing.T) {
 	files, _ := filepath.Glob("../examples/*.kg")
-	if len(files) != 23 {
-		t.Fatalf("%d examples, want 23", len(files))
+	if len(files) != 24 {
+		t.Fatalf("%d examples, want 24", len(files))
 	}
 	var got strings.Builder
 	for _, file := range files {
@@ -86,6 +86,9 @@ func TestExamples(t *testing.T) {
 		}
 		for _, a := range f.APIs {
 			got.WriteString(show(a) + "\n")
+		}
+		for _, l := range f.Tests {
+			got.WriteString(show(l) + "\n")
 		}
 	}
 	if *update {

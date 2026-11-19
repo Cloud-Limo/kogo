@@ -11,7 +11,7 @@ external class Uuid
 external class Decimal
 
 external object Uuid {
-    fun parse(text: String): Uuid?
+    fun parseOrNull(text: String): Uuid?
 }
 
 external fun <T> listOf(vararg elements: T): List<T>

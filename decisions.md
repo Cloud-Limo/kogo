@@ -3089,8 +3089,10 @@ Each entry: what was decided, why, and what would reopen it.
 - **Serving a gated `action fun` with no transaction was left to DEV-961**, and so was
   refusing a row with both `after` and an `action fun` as its work (Ruling on PR 90): both
   are under "Serving a gated row" above.
-- **Open: whether printing is an action** is Greg's (Ruling on PR 90); it stays one
-  meanwhile. If not, `Console`'s bindings and `examples/26_action.kg` change.
+- **Printing is an action** (Greg, 19 Nov 2026, answer (a) to the Ruling on PR 90's
+  question): `Console.println` and `print` stay actions, as built. Not taken: (b) printing
+  is neither kind. Reopens when logging is designed, with its own handle rather than
+  `Console`.
 - **Open: a `kogo test` cannot call an `action fun` today**: a test is a `val`, and its
   block is handed a `Tx`. Decided in row 9 with the fake `Http`, and brought to Greg then.
 

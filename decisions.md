@@ -2894,6 +2894,11 @@ Each entry: what was decided, why, and what would reopen it.
 - **`Uuid` reaches the shared source by `import kogo.Uuid`**, which Kogo accepts, and
   `kotlin/kogo.kt`'s typealias for kotlinc. Not taken: a typealias in package `builtins`,
   as `arrow.kt` does, which the brief's `kogo.Uuid` did not ask for.
+- **`offsetOf` picks its offset by `n * 10 + m`**, as `n` alone reaches 11 of the
+  20 offsets and Kogo has no `Long.toInt()`. **`plusDaysMax` is checked to fail without
+  the Year corner** (101 differ), not without the UTF-16 fix, which it cannot reach; the
+  Ruling's "each new case fails with item 1's fix taken out" holds for `offsetOf` (64
+  differ). Reopen if a case gets a wider index than `n`.
 
 ## Spec gaps found by the leakage ports, unresolved
 

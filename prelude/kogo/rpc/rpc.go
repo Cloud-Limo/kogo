@@ -21,7 +21,9 @@ import (
 	"github.com/Cloud-Limo/kogo/rt"
 )
 
-// A Request is what the server read of one HTTP request.
+// A Request is what the server read of one HTTP request. Its field is
+// unexported so that no Go outside rpc makes one: an operation's
+// request is always one a Handler or Call was handed.
 type Request struct{ r *http.Request }
 
 // Request_Header matches the header's name whatever its case, and
@@ -101,10 +103,12 @@ func browserRefuses(c Cookie) string {
 	return ""
 }
 
-// An answered is an answer's JSON and the cookies it sets.
+// An answered is an answer's JSON and the cookies it sets, with the
+// value itself, which Call gives.
 type answered struct {
 	body    []byte
 	cookies []*http.Cookie
+	value   any
 }
 
 // An Operation is one row of a table: its name on the wire and its
@@ -228,24 +232,37 @@ func answer[A any](op string, a A) answered {
 		var cs kogo.List[Cookie]
 		v, cs = r.reply()
 		for _, c := range cs {
-			hc := &http.Cookie{Name: c.Name, Value: c.Value, Path: c.Path, MaxAge: int(c.MaxAgeSeconds), Secure: c.Secure, HttpOnly: c.HttpOnly,
-				SameSite: map[SameSite]http.SameSite{SameSite_Strict: http.SameSiteStrictMode, SameSite_Lax: http.SameSiteLaxMode, SameSite_None: http.SameSiteNoneMode}[c.SameSite]}
-			if hc.MaxAge <= 0 {
-				hc.MaxAge = -1
-			}
-			if err := hc.Valid(); err != nil {
-				panic(fmt.Sprintf("the answer of %s sets a cookie HTTP cannot carry: %v", op, err))
-			}
-			if refused := browserRefuses(c); refused != "" {
-				panic(fmt.Sprintf("the answer of %s sets a cookie %s that a browser refuses: %s", op, c.Name, refused))
-			}
-			cookies = append(cookies, hc)
+			cookies = append(cookies, httpCookie("the answer of "+op, c))
 		}
 	}
 	b.WriteString(`{"type":"ok","value":`)
 	write(&b, v, op, "value")
 	b.WriteString("}")
-	return answered{b.Bytes(), cookies}
+	return answered{b.Bytes(), cookies, a}
+}
+
+// httpCookie gives c as net/http writes it, or panics, naming who set it.
+func httpCookie(who string, c Cookie) *http.Cookie {
+	hc := &http.Cookie{Name: c.Name, Value: c.Value, Path: c.Path, MaxAge: int(c.MaxAgeSeconds), Secure: c.Secure, HttpOnly: c.HttpOnly,
+		SameSite: map[SameSite]http.SameSite{SameSite_Strict: http.SameSiteStrictMode, SameSite_Lax: http.SameSiteLaxMode, SameSite_None: http.SameSiteNoneMode}[c.SameSite]}
+	if hc.MaxAge <= 0 {
+		hc.MaxAge = -1
+	}
+	if err := hc.Valid(); err != nil {
+		panic(fmt.Sprintf("%s sets a cookie HTTP cannot carry: %v", who, err))
+	}
+	if refused := browserRefuses(c); refused != "" {
+		panic(fmt.Sprintf("%s sets a cookie %s that a browser refuses: %s", who, c.Name, refused))
+	}
+	return hc
+}
+
+// SetCookies writes a Reply's cookies to w, for a route that answers
+// in Go what Call gave it. It panics on a cookie the server refuses.
+func SetCookies(w http.ResponseWriter, cookies kogo.List[Cookie]) {
+	for _, c := range cookies {
+		http.SetCookie(w, httpCookie("rpc.SetCookies", c))
+	}
 }
 
 // A Table is what the emitter writes for an api list that names its
@@ -291,8 +308,12 @@ func NewHandler[Env any](t Table[Env], pool *pgxpool.Pool, env Env, log *slog.Lo
 	if t.Check == nil {
 		panic("the table has no check: a list that a browser calls names one, api name checkedBy check")
 	}
-	h := &Handler[Env]{90 * time.Second, t.Check, map[string]Operation[Env]{}, newReader(t.Enums), pool, env, log}
-	for _, op := range t.Operations {
+	return newHandler(t.Check, t.Operations, t.Enums, pool, env, log)
+}
+
+func newHandler[Env any](check func(kogo.Tx, Env, Request) kogo.Either[string, rt.Unit], ops []Operation[Env], enums []any, pool *pgxpool.Pool, env Env, log *slog.Logger) *Handler[Env] {
+	h := &Handler[Env]{90 * time.Second, check, map[string]Operation[Env]{}, newReader(enums), pool, env, log}
+	for _, op := range ops {
 		h.read.check(op.input, map[reflect.Type]bool{})
 		h.ops[op.Name] = op
 	}
@@ -304,50 +325,87 @@ func NewHandler[Env any](t Table[Env], pool *pgxpool.Pool, env Env, log *slog.Lo
 // cause and one for a panic with its message and trace. It logs no
 // input, answer or refusal.
 func (h *Handler[Env]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
 	name := strings.TrimPrefix(r.URL.Path, "/")
-	id := kogo.NewId().String()
-	log := h.log.With("request", id, "operation", name)
-	outcome := h.serve(w, r, name, id, log, start)
-	log.Info("served", "outcome", outcome, "duration", time.Since(start))
+	res := h.run(r, name, func(op Operation[Env]) (any, result) {
+		input := reflect.ValueOf(rt.Unit{})
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			return nil, result{status: http.StatusMethodNotAllowed}
+		} else if op.input != input.Type() {
+			var err error
+			if input, err = h.read.readBody(op.input, r.Body); err != nil {
+				return nil, result{status: http.StatusBadRequest, text: name + ": " + err.Error()}
+			}
+		}
+		return input.Interface(), result{}
+	})
+	switch {
+	case res.status != http.StatusOK:
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(res.status)
+		w.Write([]byte(res.text))
+	case res.refused:
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"type":"refused","message":` + quote(res.text) + `}`))
+	default:
+		w.Header().Set("Content-Type", "application/json")
+		for _, c := range res.answer.cookies {
+			http.SetCookie(w, c)
+		}
+		w.Write(res.answer.body)
+	}
 }
 
-func (h *Handler[Env]) serve(w http.ResponseWriter, r *http.Request, name, id string, log *slog.Logger, start time.Time) (outcome string) {
-	text := func(status int, body string) string {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(status)
-		w.Write([]byte(body))
-		return fmt.Sprint(status)
-	}
+// A result is how one call ended: at 200 an answer, or a refusal
+// whose words are text; at any other status, text is what a browser
+// is answered.
+type result struct {
+	status  int
+	text    string
+	refused bool
+	answer  answered
+}
+
+// run is what a browser's call and Call share: the id, the log's
+// lines, the list's check, the limit and the reruns. input gives the
+// operation's input, or how the call ends without one.
+func (h *Handler[Env]) run(r *http.Request, name string, input func(Operation[Env]) (any, result)) (res result) {
+	start := time.Now()
+	id := kogo.NewId().String()
+	log := h.log.With("request", id, "operation", name)
+	defer func() {
+		outcome := fmt.Sprint(res.status)
+		if res.status == http.StatusOK {
+			outcome = map[bool]string{false: "ok", true: "refused"}[res.refused]
+		}
+		log.Info("served", "outcome", outcome, "duration", time.Since(start))
+	}()
 	ranOut := false
 	defer func() {
 		if p := recover(); p != nil && ranOut {
-			outcome = text(http.StatusServiceUnavailable, "request "+id)
+			res = result{status: http.StatusServiceUnavailable, text: "request " + id}
 		} else if p != nil {
 			log.Error("panic", "message", fmt.Sprint(p), "trace", string(debug.Stack()))
-			outcome = text(http.StatusInternalServerError, "request "+id)
+			res = result{status: http.StatusInternalServerError, text: "request " + id}
 		}
 	}()
 	// The list's check runs first, once, in a read-only transaction
-	// of its own: its refusal is a 403 with its words.
+	// of its own: its refusal is a 403 with its words. An unchecked
+	// list has none, and only Call reaches it.
 	db := kogo.NewDb(r.Context(), h.pool)
-	checked := kogo.ReadOnlyTx(db, func(tx kogo.Tx) kogo.Either[string, rt.Unit] { return h.check(tx, h.env, Request{r}) })
-	if refusal, refused := checked.(kogo.Either_Left[string]); refused {
-		return text(http.StatusForbidden, refusal.Value)
+	if h.check != nil {
+		checked := kogo.ReadOnlyTx(db, func(tx kogo.Tx) kogo.Either[string, rt.Unit] { return h.check(tx, h.env, Request{r}) })
+		if refusal, refused := checked.(kogo.Either_Left[string]); refused {
+			return result{status: http.StatusForbidden, text: refusal.Value}
+		}
 	}
 	op, found := h.ops[name]
 	if !found {
-		return text(http.StatusNotFound, "")
-	} else if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		return text(http.StatusMethodNotAllowed, "")
+		return result{status: http.StatusNotFound}
 	}
-	input := reflect.ValueOf(rt.Unit{})
-	if op.input != input.Type() {
-		var err error
-		if input, err = h.read.readBody(op.input, r.Body); err != nil {
-			return text(http.StatusBadRequest, name+": "+err.Error())
-		}
+	in, stop := input(op)
+	if stop.status != 0 {
+		return stop
 	}
 	again := func(conflict *pgconn.PgError) bool {
 		if ranOut = time.Since(start) >= h.Limit; !ranOut {
@@ -355,16 +413,59 @@ func (h *Handler[Env]) serve(w http.ResponseWriter, r *http.Request, name, id st
 		}
 		return !ranOut
 	}
-	w.Header().Set("Content-Type", "application/json")
-	switch result := op.run(db, again, h.env, Request{r}, input.Interface()).(type) {
+	switch got := op.run(db, again, h.env, Request{r}, in).(type) {
 	case kogo.Either_Left[string]:
-		w.Write([]byte(`{"type":"refused","message":` + quote(result.Value) + `}`))
-		return "refused"
+		return result{status: http.StatusOK, text: got.Value, refused: true}
 	case kogo.Either_Right[answered]:
-		for _, c := range result.Value.cookies {
-			http.SetCookie(w, c)
-		}
-		w.Write(result.Value.body)
+		res = result{status: http.StatusOK, answer: got.Value}
 	}
-	return "ok"
+	return res
+}
+
+// An Op is one operation as hand-written Go calls it: its name on the
+// wire with its input's and its answer's types, which the emitter
+// writes beside the operation's table as Name_op.
+type Op[Env, I, A any] struct{ name string }
+
+func NewOp[Env, I, A any](name string) Op[Env, I, A] { return Op[Env, I, A]{name} }
+
+// Calls runs the operations of an unchecked list for main's routes.
+// It is a Handler with no ServeHTTP, and so no http.Handler: no
+// browser reaches the list, and only Call does. Its Limit is a
+// Handler's.
+type Calls[Env any] Handler[Env]
+
+// NewCalls is NewHandler for an unchecked list.
+func NewCalls[Env any](u Unserved[Env], pool *pgxpool.Pool, env Env, log *slog.Logger) *Calls[Env] {
+	return (*Calls[Env])(newHandler(nil, u.operations, u.enums, pool, env, log))
+}
+
+// Refused is the error Call gives for an operation's refusal, with
+// its words.
+type Refused string
+
+func (r Refused) Error() string { return string(r) }
+
+// Call runs op of c's list with input for the request r, as a Handler
+// runs a browser's call: with a request id, the served line, the
+// limit and the reruns. It reads no body: the input is Go's, and only
+// its enums can be wrong, which Call checks as the strict reader
+// does. Its error is a Refused, or the status and text a browser
+// would be answered: 400 for an enum, 404 for an operation not of the
+// list, 500 with the request's id for a panic, 503 past the limit.
+func Call[Env, I, A any](c *Calls[Env], r *http.Request, op Op[Env, I, A], input I) (A, error) {
+	res := (*Handler[Env])(c).run(r, op.name, func(Operation[Env]) (any, result) {
+		if err := c.read.valid(reflect.ValueOf(&input).Elem(), "input"); err != nil {
+			return nil, result{status: http.StatusBadRequest, text: op.name + ": " + err.Error()}
+		}
+		return input, result{}
+	})
+	var none A
+	switch {
+	case res.status != http.StatusOK:
+		return none, fmt.Errorf("%d %s", res.status, res.text)
+	case res.refused:
+		return none, Refused(res.text)
+	}
+	return res.answer.value.(A), nil
 }

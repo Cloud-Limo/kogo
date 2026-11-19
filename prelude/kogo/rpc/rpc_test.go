@@ -398,3 +398,85 @@ func TestHandler(t *testing.T) {
 		t.Errorf("reruns are logged as %v", reruns)
 	}
 }
+
+type Mood string
+
+var Mood_entries = []Mood{"Calm", "Cross"}
+
+type Felt struct {
+	_     struct{} `kogo:"Felt"`
+	Moods []*Mood  `kogo:"moods"`
+}
+
+func feel(_ kogo.Db, _ env, _ Request, f Felt) kogo.Either[string, int32] {
+	return kogo.Either_Right[int32]{Value: int32(len(f.Moods))}
+}
+
+// Call runs an operation of an unchecked list by its typed value, as
+// a browser's call runs: an id, a served line, the reruns and the
+// rollback of a refusal. It gives the answer as its Go type, a
+// refusal as a Refused, and refuses an enum that is not an entry.
+func TestCall(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://kogo:kogo@127.0.0.1/kogo_test")
+	ctx := context.Background()
+	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
+	defer drop()
+	var log bytes.Buffer
+	e := env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}, &sync.Map{}}
+	unserved := NewUnserved([]Operation[env]{Tx("add", true, add), Tx("signIn", true, signIn), Db("who", who), Db("feel", feel), Tx("deadlocked", true, deadlocked)}, []any{Mood_entries})
+	calls := NewCalls(unserved, pool, e, slog.New(slog.NewJSONHandler(&log, nil)))
+	if _, mounts := any(calls).(http.Handler); mounts {
+		t.Error("a Calls is an http.Handler")
+	}
+	r := httptest.NewRequest("GET", "/any/route", nil)
+	r.Header.Set("X-Who", "me")
+	addOp := NewOp[env, Person, string]("add")
+	show := func(a any, err error) string {
+		if _, refused := err.(Refused); refused {
+			return fmt.Sprint("refused: ", err)
+		}
+		return strings.TrimSuffix(fmt.Sprint(a, " ", err), " <nil>")
+	}
+	cross, wild := Mood("Cross"), Mood("Wild")
+	who, err := Call(calls, r, NewOp[env, rt.Unit, Who]("who"), rt.Unit{})
+	reply, replyErr := Call(calls, r, NewOp[env, Person, Reply[string]]("signIn"), Person{Name: "called-in"})
+	calls.Limit = 0
+	for i, c := range [][2]string{
+		{show(Call(calls, r, addOp, Person{Name: "called"})), "secret answer"},
+		{show(Call(calls, r, addOp, Person{Name: "refused call"})), "refused: secret refusal"},
+		{show(Call(calls, r, addOp, Person{Name: "panics call"}))[:12], " 500 request"},
+		{show(Call(calls, r, NewOp[env, rt.Unit, int32]("nothing"), rt.Unit{})), "0 404 "},
+		{show(Call(calls, r, NewOp[env, Felt, int32]("feel"), Felt{Moods: []*Mood{&cross, nil}})), "2"},
+		{show(Call(calls, r, NewOp[env, Felt, int32]("feel"), Felt{Moods: []*Mood{&cross, &wild}})), "0 400 feel: input.moods[1] is not one of Calm, Cross"},
+		{show(Call(calls, r, NewOp[env, rt.Unit, int32]("deadlocked"), rt.Unit{}))[:12], "0 503 reques"},
+		{fmt.Sprint(*who.Header, who.Address, err), "me192.0.2.1<nil>"},
+		{fmt.Sprint(reply.Answer, len(reply.Cookies), replyErr), "in1 <nil>"},
+	} {
+		if c[0] != c[1] {
+			t.Errorf("call %d gives %q, want %q", i, c[0], c[1])
+		}
+	}
+	var n int
+	pool.QueryRow(ctx, "select count(*) from person where name in ('called', 'refused call', 'panics call')").Scan(&n)
+	if n != 1 {
+		t.Errorf("%d rows, want 1: a refusal and a panic roll back", n)
+	}
+	// Each call logs one served line with an id; the panic one more.
+	var served []string
+	for _, l := range strings.Split(strings.TrimSpace(log.String()), "\n") {
+		var m map[string]any
+		json.Unmarshal([]byte(l), &m)
+		if m["msg"] == "served" && m["request"] != "" {
+			served = append(served, fmt.Sprint(m["operation"], " ", m["outcome"]))
+		}
+	}
+	if got, want := strings.Join(served, ","), "who ok,signIn ok,add ok,add refused,add 500,nothing 404,feel ok,feel 400,deadlocked 503"; got != want {
+		t.Errorf("served %s, want %s", got, want)
+	}
+	// SetCookies writes what a browser's call would have set.
+	w := httptest.NewRecorder()
+	SetCookies(w, reply.Cookies)
+	if got := w.Header().Values("Set-Cookie"); len(got) != 1 || !strings.HasPrefix(got[0], "called-in=v; Path=/; Max-Age=60") {
+		t.Errorf("SetCookies set %q", got)
+	}
+}

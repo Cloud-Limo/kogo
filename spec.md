@@ -1319,8 +1319,15 @@ one returns an `Either` whose `Left` is a refusal in words:
 - Gated work takes no `Request`, `Tx` or `Db`: its gate has read the
   request, and the proof is all it is handed. So a proof is none of
   the three either: a gate gives a data class of the application's
-  that holds the `Tx` and what it read. An ungated operation takes no
-  proof.
+  that holds the `Tx` and what it read, a proof (15.7), or what it
+  read alone. A `P` that holds a `Tx` or a `SerializableTx` anywhere,
+  at any depth, but as a proof's own marked transaction, is a compile
+  error (`gate-proof`): in a property, a nullable, a type argument
+  (`List<Plain>`, `Box<Tx>`), a sealed interface's variant, a
+  function's result, or a proof's second, unmarked `Tx`. Mark the
+  constructor and the transaction of the class that holds it (an
+  interface's `val`), take the second one out of the proof, or give
+  the facts alone. An ungated operation takes no proof.
 - The parameters' names are the author's. None of these funs has type
   parameters or default values.
 - A `Left` is a refusal: words for the person using the page. Each
@@ -1569,9 +1576,11 @@ and in such a file three rules hold:
   itself the work, in the gate or in a `fun`, which runs in the
   transaction.
 
-A data class that is not of this shape is held to none of the three,
-whatever a gate gives it for (15.2): mark a proof's constructor and
-its transaction.
+A data class that is not of this shape is held to none of the three.
+A gate gives none that holds a transaction but in a proof's own
+marked one (15.2): a transaction a gate hands on is always held by the
+three, and a gate's `P` is a proof, or holds proofs, or facts alone, as `data class Clerk(val address: String)`,
+which work that runs outside reads with no transaction to have ended.
 
 ## 16. Tests
 

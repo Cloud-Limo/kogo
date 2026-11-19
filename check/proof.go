@@ -1,6 +1,7 @@
 package check
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -27,6 +28,69 @@ func (c *checker) proofTx(t Type) *Var {
 		}
 	}
 	return nil
+}
+
+// heldTx spells the path, as clerk.tx or box.tx, by which t, what a
+// gate gives, holds a transaction that is no proof's own marked one,
+// and the type whose property it is, nil for a type argument or a
+// function's result; or gives "". It looks at any depth:
+// properties, type arguments, a sealed interface's variants and a
+// function's result (spec.md 15.2).
+func (c *checker) heldTx(t Type, seen []*TypeDecl) (string, *TypeDecl) {
+	switch t := nonNull(t).(type) {
+	case *FuncType:
+		return c.heldIn(t.Result, "()", nil, seen)
+	case *Named:
+		if slices.Contains(seen, t.Decl) {
+			return "", nil
+		}
+		seen = append(seen, t.Decl)
+		for _, a := range t.Args {
+			if path, in := c.heldIn(a, "", nil, seen); path != "" {
+				return path, in
+			}
+		}
+		own := c.proofTx(t)
+		for _, p := range t.Decl.Props {
+			if path, in := c.heldIn(p.Type, p.Name, t.Decl, seen); p != own && path != "" {
+				return path, in
+			}
+		}
+		for _, v := range t.Decl.Variants {
+			if path, in := c.heldTx(&Named{Decl: v}, seen); path != "" {
+				return path, in
+			}
+		}
+	}
+	return "", nil
+}
+
+// holdFix says how to hold the transaction that in holds as its
+// property held, as heldTx gives them.
+func (c *checker) holdFix(in *TypeDecl, held string) string {
+	last := held[strings.LastIndex(held, ".")+1:]
+	switch {
+	case in == nil:
+		return "outside any proof: hold it as a proof's marked transaction"
+	case c.proofTx(&Named{Decl: in}) != nil:
+		return fmt.Sprintf("and %s is a proof that holds it outside its marked one: a proof holds one transaction, so take %s out of %s", in.Name, last, in.Name)
+	case in.Kind == "interface":
+		return fmt.Sprintf("in %s, which is no proof: mark it with a marker the gates' file opts in to, as @M val %s: Tx", in.Name, last)
+	}
+	return fmt.Sprintf("in %s, which is no proof: mark the constructor and the transaction of %s with a marker the gates' file opts in to, as data class %s @M constructor(..., @property:M val %s: Tx)", in.Name, in.Name, in.Name, last)
+}
+
+// heldIn is heldTx of t, which holder holds as its property name, or
+// as a type argument where name is "", or as a function's result
+// where name is "()".
+func (c *checker) heldIn(t Type, name string, holder *TypeDecl, seen []*TypeDecl) (string, *TypeDecl) {
+	if c.isTx(nonNull(t)) {
+		return cmp.Or(name, t.String()), holder
+	}
+	if path, in := c.heldTx(t, seen); path != "" {
+		return strings.Trim(strings.ReplaceAll(name+"."+path, ".()", "()"), "."), in
+	}
+	return "", nil
 }
 
 // spell gives a name or a chain of properties as it is written:

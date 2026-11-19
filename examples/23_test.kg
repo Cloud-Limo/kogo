@@ -10,7 +10,7 @@ import kogo.test.assertNull
 import kogo.test.assertTrue
 import kogo.test.test
 
-tests invoiceTests<OpsEnv> { readsWhatItWrote, startsFromNothing, refusesANumberTwice, refusesNoNumber }
+tests invoiceTests<OpsEnv> { readsWhatItWrote, startsFromNothing, refusesANumberTwice, refusesNoNumber, readsWithNoLock }
 
 fun draft(tx: Tx, number: String, totalCents: Long?): Int =
     tx.execute(sql"""
@@ -53,4 +53,19 @@ val refusesNoNumber =
         val refusal = tx.refusal(sql"insert into invoice (id, number) values (${newId()}, null)")
         assertEquals("23502", refusal?.sqlState)
         assertNull(refusal?.constraint)
+    }
+
+// A test's transaction is SERIALIZABLE and alone, so its block is
+// handed a SerializableTx: it calls a fun that takes one, as it calls
+// draft, which takes a Tx (spec.md 16.1).
+fun drafts(tx: SerializableTx, prefix: String): Long =
+    tx.queryOne<Long>(sql"""
+        select count(*) as "count!" from invoice where status = 'draft' and number like $prefix
+    """) ?: 0L
+
+val readsWithNoLock =
+    test("counts the drafts it wrote, reading with no lock") { tx, env ->
+        draft(tx, "S-1", null)
+        draft(tx, "S-2", 100L)
+        assertEquals(2L, drafts(tx, "S-%"))
     }

@@ -779,11 +779,13 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
   block must have no effect outside the transaction.
 - A transaction's kind is its handle's type. `Tx` is any transaction: a
   function that takes one assumes nothing, and locks what it needs.
-  `SerializableTx` is one that is rerun on a conflict: a function that
-  takes one may read with no lock. A `SerializableTx` fits where a `Tx`
+  `SerializableTx` is one at SERIALIZABLE, where a conflict is a
+  serialization failure and never a wrong read, so a function that
+  takes one may read with no lock: the program's is rerun on a
+  serialization failure, and a test's fails (16.2). A `SerializableTx` fits where a `Tx`
   is wanted, and not the other way. The block of `db.tx` is handed a
   `Tx`, and that of `db.tx(serializable = true)`, the literal `true`,
-  a `SerializableTx`.
+  a `SerializableTx`, as is a test's (16.1).
 
   ```
   invoices.kg:40:19 needs-serializable: invoice takes a SerializableTx and this is a Tx, which is not rerun on a conflict: call a function that locks, take a SerializableTx, or open the transaction with db.tx(serializable = true) (spec.md 10.7)
@@ -817,7 +819,8 @@ assertEquals("invoice_number_key", refusal?.constraint)
 - A statement Postgres stopped, rather than refused, is a panic: a
   timeout, a serialization failure or deadlock, a lost connection, a
   lack of resources or a system error (SQLSTATE classes 08, 40, 53,
-  57, 58, XX).
+  57, 58, XX). A test's transaction is SERIALIZABLE (16.2), and is
+  not rerun: a serialization failure in it fails the test.
 - Row-level security hides rows rather than refusing a statement: an
   update or delete of another tenant's rows is accepted and touches
   none, so a test asserts that `execute` gives 0. Only a write that
@@ -1633,8 +1636,9 @@ val cardDiscount =
   states `Test<...>`, stands in a list of its file.
 - `test(sentence) { tx, env -> ... }` makes a test. The sentence says
   what the test shows, in the words a failure is reported with. The
-  block takes the `Tx` of the test's transaction and the environment,
-  and gives nothing.
+  block takes the `SerializableTx` of the test's transaction (16.2)
+  and the environment, and gives nothing. So a test calls a fun that
+  takes a `SerializableTx` as readily as one that takes a `Tx`.
 
 ### 16.2 The run
 
@@ -1652,6 +1656,18 @@ val cardDiscount =
   database began with and those it wrote, never another test's.
   The rollback covers `tx`; a `Db` the environment holds commits as
   it does in the program.
+- The transaction is at SERIALIZABLE, which the runner states and
+  does not leave to the database's default, and is run once. A
+  test's transaction is SERIALIZABLE and alone; a test that must see
+  what another connection commits meanwhile is not written in this
+  form yet. Alone means in the runner, which runs one test at a time:
+  a `Db` the environment holds is another connection, and the test
+  sees what that or any other connection committed before the test's
+  first statement and nothing committed after it. A write that meets
+  such a commit is a serialization failure, as is a cycle with
+  another SERIALIZABLE transaction. Nothing reruns it: a
+  serialization failure in a test is a panic that fails the test, as
+  any statement Postgres stopped is (10.8).
 - The transaction never commits, so a deferred constraint never fires
   in a test: a test that wants it to runs
   `tx.execute(sql"set constraints all immediate")` first. A value

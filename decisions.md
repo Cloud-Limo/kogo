@@ -1617,6 +1617,24 @@ Each entry: what was decided, why, and what would reopen it.
   - **A shared gate is given its row's input by `rpc.Shared[I](gate)`**, so `Gated` has one
     form. Not taken: a second constructor for a gate that reads no input.
 
+- **A test's transaction is SERIALIZABLE, and its block is handed a `SerializableTx`**
+  (20 Nov 2026; DEV-969). `kogo.RolledBack` opens it at SERIALIZABLE, as stated and not
+  left to the database's default, runs the block once and rolls it back. A test's
+  transaction is alone, so nothing reruns it, and a serialization failure in it is a
+  panic that fails the test. It follows from Kogo's own rule that a `SerializableTx`
+  fits a `Tx` and not the reverse: every test written before still checks, and a test
+  can now call a gate or a reader that takes a `SerializableTx`. Greg asked because it
+  is language-wide, and he wants the language slightly more general than its first
+  application needs where possible. Not taken: (b) a test states its kind
+  (`test("...", serializable = true)`), the program's own words and the level the code
+  runs at in production, at the cost of the word on nearly every test of a program that
+  reads without locks; it can be added later, as a way to state READ COMMITTED, without
+  changing a test already written. (c) such functions tested only through a served row,
+  at the cost of a server and a row for each such test, and no test of a gate or reader
+  alone.
+  Reopen: a test that must see what another connection commits meanwhile, which shows
+  where the test's `env` holds a `Db`.
+
 ## Taken in the v0 spec, not yet discussed
 
 - Markers (`@RequiresOptIn`, `@file:OptIn`) are the one annotation form, so the access walls
@@ -3155,7 +3173,8 @@ Each entry: what was decided, why, and what would reopen it.
   a `SerializableTx`. The Review on PR 93 leans to `RolledBack` opening at SERIALIZABLE
   and handing a `SerializableTx`; it is Greg's, brought to him before roadmap row 13. Not
   taken now (the lead, 19 Nov 2026): building that here, which changes what a test may
-  call without his word.
+  call without his word. Settled since (DEV-969, above under Agreed with Greg): a test's
+  block is handed a `SerializableTx`.
 
 ## Taken serving a list's Origin and CSRF check (DEV-964), not yet discussed
 

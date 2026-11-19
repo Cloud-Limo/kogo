@@ -6,7 +6,7 @@ package kogo.test
 external class Test<E>
 external class Refusal
 
-external fun <E> test(sentence: String, body: (Tx, E) -> Unit): Test<E>
+external fun <E> test(sentence: String, body: (SerializableTx, E) -> Unit): Test<E>
 
 external val Refusal.sqlState: String
 external val Refusal.constraint: String?

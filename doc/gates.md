@@ -663,9 +663,10 @@ transaction writes one of two:
 
 - **`Tx` is any transaction.** A function that takes it assumes
   nothing, and locks what it needs.
-- **`SerializableTx` is one that is rerun on a conflict.** A function
-  that takes it may read with no lock. It fits wherever a `Tx` is
-  wanted.
+- **`SerializableTx` is one at SERIALIZABLE.** A conflict there is a
+  serialization failure and never a wrong read, so a function that
+  takes it may read with no lock. The program's is rerun on one, and
+  a test's fails. It fits wherever a `Tx` is wanted.
 
 ```kotlin
 fun invoice(tx: SerializableTx, id: ID): Invoice? =            // relies on serializable

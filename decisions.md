@@ -2779,6 +2779,23 @@ Each entry: what was decided, why, and what would reopen it.
   `float64` and wrote `PT-1.9999999960000001S` for Java's `PT-1.999999996S`; the check
   found it. Not taken: leaving it to an issue of its own, for a three-line fix.
 
+## Going public (DEV-941), not yet discussed
+
+- **Apache-2.0, the license text verbatim in `LICENSE`, and the copyright line in
+  `README.md`.** Not taken: editing the license's text to carry the name, or a `NOTICE`
+  file, which Apache-2.0 asks for only when there are notices to pass on.
+- **`mise run leaks` is gitleaks with its default rules, over HEAD's tracked files (`git
+  archive HEAD` into a temporary directory, then `gitleaks dir`) and `origin/main..HEAD`.**
+  Only what is committed is published, so a key in an ignored file such as
+  `.mise.local.toml` does not block a merge. The commit scan fails when the range is empty
+  or cannot be resolved, since gitleaks would scan nothing and pass. It needs
+  `origin/main` fetched, as the merge step's worktree has. Not taken: `gitleaks dir .`
+  over the working tree, which reads ignored and uncommitted files; a `.gitleaks.toml` of
+  our own, which nothing found so far needs; a git hook, which a fresh worktree or an
+  async clone would not have.
+- **The light rule extends rule 1 rather than becoming a rule of its own,** so the rules
+  keep their numbers, which reviews cite.
+
 ## Spec gaps found by the leakage ports, unresolved
 
 - Outbound calls are handles (above), but their timeouts and retries, and workers, have no

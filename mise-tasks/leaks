@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#MISE description="Look for secrets in HEAD's tracked files and in this branch's commits"
+# The lead runs this before every merge (doc/lead.md, Merging): Kogo is
+# public and has no CI. gitleaks is pinned in .mise.toml.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+# Only what git tracks at HEAD is published: ignored local settings are not.
+t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+git archive HEAD | tar -x -C "$t"
+gitleaks dir --no-banner --redact "$t"
+# An empty or unresolvable range would scan nothing and still pass.
+n=$(git rev-list --count origin/main..HEAD)
+[ "$n" -gt 0 ] || { echo "leaks: no commits in origin/main..HEAD; run it on the PR's branch" >&2; exit 1; }
+gitleaks git --no-banner --redact --log-opts="origin/main..HEAD" .

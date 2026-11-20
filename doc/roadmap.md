@@ -5,9 +5,10 @@ Kogo lacks, ops site first), DEV-929 and DEV-938 (the test form) and
 DEV-930 (moving piece by piece). Every size is an estimate in code /
 test lines, from counting the Kotlin a piece replaces or from the
 designs' own guesses; nothing was built to measure it. Linear holds
-each piece's state; this file holds the order and the reasons, and is
-rewritten when either moves. Last rewritten to the evening of 19 Nov
-2026 (DEV-979).
+each piece's state, so no table here has a column for it: what is
+built is in the code and `spec.md`. This file holds the order and the
+reasons, and is rewritten when either moves. Last rewritten to the
+evening of 19 Nov 2026 (DEV-979).
 
 ## The goal
 
@@ -92,29 +93,25 @@ Every prelude name is imported from a `kogo.` package (DEV-939, DEV-954).
 
 ### 1. The ops site from Go (about 2,000 / 1,900 Kogo, 1,500 / 800 port)
 
-| # | Repo | Piece | Size (estimate) | State |
-| --- | --- | --- | --- | --- |
-| 1 | cusoon2 | Kotlin first: the first call makes the session; gates bind the storefront; Origin drops `null` | 60 / 60 | merged, PR 1524 |
-| 1b | cusoon2 | Kotlin first: job pages show the stored address; `operatorJobs` replaces `driverJobs` | ~80 / 80 | merged, PR 1523 |
-| 2 | Kogo | The lists in their agreed forms (`gatedBy`, `ungated`, `after`, `checkedBy`/`unchecked`) | 250 / 250 | merged, PR 88 |
-| 3 | Kogo | Serve a gated row: check, gate, work | 150 / 150 | merged, PR 91 |
-| 4 | Kogo | The Origin and CSRF check (`doc/origin.md`) | 120 / 150 | merged, PR 92 |
-| 5 | Kogo | `SerializableTx` beside `Tx` | 70 / 70 | merged, PR 93 |
-| 6a | Kogo | A proof's rules in the checker (DEV-976) | 170 / 150, 6a and 6b | |
-| 6b | Kogo | A gate only reads (DEV-977) | (in 6a's) | |
-| 7 | Kogo | `action fun`, `lookup` and `action` bindings | 100 / 100 | merged, PR 90 |
-| 8 | Kogo | `Reply` and `Cookie` | 50 / 50 | merged, PR 89 |
-| 9 | Kogo | `kogo.http` (DEV-978) | 360 / 250 | |
-| 10 | Kogo | Compare and shift an `Instant` | 30 / 30 | merged, PR 79 |
-| 11 | Kogo | `main`'s prelude: `rpc.Call`, `_op`, settings | 150 / 150 | |
-| 12 | Kogo | `ByteArray` and `kogo.mail` | 130 / 120 | |
-| 13–18 | cusoon2 | Port the logins and logout (with a FusionAuth client), the passkeys, the five ported operations as gated rows, the jobs with `settle`, `jobOffer`/`giveJob`, `operatorJobs` | ~1,600 / 850 | |
-| 19 | cusoon2 | The ops site's Go `main`; settings move | 150 / 80 | |
-| 20 | cusoon2 | Serve the ops site from Go | | |
-
-Before row 13, Greg settles what a `kogo test` is handed (DEV-969):
-a `Tx` today, so a test calls no `action fun` and none of the port's
-operations, which take a `SerializableTx`.
+| # | Repo | Piece | Size (estimate) |
+| --- | --- | --- | --- |
+| 1 | cusoon2 | Kotlin first: the first call makes the session; gates bind the storefront; Origin drops `null` | 60 / 60 |
+| 1b | cusoon2 | Kotlin first: job pages show the stored address; `operatorJobs` replaces `driverJobs` | ~80 / 80 |
+| 2 | Kogo | The lists in their agreed forms (`gatedBy`, `ungated`, `after`, `checkedBy`/`unchecked`) | 250 / 250 |
+| 3 | Kogo | Serve a gated row: check, gate, work | 150 / 150 |
+| 4 | Kogo | The Origin and CSRF check (`doc/origin.md`) | 120 / 150 |
+| 5 | Kogo | `SerializableTx` beside `Tx` | 70 / 70 |
+| 6a | Kogo | A proof's rules in the checker (DEV-976) | 170 / 150, 6a and 6b |
+| 6b | Kogo | A gate only reads (DEV-977) | (in 6a's) |
+| 7 | Kogo | `action fun`, `lookup` and `action` bindings | 100 / 100 |
+| 8 | Kogo | `Reply` and `Cookie` | 50 / 50 |
+| 9 | Kogo | `kogo.http` (DEV-978) | 360 / 250 |
+| 10 | Kogo | Compare and shift an `Instant` | 30 / 30 |
+| 11 | Kogo | `main`'s prelude: `rpc.Call`, `_op`, settings | 150 / 150 |
+| 12 | Kogo | `ByteArray` and `kogo.mail` | 130 / 120 |
+| 13–18 | cusoon2 | Port the logins and logout (with a FusionAuth client), the passkeys, the five ported operations as gated rows, the jobs with `settle`, `jobOffer`/`giveJob`, `operatorJobs` | ~1,600 / 850 |
+| 19 | cusoon2 | The ops site's Go `main`; settings move | 150 / 80 |
+| 20 | cusoon2 | Serve the ops site from Go | |
 
 Beside it, before the first list goes live (DEV-930, about 290 / 220):
 the release carries Go; units, health and CI; routing and the port
@@ -146,7 +143,6 @@ longest lead time and can go out early.
 
 ## Open
 
-- What a `kogo test` is handed (DEV-969), before row 13.
 - A place with no stored address, filled when read (cusoon2 DEV-972),
   in the Kotlin, before the jobs' port (rows 13–18).
 - The three Google operations folded back into one transaction

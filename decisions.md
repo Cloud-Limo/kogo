@@ -703,6 +703,41 @@ Each entry: what was decided, why, and what would reopen it.
   two runs, and whose cost grows with the square of the PRs open. A third tip of `main`
   is handed on, not chased. cusoon2 keeps the Fix, its check being cloud CI on the pushed
   head. Reopen if a clean merge breaks what a Review passed.
+- **The lead's and the clerk's instructions, revised from a day's use** (20 Nov 2026,
+  Greg, item by item; DEV-1023). Each cost a round trip on 20 Nov.
+  - A Budget outgrown is handed on only when the Review names something to cut or doubts
+    a thing added; otherwise its sizes go in `Merged:` or `ready`. Six hand-ons asked
+    "accept the size?" and each answer was yes. The Review brief asks what could go. It
+    changes "what is handed on" in the entry on the clerk above. Not taken: handing on
+    every overrun.
+  - A cusoon2 `ready` line says which of two PRs merges first when one is a port and the
+    other could put it behind `renew`. Not taken: the lead holding small cusoon2 launches
+    while a port is in its Fix, which idles work for as long as a Zed step waits on Greg.
+  - A port's PR behind `renew` is caught up by a run, with no `kogo/run.sh`, when every
+    file the merge brings is under `doc/`, `infra/`, `frontend/` or `site/`. The run reads
+    nothing there (read in `kogo/run.sh` and the Gradle build, 20 Nov), so the comparison
+    is the one the head passed. Not taken: the issue's list of the run's inputs
+    (`backend/`, `jooq/`, `kogo/`), which had missed the Gradle build and fails open when
+    an input is added; the four fail closed. Reopen when `run.sh` reads under one of them.
+  - A run's step comment is under its marker line: the rule on a comment's first line was
+    false for every run's as written, and one clerk reported a Handoff missing.
+  - A run that cannot start is tried again by the launcher, not the clerk: cusoon2's
+    wrapper already retries once after a preemption, and a setup failure joins that
+    (DEV-1027). Not taken: the poller starting a clerk to relaunch, a new event and a new
+    rule for the same retry.
+  - A change of a port's form that later pieces will copy goes on paper first, and a
+    brief that proposes a rule asks for its count over every instance. The limit to a
+    form others copy was taken here: a paper costs a run, a review, a fix and Greg's
+    merge, and "changes the form" alone would be read as every port.
+  - A choice about the language is put to Greg from its use: the plain code, the Kotlin
+    today, then what each option's author writes.
+  - `doc/roadmap.md` loses its State column, a day stale within a day of its writing
+    (rows 6a, 6b, 9, 11 and 12 merged and blank). Not taken: the clerk marking a row at
+    each merge, which needs a commit of the clerk's to `main`.
+  - How a cusoon2 run gets Kogo's documents and tool is in `doc/clerk.md`, "Launching a
+    run", where a brief's writer reads; the issue had it in cusoon2's
+    `doc/plans/async-agent-runs.md`, under a heading that section does not send to.
+  - Not taken: a notice to Greg when an issue is labelled `lead`. "Bump" stays.
 - **The emitted Go names its source inline, by a relative path** (15 Nov 2026). Each line of
   Go begins with its own position, `/*line ../../src/a.kg:26*/`, padded so that a file's
   code starts at one column, then indented a tab for each block or closure it is in. Nobody

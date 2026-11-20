@@ -22,7 +22,7 @@ func main() {
 	out := bufio.NewWriter(os.Stdout)
 	defer out.Flush()
 	for in.Scan() {
-		fmt.Fprintln(out, strings.NewReplacer("\n", `\n`, "\r", `\r`).Replace(run(strings.Split(in.Text(), "\t"))))
+		fmt.Fprintln(out, strings.NewReplacer(`\`, `\\`, "\n", `\n`, "\r", `\r`).Replace(run(strings.Split(in.Text(), "\t"))))
 	}
 }
 

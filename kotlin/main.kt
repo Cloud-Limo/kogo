@@ -21,7 +21,7 @@ fun main(args: Array<String>) {
         }
         // UTF-8 holds no half of a surrogate pair: one is written as
         // U+FFFD, which is what Kogo holds in its place (spec.md section 3).
-        out.println(result.replace(Regex("[\\uD800-\\uDFFF]"), "\uFFFD").replace("\n", "\\n").replace("\r", "\\r"))
+        out.println(result.replace(Regex("[\\uD800-\\uDFFF]"), "\uFFFD").replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r"))
     }
     out.flush()
 }

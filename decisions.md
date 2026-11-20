@@ -2150,7 +2150,16 @@ Each entry: what was decided, why, and what would reopen it.
 - **`lowercase()` is Go's `strings.ToLower`**, stated in spec 12 as a corner where the
   prelude differs (principle 3): matching `İ` and a final sigma means Java's case tables,
   and no ported module depends on them. `uppercase()` is not in the prelude yet, so it
-  has no corner to state.
+  has no corner to state. *Superseded for `İ` 20 Nov 2026 by "`lowercase()` follows
+  Kotlin for `İ`" (DEV-1009) below.*
+- **`lowercase()` follows Kotlin for `İ` (DEV-1009, 20 Nov 2026, the lead's call)**: it
+  gives `i` and a combining dot (U+0069 U+0307), as Java's `toLowerCase(Locale.ROOT)`
+  does, where Go gives a bare `i`. This reopens the decision above for that letter:
+  cusoon2's logins now depend on it, since Go's answer turned an address Kotlin refuses
+  into another person's. The rule is context-free, so it is one replacement before
+  `strings.ToLower`. A final sigma stays the corner in spec 12: its rule reads the
+  letters either side and no ported module depends on it. Not taken: following the sigma
+  too, about 20 code / 15 test lines. Reopen the sigma when a port depends on it.
 
 ## Taken making `Either` the only spelling (DEV-833), not yet discussed
 
@@ -2753,7 +2762,8 @@ Each entry: what was decided, why, and what would reopen it.
   fault hides only if it changes nothing but the rewritten text in those cases. Not taken:
   a substring of either result, which hid four planted faults; leaving the inputs out,
   which is anticipating. Where a kept `lowercase` difference flips a `contains`, the
-  `lowercaseContains` case's boolean is not compared when its text holds `σ`.
+  `lowercaseContains` case's boolean is not compared when its text holds `σ`. Since
+  DEV-1009 `İ` is compared, and the text `aİ` puts it in a case without `σ`.
 - **A bug's message is Kotlin's but for a closed list in spec.md section 12**: an index
   into a list Kotlin built as its empty list, which Kotlin words by the list's class, and
   a `replace` with a bad group, which keeps Kogo's words. The check holds every other

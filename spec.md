@@ -948,9 +948,8 @@ all listed here:
 
 - `Regex` takes RE2 patterns: no lookaround and no backreferences.
 - A `String` never holds half of a surrogate pair (section 3).
-- `lowercase()` maps one character at a time: `"İ".lowercase()` is `"i"`
-  where Kotlin's is `"i̇"`, two characters, and a final `Σ` becomes `σ`
-  where Kotlin's is `ς`.
+- `lowercase()` does not read the letters either side: a final `Σ`
+  becomes `σ` where Kotlin's is `ς`.
 - `replace(regex, text)` skips an empty match that starts where a match
   ends: `"abc".replace(Regex("b*"), "-")` is `"-a-c-"` where Kotlin's is
   `"-a--c-"`. The text is read as Kotlin reads it: `$1` and `${name}`

@@ -85,6 +85,12 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   What it cannot settle it hands to the lead: a `Clerk:` comment and
   the label `lead`, which wait for Greg's next "Lead". It leaves an
   issue labelled `lead` alone.
+- **Guide.** "Guide DEV-NNN", said in the repository the design is
+  about, starts a session that takes Greg through a design to his
+  rulings: read Kogo's `doc/guide.md` and follow it. It ends with one
+  comment on the issue for the lead, and posts no step's comment,
+  launches nothing and merges nothing. No other session needs that
+  file.
 - **File.** `lin file --project <project> --state <state> "Title" <
   desc.md`, into the project of the repository the work lands in, and
   in Todo if it is ready to start, in Backlog if it waits on something

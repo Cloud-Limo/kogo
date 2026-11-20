@@ -3844,3 +3844,22 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   be built on this rule; whether it gets one of its own is open, the
   lead's, and comes up in DEV-945. Reopen with a port whose proofs
   each hold their transaction and their rows.
+
+## The guide (DEV-1036), 21 Nov 2026
+
+- **`doc/guide.md` is the draft Greg read, unchanged** (Greg, 21 Nov
+  2026): the form the DEV-1035 session fell into, taken as it stands
+  and wrapped as `doc/lead.md` is. Not taken: rewording it on the way
+  in. Reopen when it has been used twice more, as it says.
+- **"Guide DEV-NNN" is said in the repository the design is about**
+  (the lead, 21 Nov 2026), as the draft and the Workflow line have it:
+  a guide checks the design against that repository's code and commits
+  the short document to its PR's branch. Not taken: always in
+  `~/Dev/kogo`, as the lead and the clerk are.
+- **The lead's form for a choice is the guide's**: a piece of code,
+  the likely mistake, what catches it and one proposal, with lettered
+  options kept for two answers that are truly close. A guide's last
+  comment reaches the lead by the board's row for a comment that is no
+  step's, on an issue In Review; in any other state Greg, who ends the
+  sitting, brings it to his next "Lead". No row or word is added for
+  it. Not taken: keeping the lead's lettered options as its default.

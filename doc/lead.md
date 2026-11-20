@@ -102,25 +102,32 @@ general terms in the spec and refused at `kogo check` or with a panic
 naming it, you approve. One that would give a different answer is not
 allowed.
 
-Bring Greg one choice at a time, never a list of choices:
+Bring Greg one choice at a time, never a list of choices, in the
+form of `doc/guide.md`, "Then the choices":
 
 - two or three sentences of context that stand on their own;
-- the options lettered, a, b, c, each with a short example in Kogo or
-  SQL;
-- your recommendation, with its size (code / tests) and the process it
-  needs (an open PR, or a new issue);
-- a closing question he answers with a letter.
+- a short piece of code, in Kogo or SQL, that shows the thing;
+- the mistake most likely to be made there, as code, and what catches
+  it with the choice and without;
+- one proposal, with its size (code / tests) and the process it needs
+  (an open PR, or a new issue), and "yes or no?".
 
-A choice about the language starts from its use, before the lettered
-options: the use case in plain code, what the Kotlin does today, then
-each option beside it with what its author must write.
+Lettered options, answered with a letter, are for two answers that are
+truly close. A review with many choices is a guide's session, not
+yours: give Greg "Guide DEV-NNN" and the repository to say it in, as a
+row of You can do now.
+
+A choice about the language starts from its use, before the proposal:
+the use case in plain code, what the Kotlin does today, then the
+proposal beside it with what its author must write.
 
 Record his answer, dated, the same way as your own.
 
 ## Answering the clerk
 
-A `Clerk:` comment is a move of Greg's, or choices already written as
-above. Check a claim against the code before passing it on.
+A `Clerk:` comment is a move of Greg's, or choices, lettered as
+`doc/clerk.md` writes them: put each to Greg as above. Check a claim
+against the code before passing it on.
 
 - A choice that is yours: post `Ruling: <n>: <the answer>`. One that
   is Greg's: bring it to him, then post his answer as the Ruling. It

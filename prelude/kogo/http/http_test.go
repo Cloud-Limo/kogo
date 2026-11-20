@@ -308,6 +308,31 @@ func TestWhatIsSent(t *testing.T) {
 	panics(t, "field: rate is NaN, which no service reads", func() { Field_String_Double("rate", rt.Div(0.0, 0.0)) })
 }
 
+// A DELETE with no fields sends no body and no Content-Type; one with
+// fields, or a POST with none, sends its body, in either encoding.
+func TestNoFields(t *testing.T) {
+	name := kogo.ListOf(Field_String_String("name", "a"))
+	for _, c := range []struct {
+		encoding             Encoding
+		withField, emptyPost string
+	}{
+		{JSON, `["application/json"] "{\"name\":\"a\"}"`, `["application/json"] "{}"`},
+		{Form, `["application/x-www-form-urlencoded"] "name=a"`, `["application/x-www-form-urlencoded"] ""`},
+	} {
+		got := ""
+		h, _ := serve(t, Service{Encoding: c.encoding}, func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			got = fmt.Sprintf("%q %q", r.Header["Content-Type"], body)
+		})
+		Http_Perform(h, Action_String_String("DELETE", "/thing"), nil)
+		want(t, "a DELETE with no fields", got, `[] ""`)
+		Http_Perform(h, Action_String_String("DELETE", "/thing"), name)
+		want(t, "a DELETE with a field", got, c.withField)
+		Http_Perform(h, Action_String_String("POST", "/thing"), nil)
+		want(t, "a POST with no fields", got, c.emptyPost)
+	}
+}
+
 // A failed send is sorted by how far it got and by its status alone,
 // whichever call made it.
 func TestFailures(t *testing.T) {

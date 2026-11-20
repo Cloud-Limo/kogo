@@ -13,6 +13,8 @@ and is not part of `go test ./...`.
   import for; the task fetches Arrow's jar once). Each branch of
   a `when` is one case, calling prelude functions singly or in a short
   chain, and its value is a template of what must agree.
+  `builtins/constructs.kg` does the same for spec 6's constructs:
+  each case calls helpers whose `when`, loops and jumps the inputs steer.
 - `cases gen` writes the inputs, edges first and then random from a
   fixed seed, one case a line; `main.kt` and `driver/main.go` run each
   and print its result or its panic's message; `cases diff` prints each

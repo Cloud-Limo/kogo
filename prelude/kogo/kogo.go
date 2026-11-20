@@ -542,6 +542,11 @@ func T_Let[T, R any](this T, block func(T) R) R { return block(this) }
 
 func A_To[A, B any](this A, that B) Pair[A, B] { return Pair[A, B]{this, that} }
 
+func T_Also[T any](this T, block func(T) rt.Unit) T {
+	block(this)
+	return this
+}
+
 func T_TakeIf[T any](this T, predicate func(T) bool) *T {
 	if predicate(this) {
 		return &this

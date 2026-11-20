@@ -109,6 +109,10 @@ func TestLists(t *testing.T) {
 	if got := T_TakeIf("a", String_IsNotEmpty); got == nil || T_TakeIf("", String_IsNotEmpty) != nil || T_Let(2, func(n int) int { return n * 2 }) != 4 {
 		t.Error("takeIf or let is wrong")
 	}
+	seen := 0
+	if T_Also(3, func(n int) rt.Unit { seen = n; return rt.Unit{} }) != 3 || seen != 3 {
+		t.Error("also is wrong")
+	}
 }
 
 // An index outside a list panics with Kotlin's message (spec.md

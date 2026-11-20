@@ -2150,7 +2150,8 @@ Each entry: what was decided, why, and what would reopen it.
 - **`lowercase()` is Go's `strings.ToLower`**, stated in spec 12 as a corner where the
   prelude differs (principle 3): matching `İ` and a final sigma means Java's case tables,
   and no ported module depends on them. `uppercase()` is not in the prelude yet, so it
-  has no corner to state.
+  has no corner to state. *Superseded for `İ` 20 Nov 2026 by "`lowercase()` follows
+  Kotlin for `İ`" (DEV-1009) below.*
 - **`lowercase()` follows Kotlin for `İ` (DEV-1009, 20 Nov 2026, the lead's call)**: it
   gives `i` and a combining dot (U+0069 U+0307), as Java's `toLowerCase(Locale.ROOT)`
   does, where Go gives a bare `i`. This reopens the decision above for that letter:

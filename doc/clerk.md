@@ -119,6 +119,20 @@ nothing is left. Hand on again only for a Question still unanswered.
 
 ## Merging
 
+First, in the worktree each paragraph below makes, `git fetch origin`
+and `git merge-base --is-ancestor origin/<base> HEAD`, the base being
+`main` for Kogo and `renew` for cusoon2: checks that passed on a head
+older than the base's newest merge say nothing of the two together,
+and `--match-head-commit` holds the head but not the base. Make it
+before every merge and every `ready`. When it fails, merge nothing and
+write no `ready`: launch a Fix that merges the base and pushes. But
+when a cusoon2 PR, or what `renew` gained since its merge base
+(`git diff --name-only HEAD...origin/renew`), touches `kogo/pins` or a
+file it pins, that Fix runs `kogo/run.sh`, which no run can: hand on
+with `Clerk: Greg's: say "Fix DEV-NNN" in Zed, in <clone>`, saying it
+merges `renew`, runs `kogo/run.sh` and moves the pin. Its `Fixed:`
+brings you back here, and the checks run on the new head.
+
 In the issue's worktree, fast-forwarded (made from `origin/<branch>`
 when missing, as in Code review): read any fix commits against the
 Review and its Rulings, then run `mise run testdb`, `mise exec -- go

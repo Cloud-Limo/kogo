@@ -115,42 +115,14 @@ func holder(tx syntax.Expr) string {
 	return "the proof"
 }
 
-// binds reads one of the five calls, sel, where it runs on a proof's
-// transaction: its literal binds another property of that proof,
-// written as the transaction is, booking.id beside booking.tx. A
-// proof with nothing but the transaction is not held to it.
-func (c *checker) binds(sel *syntax.Select, lit *syntax.SQL) {
+// runsOn reads one of the five calls, sel, where it runs on a proof's
+// transaction: a fun that runs outside runs none on one.
+func (c *checker) runsOn(sel *syntax.Select) {
 	tx := c.txReads[sel.X]
 	if delete(c.txReads, sel.X); tx != nil && c.outside != nil {
 		why, fix := c.ended("statement")
 		c.errorf(first(sel), "outside-passes-proof", "%s runs a statement on %s, and %s: that one has ended, so %s (spec.md 15.7)", c.outside.Name, spell(sel.X), why, fix)
 	}
-	if tx == nil || len(tx.Owner.Props) < 2 {
-		return
-	}
-	if spell(sel.X) == "" { // xs.first().tx: nothing says whose a bound value is
-		c.errorf(first(sel), "unbound-statement", "this statement runs on the transaction of a proof that has no name here, so nothing it binds is seen to be that proof's: keep the proof in a val, and bind what it found beside its transaction, ${held.id} with held.tx (spec.md 15.7)")
-		return
-	}
-	of := strings.TrimSuffix(spell(sel.X), tx.Name) // booking. or, on this, nothing
-	for _, p := range lit.Params {
-		for e := p.Expr; e != nil; {
-			v, _ := c.info.Uses[e].(*Var)
-			if v != nil && v.Owner == tx.Owner && spell(e) == of+v.Name {
-				return
-			}
-			s, _ := e.(*syntax.Select)
-			if s == nil {
-				break
-			}
-			e = s.X
-		}
-	}
-	other := tx.Owner.Props[0]
-	if other == tx {
-		other = tx.Owner.Props[1]
-	}
-	c.errorf(first(sel), "unbound-statement", "this statement runs on %s's transaction and binds nothing of %s: bind what it found, as ${%s%s}, so that the statement is about the thing the gate let in, or take a proof that says less (spec.md 15.7)", holder(sel.X), holder(sel.X), of, other.Name)
 }
 
 // ended says why the fun that runs outside has no transaction, and

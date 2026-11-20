@@ -1670,20 +1670,8 @@ fun renumber(invoice: OpenInvoice, number: String): OpenInvoice {
 ```
 
 So only a file that opts in makes a proof or reads its transaction,
-and in such a file three rules hold:
+and in such a file two rules hold:
 
-- **A statement binds something of its proof.** One of the five calls
-  (10.2) whose receiver is a proof's transaction binds, in its
-  literal, another property of that proof, written as the transaction
-  is: `${invoice.number}` beside `invoice.tx`, or a property of such
-  a property. A value worked out from the proof and
-  kept in a `val` does not count, and nothing counts where the proof
-  has no name, as in `invoices.first().tx`: keep it in a `val` first.
-  Anything else is a compile error (`unbound-statement`). The compiler reads the receiver and the
-  values bound, not the SQL: that the value scopes the statement is
-  the author's. A proof with no property but its transaction, as
-  `AtDesk`, is not held to this: a fun that takes one acts for
-  everyone the gate let in.
 - **A proof's transaction is used only before the dot.** It is
   written as the receiver of one of the five calls, or as an argument
   of a proof's constructor or `copy` that fills that proof's own
@@ -1700,10 +1688,10 @@ and in such a file three rules hold:
   itself the work, in the gate or in a `fun`, which runs in the
   transaction.
 
-A data class that is not of this shape is held to none of the three.
+A data class that is not of this shape is held to neither.
 A gate gives none that holds a transaction but in a proof's own
 marked one (15.2): a transaction a gate hands on is always held by the
-three, and a gate's `P` is a proof, or holds proofs, or facts alone, as `data class Clerk(val address: String)`,
+two, and a gate's `P` is a proof, or holds proofs, or facts alone, as `data class Clerk(val address: String)`,
 which work that runs outside reads with no transaction to have ended.
 
 ## 16. Tests

@@ -202,14 +202,14 @@ fun Raise<String>.requireStorefrontToAct(call: OpsCall, person: Driver, slug: St
 
 Kogo holds nothing here: it knows no tenant. cusoon2's marker
 `@BindsTenant` ports as it is (spec 11), opted into by the gates'
-file alone, and in a port a binding in the work would run on a
-proof's transaction and bind nothing of it, which the rule on
-statements refuses. It is a habit and not yet a rule while
-`driverJobs` loops over tenants, and becomes a rule once
-`operatorJobs`, one call per operator, replaces it (DEV-945;
-`doc/roadmap.md`, "Settled for the ops site"); the checker's part
-is built with the rule on statements. Agreed with Greg on 17 Nov
-2026; made in cusoon2's Kotlin first.
+file alone. It is a habit and not yet a rule while `driverJobs`
+loops over tenants, and was to become a rule once `operatorJobs`,
+one call per operator, replaced it (DEV-945; `doc/roadmap.md`,
+"Settled for the ops site"). Agreed with Greg on 17 Nov 2026; made
+in cusoon2's Kotlin first. The checker's part was to be built on the
+rule that a statement binds something of its proof. That rule left
+the language on 20 Nov 2026 ("Weighed and not taken"), so how
+`@BindsTenant` is held is open.
 
 ### A gate that reads no input is shared
 
@@ -238,8 +238,7 @@ function says in its signature whose authority it acts under.
   the caller is inside this tenant and may read what any of its users
   may. Row-level security in Postgres scopes its statements on a table
   that has it, and nothing scopes them on one that has not (cusoon2's
-  `person`, `session`, `business`). It is not held to the rule on
-  statements, so it may also write: a journey, a booking's number,
+  `person`, `session`, `business`). It may also write: a journey, a booking's number,
   Google's answers, rows that belong to no caller. A function that
   takes it acts with the whole tenant's authority, so each model
   function demands the narrowest proof that does its job. Every proof
@@ -257,25 +256,7 @@ function says in its signature whose authority it acts under.
 - **A proof carries facts.** A rule that needs data the gate has not
   read stays in the work and reads the proof: `held.isAdmin`.
 
-### A statement binds something from its proof
-
-A statement run on a proof's transaction binds at least one other
-property of that proof, written directly.
-
-```kotlin
-// Refused: runs on booking's transaction and binds nothing of booking.
-fun deletePassenger(booking: HeldBooking, passengerId: ID): Boolean =
-    booking.tx.execute(sql"delete from passenger where id = $passengerId") == 1
-
-// Accepted.
-fun deletePassenger(booking: HeldBooking, passengerId: ID): Boolean =
-    booking.tx.execute(sql"delete from passenger where id = $passengerId and booking_id = ${booking.id}") == 1
-```
-
-The checker reads the receiver of the call and the values the literal
-binds, both of which it has; it does not read the SQL. The rule holds
-whichever way SQL's parameters come to be spelt (DEV-894). A proof
-with nothing but the transaction, as `AtTenant`, is not held to it.
+### A proof's transaction stays in it
 
 **A proof's transaction is used only before the dot.** It is written
 as the receiver of one of the five calls, `booking.tx.execute(...)`,
@@ -284,10 +265,11 @@ proof's own marked `tx`, `HeldBooking(id, booker.tenant, booker.tx)`,
 so that making a thing can give its proof; and nowhere else: not kept
 in a `val`, passed to a function or to any other constructor, or
 returned. In a constructor it goes from one proof into another, where
-both rules hold it again, and only a file that opts in can call the
+the rule holds it again, and only a file that opts in can call the
 constructor; that the facts put into the new proof are the new row's
 is not held, as for any proof (agreed with Greg on 18 Nov 2026). Without
-this the rule is passed by a helper, the shape cusoon2's model is in
+this a proof reaches a helper that takes a bare `Tx` and an id, whose
+signature no longer says whose authority it acts under, the shape cusoon2's model is in
 already (`scoped.kt`: a public function takes the held row and calls a
 private one by id):
 
@@ -301,7 +283,8 @@ fun removePassenger(booking: HeldBooking, passengerId: ID): Boolean =
 model.kg:2:5 proof-tx-escapes: booking.tx is passed to deletePassenger; a proof's transaction is used only as booking.tx.query/execute/...: pass booking instead
 ```
 
-So a helper takes the proof, and its statements are under the rule.
+So a helper takes the proof, and its signature says whose authority
+it acts under.
 Work done under several proofs takes an interface they implement
 (spec 3.4), `interface OnBooking { val id: ID; @UnscopedRead val tx:
 Tx }`. Code that holds a bare transaction (a gate, an ungated
@@ -345,8 +328,7 @@ So `anyone` is not the only public door: any gate that never refuses
 is one, and the printed table names it on each row it serves. A gate
 that checks several things gives a proof that holds a list, as hiding
 several bookings at once does
-(`data class AdminBookings(val bookings: List<AdminBooking>)`); each
-statement of the work binds one of them. Neither shape changes the
+(`data class AdminBookings(val bookings: List<AdminBooking>)`). Neither shape changes the
 language.
 
 ### Ungated: logins and logout
@@ -625,8 +607,8 @@ The file enforces nothing: it is what a reviewer reads.
 - **A write made under `AtTenant` is marked `(tenant-wide)`**, since
   no rule holds it: `journey` above is meant, and a `passenger` so
   marked is a diff someone has to explain. The printer knows which
-  proof's transaction a statement runs on, as the rule on statements
-  does. Perhaps 10 lines. Agreed with Greg on 17 Nov 2026.
+  proof's transaction a statement runs on, as the checker of
+  `proof-tx-escapes` does. Perhaps 10 lines. Agreed with Greg on 17 Nov 2026.
 - **A view is listed by its own name**, read or written.
 - **It does not see** inside a function, under a view, or a row that a
   foreign key's cascade or a trigger changes. It lists what the
@@ -978,7 +960,6 @@ binding says `action` or nothing, and nothing more.
   work's second parameter.
 - A gate named with an input takes the work's input type.
 - Gated work takes no `Request`, `Tx` or `Db`.
-- A statement on a proof's transaction binds something of the proof.
 - A proof's transaction is written only as the receiver of one of the
   five calls, or as a proof constructor's argument for that proof's
   marked `tx`.
@@ -1014,7 +995,7 @@ does.
 
 The gates, the roles and states, the refusals' words, the proofs and
 their facts. The language gains two words in the `api` list, the shape
-of gated work, and one rule on statements. Constants are named in
+of gated work, and proofs. Constants are named in
 upper case, with `_ROLES` and `_STATES`, as Kotlin's conventions have
 it: a habit of the application's code, not a rule.
 
@@ -1027,7 +1008,7 @@ it: a habit of the application's code, not a rule.
   one, whose shape becomes environment, proof, input.
 - **7:** a function that touches the database has a `Tx`, a `Db` or a
   proof as a parameter.
-- **15, a new part:** proofs, the rule on statements and on a proof's
+- **15, a new part:** proofs, the rule on a proof's
   transaction, the read-only gate and the outside step.
 - **3.4 and 11:** an interface may declare a marked `val`, so proofs
   share one (`OnBooking`), and a data class may implement a `val`
@@ -1066,7 +1047,8 @@ it: a habit of the application's code, not a rule.
   path in the printed file and the checker's sight of each route's
   translation, is lost. Reopen at five routes.
 - **Following a proof's transaction through `val`s and arguments**, so
-  that a helper it reaches is held to the rule on statements. A walk of
+  that a helper it reaches is held to the rule on statements (since
+  taken out, below). A walk of
   where each value goes, perhaps 100 lines, and a rule that holds
   somewhere other than where it is written. The rule as first written,
   on the receiver alone, was passed by any helper.
@@ -1091,7 +1073,7 @@ it: a habit of the application's code, not a rule.
   by row, not by action, so a payer who may choose a card and not edit
   the notes has no place in it; it does nothing for an admin; and it
   needs a policy on about 15 tables. The rule on statements took its
-  place.
+  place, and has since left too (below).
 - **A proof type for each role and state.** Eight sets of states for
   14 operations is a type for nearly each one. The admin's type alone
   was taken.
@@ -1108,6 +1090,19 @@ it: a habit of the application's code, not a rule.
   data class, a function that fills it and a fourth name in its row.
   And the step left as first sketched: its own example broke the rule
   on actions, and SQL in it failed only when run.
+- **A statement binds something of its proof**:
+  one of the five calls on a proof's transaction binds, in its
+  literal, another property of that proof, `${booking.id}` beside
+  `booking.tx`. Taken out on 20 Nov 2026
+  (Greg; DEV-1029). The survey of cusoon2's checks (cusoon2's
+  `doc/plans/checks-survey.md`, Q1) ran it against 82 gated
+  operations: in 27 the proof has nothing to bind and in 16 more only
+  the caller's id, and since the port's one `Model` carries the
+  transaction, no proof of the port is held to it. A rule that guards
+  nothing still costs every reader and every author it refuses.
+  Proofs, their marked transaction and the rule that it is used only
+  before the dot stay. Reopen with a port whose proofs each hold
+  their transaction and their rows (`decisions.md`, 20 Nov 2026).
 - **An empty work for an operation that writes nothing of ours**,
   with the outside step's answer handed to it. A transaction for
   nothing, and a second run of the gate that can refuse after the
@@ -1155,8 +1150,8 @@ it: a habit of the application's code, not a rule.
   notes, setting its driver, and submitting a booking. The work of
   adopting it is in the model: each of some 150 functions says which
   proof it demands.
-- Not sized as a whole. The rule on statements is perhaps 30 to 50
-  lines of checker, and the rule on a proof's transaction 20 to 30. The tables of the printed table are perhaps 35
+- Not sized as a whole. The rule on a proof's transaction is perhaps
+  20 to 30 lines of checker. The tables of the printed table are perhaps 35
   lines of the SQL pass to read them, 8 to tell a lock, 30 to print
   and 15 for the command, with the walk of the functions an operation
   reaches shared with the gate's read-only check, which is perhaps 10

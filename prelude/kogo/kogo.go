@@ -348,7 +348,13 @@ func String_FilterNot(this string, predicate func(rt.Char) bool) string {
 	return string(utf16.Decode(kept))
 }
 
-func String_Lowercase(this string) string { return strings.ToLower(this) }
+// String_Lowercase is Go's strings.ToLower but for U+0130, which it
+// maps to i and a combining dot as Kotlin does (Java's ROOT locale).
+// It leaves the rest of Java's special casing, which reads the letters
+// either side: a final Σ is σ here and ς in Kotlin (spec.md 12).
+func String_Lowercase(this string) string {
+	return strings.ToLower(strings.ReplaceAll(this, "İ", "i\u0307"))
+}
 
 func String_Contains_String(this, other string) bool { return strings.Contains(this, other) }
 

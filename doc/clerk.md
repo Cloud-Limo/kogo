@@ -128,10 +128,11 @@ the merge, and `--match-head-commit` holds the head alone. When it
 fails for a Kogo PR, merge the base there yourself, `git merge
 origin/main -m "Merge main into dev-NNN"`, never a rebase: a clean
 merge of the base changes nothing the Review read, so it is yours
-though you write no code. Run the checks below on the merged tree,
-`git push`, and merge on its head; if `main` moved again meanwhile,
-do the same once more, then hand on. When the merge conflicts, `git
-merge --abort`, merge nothing and launch a Fix whose brief asks only
+though you write no code. `git push` it, then run the checks below on
+the merged tree and merge on its head. Just before `gh pr merge`, fetch
+and test `--is-ancestor` again: if `main` moved, do the same once more;
+if it moves a third time, hand on. When the merge conflicts,
+`git merge --abort`, merge nothing, launch a Fix whose brief asks only
 that it merge the base, test and push. For a cusoon2 PR, merge
 nothing and write no `ready`: launch that Fix. But when a cusoon2
 PR's own diff (`git diff --name-only origin/renew...HEAD`) touches

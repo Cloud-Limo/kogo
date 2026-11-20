@@ -76,6 +76,12 @@ func TestAsKotlin(t *testing.T) {
 	if Char_DigitToInt('7') != 7 || Char_DigitToInt('٣') != 3 {
 		t.Error("digitToInt misreads 7 or the Arabic-Indic 3")
 	}
+	// Kotlin lowercases U+0130 to i and a combining dot, Go to a bare i.
+	for _, c := range []struct{ s, want string }{{"İ", "i\u0307"}, {"İvy@X.com", "i\u0307vy@x.com"}} {
+		if got := String_Lowercase(c.s); got != c.want {
+			t.Errorf("%q.lowercase() is %q, want %q", c.s, got, c.want)
+		}
+	}
 	re := Regex_String("[0-9]{2}|a")
 	if !Regex_Matches(re, "12") || Regex_Matches(re, "123") || Regex_Matches(re, "ab") || !rt.Equal(re, Regex_String("[0-9]{2}|a")) {
 		t.Error("matches is of the whole input, and two of one pattern are equal")

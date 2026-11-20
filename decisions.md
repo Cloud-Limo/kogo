@@ -3559,6 +3559,12 @@ Each entry: what was decided, why, and what would reopen it.
 - **A binding that says nothing is not refused** (DEV-962's entry; since 20 Nov 2026 a
   binding says `action` or nothing, above): nothing marks which bindings call outside,
   and nothing checks that one that says nothing is right to.
+- **A DELETE with no fields sends no body and no `Content-Type`** (the lead, 20 Nov
+  2026; DEV-1010), as FusionAuth's Java client and most clients send one, and a service
+  may refuse a body on a DELETE. A POST, PUT or PATCH with no fields still sends `{}` or
+  the empty form, since an empty object is what such a call expects. Not taken: no body
+  for every method with no fields. Reopen when a service refuses `{}` on an empty POST,
+  PUT or PATCH, or a port's Kotlin sends one with no body.
 
 ## Taken building what `main` needs (DEV-986), not yet discussed
 

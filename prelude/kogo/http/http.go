@@ -247,6 +247,8 @@ func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 	switch {
 	case e.method == "GET":
 		query = form(query, "", fields)
+	case e.method == "DELETE" && len(fields) == 0:
+		// No body and no Content-Type, as most clients send a DELETE.
 	case h.s.Encoding == Form:
 		body, contentType = form(nil, "", fields), "application/x-www-form-urlencoded"
 	default:

@@ -33,8 +33,9 @@ for DEV-NNN exited N: <its last line>`, then the command and its last
 lines. Anyone may say "Clerk DEV-NNN" by hand.
 
 You launch runs, check, merge and tidy. You write no code and make no
-commit, you run no Pickup, Code review or Fix yourself, and you make no
-choice a step left open: that goes to the lead. Write every file a
+commit but the merge of `main` into a Kogo PR that Merging gives, you
+run no Pickup, Code review or Fix yourself, and you make no choice a
+step left open: that goes to the lead. Write every file a
 command reads (`clerk.md`, `brief.md`, the `Merged:` text) under
 `/tmp`, in a directory of its own from `mktemp -d`, and never in a
 checkout: one left in the issue's worktree makes it not clean, so
@@ -124,8 +125,16 @@ there `git fetch origin` and `git merge-base --is-ancestor
 origin/<base> HEAD`, the base being `main` for Kogo and `renew` for
 cusoon2: checks on a head the base has since passed say nothing of
 the merge, and `--match-head-commit` holds the head alone. When it
-fails, merge nothing and write no `ready`: launch a Fix whose brief
-asks only that it merge the base, test and push. But when a cusoon2
+fails for a Kogo PR, merge the base there yourself, `git merge
+origin/main -m "Merge main into dev-NNN"`, never a rebase: a clean
+merge of the base changes nothing the Review read, so it is yours
+though you write no code. `git push` it, then run the checks below on
+the merged tree and merge on its head. Just before `gh pr merge`, fetch
+and test `--is-ancestor` again: if `main` moved, do the same once more;
+if it moves a third time, hand on. When the merge conflicts,
+`git merge --abort`, merge nothing, launch a Fix whose brief asks only
+that it merge the base, test and push. For a cusoon2 PR, merge
+nothing and write no `ready`: launch that Fix. But when a cusoon2
 PR's own diff (`git diff --name-only origin/renew...HEAD`) touches
 `kogo/` or a file `renew`'s `kogo/pins` names
 (`git show origin/renew:kogo/pins`), that Fix runs `kogo/run.sh`,

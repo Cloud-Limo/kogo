@@ -694,6 +694,15 @@ Each entry: what was decided, why, and what would reopen it.
   is gone, the clerk seeing a Zed session's comment.
   Reopen if what is handed on waits too long for a "Lead", or the clerk merges what a
   lead would have stopped.
+- **The clerk merges `main` into a Kogo PR behind it** (20 Nov 2026, Greg; DEV-1013).
+  When the head does not hold `origin/main`, the clerk merges it in the worktree, pushes,
+  runs the checks on the merged tree and merges on the new head, fetching just before the
+  merge and doing the same once more if `main` moved; only a conflict launches a Fix. A
+  clean merge of the base changes nothing the Review read, so it is the one commit the
+  clerk makes. Not taken: a Fix run for each base merge (DEV-1005), which cost Kogo PR 111
+  two runs, and whose cost grows with the square of the PRs open. A third tip of `main`
+  is handed on, not chased. cusoon2 keeps the Fix, its check being cloud CI on the pushed
+  head. Reopen if a clean merge breaks what a Review passed.
 - **The emitted Go names its source inline, by a relative path** (15 Nov 2026). Each line of
   Go begins with its own position, `/*line ../../src/a.kg:26*/`, padded so that a file's
   code starts at one column, then indented a tab for each block or closure it is in. Nobody

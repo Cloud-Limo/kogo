@@ -308,6 +308,20 @@ func TestWhatIsSent(t *testing.T) {
 	panics(t, "field: rate is NaN, which no service reads", func() { Field_String_Double("rate", rt.Div(0.0, 0.0)) })
 }
 
+// A DELETE with no fields sends no body and no Content-Type, in
+// either encoding.
+func TestDeleteWithNoFields(t *testing.T) {
+	for _, encoding := range []Encoding{JSON, Form} {
+		got := ""
+		h, _ := serve(t, Service{Encoding: encoding}, func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			got = fmt.Sprintf("%q %q", r.Header["Content-Type"], body)
+		})
+		Http_Perform(h, Action_String_String("DELETE", "/thing"), nil)
+		want(t, "a DELETE with no fields", got, `[] ""`)
+	}
+}
+
 // A failed send is sorted by how far it got and by its status alone,
 // whichever call made it.
 func TestFailures(t *testing.T) {

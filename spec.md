@@ -1075,7 +1075,9 @@ each form.
   sent as it is. Every name is a literal string of the service's. Kogo
   code never says how fields travel: a `GET`'s are in the query, and
   any other call's are the body, in the handle's encoding and the order
-  written. A form writes a group's field as `group[name]`, a list's
+  written; a `DELETE` with no fields sends no body and no
+  `Content-Type`, and any other call with none sends `{}` or the empty
+  form. A form writes a group's field as `group[name]`, a list's
   values each as `name[]` and a `Json` as its text; JSON writes a
   group as an object and a list as an array.
 - `http.withHeader(name, value): Http` is a new handle with one more

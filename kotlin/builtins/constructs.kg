@@ -1,0 +1,329 @@
+// The language's constructs (spec 6 and 6.1), one case each, so
+// kotlinc and Kogo run the same `when`, `if`, `?:`, loop and jump.
+// Each value depends on the inputs, so the edges and the random cases
+// reach each branch; an order is shown by a local fun that appends to
+// a local var. A `when` over a String outside constructs keeps its
+// branches on its own line: cases gen reads `"word" ->` as a case.
+package builtins
+
+enum class Light { red, amber, green }
+
+sealed interface Shape {
+    data class Dot(val n: Int) : Shape
+    data class Line(val length: Int) : Shape
+    data object Empty : Shape
+}
+
+data class Box(val a: Long, val b: String = "b", val c: Int = 0)
+
+fun constructs(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int, m: Int, x: Long, y: Long, d: Double): String? = when (f) {
+    "whenConst" -> "${band(n)} ${band(m)} ${band(n % 25)} ${bandLong(x)} ${bandLong(y)}"
+    "whenString" -> "${word(s)} ${word(t)} ${word(s.take(1))}"
+    "whenEnum" -> "${light(lightOf(n))} ${light(lightOf(m))}"
+    "whenBoolean" -> "${flag(n > m)} ${flag(s == "")}"
+    "whenIs" -> "${shape(shapeOf(n))} ${shape(shapeOf(m))}"
+    "whenNullable" -> "${nullable(n.takeIf { it % 3 != 0 })} ${nullable(m.takeIf { it > 0 })}"
+    "whenDouble" -> "${dbl(d)} ${dbl(-d)} ${dbl(d * 0.0)} ${dblN(d.takeIf { n > 0 })} ${dblN(-d)}"
+    "whenOrder" -> "${order(n)} ${order(m)} ${order(n % 5)}"
+    "whenSubject" -> "${subjectOnce(n)} ${subjectOnce(m)}"
+    "whenCondOrder" -> "${condOrder(n)} ${condOrder(m)}"
+    "whenJumps" -> "${jumps(xs)} ${jumps(ys)} ${jumps(xs + ys)}"
+    "whenStatement" -> "${stmt(n)} ${stmt(m)} ${stmt(n % 12)}"
+    "whenBlocks" -> "${blocks(n)} ${blocks(m)}"
+    "whenPrecedence" -> "${prec(s, n)} ${prec(t, m)} ${prec(s, -m)}"
+    "whenNested" -> "${mix(s.takeIf { n > 0 }, m)} ${mix(t.takeIf { it.isNotEmpty() }, n)}"
+    "ifValue" -> "${if (n > m) "gt" else if (n == m) "eq" else "lt"} ${if (s == "") 0 else s.length + n}"
+    "ifStatement" -> ifStatement(n, m, s)
+    "elvisValue" -> "${xs.firstOrNull() ?: y} ${s.takeIf { it.length > n } ?: t} ${ys.lastOrNull() ?: xs.firstOrNull() ?: x}"
+    "elvisJump" -> "${elvisReturn(s, t, n)} ${elvisLoop(xs, ys)}"
+    "safeCall" -> "${s.takeIf { it.isNotEmpty() }?.length} ${xs.firstOrNull()?.coerceAtLeast(y)?.coerceAtMost(x)} ${shapeOrNull(n)?.let { shape(it) }?.length}"
+    "scope" -> scopes(xs, s, n, x)
+    "forLoops" -> forLoops(xs, ys, n, m)
+    "whileLoop" -> whiles(n, m, xs)
+    "breakContinue" -> breaks(xs, n)
+    "defaults" -> "${Box(x)} ${Box(x, c = n)} ${Box(b = s, a = y)} ${greet(s)} ${greet(s, times = n % 4)} ${greet(times = m % 3, who = t)}"
+    "copy" -> "${Box(x, s, n).copy(b = t)} ${Box(x).copy(c = m, a = y)} ${Box(y, t) == Box(x, s).copy(a = y, b = t)}"
+    "destructure" -> destructure(xs, s, t, n)
+    "smartCast" -> smart(shapeOf(n), xs.firstOrNull(), s.takeIf { m > 0 })
+    "templates" -> "${"<${s.length}${if (n > 0) "+${n}${"!${t}"}" else "${"-"}$m"}>"} $s$t\$n ${'$'}x ${x}y ${xs}${ys.size}"
+    "precedence" -> "${x + y * 2 - x % 3} ${n - m - 1} ${n / 2 * 2} ${-n % 3} ${x > y == n > m} ${n > 0 || m > 0 && n < m} ${!(n > m) && s == "" || t == ""} ${x - y + 1 in 0L..10L} ${n + 1 in 0 until m}"
+    "evalOrder" -> evalOrder(n, m)
+    else -> null
+}
+
+fun lightOf(n: Int): Light? = if (n % 4 == 0) null else if (n % 4 == 1 || n % 4 == -1) Light.red else if (n > 0) Light.amber else Light.green
+
+fun shapeOf(n: Int): Shape = if (n > 0) Shape.Dot(n) else if (n < 0) Shape.Line(-n) else Shape.Empty
+
+fun shapeOrNull(n: Int): Shape? = if (n == 1) null else shapeOf(n)
+
+fun band(n: Int): String = when (n) {
+    0 -> "zero"
+    1, 2 -> "few"
+    in 3..9 -> "some"
+    in 10 until 20 -> "teens"
+    else -> "many"
+}
+
+fun bandLong(n: Long): String = when (n) {
+    0L -> "zero"
+    in 1L..9L -> "some"
+    -1L, -2L -> "low"
+    else -> "many"
+}
+
+fun word(s: String): Int = when (s) { "a" -> 1; "b", "c" -> 2; "" -> 0; else -> -1 }
+
+fun light(l: Light?): String = when (l) {
+    Light.red -> "stop"
+    Light.amber, Light.green -> "go"
+    null -> "off"
+}
+
+fun flag(b: Boolean): Int = when (b) {
+    true -> 1
+    false -> 0
+}
+
+fun shape(s: Shape): String = when (s) {
+    is Shape.Dot -> "dot ${s.n}"
+    is Shape.Line -> "line ${s.length}"
+    Shape.Empty -> "empty"
+}
+
+fun nullable(x: Int?): Int = when (x) {
+    null -> -1
+    0 -> 0
+    else -> x + 1
+}
+
+fun dbl(x: Double): String = when (x) {
+    0.0 -> "zero"
+    1.5, -1.5 -> "half"
+    else -> "other"
+}
+
+fun dblN(x: Double?): String = when (x) {
+    0.0 -> "zero"
+    null -> "null"
+    else -> "other"
+}
+
+fun order(n: Int): String {
+    var log = ""
+    fun hit(tag: String, v: Boolean): Boolean {
+        log += tag
+        return v
+    }
+    val r = when {
+        hit("a", n == 1) -> "one"
+        hit("b", n == 2) || hit("c", n == 3) -> "two-three"
+        hit("d", n == 4) && hit("e", true) -> "four"
+        else -> "else"
+    }
+    return "$r $log"
+}
+
+fun subjectOnce(n: Int): String {
+    var count = 0
+    fun next(): Int {
+        count += 1
+        return n
+    }
+    val r = when (next()) {
+        1 -> "one"
+        2, 3 -> "two-three"
+        in 4..6 -> "mid"
+        else -> "else"
+    }
+    return "$r $count"
+}
+
+fun condOrder(n: Int): String {
+    var log = ""
+    fun v(tag: String, k: Int): Int {
+        log += tag
+        return k
+    }
+    val r = when (n) {
+        v("a", 1) -> "one"
+        v("b", 2), v("c", 3) -> "two-three"
+        in v("d", 4)..v("e", 6) -> "mid"
+        else -> "else"
+    }
+    return "$r $log"
+}
+
+fun jumps(xs: List<Long>): String {
+    var out = ""
+    for (x in xs) {
+        val t = when {
+            x == 2L -> continue
+            x > 5L -> break
+            x == 3L -> return "three $out"
+            else -> "x$x"
+        }
+        out += t
+    }
+    return out
+}
+
+fun stmt(n: Int): String {
+    var out = "start"
+    when (n) {
+        1 -> out += " one"
+        2 -> {
+            out += " two"
+            out += " more"
+        }
+    }
+    when {
+        n > 0 -> when {
+            n > 10 -> out += " big"
+            else -> out += " small"
+        }
+        else -> out += " neg"
+    }
+    return out
+}
+
+fun blocks(n: Int): Int = when {
+    n > 0 -> {
+        val d = n * 2
+        d + 1
+    }
+    else -> {
+        0
+    }
+}
+
+fun mix(s: String?, n: Int): String {
+    val t = s ?: return "none"
+    return "${when (n) { 0 -> t; else -> if (n > 0) t + t else "" }}!"
+}
+
+fun prec(s: String, n: Int): String = when {
+    "a" in s || "b" in s && n > 0 -> "1"
+    n + 1 in 2..3 == (n > 5) -> "2"
+    n * 2 - 1 < 0 == (s.length == 0) -> "3"
+    else -> "4"
+}
+
+fun ifStatement(n: Int, m: Int, s: String): String {
+    var out = ""
+    if (n > m) {
+        out += "gt"
+    } else if (n == m) {
+        out += "eq"
+    } else {
+        out += "lt"
+    }
+    if (s.isNotEmpty()) out += " text"
+    if (n > 0) out += " pos" else out += " nonpos"
+    return out
+}
+
+fun elvisReturn(s: String, t: String, n: Int): String {
+    val a = s.takeIf { it.length > n } ?: return "short"
+    val b = t.takeIf { it.isNotEmpty() } ?: return "empty $a"
+    return "$a $b"
+}
+
+fun elvisLoop(xs: List<Long>, ys: List<Long>): String {
+    var out = ""
+    for (x in xs) {
+        val k = x.takeIf { it != 0L } ?: continue
+        val l = ys.firstOrNull { it == k } ?: break
+        out += "$k:$l "
+    }
+    return out
+}
+
+fun scopes(xs: List<Long>, s: String, n: Int, x: Long): String {
+    var log = ""
+    val a = xs.also { log += "also ${it.size} " }.let { it.size + n }
+    val b = s.takeIf { it.length > n }?.let { it + "!" }?.also { log += "kept " }
+    val c = x.takeIf { it > 0L }.let { it ?: -1L }
+    return "$a $b $c $log"
+}
+
+fun forLoops(xs: List<Long>, ys: List<Long>, n: Int, m: Int): String {
+    var out = ""
+    for (x in xs) out += "$x,"
+    for (i in n % 5..m % 5) out += " i$i"
+    for (i in 0 until n % 6) out += " u$i"
+    for (i in 0L until xs.size.toLong()) out += " l$i"
+    for ((a, b) in xs.zip(ys)) out += " ${a - b}"
+    for ((k, v) in listOf(n to "n", m to "m")) out += " $k=$v"
+    return out
+}
+
+fun whiles(n: Int, m: Int, xs: List<Long>): String {
+    var i = n % 7
+    var out = ""
+    while (i < m % 7) {
+        out += "w$i "
+        i += 1
+    }
+    var rest = xs
+    while (rest.isNotEmpty() && rest.first() >= 0L) rest = rest.drop(1)
+    return "$out$i $rest"
+}
+
+fun breaks(xs: List<Long>, n: Int): String {
+    var out = ""
+    for (x in xs) {
+        if (x < 0L) continue
+        if (x > n.toLong()) break
+        out += "$x "
+    }
+    var i = 0
+    while (true) {
+        i += 1
+        if (i % 2 == 0) continue
+        if (i > n % 9) break
+        out += "o$i"
+    }
+    return "$out $i"
+}
+
+fun greet(who: String, times: Int = 1, sep: String = "-"): String {
+    var out = ""
+    for (i in 0 until times) out += if (i == 0) who else "$sep$who"
+    return "[$out]"
+}
+
+fun destructure(xs: List<Long>, s: String, t: String, n: Int): String {
+    val (a, b) = s to t
+    val (p, q, r) = Box(xs.size.toLong(), s + t, n)
+    val (first, _) = (xs.firstOrNull() ?: 0L) to n
+    return "$b$a $p $q $r $first"
+}
+
+fun smart(sh: Shape, x: Long?, s: String?): String {
+    var out = ""
+    if (sh is Shape.Dot) out += "dot${sh.n + 1}"
+    if (sh is Shape.Line && sh.length > 2) out += "long${sh.length}"
+    if (x != null) out += " ${x + 1L}"
+    if (s == null) return "$out null"
+    return "$out ${s.length}"
+}
+
+fun evalOrder(n: Int, m: Int): String {
+    var log = ""
+    fun at(tag: String, k: Int): Int {
+        log += tag
+        return k
+    }
+    fun three(a: Int, b: Int, c: Int): Int = a * 100 + b * 10 + c
+    val sum = at("a", n) + at("b", m) * at("c", 2)
+    val args = three(at("d", n % 10), at("e", m % 10), at("f", 1))
+    val named = three(c = at("g", 1), a = at("h", 2), b = at("i", 3))
+    val cmp = at("j", n) > at("k", m) && at("l", 0) == 0 || at("m", 1) == 1
+    val r = when (at("n", n % 3)) {
+        at("o", 0) -> "zero"
+        at("p", 1), at("q", 2) -> "one-two"
+        else -> "else"
+    }
+    return "$sum $args $named $cmp $r $log"
+}

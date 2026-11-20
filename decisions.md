@@ -3768,3 +3768,19 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
     own Go type in place of `Nothing`, which needs the checker's
     unnarrowed type at each call. Reopen when a port passes `Nothing` to
     a call that returns a value.
+
+## Constructs against kotlinc (DEV-1019), 20 Nov 2026
+
+- **`also` is added to the prelude**, `external fun <T> T.also(block:
+  (T) -> Unit): T`: spec 6 names `let`, `also` and `takeIf` as the
+  scope functions, and the prelude had only two, so the `scope` case
+  could not be written. Not taken: leaving `also` out of the case and
+  naming the gap for later; the spec already says what it is, and the
+  case now holds it to Kotlin. Reopen if `also` is to leave the spec.
+- **The constructs' cases are helpers called with the inputs, not one
+  `when` per construct inline**: a loop, a jump or a local `fun` needs
+  a body, so each case calls a top-level helper in
+  `kotlin/builtins/constructs.kg` once or twice with inputs, or a value
+  derived from them (`n % 5`), that reach its branches. Not taken:
+  fixed inputs per case, which the edges and random cases would not
+  vary.

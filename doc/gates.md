@@ -202,11 +202,14 @@ fun Raise<String>.requireStorefrontToAct(call: OpsCall, person: Driver, slug: St
 
 Kogo holds nothing here: it knows no tenant. cusoon2's marker
 `@BindsTenant` ports as it is (spec 11), opted into by the gates'
-file alone. It is a habit and not a rule: the checker's part was to
-be built with the rule that a statement binds something of its
-proof, which a binding in the work would break, and that rule left
-the language on 20 Nov 2026 ("Weighed and not taken"). Agreed with
-Greg on 17 Nov 2026; made in cusoon2's Kotlin first.
+file alone. It is a habit and not yet a rule while `driverJobs`
+loops over tenants, and was to become a rule once `operatorJobs`,
+one call per operator, replaced it (DEV-945; `doc/roadmap.md`,
+"Settled for the ops site"). Agreed with Greg on 17 Nov 2026; made
+in cusoon2's Kotlin first. The checker's part was to be built on the
+rule that a statement binds something of its proof. That rule left
+the language on 20 Nov 2026 ("Weighed and not taken"), so how
+`@BindsTenant` is held is open.
 
 ### A gate that reads no input is shared
 

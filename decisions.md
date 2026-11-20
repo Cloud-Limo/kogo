@@ -3799,9 +3799,8 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   stay. The refused cases removed with it are this decision's, not a
   loosening; one turned round holds that a statement on a proof's
   transaction that binds nothing of the proof passes. Not taken: a,
-  the rule kept and the port's `Model` exempt. Reopen with a port
-  whose proofs each hold their transaction and their rows.
-- **The `@BindsTenant` habit stays a habit** (`doc/gates.md`, "The
-  gate binds the tenant"): its check was to be built on this rule, so
-  it has no planned home now. Not taken: a check of its own, which no
-  issue asks for.
+  the rule kept and the port's `Model` exempt. `@BindsTenant`'s
+  planned check (`doc/gates.md`, "The gate binds the tenant") was to
+  be built on this rule; whether it gets one of its own is open, the
+  lead's, and comes up in DEV-945. Reopen with a port whose proofs
+  each hold their transaction and their rows.

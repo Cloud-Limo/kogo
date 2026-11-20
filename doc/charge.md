@@ -188,8 +188,8 @@ work daemon alertedBy opsAlert {
   flag added it; `lockedInvoice` says `for update`, as `record` asks.
   A rerun on a deadlock is safe: no step in a transaction acts.
 - **The daemon's own functions take a `Tx` and a bare id**
-  (`setChargeId(tx, row.id, ...)`), so the rule on statements never
-  fires there. A write shared with a request takes an interface the
+  (`setChargeId(tx, row.id, ...)`), so the rules on proofs never
+  fire there. A write shared with a request takes an interface the
   daemon wraps its transaction for: `recordPayment` is also an admin's
   marking paid, whose proof also implements `OnInvoice`, and
   `enqueueMail` every request's. So `enqueueMail` takes `InTenant`, not

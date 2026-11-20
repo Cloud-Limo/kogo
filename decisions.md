@@ -3784,3 +3784,24 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   derived from them (`n % 5`), that reach its branches. Not taken:
   fixed inputs per case, which the edges and random cases would not
   vary.
+
+## A statement need not bind its proof (DEV-1029), 20 Nov 2026
+
+- **The rule that a statement binds something of its proof leaves the
+  language** (Greg, 20 Nov 2026: the survey's Q1 b): spec 15.7's first
+  rule, the checker's `unbound-statement` and its cases go, and nothing
+  takes their place. The survey of cusoon2's checks (cusoon2's
+  `doc/plans/checks-survey.md`, Q1) ran it against 82 gated
+  operations: in 27 the proof has nothing to bind and in 16 more only
+  the caller's id, and since the port's one `Model` carries the
+  transaction, no proof of the port is held to it. Proofs, their
+  marked transaction, `proof-tx-escapes` and `outside-passes-proof`
+  stay. The refused cases removed with it are this decision's, not a
+  loosening; one turned round holds that a statement on a proof's
+  transaction that binds nothing of the proof passes. Not taken: a,
+  the rule kept and the port's `Model` exempt. Reopen with a port
+  whose proofs each hold their transaction and their rows.
+- **The `@BindsTenant` habit stays a habit** (`doc/gates.md`, "The
+  gate binds the tenant"): its check was to be built on this rule, so
+  it has no planned home now. Not taken: a check of its own, which no
+  issue asks for.

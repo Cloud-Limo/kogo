@@ -127,9 +127,8 @@ Agreed subject to this review:
 - **Every size.** None of this was sized as a whole on 17 Nov; the
   roadmap now sizes the work as a whole, by estimate
   (`doc/roadmap.md`, "The work, in order"). Guesses given: the
-  rule that a statement binds something of its proof, 30 to 50 lines
-  of checker, and that a proof's transaction is used only before the
-  dot, 20 to 30; the functions a gate reaches, for the read-only check,
+  rule that a proof's transaction is used only before the dot, 20 to
+  30 lines of checker; the functions a gate reaches, for the read-only check,
   60 to 100; the HTTP binding, 150 to 250 lines of Go, before its
   fields, its paths' ids and its `Json`, perhaps 90 more; the runner,
   about the Kotlin's 500; the tables of the printed table, about 90

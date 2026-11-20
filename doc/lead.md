@@ -113,9 +113,7 @@ Bring Greg one choice at a time, never a list of choices:
 
 A choice about the language starts from its use, before the lettered
 options: the use case in plain code, what the Kotlin does today, then
-each option beside it with what its author must write. Options drawn
-from the rule that exists leave out having no rule, which was Greg's
-answer on DEV-1020.
+each option beside it with what its author must write.
 
 Record his answer, dated, the same way as your own.
 
@@ -135,8 +133,7 @@ above. Check a claim against the code before passing it on.
   work it names, you file.
 - A move of Greg's (a Zed step, a cusoon2 PR ready to merge) goes in
   You can do now. When the clerk's `ready` line gives an order, `merge
-  before PR N` or `after`, the row's How says it: a port's PR that
-  goes behind `renew` costs him a Zed round.
+  before PR N` or `after`, the row's How says it.
 - Then take the label off, `lin label DEV-NNN lead --remove`: after
   the Ruling, or once Greg's move is in the boxes. The clerk leaves a
   labelled issue alone, and takes it up from its newest comment when
@@ -225,9 +222,9 @@ Launching a run in `doc/clerk.md` says, and you do not wait for it.
 - **Async** is the default otherwise: the issue stands alone and a
   launch comment can say the rest.
 - **On paper first**, as `pr fable high`, when a piece changes the
-  form of a port that later pieces will copy, its answers and rows
-  the same: `kogo/run.sh` cannot tell one form from another, so a
-  session coding it settles the design alone. A brief that proposes a
+  form of a port that later pieces will copy, while its answers and
+  rows stay the same: `kogo/run.sh` cannot tell one form from
+  another, so a session coding it settles the design alone. A brief that proposes a
   rule asks for its count against every instance, not a sample: on
   DEV-1020, a rule on statements would have read 4 of the port's 17.
 - **Zed** when Greg wants to watch or steer, when the work is a

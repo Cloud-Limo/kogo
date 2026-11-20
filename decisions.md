@@ -705,22 +705,27 @@ Each entry: what was decided, why, and what would reopen it.
   head. Reopen if a clean merge breaks what a Review passed.
 - **The lead's and the clerk's instructions, revised from a day's use** (20 Nov 2026,
   Greg, item by item; DEV-1023). Each cost a round trip on 20 Nov.
-  - A Budget outgrown is handed on only when the Review names something to cut or doubts
-    a thing added; otherwise its sizes go in `Merged:` or `ready`. Six hand-ons asked
-    "accept the size?" and each answer was yes. The Review brief asks what could go. It
+  - A Budget outgrown is handed on only when a Fix or a Question of the Review cuts
+    something or doubts a thing added; otherwise its sizes go in `Merged:` or `ready`.
+    Six hand-ons asked "accept the size?" and each answer was yes. The Review brief asks
+    it to answer each thing that could go as a Fix, a Won't fix or a Question. It
     changes "what is handed on" in the entry on the clerk above. Not taken: handing on
     every overrun.
-  - A cusoon2 `ready` line says which of two PRs merges first when one is a port and the
-    other could put it behind `renew`. Not taken: the lead holding small cusoon2 launches
-    while a port is in its Fix, which idles work for as long as a Zed step waits on Greg.
+  - A cusoon2 `ready` line says which of two reviewed PRs merges first when exactly one
+    is a port and the other could put it behind `renew`. Not taken: the lead holding small
+    cusoon2 launches while a port is in its Fix, which idles work for as long as a Zed
+    step waits on Greg.
   - A port's PR behind `renew` is caught up by a run, with no `kogo/run.sh`, when every
-    file the merge brings is under `doc/`, `infra/`, `frontend/` or `site/`. The run reads
-    nothing there (read in `kogo/run.sh` and the Gradle build, 20 Nov), so the comparison
-    is the one the head passed. Not taken: the issue's list of the run's inputs
-    (`backend/`, `jooq/`, `kogo/`), which had missed the Gradle build and fails open when
-    an input is added; the four fail closed. Reopen when `run.sh` reads under one of them.
+    path the merge brings, renames split, begins `doc/`, `infra/`, `frontend/` or
+    `site/`. The run reads nothing there (read in `kogo/run.sh` and the Gradle build,
+    20 Nov), so the comparison is the one the head passed. Not taken: the issue's list of
+    the run's inputs (`backend/`, `jooq/`, `kogo/`), which had missed the Gradle build and
+    fails open when an input is added; the four fail closed. Reopen when `run.sh` reads
+    under one of them.
   - A run's step comment is under its marker line: the rule on a comment's first line was
-    false for every run's as written, and one clerk reported a Handoff missing.
+    false for every run's as written, and one clerk reported a Handoff missing. It
+    changes "a step's comment counts only when its first line is the one on the issue"
+    in the entry on the clerk above.
   - A run that cannot start is tried again by the launcher, not the clerk: cusoon2's
     wrapper already retries once after a preemption, and a setup failure joins that
     (DEV-1027). Not taken: the poller starting a clerk to relaunch, a new event and a new

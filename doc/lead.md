@@ -125,8 +125,9 @@ Record his answer, dated, the same way as your own.
 
 ## Answering the clerk
 
-A `Clerk:` comment is a move of Greg's, or choices already written as
-above. Check a claim against the code before passing it on.
+A `Clerk:` comment is a move of Greg's, or choices, lettered as
+`doc/clerk.md` writes them: put each to Greg as above. Check a claim
+against the code before passing it on.
 
 - A choice that is yours: post `Ruling: <n>: <the answer>`. One that
   is Greg's: bring it to him, then post his answer as the Ruling. It

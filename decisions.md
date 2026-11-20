@@ -3860,5 +3860,6 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   the likely mistake, what catches it and one proposal, with lettered
   options kept for two answers that are truly close. A guide's last
   comment reaches the lead by the board's row for a comment that is no
-  step's; no row or word is added for it. Not taken: keeping the
-  lead's lettered options as its default.
+  step's, on an issue In Review; in any other state Greg, who ends the
+  sitting, brings it to his next "Lead". No row or word is added for
+  it. Not taken: keeping the lead's lettered options as its default.

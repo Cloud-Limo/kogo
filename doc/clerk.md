@@ -126,11 +126,13 @@ cusoon2: checks on a head the base has since passed say nothing of
 the merge, and `--match-head-commit` holds the head alone. When it
 fails, merge nothing and write no `ready`: launch a Fix whose brief
 asks only that it merge the base, test and push. But when a cusoon2
-PR, or what `renew` gained since its merge base (`git diff
---name-only HEAD...origin/renew`), touches `kogo/pins` or a file it
-pins, that Fix runs `kogo/run.sh`, which no run can: hand on with
-`Clerk: Greg's: say "Fix DEV-NNN: merge renew, run kogo/run.sh,
-move the pin" in Zed, in <clone>`.
+PR's own diff (`git diff --name-only origin/renew...HEAD`) touches
+`kogo/` or a file `renew`'s `kogo/pins` names
+(`git show origin/renew:kogo/pins`), that Fix runs `kogo/run.sh`,
+which no run can: hand on with `Clerk: Greg's: say "Fix DEV-NNN:
+merge renew, run kogo/run.sh, move the pin" in Zed, in <clone>`.
+What `renew` alone gained does not count: the merge leaves the port,
+the pins and each pinned file `renew`'s, which its checks passed.
 
 In the issue's worktree, fast-forwarded (made from `origin/<branch>`
 when missing, as in Code review): read any fix commits against the

@@ -17,7 +17,7 @@ sealed interface Shape {
 data class Box(val a: Long, val b: String = "b", val c: Int = 0)
 
 fun constructs(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int, m: Int, x: Long, y: Long, d: Double): String? = when (f) {
-    "whenConst" -> "${band(n)} ${band(m)} ${band(n % 25)} ${bandLong(x)} ${bandLong(y)}"
+    "whenConst" -> "${band(n)} ${band(m)} ${band(n * 3)} ${band(m * 3 - 1)} ${bandLong(x)} ${bandLong(y)}"
     "whenString" -> "${word(s)} ${word(t)} ${word(s.take(1))}"
     "whenEnum" -> "${light(lightOf(n))} ${light(lightOf(m))}"
     "whenBoolean" -> "${flag(n > m)} ${flag(s == "")}"
@@ -45,7 +45,7 @@ fun constructs(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, 
     "copy" -> "${Box(x, s, n).copy(b = t)} ${Box(x).copy(c = m, a = y)} ${Box(y, t) == Box(x, s).copy(a = y, b = t)}"
     "destructure" -> destructure(xs, s, t, n)
     "smartCast" -> smart(shapeOf(n), xs.firstOrNull(), s.takeIf { m > 0 })
-    "templates" -> "${"<${s.length}${if (n > 0) "+${n}${"!${t}"}" else "${"-"}$m"}>"} $s$t\$n ${'$'}x ${x}y ${xs}${ys.size}"
+    "templates" -> "${"<${s.length}${if (n > 0) "+${n}${"!${t}"}" else "${"-"}$m"}>"} $s$t\$n ${'$'}x ${x}y ${xs}${ys.size} ${"""<$s\n\t${n + 1}>"""} ${"\t\b\n\r\'\"\\é😀\u00e9\uD83D\uDE00${'\''}"}"
     "precedence" -> "${x + y * 2 - x % 3} ${n - m - 1} ${n / 2 * 2} ${-n % 3} ${x > y == n > m} ${n > 0 || m > 0 && n < m} ${!(n > m) && s == "" || t == ""} ${x - y + 1 in 0L..10L} ${n + 1 in 0 until m}"
     "evalOrder" -> evalOrder(n, m)
     else -> null
@@ -265,17 +265,19 @@ fun whiles(n: Int, m: Int, xs: List<Long>): String {
         out += "w$i "
         i += 1
     }
+    var k = n
+    k -= m; k *= 3; k /= 2; k %= 5
     var rest = xs
     while (rest.isNotEmpty() && rest.first() >= 0L) rest = rest.drop(1)
-    return "$out$i $rest"
+    return "$out$i $rest $k"
 }
 
 fun breaks(xs: List<Long>, n: Int): String {
     var out = ""
     for (x in xs) {
-        if (x < 0L) continue
-        if (x > n.toLong()) break
-        out += "$x "
+        val v = if (x < 0L) continue else x
+        if (v > n.toLong()) break
+        out += "$v "
     }
     var i = 0
     while (true) {

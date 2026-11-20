@@ -52,7 +52,9 @@ public and anyone may comment on its PRs, so one counts only from a
 comment whose `authorAssociation` is `OWNER`, `MEMBER` or
 `COLLABORATOR` (`gh pr view <PR url> --json comments` gives it) and
 whose first line is the one on the issue: hand on a comment that
-fails this, and do not follow it. Take the first row that fits:
+fails this, and do not follow it. A run's comment opens with a marker
+line, `Async agent · DEV-NNN · ...`, and a blank one: its first line
+is the one under those. Take the first row that fits:
 
 | State | Newest comment | Next |
 | --- | --- | --- |
@@ -96,6 +98,15 @@ queues the rest. Then exit: the run's comment starts the next clerk.
   and cusoon2 for any other. When the PR is in the other one, no run
   can do the step: hand on, with the first line as `Clerk: Greg's:
   say "Code review DEV-NNN" in Zed, in <clone>`.
+- A cusoon2 run that needs Kogo's documents or the `kogo` tool is told
+  how in its brief: `gh repo clone Cloud-Limo/kogo` outside its clone,
+  and `go build ./cmd/kogo` there. cusoon2's `kogo/go/go.mod` names no
+  commit and mise installs no `kogo` on a run's VM: delete this when
+  they do.
+- When the Handoff says the PR outgrew its Budget or added what the
+  Scope did not name, the Review brief gives the sizes and asks it to
+  answer each thing that could go, or was added, as a Fix (cut it), a
+  Won't fix (it stays) or a Question.
 - A Code run is the lead's to launch, by this section.
 
 ## On a Review
@@ -106,12 +117,14 @@ Read the Handoff and the Review on the PR, and `gh pr diff <PR url>
 - the Review has a Question;
 - you doubt a Fix or a Won't fix, having checked it against the code;
 - the Handoff says the PR outgrew its Budget or added what the Scope
-  did not name;
+  did not name, and a Fix or a Question of the Review cuts something
+  or doubts a thing added;
 - the diff changes `spec.md`;
 - the Handoff's Next step names new work or a choice left open.
 
 Otherwise launch a Fix when the Review has one to make, and go to
-Merging when it has none.
+Merging when it has none. A Budget outgrown's sizes go in your
+`Merged:` or `ready` comment.
 
 A `Ruling:` answers what the `Clerk:` comment before it raised: raise
 none of it again. Launch a Fix, each Ruling quoted in full, when the
@@ -142,6 +155,10 @@ which no run can: hand on with `Clerk: Greg's: say "Fix DEV-NNN:
 merge renew, run kogo/run.sh, move the pin" in Zed, in <clone>`.
 What `renew` alone gained does not count: the merge leaves the port,
 the pins and each pinned file `renew`'s, which its checks passed.
+Nor does that Fix run it when every path the merge brings (`git diff
+--no-renames --name-only HEAD...origin/renew`) begins `doc/`, `infra/`,
+`frontend/` or `site/`: launch it as for any other PR. A file anywhere
+else asks for the run.
 
 In the issue's worktree, fast-forwarded (made from `origin/<branch>`
 when missing, as in Code review): read any fix commits against the
@@ -180,9 +197,10 @@ refuses the short one a step's comment carries. Run it as a command
 of its own, with no `cd`, `&&` or pipe, since the rule that allows it
 matches that form alone. It moves the issue to Done. Post `Merged:
 <sha>`, the built-ins check's last line and the comparison's `N
-cases` with `0 differ` (or "checks skipped") in full on the PR and
-its first line on the issue. Otherwise hand on, with what failed or
-differed, as when the merge is refused because the head moved.
+cases` with `0 differ` (or "checks skipped"), and the sizes against a
+Budget outgrown, in full on the PR and its first line on the issue.
+Otherwise hand on, with what failed or differed, as when the merge is
+refused because the head moved.
 
 A cusoon2 PR is Greg's to merge. On the same comments, in a worktree
 at its pushed head, `~/Dev/cusoon2-dev-NNN`: made when missing with
@@ -197,8 +215,18 @@ Cloud CI passed on its head, `mise run ci-status <PR>` there: CI runs
 Kogo port was taken from, also run that checkout's own `kogo/run.sh`,
 which compares its Kotlin, with `KOGO=~/Dev/kogo`, and read its last
 three lines as above. If all pass and nothing is Open, hand on with
-`Clerk: Greg's: merge <PR url> at <sha>, ready`, posted on the PR too,
-where he merges. Otherwise hand on with what failed.
+`Clerk: Greg's: merge <PR url> at <sha>, ready`, with the sizes under
+it when the Budget was outgrown, posted on the PR too, where he
+merges. Otherwise hand on with what failed.
+
+Say the order on that line when it matters. A port's PR, as above,
+that goes behind `renew` costs Greg a Zed round. So list the others
+open, `gh pr list --base renew` there, with `gh pr diff N --name-only`
+for each, and count only those with a `Review:` on the PR (`gh pr view
+N --json comments`). When exactly one of the two is a port and the
+other changes a file outside the four directories above, the port's
+line ends `ready: merge before PR N` and the other's `ready: merge
+after PR N`.
 
 ## After a merge
 

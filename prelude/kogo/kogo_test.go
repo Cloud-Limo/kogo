@@ -557,25 +557,20 @@ func TestListEnds(t *testing.T) {
 	}
 }
 
-// orEmpty, isNullOrBlank, firstOrNull with a predicate and
-// contains(char), as Kotlin's: contains looks by UTF-16 units.
-func TestNullableAndOverloads(t *testing.T) {
+// firstOrNull with a predicate and contains(char), as Kotlin's:
+// contains looks by UTF-16 units.
+func TestOverloads(t *testing.T) {
 	list := ListOf[int32](1, 2, 3)
 	odd := func(x int32) bool { return x%2 == 1 }
 	big := func(x int32) bool { return x > 1 }
 	for _, c := range [][2]string{
-		{rt.ToString(List_OrEmpty(&list)) + rt.ToString(List_OrEmpty[int32](nil)), "[1, 2, 3][]"},
 		{rt.ToString(ListT_FirstOrNull_TToBoolean(list, odd)) + rt.ToString(ListT_FirstOrNull_TToBoolean(list, big)) + rt.ToString(ListT_FirstOrNull_TToBoolean(list, func(x int32) bool { return x > 3 })), "12null"},
 		{rt.ToString(ListT_FirstOrNull_TToBoolean(EmptyList[int32](), odd)), "null"},
-		{rt.ToString([]bool{String_IsNullOrBlank(nil), String_IsNullOrBlank(rt.Ptr(" \t")), String_IsNullOrBlank(rt.Ptr("\u0085")), String_IsNullOrBlank(rt.Ptr(" a"))}), "[true, true, false, false]"},
 		{rt.ToString([]bool{String_Contains_Char("a@b", '@'), String_Contains_Char("ab", '@'), String_Contains_Char("😀", 0xDE00), String_Contains_Char("", 'a')}), "[true, false, true, false]"},
 	} {
 		if c[0] != c[1] {
 			t.Errorf("got %q, want %q", c[0], c[1])
 		}
-	}
-	if List_OrEmpty[int32](nil) == nil {
-		t.Error("orEmpty of null is a nil list")
 	}
 }
 

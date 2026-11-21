@@ -38,7 +38,6 @@ external fun <T, R> List<T>.zip(other: List<R>): List<Pair<T, R>>
 external val String.length: Int
 external fun String.plus(other: String): String
 external fun String.compareTo(other: String): Int
-external fun String?.isNullOrBlank(): Boolean
 external fun String.toIntOrNull(): Int?
 external fun Int.toLong(): Long
 external fun Int.toDouble(): Double
@@ -247,6 +246,9 @@ func TestNames(t *testing.T) {
 		// Section 6: the scope functions that do not exist.
 		{"fun f(x: Int): Int = x.‸apply { 1 }", "kotlin-scope-function", "name the value and call it"},
 		{"fun f(x: Int): Int? = x.‸takeUnless { it > 1 }", "kotlin-scope-function", "use takeIf"},
+		// Section 14: the prelude has no nullable receiver.
+		{"fun f(s: String?): Boolean = s.‸isNullOrBlank()", "nullable-receiver", "isNullOrBlank is not Kogo: write x == null || x.isBlank()"},
+		{"fun f(xs: List<Int>?): List<Int> = xs.‸orEmpty()", "nullable-receiver", "orEmpty is not Kogo: write x ?: emptyList()"},
 	})
 	// A hint names only an import Kogo has.
 	for src, want := range map[string]string{
@@ -503,7 +505,6 @@ func TestNarrowing(t *testing.T) {
 		"fun f(xs: List<Int?>): List<Int> = xs.map { if (it != null) it else 0 }",
 		"fun f(x: Int?): Int = x?.let { it + 1 } ?: 0",
 		"fun f(x: Int?): Int = requireNotNull(x) { \"none\" } + 1",
-		"fun f(s: String?): Boolean = s.isNullOrBlank() || s?.length == 0",
 		"sealed interface S {\n    data class A(val n: Int) : S\n    data object B : S\n}\nfun f(s: S?): Int = if (s is S.A) s.n else 0\nfun g(s: S): Int {\n    if (s is S.B) return 0\n    return 1\n}",
 	)
 	refused(t, [][3]string{
@@ -513,11 +514,10 @@ func TestNarrowing(t *testing.T) {
 		{"fun f(s: String?): String = ‸s + \"\"", "nullable", "this String? may be null"},
 		{"fun f(x: Int?): Int = if (x != null) 0 else ‸x", "type-mismatch", "this is a Int? where a Int is wanted"},
 		{"fun f(x: Int?, y: Int?): Int = if (x != null || y != null) ‸x else 0", "type-mismatch", "this is a Int? where a Int is wanted"},
-		// A var never narrows, nor a path, nor does require or isNullOrBlank.
+		// A var never narrows, nor a path, nor does require.
 		{"fun f(a: Int?): Int {\n    var x = a\n    if (x != null) return ‸x\n    return 0\n}", "type-mismatch", "this is a Int? where a Int is wanted"},
 		{"data class P(val n: Int?)\nfun f(p: P): Int = if (p.n != null) ‸p.n else 0", "type-mismatch", "this is a Int? where a Int is wanted"},
 		{"fun f(x: Int?): Int {\n    require(x != null) { \"none\" }\n    return ‸x\n}", "type-mismatch", "this is a Int? where a Int is wanted"},
-		{"fun f(s: String?): Int {\n    if (!s.isNullOrBlank()) return s.‸length\n    return 0\n}", "nullable", "this String? may be null: write ?.length, or test it for null first"},
 		// The narrowing ends with the block that the test rules.
 		{"fun f(x: Int?): Int {\n    if (x != null) {\n        val y = x + 1\n    }\n    return ‸x\n}", "type-mismatch", "this is a Int? where a Int is wanted"},
 		{"interface I\ndata class D(val n: Int) : I\nfun f(i: I): Boolean = i is ‸D", "is-variant", "is tests for a variant of a sealed interface, and this value is a I"},

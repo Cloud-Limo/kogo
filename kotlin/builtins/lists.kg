@@ -31,7 +31,6 @@ fun lists(f: String, xs: List<Long>, ys: List<Long>, n: Int, m: Int): String? = 
     "sum" -> "${xs.sum()}"
     "sumOfInt" -> "${xs.sumOf { if (it > 0L) n else m }}"
     "sumOfLong" -> "${xs.sumOf { it * it }}"
-    "orEmpty" -> "${xs.takeIf { n > m }.orEmpty()} ${ys.takeIf { n <= m }.orEmpty()}"
     "plus" -> "${xs + ys} ${ys.plus(xs)}"
     "to" -> "${n to xs}"
     "takePlus" -> takePlus(xs, ys, n, m)

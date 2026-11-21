@@ -35,7 +35,13 @@ Each entry: what was decided, why, and what would reopen it.
 - **An extension's receiver is not nullable** (15 Nov 2026). Allowing `fun String?.f()` makes
   the checker handle a `this` that may be null, and no example or stage-1 port writes one; a
   parameter does the job. The parser refuses it at the `?.` (`nullable-receiver`). Reopen
-  when a port needs one to read naturally.
+  when a port needs one to read naturally. Amended 22 Nov 2026 (Greg; DEV-1067): a binding's
+  receiver is not nullable either, so the rule holds for every extension and a reader
+  need not know which prelude names a plain `.` on a nullable value still reaches. The
+  prelude's two, `List<T>?.orEmpty()` and `String?.isNullOrBlank()`, are gone: write
+  `x ?: emptyList()`, with `emptyList<T>()` where nothing else settles `T` (DEV-1069), and
+  `x == null || x.isBlank()`, which narrows `x` where `isNullOrBlank` did not. Not taken: keeping the two as a convenience of the prelude;
+  cusoon2's port called them at three places, each as clear in the longer form.
 - **The columns under `exists` and `execute` are not typed** (15 Nov 2026). Both discard
   them, so `tx.execute(sql"select pg_advisory_xact_lock($key)")` passes though `void` has no
   Kogo type. Mapping `void` to `Unit` was the other way; it would let a row type carry a
@@ -364,9 +370,10 @@ Each entry: what was decided, why, and what would reopen it.
   change and put the prelude in the core (principle 8). Built into the checker all the same,
   because the core sections define them: the operators on numbers, `==`, ranges, the forms
   of section 9, the five SQL calls and `db.tx`, and what data classes and enums provide.
-  The other operators are bindings (the entry below). A binding may have a nullable receiver (`isNullOrBlank`,
-  `orEmpty`), which application code may not. Reopen if a prelude function's type cannot be
-  written in Kogo and is too useful to leave out.
+  The other operators are bindings (the entry below). A binding's receiver is not nullable,
+  as no extension's is (amended 22 Nov 2026, DEV-1067; it allowed one for `isNullOrBlank`
+  and `orEmpty`, both now gone). Reopen if a prelude function's type cannot be written in
+  Kogo and is too useful to leave out.
 - **Type arguments are settled in one fixed order, with no solver** (15 Nov 2026; spec 5.1):
   the receiver, the arguments that are not lambdas, the type the result must have, then
   what each lambda returns. Kotlin weighs every clue at once, in thousands of lines and
@@ -1895,7 +1902,7 @@ Each entry: what was decided, why, and what would reopen it.
 
 - **A type that Go implements is `external class Name<T>`, with no body.** Its members are
   `external fun` and `external val` with the class as the receiver, the one form that can
-  also say `List<Long>.sum()` and `String?.isNullOrBlank()`; members in a body would be a
+  also say `List<Long>.sum()`; members in a body would be a
   second way to write most of them. An `external object` of the same name gives
   `Uuid.parse(text)`. `class` is refused everywhere else, so the word marks the type as not
   Kogo's to construct.
@@ -1964,8 +1971,8 @@ Each entry: what was decided, why, and what would reopen it.
   prelude's may declare a binding** (spec 13). `kogo check` loads the prelude itself, so
   it knows which is which. Not taken: allowing `external` in package `kogo` and under it,
   which any file could claim with its package line. An `external` in a program's file is
-  refused where it is declared; with it go the nullable receiver, `out` and `vararg` that
-  only a binding may write. Reopen if a program needs Go bindings of its own.
+  refused where it is declared; with it go `out` and `vararg`, which only a binding may
+  write. Reopen if a program needs Go bindings of its own.
 
 ## Taken checking expected failures (DEV-826), not yet discussed
 

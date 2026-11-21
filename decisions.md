@@ -4115,6 +4115,36 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   was, as the issue's Scope said, and filing it apart. Reopen if a port reads the row as
   licence to skip a prelude function the spec lists.
 
+## A refusal inside a 2xx is logged (DEV-1063), 22 Nov 2026
+
+- **The client logs it with `http.logRefusal(endpoint, why: String)`** (Greg, 22 Nov
+  2026), two bindings in `prelude/http.kg`, one for a `Lookup` and one for an `Action`,
+  neither an action, so a client's fun that asks and reads the answer stays a lookup;
+  spec 7.1 already says a binding that says nothing may be called anywhere, and is
+  unchanged. Not taken: `json.logRefusal(why)` on the answer, since a `Json` is its text
+  and would have to hide a logger and its call inside a value; a function with no
+  endpoint, which cannot say which call was refused; `ask` taking the function that
+  reads the answer, so every `Left` is logged, which costs a lambda at each call and a
+  generic `ask`; general logging, which stays open under "Printing is an action" (19 Nov
+  2026) and is not reopened here.
+- **Its line is `kogo.http: refused in a 2xx`, with `method`, `path` and `why`**, at WARN
+  to the handle's logger, the one a failed call is written to; `why` is cut at 4 KiB as
+  a refused body is. Not taken: `kogo.http: failed`, the failed call's message, which
+  would count with the failures a call that `ask` ended as a success, and gives no way
+  to tell the two apart; `kogo.http: refused`, the message DEV-1050 retired for a 4xx,
+  which a search of old logs would mix with these. It has no `status`: the binding is
+  not handed the answer, and every such answer is a 2xx. Reopen if an op needs the exact
+  status.
+- **The test client is `priceOf` in `examples/29_http.kg`**, run by the emitted-Go test
+  against a local server, with the line written to its output. Not taken: a client of
+  its own in `cmd/kogo/testdata`, a second place the end-to-end test reads Kogo from.
+- **Spec 12's example leaves `NOT_FOUND` silent** (the lead's Ruling, 22 Nov 2026):
+  which answers a client logs is the client's to choose, and a stale id is an ordinary
+  answer, so a WARN line for each would bury the refused key the line is for. Not
+  taken: logging it as the Kotlin did.
+- **Its section is spec 12, "An outside service"**, where the `kogo.http` text is: the
+  issue names section 14, which is "Not in Kogo" and has no `kogo.http` text.
+
 ## `joinToString` (DEV-1070), 21 Nov 2026
 
 - **`joinToString` is two prelude externals: `List<String>.joinToString(separator)` and

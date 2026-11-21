@@ -40,6 +40,28 @@ action fun reserved(depot: Http, shop: String, item: String, count: Long): Eithe
     answer.at("reservation")?.string("id") ?: raise(HttpFailure.Unreadable("the answer has no reservation"))
 }
 
+// A no inside a 2xx is the client's to read, and raise in a failure
+// type of its own. logRefusal leaves a line for it, as a failed call
+// leaves one, and is no action, so a lookup may call it.
+val PRICE: Lookup = lookup("GET", "/v1/prices")
+
+sealed interface PriceFailure {
+    data class Wire(val failure: HttpFailure) : PriceFailure
+    data class Refused(val status: String) : PriceFailure
+}
+
+fun priceOf(depot: Http, item: String): Either<PriceFailure, Long> = either {
+    val answer = depot.ask(PRICE, listOf(field("item", item))).mapLeft { PriceFailure.Wire(it) }.bind()
+    val status = answer.string("status")
+    when (status) {
+        "OK" -> answer.long("cents") ?: raise(PriceFailure.Wire(HttpFailure.Unreadable("the answer has no cents")))
+        else -> {
+            depot.logRefusal(PRICE, status ?: "no status")
+            raise(PriceFailure.Refused(status ?: "no status"))
+        }
+    }
+}
+
 // A failed call is one of four, by how far it got.
 fun said(failure: HttpFailure): String =
     when (failure) {

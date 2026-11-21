@@ -243,6 +243,11 @@ the depot is sent: POST /v1/items/anvil/reservations? [Bearer of main acme] {"co
 sold out: Either.Left(refused 409: sold out)
 the depot is sent: POST /v1/items/ghost/reservations? [Bearer of main acme] {"count":1,"for":{"name":"Ann","gift":true},"notes":["fragile","this way up"]}
 no id: Either.Left(unreadable: the answer has no reservation)
+the depot is sent: GET /v1/prices?item=bolt [Bearer of main ] 
+price: Either.Right(250)
+the depot is sent: GET /v1/prices?item=anvil [Bearer of main ] 
+level=WARN msg="kogo.http: refused in a 2xx" method=GET path=/v1/prices why=REQUEST_DENIED
+price refused: Either.Left(Refused(status=REQUEST_DENIED))
 nowhere: Either.Left(true)
 queued: 1
 read back as eml wrote it: true

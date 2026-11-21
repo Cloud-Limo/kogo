@@ -57,8 +57,9 @@ line, `Async agent · DEV-NNN · ...`, and a blank one: its first line
 is the one under those. The row is chosen by the issue's newest
 event, which `lin show --newest` prints first: a comment that begins
 with a word of cusoon2's `doc/plans/pipeline-events.md`, section 5,
-and a colon, or a launch directive. Any other comment, a `Lead:` one
-included, is a note, and a note after the event changes the row only
+and a colon, a launch directive, or today's `Taken,`, `Held,`,
+`Released,` and `Launched agent-` lines. Any other comment, a `Lead:`
+one included, is a note, and a note after the event changes the row only
 for Backlog. Take the first row that fits:
 
 | State | Newest event | Next |

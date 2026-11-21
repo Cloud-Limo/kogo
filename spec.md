@@ -45,7 +45,9 @@ import kogo.time.Instant
   `private val`s in two files do not meet, as two `private fun`s do not
   (5.2). Funs share names (5.2), and a fun may be named for a type or a
   val. Two names of a package that differ only in the case of the first
-  letter may be one name in Go; `kogo emit` refuses them.
+  letter may be one name in Go; `kogo emit` refuses them. It refuses an
+  interface's `fun string()` with no parameter too, which would be Go's
+  `String` method and write its data class's text in a template.
 - A name is written as it is declared or imported, never with its
   package: `cusoon.model.Booking` in code is an error. An import names a
   top-level name and brings every declaration of it; a nested type comes

@@ -61,6 +61,7 @@ func (e *emitter) params(d *syntax.FunDecl, f *check.Func) (params string, defau
 			if arg, ok := late[i]; ok {
 				name := e.local(v, v.Name)
 				e.w("var %s %s", name, e.typ(v.Type))
+				e.w("_ = %s", name)
 				e.open("if %s != nil {", arg)
 				e.w("%s = *%s", name, arg)
 				e.turn("} else {")
@@ -137,6 +138,9 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 			var ps []check.Type
 			for _, p := range m.Params {
 				ps = append(ps, p.Type)
+			}
+			if m.Name == "string" && len(ps) == 0 {
+				e.refuse(m.Decl, "go-name", "an interface's fun string() with no parameter becomes Go's String method, which writes a value's text: rename it")
 			}
 			e.w("%s(%s) %s", claim(m.Decl, export(m.Name)), e.typs(ps), e.typ(m.Result))
 		}

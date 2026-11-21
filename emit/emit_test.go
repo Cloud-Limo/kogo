@@ -383,6 +383,7 @@ func TestLanguage(t *testing.T) {
 	expect(t, [][2]string{
 		{"t.Fares()", "Fare(base=100, tip=0, note=none) Fare(base=100, tip=5, note=none) 105 true"},
 		{"t.Greetings()", "Hello, AnnH Hello, Bob! Yo, CyY"},
+		{"t.U1(3, nil)", "a3"},
 		{"t.Band(0) + t.Band(2) + t.Band(9) + t.Band(10)", "zerofewsomemany"},
 		{"t.Sign(-5)", "-1"},
 		{"t.Sign(0)", "0"},
@@ -425,6 +426,9 @@ fun fares(): String {
 
 fun greet(name: String, greeting: String = "Hello", mark: String = greeting.substring(0, 1)): String =
     "$greeting, $name$mark"
+
+// A default that its fun never reads builds.
+fun u1(x: Int, y: Int = 0): String = "a$x"
 
 fun greetings(): String = greet("Ann") + " " + greet("Bob", mark = "!") + " " + greet(greeting = "Yo", name = "Cy")
 
@@ -1052,6 +1056,7 @@ func TestRefused(t *testing.T) {
 		{"enum class Kind { entries, b }", "1:19: go-name", "are both Kind_entries in Go"},
 		{"data class D(val a: Int, val A: Int)", "1:26: go-name", "two members of D are both A in Go"},
 		{"interface I {\n    val name: String\n}\ndata class D(override val name: String, val getName: String) : I", "4:14: go-name", "two members of D are both GetName in Go"},
+		{"interface Texty {\n    fun string(): String\n}", "2:5: go-name", "becomes Go's String method"},
 	} {
 		_, files, errs := emit(t, "x", "package t\n"+c[0])
 		got := ""

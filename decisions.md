@@ -4296,3 +4296,16 @@ and 7.
   **a named deviation from "`kogo check` is the only gate" (15 Nov 2026)**: Kotlin
   accepts the two names, and moving the refusal into the checker (15 / 4) waits for the
   audit issue DEV-1079, until a file meets one. Reopen when a port meets either.
+
+## An unread default, and an interface's `string()` (DEV-1085), 22 Nov 2026
+
+- **A defaulted parameter's local is read once (`_ = y_`)**, as a local `val`'s is, so a
+  fun that never reads it builds. Not taken: leaving the local out when nothing reads it.
+- **`kogo emit` refuses an interface's `fun string()` with no parameter (`go-name`)**:
+  it became Go's `String` method, which `rt` writes as the value's text, so
+  `"${Tex(3)}"` was the fun's result where Kotlin writes `Tex(a=3)`. Not taken: having
+  `rt`'s walk tell an emitted data class from a prelude type that writes its own text,
+  more code for a name no program has. The refusal sits in the emitter beside the other
+  `go-name`s, not in `kogo check` as the issue first said (lead, 22 Nov 2026). Not
+  taken: a second home for `go-name` in the checker ahead of DEV-1079, which moves them
+  all. Reopen with DEV-1079.

@@ -7,6 +7,47 @@ happens to a difference.
 **Transliterate by default.** Keep the Kotlin's names, order and
 structure wherever Kogo has the construct, so the two read side by side.
 
+**Keep the Kotlin's shape.** A port is no longer than its Kotlin and
+reads no worse. Kogo has most of Kotlin's short forms (`?.let`, `?:`,
+`also`, an extension fun or val, a `when` on a value, a `for` over a
+range), so a ladder of statements where the Kotlin had one expression
+is a mistake in the port. The handoff lists every declaration not the
+Kotlin's by name, kind and receiver (a helper added, an extension or a
+property made a fun, a named val written in) and every function three
+or more lines longer than its Kotlin, each with one cause: a row of
+`spec.md` section 14, a name section 12 lacks, or a design. The Code
+review reads each ported function beside its Kotlin, checks each cause
+against the spec, and tries the Kotlin's form with `kogo check` where
+the port's is longer or shaped otherwise; a cause the spec does not
+bear out, or a shorter form that passes, is a Fix. The list does not
+stand in for the reading: of the eleven such places an audit of
+cusoon2's ports found (22 Nov 2026), it would have named nine, and
+missed a ladder inside a function no longer than its Kotlin. SQL is
+read so against the jOOQ: a value the Kotlin computed stays computed
+where section 12 has the name, so `now.minusDays(28)` is
+`${now.minus(Duration.ofDays(28L))}`, not `($now::timestamptz at time
+zone 'UTC' - interval '28 days') at time zone 'UTC'`. The port keeps
+the Kotlin's comments and adds beside the code only its marks and the
+records a Ruling asks for; what the port went through (the comparison,
+a DEV number, how the Java client did it) goes in the handoff.
+
+For one, the Kotlin
+
+```kotlin
+model.cachedGooglePlace(placeId)?.let {
+    return cachedPlace(it)
+}
+return super.getPlace(placeId).also { model.storeGoogleAnswer(placeId, it) }
+```
+
+was ported as an `if`/`else` of eight lines inside `either { }`, where
+this passes `kogo check` in two:
+
+```kotlin
+cachedGooglePlace(tx, placeId)?.let { cachedPlace(it) }
+    ?: getPlace(google, placeId).bind().also { storeGoogleAnswer(tx, clock, placeId, it) }
+```
+
 **Follow a design where one gives the form.** Where a design gives the
 port a form `kogo/run.sh` cannot see (the list's rows, a gate, a
 step's signature, where a mark sits: cusoon2's `doc/plans/gates.md`),
@@ -96,7 +137,8 @@ stand-in's lookup by text and the comparison's check of the calls sent
 told them apart.
 
 **The handoff reports:** the cusoon2 commit the port matches; each
-departure with its case, and under Decided each write-around weighed,
+declaration not the Kotlin's and each function three or more lines
+longer, with its cause; each departure with its case, and under Decided each write-around weighed,
 with its size, who sees the difference and the form not taken; "N of M
 statements run" and each not reached; the run's cases, differences, any
 accepted ones and each one owed with its issue.

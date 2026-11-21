@@ -6,7 +6,7 @@ import (
 	"github.com/Cloud-Limo/kogo/syntax"
 )
 
-// Actions (spec.md 7.1; doc/gates.md, "Outside calls"). An action fun
+// Actions (spec.md 7.1; doc/gates.md, "A function that acts says so"). An action fun
 // changes something outside, which no transaction rolls back. The
 // word is carried up: a fun that calls one is one. It takes no Tx,
 // calls none where a block holds a Tx, and is not kept in a value.

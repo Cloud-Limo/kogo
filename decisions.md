@@ -3891,3 +3891,24 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   "refused by the step" and calls the row's success "sent". Not
   taken: keeping `tellPrinter` as a called helper, which is the next
   issue's rewrite of the example.
+
+## Where a port leaves the Kotlin (DEV-1041), 21 Nov 2026
+
+- **What `kogo/run.sh` can see goes Kotlin first; what it cannot is
+  written from the design** (Greg, 21 Nov 2026), in `doc/roadmap.md`'s
+  "How it moves" and `doc/porting.md`. An answer, a row, or what
+  Postgres is asked or holds changes in the Kotlin first, under its
+  tests, and the port matches it. The form (the list's rows, a gate,
+  `call.kg`, a step's signature, where a mark sits) is written in the
+  port from cusoon2's `doc/plans/gates.md`, and the file that departs
+  names it in one line; the Kotlin keeps its form until it is deleted.
+  Not taken: every change Kotlin first and then translated, which costs
+  a Kotlin rewrite for a form the Kotlin has nothing like. Reopen when
+  a port whose form has left the Kotlin's meets a Kotlin-first change
+  that no longer translates.
+- **The roadmap's ops table marks each piece built, with its PR**
+  (the issue's Scope), in place of the rule that no table has a column
+  for state. Rows 13 to 18 become 13a to 13i, so 19 and 20 keep their
+  numbers. The two Open items DEV-972 and DEV-975 went, both merged
+  (cusoon2 PR 1536, 1537), and "Settled" says so. Not taken:
+  renumbering the rows.

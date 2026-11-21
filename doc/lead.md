@@ -55,7 +55,8 @@ and holds only what a decision needs.
 
 1. `lin brief`: it pulls both checkouts, then prints every open issue
    of both projects with its state and the first line of its newest
-   comment, the newest comment in full of each issue labelled `lead`,
+   event, the newest event in full of each issue labelled `lead`, each
+   with a newer note under it,
    and the line of runs. Backlog is not in it: when Greg asks to bring
    something back, `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list
    backlog` is the parked work, each with what brings it back.
@@ -105,7 +106,7 @@ naming it, you approve. One that would give a different answer is not
 allowed.
 
 Bring Greg one choice at a time, never a list of choices, in the
-form of `doc/guide.md`, "Then the choices":
+form of `doc/guide.md`, "The form of a choice":
 
 - two or three sentences of context that stand on their own;
 - a short piece of code, in Kogo or SQL, that shows the thing;
@@ -147,14 +148,14 @@ against the code before passing it on.
   takes `lead` off, so the merge is his from there. When CI fails, its
   `Clerk: Cloud CI failed on <PR> at <sha>` keeps `lead`: tell Greg
   the cause, as for a step that failed.
-- Then take the label off, `lin label DEV-NNN lead --remove`: after
-  a `Lead:` comment that follows `lin rule --keep-label`, or once
-  Greg's move is in the boxes. The clerk leaves a labelled issue
-  alone, and takes it up from its newest comment when the label goes.
+- Then take the label off, `lin label DEV-NNN lead --remove`, once
+  Greg's move is in the boxes, or for a Zed step once its comment is
+  on the issue. The clerk leaves a labelled issue alone, and takes it
+  up from its newest event when the label goes.
 - To have the next step in Zed, post the Ruling with `lin rule
-  DEV-NNN --keep-label`, then a `Lead:` comment naming it, then take
-  the label off: a `Lead:` starts no clerk. To hold every step of an
-  issue, label it `lead` yourself.
+  DEV-NNN --keep-label` and leave the label on: a `Lead:` comment is a
+  note and holds nothing, so without the label the clerk takes up the
+  Ruling. To hold every step of an issue, label it `lead` yourself.
 - `Clerk: the clerk for DEV-NNN exited N: ...` is the poller's, for a
   step that failed, and no choice. Read its last lines and tell Greg
   the cause. Once the cause is gone, put "Clerk DEV-NNN", said by hand
@@ -190,7 +191,7 @@ takes a row only when the step after the clerk's is Greg's, such as
 walking through a PR once its Fix run is back; the clerk's steps after a
 run are not rows, since he cannot start them too soon. A cusoon2 merge
 waiting on Cloud CI is a row: while the clerk's `Clerk: Greg's: merge
-<PR> at <sha> once Cloud CI passes` is the issue's newest comment and
+<PR> at <sha> once Cloud CI passes` is the issue's newest event and
 `lead` is on, its row is "waits on Cloud CI, then your inbox". The watch
 takes `lead` off on green and the row goes with it, so a row still there
 after CI has ended says the watch failed. When the cap binds, keep the
@@ -202,7 +203,7 @@ follows it is not a row. A step in Zed is a row in You can do now, and
 the clerk sees its comment: Greg reports nothing back.
 
 After the boxes, one line: every issue labelled `agent`, by ID, each
-running (its newest comment starts `Launched`) or queued, and beside
+running (its newest event starts `Launched`) or queued, and beside
 it each session `lin local --list` shows, by ID with its place and
 minutes so far: `lin brief --runs`, run afresh for each reply. It
 lets Greg see the runs have not got out of hand.

@@ -74,8 +74,8 @@ for Backlog. Take the first row that fits:
 | any | launch comment, `[agent]` | the run's: exit |
 | Todo | launch comment, no label | a speculative run, the lead's to label: exit |
 | In Progress | `Taken` | the session's: exit |
-| any | `Start:` | the step's, running: exit |
 | Backlog | any, with a `Lead:` note of what brings it back | After a merge moves it, when that is a merge; else the lead's |
+| any | `Start:` | the step's, running: exit |
 | any | `Held,`, `Released,` or `Walkthrough:` | Greg's walkthrough, the lead's: exit |
 | any | `Clerk:` | the lead's or Greg's, as the comment says: exit |
 
@@ -126,8 +126,11 @@ neither, a Pickup said in a session, launch a run, but start a local
 one in the newest `Taken`'s `<where>` when the PR is in the other
 repository than the issue's project's. A `Lead:` comment does not
 choose: the lead holds an issue whose next step is Greg's with the
-label `lead`. The Fix that runs `kogo/run.sh` (Merging) is a local
-run however the steps before it ran.
+label `lead`. One exception: an issue with no `Start:` whose `Lead:`
+comment says every step runs locally is started locally, in the
+`<where>` that comment names; DEV-1081 is the only one, and this
+sentence goes when it merges. The Fix that runs `kogo/run.sh` (Merging) is a local run
+however the steps before it ran.
 
 ## Starting a local run
 

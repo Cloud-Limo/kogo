@@ -4245,3 +4245,36 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
 - **An import of one declaration twice under the same alias is `duplicate`**, as is an
   alias that meets another import's name; an import without `as` repeated stays
   accepted, as before. Not taken: comparing aliases' targets, a line for nothing.
+
+## The rules on a package's names (DEV-1077), 21 Nov 2026
+
+Greg's rulings on DEV-1068, `doc/plans/packages-and-names-design.md` sections 1, 2, 5, 6
+and 7.
+
+- **A package has one table of names for its types, typealiases, markers and top-level
+  `val`s, `private` ones included, as in Kotlin; but two `private val`s in two files do
+  not meet**, as two `private fun`s do not. A `private val` beside one that is not
+  private stays `duplicate`, as in Kotlin. The checker keeps the first `val` of a name
+  in the package's table and each file's private one beside it, and a file means its
+  own first. Not taken: one table that also holds two `private val`s of two files.
+- **A name is written bare, and an import names a top-level name and brings what it
+  declares and the types nested in it** (spec 2). The checker held this already; the
+  spec gains the words and the tests hold them. Not taken: a package written in code.
+- **Only a sealed interface holds types, and only its variants (`nested-type`)**: a type
+  or a typealias nested in a plain interface, a typealias nested in any type, and a type
+  in a sealed interface that does not implement it, are refused. The parser already
+  refuses a type in a data class's body. Not taken: types nested in a plain interface
+  as a namespace.
+- **A program's package is not `kogo` or under it (`kogo-package`)**: a program's
+  `package kogo` put its names in every file, and `package kogo.time` had its names
+  imported as the prelude's. **A package's own type or val is meant before one of
+  package `kogo` or a built-in type**, as the checker already does. Not taken:
+  refusing a program's own declaration of a name the prelude or the built-in types
+  have.
+- **Stated, with no code** (design section 7): `kogo emit` refuses two names that
+  differ only in the case of the first letter; an alias stands where a type is written,
+  and a value, a constant or a variant is named by the type's own name; a local hides a
+  name declared outside it. The emitter's `go-name` refusal stays outside `kogo check`,
+  **a named deviation from "`kogo check` is the only gate" (15 Nov 2026)**: Kotlin
+  accepts the two names, and moving the refusal into the checker (15 / 4) waits for the
+  audit issue the design names, until a file meets one. Reopen when a port meets either.

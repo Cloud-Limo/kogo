@@ -39,6 +39,18 @@ import kogo.time.Instant
   A package is the files that share a package line, wherever they lie. An
   import names one declaration of another package; a name of the file's
   own package needs none.
+- In a package, a type, a typealias, a marker and a top-level `val` each
+  take a name no other of them has, in any file, as in Kotlin: `private`
+  limits who may name a declaration, not where its name is taken. Two
+  `private val`s in two files do not meet, as two `private fun`s do not
+  (5.2). Funs share names (5.2), and a fun may be named for a type or a
+  val. Two names of a package that differ only in the case of the first
+  letter may be one name in Go; `kogo emit` refuses them.
+- A name is written as it is declared or imported, never with its
+  package: `cusoon.model.Booking` in code is an error. An import names a
+  top-level name and brings every declaration of it; a nested type comes
+  with its outer one, `import shop.Outcome` and then `Outcome.Ok`. An
+  extension is imported by its own name.
 - `import cusoon.schema.Area as AreaRow` gives the declaration another
   name in this file, as in Kotlin: the file writes `AreaRow`, also for its
   constructor, constants and variants. Any import may take one, a `kogo.`
@@ -61,7 +73,9 @@ import kogo.time.Instant
 - Comments: `//`, `/* */` and `/** */`. KDoc is kept as a comment.
 - The declarations of package `kogo` (section 12, and the functions of
   sections 8 and 9) are in scope in every file. The prelude's other
-  packages, as `kogo.time`, are imported by name.
+  packages, as `kogo.time`, are imported by name. A program's package is
+  not `kogo` or under it. A package's own type or val is meant before one
+  of package `kogo` or a built-in type, as in Kotlin.
 - A file named `_test.kg` is a test file (section 16). It is in its
   package as any file is, but only a test file may name what one
   declares, or import from `kogo.test`.
@@ -174,7 +188,8 @@ sealed interface Outcome<out T> {
 ```
 
 The variants are data classes or `data object`s nested in the body or
-declared in the same file. A nested one is named in full everywhere,
+declared in the same file. Only a sealed interface holds types, and each
+implements it. A nested one is named in full everywhere,
 `Outcome.Ok`, also inside the body, where Kotlin allows `Ok`. `out` on a
 type parameter of a sealed interface
 is the only variance annotation in the language, a binding's external
@@ -212,14 +227,17 @@ though Kotlin allows both: make it a top-level fun that takes the value,
 or state the argument at each call. Only
 data classes and `data object`s implement interfaces. A `data object` has no
 constructor to implement a `val` in, so it implements only interfaces
-that declare `fun`s alone. There are no other
+that declare `fun`s alone. An interface holds no types: declare each at
+the top level. There are no other
 classes, no inheritance, no `object`, no `companion object`, no anonymous
 `object :` expressions. Use a lambda where Kotlin would use an anonymous
 object.
 
 ### 3.5 Typealias
 
-`typealias Cents = Long` is transparent, as in Kotlin.
+`typealias Cents = Long`: an alias stands where a type is written; a
+value is built, and a constant or a variant named, by the type's own
+name.
 
 ## 4. Absence
 
@@ -369,6 +387,8 @@ interface `fun` before an extension of the same name.
 - `val` everywhere. `var` only for locals inside a function body.
   Top-level `val` and `const val` hold constants; there is no top-level
   `var` and no other global state.
+- A local hides a name declared outside it, an outer block's local and a
+  type's name included, as in Kotlin.
 - A top-level `val`'s value may not refer to the `val` itself, or to a
   `val` declared below it in its file, directly or through the `val`s
   and functions it refers to. A reference counts wherever it is
@@ -1347,6 +1367,10 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `==` on a value that holds a function, as `rule == rule` | compare the other properties |
 | two funs of one name imported from two packages | `import ... as` on one |
 | an import of a name the file's own package declares | `import ... as`, or rename one |
+| `a.b.Name` written in code | import it and write `Name` |
+| `import a.b.Outer.Inner` | `import a.b.Outer`, and write `Outer.Inner` |
+| a constructor or a constant through a typealias, `PRow(1)` | the type's own name |
+| a type nested in an interface as a namespace, `GoogleMaps.Place` | a top-level type, `GoogleMapsPlace` |
 
 ## 15. Operations
 

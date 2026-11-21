@@ -150,7 +150,7 @@ func (c *checker) holds(rt Type, written bool, name string) bool {
 	if n, ok := rt.(*Named); ok && slices.ContainsFunc(n.Decl.Props, func(v *Var) bool { return v.Name == name }) {
 		return true
 	}
-	return !written && slices.ContainsFunc(c.homes(name), func(p *pkg) bool { return p.vals[name] != nil })
+	return !written && slices.ContainsFunc(c.homes(name), func(p *pkg) bool { return c.val(p, name) != nil })
 }
 
 // noFunc reports a call of a name that no function in scope has.

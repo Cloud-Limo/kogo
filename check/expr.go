@@ -359,7 +359,7 @@ func (c *checker) ident(e *syntax.Ident) Type {
 		}
 	}
 	for _, p := range c.homes(e.Name) {
-		if v := p.vals[e.Name]; v != nil {
+		if v := c.val(p, e.Name); v != nil {
 			c.see(e, e.Name, v.vis)
 			c.demand(e, e.Name, v.vis)
 			c.info.Uses[e] = v

@@ -38,6 +38,9 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 	for i, f := range files {
 		order[f.Name] = i
 		c.enter(f, c.pkgOf(f.Package.Name))
+		if name := f.Package.Name; i >= len(prelude) && (name == "kogo" || strings.HasPrefix(name, "kogo.")) {
+			c.errorf(f.Package, "kogo-package", "package %s is the prelude's, and a program's package is not kogo or under it (spec.md 2): rename it", name)
+		}
 		for _, d := range f.Decls {
 			if i >= len(prelude) && external(d) {
 				c.errorf(d, "external", "only the prelude declares bindings (spec.md 13): give this a body in Kogo")
@@ -115,6 +118,21 @@ type pkg struct {
 	aliases map[string]*alias
 	funcs   map[string][]*Func // funs and extension vals
 	vals    map[string]*Var
+	privs   map[privKey]*Var // each file's private vals (spec.md 2)
+}
+
+type privKey struct {
+	file *syntax.File
+	name string
+}
+
+// val gives the top-level val called name that the file at hand
+// means in p: its own private one first.
+func (c *checker) val(p *pkg, name string) *Var {
+	if v := p.privs[privKey{c.file, name}]; v != nil {
+		return v
+	}
+	return p.vals[name]
 }
 
 type alias struct {
@@ -127,7 +145,7 @@ type alias struct {
 
 func (c *checker) pkgOf(name string) *pkg {
 	if c.pkgs[name] == nil {
-		c.pkgs[name] = &pkg{name, map[string]*TypeDecl{}, map[string]*TypeDecl{}, map[string]*alias{}, map[string][]*Func{}, map[string]*Var{}}
+		c.pkgs[name] = &pkg{name, map[string]*TypeDecl{}, map[string]*TypeDecl{}, map[string]*alias{}, map[string][]*Func{}, map[string]*Var{}, map[privKey]*Var{}}
 	}
 	return c.pkgs[name]
 }
@@ -285,7 +303,7 @@ func (c *checker) importAll(f *syntax.File) {
 // renamed gives what an import with as brings: what from declares as
 // name, and the types nested in it, under the name local.
 func renamed(from *pkg, name, local string) *pkg {
-	return &pkg{from.name, rename(from.types, name, local), rename(from.objects, name, local), rename(from.aliases, name, local), rename(from.funcs, name, local), rename(from.vals, name, local)}
+	return &pkg{from.name, rename(from.types, name, local), rename(from.objects, name, local), rename(from.aliases, name, local), rename(from.funcs, name, local), rename(from.vals, name, local), nil}
 }
 
 func rename[V any](from map[string]V, name, local string) map[string]V {
@@ -374,8 +392,14 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 			c.pkg.types[td.Name] = td
 		}
 		for _, m := range d.Body {
-			if nested, ok := m.(*syntax.ClassDecl); ok {
-				c.declare(nested, td.Name+".")
+			switch m := m.(type) {
+			case *syntax.ClassDecl:
+				if d.Kind != "sealed interface" {
+					c.errorf(m, "nested-type", "only a sealed interface holds types, its variants (spec.md 3.2): declare %s at the top level", m.Name)
+				}
+				c.declare(m, td.Name+".")
+			case *syntax.TypeAlias:
+				c.errorf(m, "nested-type", "a typealias is declared at the top level: move %s out of %s", m.Name, d.Name)
 			}
 		}
 		c.later(&c.sigs, func() { c.class(td) })
@@ -408,8 +432,14 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 		default:
 			g := &Var{Kind: Global, Name: d.Name, Decl: d, vis: v}
 			c.info.Vars[d] = []*Var{g}
-			if !taken(d.Name) {
+			// Two private vals of two files do not meet (spec.md 2).
+			if u := c.pkg.vals[d.Name]; u != nil && v.visibility == "private" && u.visibility == "private" && u.file != c.file {
+				c.pkg.privs[privKey{c.file, d.Name}] = g
+			} else if !taken(d.Name) {
 				c.pkg.vals[d.Name] = g
+				if v.visibility == "private" {
+					c.pkg.privs[privKey{c.file, d.Name}] = g
+				}
 			}
 			c.later(&c.sigs, func() {
 				g.markers = c.marks(d.Mods)
@@ -694,6 +724,11 @@ func (c *checker) class(td *TypeDecl) {
 			if td.Supers = append(td.Supers, st); sealed {
 				st.Decl.Variants = append(st.Decl.Variants, td)
 			}
+		}
+	}
+	if i := strings.LastIndexByte(td.Name, '.'); i >= 0 {
+		if o := c.pkg.types[td.Name[:i]]; o != nil && o.Kind == "sealed interface" && !slices.ContainsFunc(td.Supers, func(s *Named) bool { return s.Decl == o }) {
+			c.errorf(d, "nested-type", "%s is not a variant of %s, and only its variants are nested in it (spec.md 3.2): add : %s, or declare %s at the top level", td.Name, o.Name, o.Name, d.Name)
 		}
 	}
 	for _, p := range d.Params {

@@ -177,9 +177,6 @@ func (c *checker) destructure(at syntax.Node, names []string, t Type) {
 			if i < len(names) {
 				c.demand(at, p.Name, p.vis) // Kotlin asks the opt-in of a _ too
 			}
-			if i < len(names) && names[i] != "_" {
-				c.apart(at, n, p)
-			}
 			parts = append(parts, subst(p.Type, bind(n.Decl.Params, n.Args)))
 		}
 	} else if ok && n.Decl == c.prelude("Pair") {

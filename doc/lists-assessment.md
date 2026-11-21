@@ -1,5 +1,7 @@
 # The lists, assessed
 
+Proofs left the language with DEV-1040; `doc/gates.md` is the design.
+
 Written for DEV-901 on 17 Nov 2026 and kept as it was weighed: it
 spells a function that acts `@Acts` and the lists as they then were.
 DEV-894 (18 Nov 2026, `decisions.md`) respelt the first `action fun`

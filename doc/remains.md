@@ -1,5 +1,7 @@
 # What remains after 17 Nov 2026
 
+Proofs left the language with DEV-1040; `doc/gates.md` is the design.
+
 For whoever takes up the designs of `doc/gates.md` and `doc/work.md`.
 Read those two first, then `doc/measured.md` for the counts they rest
 on. All three record a discussion with Greg on 17 Nov 2026: agreed as

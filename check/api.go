@@ -33,7 +33,7 @@ type Op struct {
 	// ungated fun, names; otherwise it is at READ COMMITTED.
 	Serializable bool
 	Gate         *Func // nil for an ungated operation
-	Proof        Type  // what the gate gives and the work takes
+	Given        Type  // what the gate answers and the work takes
 	Input        Type  // Unit for none
 	Answer       Type  // the A of its Either<String, A>, or of an ungated one's Reply<A>
 }
@@ -57,11 +57,11 @@ type role struct {
 
 var (
 	ungatedRole = &role{"operation", "an ungated operation", []string{"handle", "env", "request", ""},
-		"tx: Tx, env: Env, request: Request, input: Input), with a Db for the Tx to open its own transactions and Unit for no input; work that takes a gate's proof names the gate in its row, with gatedBy", "Either<String, A>"}
+		"tx: Tx, env: Env, request: Request, input: Input), with a Db for the Tx to open its own transactions and Unit for no input; work that takes what a gate answers names the gate in its row, with gatedBy", "Either<String, A>"}
 	workRole = &role{"operation", "gated work", []string{"env", "", ""},
-		"env: Env, proof: Proof, input: Input), with what its gate gives for the proof and Unit for no input: the gate has read the Request, and the proof is the work's only handle on the database", "Either<String, A>"}
+		"env: Env, call: Call, input: Input), with what its gate answers for the Call and Unit for no input: the gate has read the Request, and its answer is all the work is handed", "Either<String, A>"}
 	gateRole = &role{"gate", "a gate", []string{"tx", "env", "request"},
-		"tx: Tx, env: Env, request: Request), and its operation's input fourth where it reads it", "Either<String, Proof>"}
+		"tx: Tx, env: Env, request: Request), and its operation's input fourth where it reads it", "Either<String, Call>"}
 	inputGateRole = &role{"gate", "a gate", []string{"tx", "env", "request", ""}, gateRole.as, gateRole.gives}
 	checkRole     = &role{"check-shape", "a list's check", []string{"tx", "env", "request"},
 		"tx: Tx, env: Env, request: Request)", "Either<String, Unit>"}
@@ -141,7 +141,7 @@ func (c *checker) apis(program []*syntax.File) {
 func same(a, b Type) bool { return fits(a, b) && fits(b, a) }
 
 // operation checks a row: that each fun it names has its role's
-// shape, and that what one stage gives is what the next takes. env
+// shape, and that what one stage answers is what the next takes. env
 // holds a fun to the list's environment, and gates has the list's
 // gates so far. It gives nil where it reports an error.
 func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *role), gates map[*Func]string) *Op {
@@ -158,19 +158,22 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 		}
 		return op
 	}
-	g, proof := c.shaped(row.Gate, gateRole)
+	g, given := c.shaped(row.Gate, gateRole)
 	f, answer := c.shaped(id, workRole)
 	if g == nil || f == nil {
 		return nil
 	}
 	env(row.Gate, g, gateRole)
 	env(id, f, workRole)
-	op := &Op{Func: f, Gate: g, Serializable: c.serializable(g.Params[0].Type), Proof: proof, Input: f.Params[2].Type, Answer: answer}
-	if d := named(proof); d != nil && (c.isTx(proof) || d == c.prelude("Db") || d.Pkg == "kogo.rpc" && d.Name == "Request") {
-		c.errorf(row.Gate, "gate", "%s gives a %s: a gate gives a proof, not the handle, so give a proof that holds the Tx and what the gate read (spec.md 15.7), or the facts alone (spec.md 15.2)", g.Name, proof)
+	op := &Op{Func: f, Gate: g, Serializable: c.serializable(g.Params[0].Type), Given: given, Input: f.Params[2].Type, Answer: answer}
+	if d := named(given); d != nil && (c.isTx(given) || d == c.prelude("Db") || d.Pkg == "kogo.rpc" && d.Name == "Request") {
+		c.errorf(row.Gate, "gate", "%s answers a %s: gated work is handed no bare transaction, Db or Request, so answer a call, a data class that holds the transaction and what the gate found, or the facts alone (spec.md 15.2)", g.Name, given)
+	} else if f.Action {
+		c.outlives(row.Gate, "action-gate", fmt.Sprintf("%s is an action fun, and its gate %s", id.Name, g.Name), given,
+			fmt.Sprintf("the server ends the gate's transaction before work that is an action fun runs, so name a gate that answers the facts %s needs, or make %s a fun, which runs in the transaction (spec.md 15.7)", id.Name, id.Name))
 	}
-	if t := f.Params[1].Type; !same(t, proof) {
-		c.errorf(id, "operation", "%s takes a %s second, and its gate %s gives a %s: gated work takes its gate's proof, so take a %s or name the gate that gives a %s (spec.md 15.2)", id.Name, t, g.Name, proof, proof, t)
+	if t := f.Params[1].Type; !same(t, given) {
+		c.errorf(id, "operation", "%s takes a %s second, and its gate %s answers a %s: gated work takes what its gate answers, so take a %s or name the gate that answers a %s (spec.md 15.2)", id.Name, t, g.Name, given, given, t)
 	}
 	if len(g.Params) == 4 {
 		if t := g.Params[3].Type; !same(t, op.Input) {
@@ -182,9 +185,6 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 	}
 	if _, ok := gates[g]; !ok {
 		gates[g] = id.Name
-		if held, in := c.heldTx(proof, nil); held != "" && !c.isTx(proof) {
-			c.errorf(row.Gate, "gate-proof", "%s gives %s, which holds a transaction, %s, %s, or give the facts alone (spec.md 15.7)", g.Name, proof, held, c.holdFix(in, held))
-		}
 	}
 	if len(c.errs) > errs {
 		return nil
@@ -218,9 +218,6 @@ func (c *checker) shaped(id *syntax.Ident, r *role) (*Func, Type) {
 	}
 	f, errs := fs[0], len(c.errs)
 	c.info.Uses[id] = f
-	if r == workRole {
-		c.placed[f] = r
-	}
 	if r == gateRole && len(f.Params) == 4 {
 		r = inputGateRole
 	}

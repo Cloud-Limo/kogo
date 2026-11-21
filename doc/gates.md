@@ -1,160 +1,429 @@
 # Gates: who may call an operation
 
-Agreed with Greg in discussion on 17 Nov 2026, as the design to work
-from. `doc/work.md` has the rest of that day: workers, outside
-services and time limits; `doc/measured.md` has the counts both rest
-on. Of it, the list's head and rows are parsed and checked, and in
-spec 15.1 and 15.2 (DEV-950, `examples/24_gates.kg`), and the server
-runs a check, a gate and the work, with no transaction open
-where the work is an `action fun`, spec 15.3 and 15.5 (DEV-961),
-a gate is held to reading, spec 15.2 and 15.3 (DEV-977), and a
-proof's rules, spec 15.7 (DEV-976). The
-rest is not built and not in `spec.md`: until it is,
-the spec stands as written. The outside step, a row's `after`, was
-built and then taken out on 21 Nov 2026 (DEV-1039, `decisions.md`).
-No example here has been through `kogo check`, the
-names in them are invented, and every size is a guess.
+How an operation finds out who is asking, checks what they may do and
+reaches the database. Greg ruled on this design on 21 Nov 2026
+(DEV-1035), from cusoon2's `doc/plans/gates.md`, which is the same
+design written for cusoon2's port and has its counts. This document
+is the design alone, in Kogo's terms. What was weighed and not taken
+keeps a sentence each, with its reason, at the end; `decisions.md`
+has the rest.
 
-## The problem
+What is built: the list, its check, the gate and the work (spec 15.1
+to 15.3, 15.5), a gate held to reading (15.2, 15.3), `action fun`
+(7.1), markers (11), and the two refusals of a transaction used after
+it ended (15.7; DEV-1040). The printed table and commands are
+designed and not built. The listings of the desk are
+`examples/24_gates.kg`, which the tests check and serve. A listing
+marked "a sketch" was not checked.
 
-Every request comes from someone, names a thing, and asks to read or
-change it. Before any work, one question must be settled: may this
-caller do this action to this thing, in the state the thing is in now?
-If not, the request is refused in words that reveal nothing. If so, the
-work is done on the thing that was checked, and on nothing else.
+## The shape
 
-A request is therefore a pipeline, and each stage consumes what the
-stage before produced:
+- The list says who may call each operation, in a word.
+- The word names a gate, which answers a call: the transaction and
+  who is asking. One file makes a call.
+- The work is a plain function handed the call. Its first lines are
+  steps. A step turns an id from the request into a held value: a
+  permission that no other file can make.
+- A model function that changes a thing takes the held value, so its
+  step cannot be left out.
+- Postgres holds the rows, where the application gives it policies.
+
+Every rule the checker holds here refuses a mistake itself and not a
+stand-in for one (`doc/design.md`, principle 1). A transaction is a
+plain value: it is kept in a property, in a name, and passed on. What
+is refused is a transaction used after it ended, in the two places
+that can happen (7 and 8).
+
+## 1. The list
+
+```kotlin
+// api.kg
+api desk checkedBy fromOurPage {
+    statusOf    gatedBy atDesk
+    unpaid      gatedBy atDesk
+    markPaid    gatedBy atDesk
+    sendInvoice gatedBy atDesk
+    testPrinter gatedBy mayPrint
+    looks       ungated
+}
+
+api hooks unchecked {
+    forgetLooks ungated
+}
+```
+
+- `checkedBy` names the list's check, which the server runs once for
+  a request, before any row, ungated ones included: the Origin's
+  check, then the CSRF token's (`doc/origin.md`; `decisions.md`, 18
+  Nov 2026). It runs in a read-only transaction of its own that the
+  server rolls back, and its refusal is a 403 with its words.
+- A list with no check says so, `api hooks unchecked { ... }`, as a
+  row says `ungated`, and its Go type cannot be mounted for a
+  browser.
+- A row says `gatedBy <gate>` or `ungated`. A row with neither is a
+  compile error.
+- A gate says who is asking, so many rows share one. The desk has
+  one, `atDesk`. cusoon2's ops site has one, `loggedIn`, and a
+  storefront a handful: an admin, a customer, anyone.
+- `ungated` is for a row that finds out who is asking itself (8). The
+  word is rare, and marks the rows a reviewer reads whole.
+
+For one request the server runs the list's check; reads the body into
+the work's input type, or answers 400; opens the transaction and
+calls the gate; on a refusal rolls back and answers with the gate's
+words; and otherwise calls the work with the environment, the gate's
+answer and the input, and commits (spec 15.3, 15.5).
+
+## 2. The call
+
+```kotlin
+// call.kg: the one file that makes a call
+data class Clerk private constructor(val address: String)
+
+data class DeskCall private constructor(val tx: SerializableTx, val clerk: Clerk)
+
+fun atDesk(tx: SerializableTx, env: DeskEnv, request: Request): Either<String, DeskCall> = either {
+    val misses = tx.queryOne<Int>(sql"select count from look where address = ${request.clientAddress}") ?: 0
+    ensure(misses == 0) { "This address may not use the desk." }
+    DeskCall(tx, Clerk(request.clientAddress))
+}
+```
+
+- A gate answers a call: the transaction, in a plain property, and
+  what the gate found. It is an ordinary data class, and no rule
+  knows it as a call.
+- `private` is the file, and covers `copy` (spec 2, 3.1). Only
+  `call.kg` makes a `DeskCall` or a `Clerk`, so a call means that
+  `atDesk` ran in this transaction and found a clerk.
+- Where Postgres is told who is asking (6), the gate binds the person
+  as it makes the call, so that the person bound and the person
+  handed to the work are one value, set on adjacent lines of the only
+  function that makes a call. Binding is a setting, not a write.
+
+How far it reaches: every gated row, and no `ungated` one. A later
+statement could bind another person on purpose; a marker on the
+function that binds (Marks) stops the slip of calling it, and nothing
+stops the statement.
+
+## 3. The work
+
+```kotlin
+// desk.kg, which opts in to nothing
+fun markPaid(env: DeskEnv, call: DeskCall, input: InvoiceRef): Either<String, Long> = either {
+    val invoice = requireOpenInvoice(call, input.number).bind()
+    ensure(setStatus(call.tx, invoice, true)) { "Invoice ${invoice.number} is gone." }
+    invoice.totalCents
+}
+```
+
+- The work takes the environment, the call and the input. It is never
+  handed the request, a `Db` or a bare transaction (`gate`,
+  `operation`), so it has no line that checks who is asking and none
+  to leave out.
+- A line refuses only if it ends in `.bind()`, is an `ensure` or a
+  `raise`.
+- The gate and the work run in one transaction, of the kind the
+  gate's first parameter names ("Two kinds of transaction"). An
+  answer commits it, a refusal rolls it back, and a conflict runs
+  both again. So a step that refuses after a write has undone the
+  write.
+- Statements are written in model functions. Nothing enforces that:
+  `call.tx` is a plain transaction, and a statement in an operation's
+  file compiles. What it can reach is Postgres's to hold (6).
+
+## 4. A step and its held value
+
+```kotlin
+// model.kg
+@RequiresOptIn
+annotation class DeskOnly
+
+data class OpenInvoice @DeskOnly constructor(val number: String, val totalCents: Long)
+
+// steps.kg, which opts in to DeskOnly
+fun requireOpenInvoice(call: DeskCall, number: String): Either<String, OpenInvoice> = either {
+    val total = call.tx.queryOne<Long>(sql"""
+        select total_cents as "total_cents!" from invoice where number = $number and status <> 'paid' and total_cents is not null
+    """) ?: raise("Invoice $number cannot be changed.")
+    OpenInvoice(number, total)
+}
+```
+
+- A held value is the permission. Its constructor is marked (spec
+  11), and an operation's file does not opt in, so only a step makes
+  one. An operation's input never makes one either, opt-in or none
+  (spec 15.4).
+- A step takes the call and an id of the input, and no person: it
+  asks about whoever the gate found.
+- A thing that is not there and a thing the caller may not touch are
+  refused in the same words.
+- Reading and changing are two types where they differ: a step that
+  admits more callers answers the kind that reads, and a function
+  that writes takes the kind that changes.
+
+How far it reaches: the thing the id names. Any other id of the input
+is tied by a statement's `where` alone (5).
+
+## 5. The model function
+
+```kotlin
+// model.kg
+fun setStatus(tx: Tx, invoice: OpenInvoice, paid: Boolean): Boolean =
+    tx.execute(sql"""
+        update invoice set status = case when $paid then 'paid' else 'sent' end::invoice_status
+        where number = ${invoice.number}
+    """) == 1
+```
+
+- The parameter is the held value and never an id. This is what makes
+  the work's first line impossible to leave out.
+- It takes the transaction as a transaction, `call.tx` passed on. A
+  second id, as a supplier's beside the business that is held, is the
+  browser's, unchecked: the `where` ties it to the held value.
+
+How far it reaches: Kogo types the statement against the schema and
+does not judge its `where` (`doc/design.md`, principle 2). A wrong
+one is caught by Postgres where a policy holds the table (6), and by
+the application's test that sends another's id and reads a refusal.
+
+## 6. Postgres beneath
+
+```sql
+-- a sketch: the desk's schema has no policy
+create function desk.works_at(desk uuid) returns boolean
+    language sql stable security definer set search_path = desk, pg_temp as $$
+    select exists (select 1 from clerk_desk where clerk_id = current_clerk_id() and desk_id = desk) $$;
+
+create policy change_invoice on desk.invoice for update
+    using (desk.works_at(desk_id)) with check (desk.works_at(desk_id));
+```
+
+- Kogo holds nothing here and needs nothing: a policy is the
+  schema's, and holds a table from whatever file a statement is
+  written in. With nobody bound it shows nothing.
+- The step and the policy call one function of the database, so the
+  check that words a refusal and the wall beneath it cannot disagree.
+- A column grant keeps the web's role from a column that no request
+  sets.
+
+How far it reaches: rows, never columns, and only the tables that
+have a policy. Between two callers that one policy admits alike, the
+held values and the marks on reads by a bare id are the wall, and the
+application's access test probes them (Marks). cusoon2's worked
+example is its `doc/plans/business-rls.md`: policies on five business
+tables and column grants on `person`.
+
+## 7. Work that changes something outside
+
+```kotlin
+// printer.kg
+data class Printing(val address: String)
+
+fun mayPrint(tx: SerializableTx, env: DeskEnv, request: Request): Either<String, Printing> = either {
+    val call = atDesk(tx, env, request).bind()
+    Printing(call.clerk.address)
+}
+
+action fun testPrinter(env: DeskEnv, printing: Printing, input: Unit): Either<String, String> = either {
+    ensure(env.printer != "") { "No printer is set up." }
+    env.console.println("${env.printer}: a test page for ${printing.address}")
+    env.printer
+}
+```
+
+- Work that changes something outside is an `action fun` ("A function
+  that acts says so"). The server commits the gate's transaction and
+  then runs the work with none open. The gate runs once.
+- So the work is not handed a call, whose transaction has ended. Its
+  row names a gate that begins with the list's own gate and answers
+  facts alone. A row of this kind whose gate answers anything that
+  holds a transaction is a compile error:
+
+  ```
+  api.kg:6:25 action-gate: testPrinter is an action fun, and its gate atDesk answers DeskCall, which holds a transaction, tx, a property of DeskCall: the server ends the gate's transaction before work that is an action fun runs, so name a gate that answers the facts testPrinter needs, or make testPrinter a fun, which runs in the transaction (spec.md 15.7)
+  ```
+- What the work needs of the request is a fact of the gate's answer,
+  as the address is here.
+- Such a row has no transaction for a step to run in, so a check on
+  the thing its input names is its gate's: a gate may read the
+  operation's input, and then stands in that one row (spec 15.2).
+- This is the one place a gate and an answer type are written for
+  particular rows. In cusoon2 they are the passkey registrations,
+  which share a gate on each site, and deleting a passkey.
+
+### A function that acts says so
+
+A transaction is all or nothing and may run again; a call that
+changes something outside is neither. So a binding that changes
+something outside says `action`, and a function that calls an action
+is an `action fun`, as it is to its own callers (spec 7.1). An
+`action fun` takes no `Tx`, calls no action in a block that holds
+one, and is not kept in a value. An action has three homes: a worker,
+fed by a row (`doc/work.md`); an ungated operation on a `Db`, between
+its transactions (8); and gated work that is an `action fun`. A
+lookup says nothing and is allowed anywhere; a slow one holds its
+transaction open. Which kind of operation to write is the table in
+spec 15.1.
+
+## 8. An `ungated` row
+
+```kotlin
+// desk.kg
+fun looks(tx: Tx, env: DeskEnv, request: Request, input: Unit): Either<String, Int> = either {
+    tx.queryOne<Int>(sql"select count from look where address = ${request.clientAddress}") ?: 0
+}
+```
+
+- It takes the request and a bare transaction, or a `Db`, and nothing
+  of this design reaches inside it. The list's check still runs
+  first, and nobody is bound unless the row binds.
+- These are the logins, the logouts and the page's first call, which
+  make the session every gate reads, and gated work may not answer a
+  `Reply`.
+
+An operation that must keep a write after a refusal, or write what an
+action answered, is `ungated` on a `Db` and calls its gate itself in
+each of its transactions:
+
+```kotlin
+// cut to the first transaction
+    val number = db.tx(serializable = true) { tx ->
+        val call = atDesk(tx, env, request).bind()
+        requireOpenInvoice(call, input.number).bind().number
+    }.bind()
+```
+
+A `db.tx` block hands back facts, as a gate of 7 does. A block that
+answers anything that holds a transaction, a call included, is a
+compile error, since the transaction ends with the block:
 
 ```
-bytes ──read──► input ──gate──► proof ──work──► answer ──write──► JSON
-        400 if it       refused if
-        does not fit    not allowed
+login.kg:9:19 tx-escapes: this db.tx block answers DeskCall, which holds a transaction, tx, a property of DeskCall: the transaction ends with the block, so answer the facts the lines after it need (spec.md 10.7)
 ```
 
-Kogo already runs the first stage: an operation never sees the body,
-only its typed input. This design has it run the second as well: the
-work never sees the request, only the gate's proof.
+"Holds a transaction" is one meaning for both refusals: the type is a
+`Tx` or a `SerializableTx`, or has one in a property or a type
+argument, at any depth (spec 15.7).
 
-## What was measured
+### Ungated: logins and logout
 
-Counted in cusoon2 at `691aa93cf` on 17 Nov 2026, by regex over the
-source, so approximate.
+A login reads the request's own session and address, must keep the
+count of a failed attempt after a refusal, calls the identity
+service, and makes the session that every gate reads. It ends the
+caller's session and starts another, and the browser must be given
+the new one's cookies. The answer carries them, in two types of
+`kogo.rpc` (spec 15.2):
 
-- 73 GraphQL fetchers and 20 RPC operations. 48 fetchers call a gate
-  and 25 do not, on purpose; a 26th by mistake would compile.
-- The gates are 8 functions. A fetcher's policy is its first two
-  lines: `requireVisibleBooking(id)`, then
-  `access.require(roles, states) { action }`.
-- The access matrix test's 44 rows by 6 callers collapse to 7 patterns
-  of allowed and refused, and three of them cover 37 rows: admin only;
-  owner and admin; payer, owner and admin.
-- 23 of the 48 gated fetchers are for an admin alone. The 14 booking
-  writes that call `require` use three sets of roles and eight sets of
-  states.
-- 11 of the 48 read the caller's role again inside the work.
-- 28 of the 48 gates read nothing of the input (16 admin, 9 booker,
-  3 viewer); 20 name a thing in it.
-- 74 functions of `Model` take a bare id unmarked, and 26 of the public
-  ones write. `deletePassenger(passengerId)` deletes any passenger of
-  the tenant.
+```kotlin
+action fun completeEmailLogin(db: Db, env: Env, request: Request, input: CodeInput): Either<String, Reply<BookerView>> = either {
+    val user = redeemEmailCode(db, env, request, input.oneTimeCode).bind()
+    val session = db.tx(serializable = true) { tx -> completeLogin(tx, env, request, user) }.bind()
+    Reply(bookerView(session), sessionCookies(session, env.clock.now(), isSecure(request)))
+}
+```
 
-## The design
+The server sends `answer` as the JSON and each cookie as a
+`Set-Cookie` header, when the operation answers; a refusal sets none.
+Only an ungated operation answers with a `Reply`, so a search for it
+lists every place a cookie is set.
 
-### The list states each operation's gate
+### The first call makes the session
 
-A row of an `api` list is an operation and its gate, or an operation
-marked `ungated`:
+A session's row is there before anyone logs in: it holds the CSRF
+token, the emailed code and the count of attempts. cusoon2's routes
+make it for any request that comes without a live one, before a
+fetcher runs. A first load's many requests then each made a session,
+so its page already makes one request and waits for it before it
+draws anything (`InitializeSession.tsx`): the `Booker` query.
+
+A gate does not write and nothing runs before one, so in Kogo that
+first call is an ungated operation that says what it does, and no
+other request makes a session. Kogo gains nothing for it:
 
 ```kotlin
 api booker checkedBy fromOurPage {
-    setBookingNotes     gatedBy setBookingNotesGate
-    drivers             gatedBy admin
-    areas               gatedBy anyone
-    completeEmailLogin  ungated
+    whoAmI  ungated        // the page's first call: makes the session when there is none
+}
+
+fun whoAmI(tx: SerializableTx, env: Env, request: Request, input: Unit): Either<String, Reply<BookerView?>> = either {
+    val live = liveSession(tx, env, request)
+    val session = live ?: createSession(tx, tenantOf(tx, request).bind())
+    val cookies = if (live == null) sessionCookies(session, env.clock.now(), isSecure(request)) else emptyList()
+    Reply(bookerOf(tx, session), cookies)
 }
 ```
 
-`checkedBy` names the list's check, which the server runs before
-every row, ungated ones included: the Origin's check, then the CSRF
-token's (`doc/origin.md`; `decisions.md`, 18 Nov 2026). A list with
-no check says so, `api hooks unchecked { ... }`, as a row says
-`ungated`, and its Go type cannot be mounted for a browser. A list's
-entries are separated by a comma, a new line or both (spec 15.1),
-and a row of more than one word stays on one line.
+A request with no live session is refused by a gate that needs one
+and served by one that needs the tenant alone. Cookies are set
+by the first call, a login and a logout, where cusoon2 sets them on
+every response: the same cookies, since a session's deadline does not
+move. It changes how cusoon2 behaves, so it is made in the Kotlin
+first, under its tests, and ported after.
 
-### A gate and its work are two functions
+## Marks
 
-The gate takes what an operation takes today and gives a proof or a
-refusal. The work takes the proof where the request was.
+Mark what grants, not what reads (spec 11).
 
-```kotlin
-// Gate file: the only file that makes a HeldBooking.
-@file:OptIn(UnscopedRead::class)
-package cusoon.gate
+| Marked | Why |
+| -- | -- |
+| the constructor of a held value | it is a permission |
+| a function that binds the person or the tenant, and one that binds in turn | it opens a wall |
+| a read or write that answers by a bare id, where no policy tells two callers apart | it answers whoever holds the id: it is for a worker and a held value's own file, and an operation reaches those rows through a held value |
 
-val ADMIN_OR_OWNER_ROLES: Set<BookingRole> = setOf(BookingRole.Admin, BookingRole.Owner)
-val EDITABLE_STATES: Set<BookingState> = setOf(
-    BookingState.Unpriced, BookingState.Priced, BookingState.Assigned,
-    BookingState.Confirmed, BookingState.Complete)
-
-data class HeldBooking @UnscopedRead constructor(
-    val id: ID, val state: BookingState, val isAdmin: Boolean,
-    val tenant: AtTenant, @property:UnscopedRead val tx: SerializableTx)
-
-fun booking(tx: SerializableTx, env: Env, request: Request, id: ID, roles: Set<BookingRole>,
-            states: Set<BookingState>, action: String): Either<String, HeldBooking> = either { ... }
-```
+A model function that reads rows Postgres already filters carries no
+mark. One that answers for a held thing takes the held value, and is
+marked only where its caller is not a request. The request's side is
+a plain function that takes the held value and calls the marked one:
 
 ```kotlin
-// Operation file: does not opt in.
-package cusoon.booker
-
-data class NotesInput(val id: ID, val notes: String)
-
-fun setBookingNotesGate(tx: SerializableTx, env: Env, request: Request, input: NotesInput): Either<String, HeldBooking> =
-    booking(tx, env, request, input.id, ADMIN_OR_OWNER_ROLES, EDITABLE_STATES, "set the notes on")
-
-fun setBookingNotes(env: Env, booking: HeldBooking, input: NotesInput): Either<String, BookingView> = either {
-    setNotes(booking, input.notes)
-    bookingView(booking)
-}
+// a sketch: needs no mark; unscopedInvoice keeps its own
+fun invoice(tx: SerializableTx, desk: DeskManager, number: String): Invoice? = unscopedInvoice(tx, number)
 ```
+
+Kogo holds the opt-in and nothing else: which functions an
+application marks is its own. cusoon2's are listed in its
+`doc/plans/gates.md`, with what its storefront's port starts from.
+
+## A field only an admin sets
 
 ```kotlin
-// Model file: opts in, and holds the SQL.
-fun setNotes(booking: HeldBooking, notes: String) {
-    booking.tx.execute(sql"update booking set notes = $notes where id = ${booking.id}")
-}
+// a sketch
+/** The notes, which any clerk may change on an open invoice. */
+fun setNotes(tx: Tx, invoice: OpenInvoice, notes: String): Boolean
+
+/** The total, which only a manager sets: it takes the manager's access, which a clerk's call has not. */
+fun setTotal(tx: Tx, manager: DeskManager, invoice: OpenInvoice, totalCents: Long): Boolean
 ```
 
-For one request the server:
+One function for what any caller may change and one for each thing
+only an admin may. The admin's functions take a held value, so
+another's call cannot reach them. The two comments are the guidance
+for where a new field goes; no rule checks it. A test for each such
+field, another caller sending it and it not changing, is the
+application's.
 
-0. runs the list's check first, in a read-only transaction of its own
-   that it rolls back, and on a refusal answers 403 with its words
-   (`doc/origin.md`);
-1. reads the body into the work's input type, or answers 400;
-2. opens the transaction and calls the gate with it, the environment,
-   the request and the input;
-3. on a refusal, rolls back and answers with the gate's words;
-4. otherwise calls the work with the environment, the proof and the
-   input, and commits and answers as it does today.
+## Two kinds of transaction
 
-A gate is ordinary code and may run any number of steps before it
-answers, each with `bind`: who is asking, then what they are to the
-thing named, then whether its state allows the action. There is one
-gate for an operation and no stack of layers: what ran before the
-work, and in what order, is read from one function.
+The kind is the handle's type, and every function that takes a
+transaction writes one of two (spec 10.7). `Tx` is any transaction: a
+function that takes it assumes nothing, and locks what it needs.
+`SerializableTx` is one at SERIALIZABLE, where a conflict is a
+serialization failure and never a wrong read, so a function that
+takes it may read with no lock; it fits wherever a `Tx` is wanted,
+and not the other way (`needs-serializable`). The first parameter of
+a gate, or of an ungated operation, names the kind the server opens
+(spec 15.3), and a call holds the kind its gate was handed, as
+`DeskCall.tx` is a `SerializableTx`.
 
-### A gate reads and decides; it does not write
+## A gate reads and decides; it does not write
 
-Every gate of cusoon2 obeys this already: none writes a row, and three
-of the ops site's steps bind a tenant, which is a setting of the
-transaction. Its routes do write, in front of the gates: each makes a
-session for a request that comes without a live one ("The first call"
-below). A count of attempts writes, so it is no gate's: it belongs
-to an ungated operation. Both checks were
-run on Postgres 18.7 on 17 Nov 2026:
+Every gate of cusoon2 obeys this already: none writes a row. A gate
+binds the person or the tenant, which is a setting of the
+transaction and no write. cusoon2's routes do write, in front of the
+gates: each makes a session for a request that comes without a live
+one ("The first call makes the session" above). A count of attempts
+writes, so it is no gate's: it belongs to an ungated operation. Both
+checks were run on Postgres 18.7 on 17 Nov 2026:
 
 - **When it runs.** The server runs the gate in a savepoint with
   `transaction_read_only` on and releases it before the work. Postgres
@@ -178,232 +447,7 @@ gate.kg:41:9 gate-writes: this statement updates person, and a gate only reads: 
 gate.kg:52:9 gate-writes: this statement locks session, and a gate only reads: lock it in the work
 ```
 
-### The gate binds the tenant
-
-Which tenant's rows a statement sees is a setting of the transaction,
-and a gate may make it. The work does not change it, so a proof's
-`AtTenant` means one tenant for the whole of the work. In cusoon2 the
-model switches tenant for one row in three places on the ops site:
-queuing an invite's mail (`Outbox.kt`), linking a driver who accepts
-an in-house invite (`HeldInvite.acceptInHouse`), and reading a
-storefront's in-house drivers (`inHouseDrivers`). Each operation's gate
-binds the storefront instead, as `requireStorefront` does, and the
-model loses its `withTenant` and its opt-ins to `@BindsTenant`:
-
-```kotlin
-// gate.kt: beside requireBusinessToAct
-fun Raise<String>.requireStorefrontToAct(call: OpsCall, person: Driver, slug: String): ActingBusiness {
-    val business = requireBusinessToAct(call, person, slug)
-    val storefront = business.storefront ?: raise("Only a business with a storefront can invite.")
-    call.model.tenantId = storefront.id
-    return business
-}
-```
-
-Kogo holds nothing here: it knows no tenant. cusoon2's marker
-`@BindsTenant` ports as it is (spec 11), opted into by the gates'
-file alone. It is a habit and not yet a rule while `driverJobs`
-loops over tenants, and was to become a rule once `operatorJobs`,
-one call per operator, replaced it (DEV-945; `doc/roadmap.md`,
-"Settled for the ops site"). Agreed with Greg on 17 Nov 2026; made
-in cusoon2's Kotlin first. The checker's part was to be built on the
-rule that a statement binds something of its proof. That rule left
-the language on 20 Nov 2026 ("Weighed and not taken"), so how
-`@BindsTenant` is held is open.
-
-### A gate that reads no input is shared
-
-A gate that takes no input is named by many rows, and their operations
-have no gate function of their own:
-
-```kotlin
-fun admin(tx: SerializableTx, env: Env, request: Request): Either<String, Admin> = either { ... }
-
-fun drivers(env: Env, admin: Admin, input: DriversInput): Either<String, List<DriverView>> = either { ... }
-```
-
-### The proof is the only handle
-
-A proof (a *held* value) is a data class whose constructor is marked,
-so only a file that opts in makes one: the gate's, or the model's for a
-row it has just inserted. It carries the facts the gate found and the
-transaction, in a marked property that only such a file reads.
-
-So the work has no `Request` and no `Tx`. It cannot write SQL, and it
-cannot call a function that takes a `Tx` and a bare id. A model
-function says in its signature whose authority it acts under.
-
-- **Shared reads take a wider proof.** Places, areas and prices are
-  read under many proofs, so every proof carries a tenant's, `AtTenant`:
-  the caller is inside this tenant and may read what any of its users
-  may. Row-level security in Postgres scopes its statements on a table
-  that has it, and nothing scopes them on one that has not (cusoon2's
-  `person`, `session`, `business`). It may also write: a journey, a booking's number,
-  Google's answers, rows that belong to no caller. A function that
-  takes it acts with the whole tenant's authority, so each model
-  function demands the narrowest proof that does its job. Every proof
-  of a tenant's site carries one; the ops site's proofs (a driver, a
-  business, an invite) carry none, since its pages run with no tenant
-  bound and bind a storefront only where the gate names one.
-- **Making a thing gives its proof.** `insertBooking(held, ...)` takes
-  the proof that the caller may book and gives the `HeldBooking` of the
-  new row, which the writes that follow take.
-- **An admin's proof is its own type.** `AdminBooking` is not a
-  `HeldBooking`, and the model's admin-only functions take the first,
-  so work for an admin paired with a gate that admits an owner does not
-  compile. Owner against payer, and the states, are arguments of the
-  gate.
-- **A proof carries facts.** A rule that needs data the gate has not
-  read stays in the work and reads the proof: `held.isAdmin`.
-
-### A proof's transaction stays in it
-
-**A proof's transaction is used only before the dot.** It is written
-as the receiver of one of the five calls, `booking.tx.execute(...)`,
-or as the argument of a proof's constructor in the position of that
-proof's own marked `tx`, `HeldBooking(id, booker.tenant, booker.tx)`,
-so that making a thing can give its proof; and nowhere else: not kept
-in a `val`, passed to a function or to any other constructor, or
-returned. In a constructor it goes from one proof into another, where
-the rule holds it again, and only a file that opts in can call the
-constructor; that the facts put into the new proof are the new row's
-is not held, as for any proof (agreed with Greg on 18 Nov 2026). Without
-this a proof reaches a helper that takes a bare `Tx` and an id, whose
-signature no longer says whose authority it acts under, the shape cusoon2's model is in
-already (`scoped.kt`: a public function takes the held row and calls a
-private one by id):
-
-```kotlin
-// Refused: the proof's transaction leaves it, and the helper's statement is on a bare Tx.
-fun removePassenger(booking: HeldBooking, passengerId: ID): Boolean =
-    deletePassenger(booking.tx, passengerId)
-```
-
-```
-model.kg:2:5 proof-tx-escapes: booking.tx is passed to deletePassenger; a proof's transaction is used only as booking.tx.query/execute/...: pass booking instead
-```
-
-So a helper takes the proof, and its signature says whose authority
-it acts under.
-Work done under several proofs takes an interface they implement
-(spec 3.4), `interface OnBooking { val id: ID; @UnscopedRead val tx:
-Tx }`. Code that holds a bare transaction (a gate, an ungated
-operation, the daemon) opts in and may make a proof, so it reaches a
-function written for proofs by wrapping its transaction: a login
-answers `bookerView(AtTenant(tx), booker)`, which gated work calls as
-`bookerView(held.tenant, held.booker)`. The cost is that wrapping,
-not a second form of each function. Agreed with Greg on 17 Nov 2026.
-
-The rule is odd for a general language. It fires only where a
-transaction is reached through a proof, so a program with no proofs
-never meets it, and it is no flag of `kogo check`: a flag would make
-two dialects and put the safety outside the source.
-
-### Gates that admit anyone
-
-What cusoon2 leaves without a gate is three things, and two of them
-have one.
-
-- **A tenant's public reads** (13 gated by `anyone`: areas,
-  branding, the default area). Nobody logs in, but the read is of one
-  tenant: `gatedBy anyone`, whose proof is `AtTenant`.
-- **Bearer links** (4: an invoice, a charge, a payment link, a new
-  booker's secret). The secret in the input is the credential, and its
-  gate gives the proof of that one thing.
-
-Some public reads use the caller when there is one: place suggestions
-put a booker's own places first, and past passengers answer a
-stranger with none. Their gate never refuses, and its proof says who,
-if anyone, is asking:
-
-```kotlin
-data class MaybeBooker @UnscopedRead constructor(val tenant: AtTenant, val booker: HeldBooker?)
-
-fun maybeBooker(tx: SerializableTx, env: Env, request: Request): Either<String, MaybeBooker> = either {
-    MaybeBooker(atTenant(tx, request).bind(), booker(tx, env, request).getOrNull())
-}
-```
-
-So `anyone` is not the only public door: any gate that never refuses
-is one, and the printed table names it on each row it serves. A gate
-that checks several things gives a proof that holds a list, as hiding
-several bookings at once does
-(`data class AdminBookings(val bookings: List<AdminBooking>)`). Neither shape changes the
-language.
-
-### Ungated: logins and logout
-
-Five fetchers on the booker side, and the ops site's logins. They read
-the request's own session and address, must keep the count of a failed
-attempt after a refusal, call the identity service, and make the
-session that every gate reads. An `ungated` operation takes today's
-four parameters, a `Db` among them where it runs its own transactions
-(spec 15.3). It is trusted code and sits beside the gates.
-
-A login ends the caller's session and starts another, and the browser
-must be given the new one's cookies. cusoon2's fetcher leaves the
-session in a slot of the request's context (`renewedSession`), which
-the route reads after, and guards against the slot being filled
-twice. Here the answer carries them, in two types of `kogo.rpc`:
-
-```kotlin
-// kogo.rpc
-data class Cookie(val name: String, val value: String, val path: String, val maxAgeSeconds: Long,
-                  val sameSite: SameSite, val secure: Boolean, val httpOnly: Boolean)
-data class Reply<A>(val answer: A, val cookies: List<Cookie>)
-```
-
-```kotlin
-action fun completeEmailLogin(db: Db, env: Env, request: Request, input: CodeInput): Either<String, Reply<BookerView>> = either {
-    val user = redeemEmailCode(db, env, request, input.oneTimeCode).bind()
-    val session = db.tx(serializable = true) { tx -> completeLogin(tx, env, request, user) }.bind()
-    Reply(bookerView(session), sessionCookies(session, env.clock.now(), isSecure(request)))
-}
-
-// The application's own: which cookies, and their names, paths and flags.
-fun sessionCookies(session: Session, now: Instant, secure: Boolean): List<Cookie> = ...
-```
-
-The server sends `answer` as the JSON and each cookie as a
-`Set-Cookie` header, when the operation answers; a refusal sets none.
-Only an ungated operation answers with a `Reply`, so a search for it
-lists every place a cookie is set. The browser's TypeScript has the
-answer's type alone.
-
-### The first call makes the session
-
-A session's row is there before anyone logs in: it holds the CSRF
-token, the emailed code and the count of attempts. cusoon2's routes
-make it for any request that comes without a live one, before a
-fetcher runs. A first load's many requests then each made a session,
-so its page already makes one request and waits for it before it
-draws anything (`InitializeSession.tsx`): the `Booker` query.
-
-A gate does not write and nothing runs before one, so in Kogo that
-first call is an ungated operation that says what it does, and no
-other request makes a session. Kogo gains nothing for it:
-
-```kotlin
-api booker {
-    whoAmI  ungated        // the page's first call: makes the session when there is none
-}
-
-fun whoAmI(tx: SerializableTx, env: Env, request: Request, input: Unit): Either<String, Reply<BookerView?>> = either {
-    val live = liveSession(tx, env, request)
-    val session = live ?: createSession(tx, tenantOf(tx, request).bind())
-    val cookies = if (live == null) sessionCookies(session, env.clock.now(), isSecure(request)) else emptyList()
-    Reply(bookerOf(tx, session), cookies)
-}
-```
-
-A request with no live session is refused by a gate that needs one
-and served by `anyone`, which needs the tenant alone. Cookies are set
-by the first call, a login and a logout, where cusoon2 sets them on
-every response: the same cookies, since a session's deadline does not
-move. It changes how cusoon2 behaves, so it is made in the Kotlin
-first, under its tests, and ported after.
-
-### Routes that are not operations
+## Routes that are not operations
 
 Some requests are not a browser's JSON call: a page the identity
 service sends the browser back to, a webhook from a server. cusoon2
@@ -436,7 +480,7 @@ mux.HandleFunc("POST /backend/smtp2go-webhook", func(w http.ResponseWriter, r *h
   types, and its lines in the printed file. `recordDeliveryFailure`
   knows nothing of HTTP.
 - **Logout** calls an ungated operation that answers a `Reply`
-  ("Ungated: logins and logout"); Go writes its cookies as
+  ("An `ungated` row"); Go writes its cookies as
   `Set-Cookie` headers and then a 303 to `/` in place of the JSON. The
   cookies stay Kogo's; only the redirect is Go's.
 - **A route touches the database only through its operation**, as
@@ -453,7 +497,7 @@ operation's. Reopen at five routes. Commands are not affected and stay
 a list. Agreed with Greg on 17 Nov 2026 (`doc/lists-assessment.md`,
 choice B), reversing a `routes` list agreed earlier the same day.
 
-### Commands
+## Commands
 
 cusoon2's binary takes `--op <name>` and flags (`Main.kt`). Ten of
 its operations are the application's work, run by Greg or the deploy
@@ -512,16 +556,16 @@ painful by hand; commands in Go, which for ten commands would grow
 Go with each and lose the reading by property name. Agreed with Greg
 on 17 Nov 2026, and kept when routes went to Go the same day.
 
-### The table is printed
+## The table is printed
 
-A command of its own prints, from the list, the gate functions and
-Postgres's answers, each operation with its gate, the arguments it
-passes and the tables it touches, into a file that is checked in. A
+Designed and not built. A command of its own prints, from the list,
+the gate functions and Postgres's answers, each operation with its
+gate and the tables it touches, into a file that is checked in. A
 change of who may do what, or of what an operation reads and writes,
 is then a diff, made on purpose or by accident:
 
 ```
-setBookingNotes     booking      input.id, ADMIN_OR_OWNER_ROLES, EDITABLE_STATES
+setBookingNotes     viewer
                     runs         serializable
                     gate reads   booking, booking_role, session
                     reads        booking
@@ -530,7 +574,7 @@ submitBooking       booker
                     runs         serializable
                     gate reads   booker, session
                     reads        area, booker, place, price_regime, stripe_card
-                    writes       booking, passenger, journey (tenant-wide)
+                    writes       booking, passenger, journey
                     asks         google.distance (in transaction)
 drivers             admin
                     runs         serializable
@@ -557,15 +601,10 @@ The file enforces nothing: it is what a reviewer reads.
   "The server"): the application's checks run the command and fail
   when `git diff` shows a change, so Kogo has no rule for a stale
   file. The command needs a database, as `kogo check` does.
-- **The outside step is on the first line, beside the gate**:
-  `updateBooker  updateBookerGate  after renameLogins`, and `action`
-  for an operation that runs wholly outside. A row's order of calls
-  is then read where its gate is: a line with neither is gate, then
-  work. That the gate runs a second time
-  after an outside step is left to the spec. Perhaps 5 / 5. Agreed
-  with Greg on 17 Nov 2026 (`doc/lists-assessment.md`, choice C), over
-  a line of order on every entry, which prints `gate, work` on most.
-  The outside step is out since 21 Nov 2026 (`decisions.md`).
+- **`action` is on the first line, beside the gate**, for a row
+  whose work is an `action fun`: `testPrinter  mayPrint  action`. A
+  row's order of calls is then read where its gate is: a line without
+  the word is gate, then work, in one transaction.
 - **It lists no route**: routes are Go ("Routes that are not
   operations"), and what each writes is on its operation's lines.
 - **The tables are those a statement names**, over the statements the
@@ -604,11 +643,6 @@ The file enforces nothing: it is what a reviewer reads.
   two calls is printed once, and a wrapper that takes its endpoint
   as a parameter is printed as itself on every operation that uses
   it. Nothing is refused for the table's sake.
-- **A write made under `AtTenant` is marked `(tenant-wide)`**, since
-  no rule holds it: `journey` above is meant, and a `passenger` so
-  marked is a diff someone has to explain. The printer knows which
-  proof's transaction a statement runs on, as the checker of
-  `proof-tx-escapes` does. Perhaps 10 lines. Agreed with Greg on 17 Nov 2026.
 - **A view is listed by its own name**, read or written.
 - **It does not see** inside a function, under a view, or a row that a
   foreign key's cascade or a trigger changes. It lists what the
@@ -623,483 +657,127 @@ listed), and a `delete`; and, for the gate's check, `for share` and
 `for key share`, which Postgres marks as it does `for update`. Not
 run: a cascade, a trigger and `for no key update`.
 
-## Two kinds of transaction
+## What holds what
 
-cusoon2 runs its requests at SERIALIZABLE with no locks, and reruns
-one on a conflict; its daemon and the Google login's callback run at
-READ COMMITTED and lock what they read; logout deletes by the cookie's
-id. Most programs work the second way
-throughout. In the Kotlin a flag on `Model`, read as a statement is
-built (`withLocking`), decides whether a read locks, so one call
-sends three statements:
+|  | Held by | How far |
+| -- | -- | -- |
+| No operation without a gate | the list: a row with neither word is refused | all rows |
+| No list without a check | the list's head: `checkedBy` or `unchecked` | all lists |
+| The person checked is the person handed on | the private constructors of the call's file | gated rows; not a statement that binds again |
+| A step is not left out | the model function's parameter, and the held value's marked constructor | where a model function takes the held value |
+| Another's rows | the application's policies | the tables that have one |
+| Two callers one policy admits | held values, the marks on reads by a bare id, and the application's access test | what the test probes |
+| A second id | its `where`, and a probe | the ids that have a probe |
+| A field only an admin sets | the function that takes the admin's held value, and a test | the fields that have a test |
+| A gate that writes | `gate-writes`, and the read-only savepoint of a gate on a `SerializableTx` | "A gate reads and decides" |
+| An action in a transaction | `action fun` and its rules (spec 7.1) | every call the checker reads |
+| A transaction used after it ended | the two refusals of 7 and 8 | gated work that runs outside, and a `db.tx` block |
 
-```kotlin
-unscopedInvoice(id)                                     // a request:           select ... where id = ?
-model.unscopedInvoice(row.invoiceId)                    // the charge's prepare: select ... for share
-model.unscopedInvoice(row.invoiceId, forUpdate = true)  // the charge's record:  select ... for update
-```
+### What the checker holds
 
-Kogo's statements are constants and a transaction has no flag, so the
-kind is the handle's type, and every function that takes a
-transaction writes one of two:
-
-- **`Tx` is any transaction.** A function that takes it assumes
-  nothing, and locks what it needs.
-- **`SerializableTx` is one at SERIALIZABLE.** A conflict there is a
-  serialization failure and never a wrong read, so a function that
-  takes it may read with no lock. The program's is rerun on one, and
-  a test's fails. It fits wherever a `Tx` is wanted.
-
-```kotlin
-fun invoice(tx: SerializableTx, id: ID): Invoice? =            // relies on serializable
-    tx.queryOne<Invoice>(sql"select * from invoice where id = $id")
-
-fun sharedInvoice(tx: Tx, id: ID): Invoice? =                  // holds the row against a change
-    tx.queryOne<Invoice>(sql"select * from invoice where id = $id for share")
-
-fun lockedInvoice(tx: Tx, id: ID): Invoice? =                  // about to write it
-    tx.queryOne<Invoice>(sql"select * from invoice where id = $id for update")
-```
-
-```
-invoices.kg:40:19 needs-serializable: invoice takes a SerializableTx and sendInvoice holds a Tx: call a function that locks
-```
-
-- **Who opens which is read from the type.** `db.tx { }` gives a `Tx`
-  at READ COMMITTED, set by the handle and not left to the database's
-  default; `db.tx(serializable = true) { }` gives a `SerializableTx`.
-  For a transaction the server or the runner opens, the first
-  parameter of the gate, the ungated operation or the queue's step
-  says which. There is no default.
-- **A gate on a `Tx` may lock, and still may not write.** Where
-  nothing is rerun on a conflict the gate is where the lock belongs:
-  without it, what the gate found can change before the work writes.
-  A gate on a `SerializableTx` is as above: a lock is refused.
-- **A rerun is safe at either level**, since no `action fun`
-  runs in a transaction. A `Tx` the server or the runner opened is
-  rerun on a deadlock.
-- **The printed table says which**, on a line of its own: `runs
-  serializable` or `runs plain`. An operation that takes a `Db` has
-  no such line: it opens its own.
-
-**A proof made both ways shares an interface**, as work done under
-several proofs does. A tenant's proof is made by a request and by the
-daemon (the names here are invented):
-
-```kotlin
-interface InTenant { @UnscopedRead val tx: Tx }                // the tenant is bound; assume no more
-
-data class AtTenant @UnscopedRead constructor(@property:UnscopedRead override val tx: SerializableTx) : InTenant   // a request's
-data class WorkerTenant @UnscopedRead constructor(@property:UnscopedRead override val tx: Tx) : InTenant           // the daemon's, or a login's
-
-fun nextInvoiceNumber(at: AtTenant): Long = ...                // relies on serializable: a request alone calls it
-fun lockedInvoice(at: InTenant, id: ID): Invoice? = ...        // locks for itself: either calls it
-```
-
-Run on Kotlin 2.4.0 on 17 Nov 2026: it compiles and runs, a marked
-`val` in an interface included, and a `WorkerTenant` passed where an
-`AtTenant` is wanted is refused. Kogo gains one thing for it: a data
-class may implement an interface's `val` with a type that fits it.
-
-**For a port of cusoon2.** The gates and proofs of its requests say
-`SerializableTx`, as the examples above do, and the daemon's
-functions say `Tx`. A session has one reader, `liveSession`, on a
-`SerializableTx`: a login reads its session in
-`db.tx(serializable = true) { }`, as each login of the Kotlin does,
-and none locks it (`doc/origin.md`, Q8). Each read of the daemon's
-writes its lock in its statement, where the Kotlin's flag added it
-out of sight. A read used both ways becomes two functions, so that a
-request sends the statement the Kotlin sends. About 30 reads of
-`database.kt` go through the flag; how many are used both ways was not
-counted.
-
-**What a gate on a `Tx` loses.** The server cannot put it in
-Postgres's read-only mode, which refuses a lock as it refuses a
-write, and Postgres has no mode that allows the one and refuses the
-other. So such a gate is held by the check made when it compiles,
-which does not see a `select` of a function that writes, or of
-`nextval`. Postgres knows which functions may write, so the checker
-could refuse those in a gate; that was not tried, and binding the
-tenant is itself such a function.
-
-Perhaps 40 lines of checker, 30 of Go and 60 of tests. Weighed and
-not taken:
-
-- **The level stated on the list, or in `main`.** A function would
-  then rely on what its signature does not say, and one called from
-  both kinds of transaction would be wrong in one of them in silence.
-- **A flag on the handle, read when the program runs**, as the Kotlin
-  has: one call that sends different SQL by who opened the
-  connection.
-- **One function that locks, for a read used both ways.** It is
-  allowed, since a `SerializableTx` fits a `Tx`, and costs a lock the
-  Kotlin does not take; a port writes two.
-
-Agreed with Greg on 17 Nov 2026.
-
-## Outside calls
-
-A transaction is all or nothing and may be run again from the start.
-A call to another service is neither: it cannot be rolled back, and
-run twice it happens twice. Made inside a transaction it can be done
-twice, be done and then undone on our side alone, or hold the
-transaction open while the service answers.
-
-cusoon2's daemon already has the rule, agreed 25 Sep 2026
-(`doc/plans/effect-runner.md` there): "A remote write happens in no
-transaction, ever." Its requests do not. Of the 73 fetchers, 7 queue a
-row for the daemon, about 9 look something up (Google's places and
-distances, the identity service's "has a passkey?"), 4 are logins, and
-4 change something outside in the middle of their transaction (three
-passkey operations and a booker's change of address). The ops site
-has the same three passkey operations, so seven in all. The logins
-act too, on both sites, inside their transaction today: they are
-`ungated` with a `Db` here, and act between their transactions. Six
-comments argue, call by call, what a rerun would do.
-
-- **Only a binding that acts is marked**: an `action` binding
-  changes something outside, and any other says nothing, a lookup
-  among them; nothing checks that one is right to say nothing. The
-  word `lookup` on a binding, settled on 17 Nov 2026, was removed on
-  20 Nov (`decisions.md`). The one outbound binding is a general HTTP
-  call, and each endpoint of a service is declared once with its kind
-  (`doc/work.md`).
-- **An action is refused where a transaction is open**: in a function
-  that holds a `Tx` or a proof, and in a `db.tx { }` block. A function
-  that calls an action says so ("A function that acts says so"
-  below), so a helper hides none. Gated work that runs wholly
-  outside is the one function that holds a proof and may act.
-- **An action has three homes**: a worker, fed by a row; an ungated
-  operation, between its own transactions; and gated work that runs
-  wholly outside.
-- **A lookup is allowed anywhere.** A slow one still holds a
-  transaction open, as today. Which kind of operation to write, by
-  where it asks and changes things outside, is the table in `spec.md`
-  15.1.
-
-### A function that acts says so
-
-A function that calls an action is an `action fun`, as the binding it
-calls is:
-
-```kotlin
-// kogo.http
-action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<HttpFailure, Json>
-
-// The application.
-action fun setUserEmail(idp: Http, userId: String, email: String): Boolean { ... }   // calls perform
-action fun renameLogins(env: Env, booker: HeldBooker, input: BookerInput): Either<String, Unit> = ...   // calls setUserEmail
-```
-
-The word is carried up as Kotlin carries a marker: a function that
-calls an `action fun` is one, and so it is to its own callers. kotlinc
-refuses `action fun` (run on 2.4.21), so no Kotlin habit applies to
-it (`doc/design.md`, principle 3). No file opts in to it, as there
-is nothing to opt in to, and the checker holds three rules:
-
-- **The word stays true.** An `action fun` that calls no action is an
-  error, and a function that calls one and is not one is refused.
-- **It keeps out of a transaction.** An `action fun` takes no `Tx`,
-  takes a proof only as a gated operation that runs with no
-  transaction, and is not called in a `db.tx { }` block.
-- **It is not kept in a value.** There is no `::` reference to one,
-  an interface's `fun` is not one, and a lambda that acts is passed
-  straight to a prelude function that runs it, as a lambda that fails
-  is (spec 9).
-
-```
-logins.kg:3:5 unmarked-action: setUserEmail calls perform, an action: make setUserEmail an action fun, or move the call
-```
-
-As first written, whether a function acts was worked out through what
-it calls. A line added to a helper then changed what its callers
-were, with no word of theirs changed, and the error came up where a
-transaction was held, files away; where no caller held one, nothing
-was reported. A lambda kept in a value, a `::` reference and an
-interface's `fun` each carried an action past that walk. Only an
-action is marked: no rule rests on whether a function looks something
-up.
-
-Perhaps 40 lines of checker and 45 of tests; in a port of cusoon2
-perhaps 40 to 50 functions are one, by a guess. Weighed and not taken:
-
-- **The kind left worked out**, with the hole closed and the error
-  naming the chain of calls. Cheaper, and a reader still opens what a
-  function calls to learn what it is.
-- **A marker, `Acts`**, Kotlin's own rule for a marker, which held
-  this until 18 Nov 2026. It added no syntax, but was the one marker
-  held by the function and never by the file, against spec 11, and a
-  marker the checker knows by name. Respelt `action fun` when Kogo
-  source was freed from compiling as Kotlin (DEV-894).
-- **Two environments**, one that can act and one that cannot. Spec 7
-  at its purest, and two environments in every list with a handle
-  that only asks.
-
-Agreed with Greg on 17 Nov 2026; respelt `action fun` on 18 Nov 2026.
-
-### An operation that runs wholly outside
-
-Six of cusoon2's seven write nothing of ours after the gate: the
-three passkey operations, on both sites, change the identity service
-and are done, and starting a registration answers with what the
-service said. The seventh acts outside and then writes, and is
-`ungated` on a `Db` since 21 Nov 2026 (DEV-1035, `decisions.md`).
-So a gated operation may have no work in a transaction.
-Its row is an ordinary one: the operation being an `action fun` is
-what says it runs with none, as a `Db` does for an ungated one (spec
-15.3), and the list only labels the gates:
-
-```kotlin
-api booker {
-    setBookingNotes           gatedBy setBookingNotesGate  // gate, then work, in one transaction
-    startPasskeyRegistration  gatedBy booker               // an action fun: gate; then it, outside
-}
-
-// No transaction is open.
-action fun startPasskeyRegistration(env: Env, booker: HeldBooker, input: Unit): Either<String, PasskeyCeremony> = either {
-    if (booker.isAdmin && !booker.isPasskeySession) {
-        ensure(!hasPasskey(env.idp, booker.idpUserId).bind()) { ADD_PASSKEY_MESSAGE }      // a lookup
-    }
-    PasskeyCeremony(startRegistration(env.idp, booker.idpUserId, booker.deviceName).bind())   // an action
-}
-```
-
-The server runs the gate in a transaction, ends it, and calls the
-operation with none open; its answer is the request's. It may act,
-and it passes its proof to nothing.
-The gate runs once. The printed table gives it a `gate reads` line
-and no other. What it needs of the request is a fact of the proof:
-the Kotlin names a new passkey from the User-Agent (`deviceName`).
-
-Nothing gated in cusoon2 needs a `Db`: by a scan of its mutations
-every gated one is one transaction but these six.
-
-A third kind of call, `repeatable` (an action that is safe to make
-twice, allowed in a transaction), was weighed for the operations that
-act and not taken: it rests on the binding's word, and fits one of them. Nor does
-it decide a worker's retry: cusoon2's mail is not safe to repeat and
-is retried without limit, and its charge is safe to repeat under its
-key and is never retried. Retry is a judgment for each queue, so a
-binding says `action` or nothing, and nothing more.
-
-## What the checker holds
-
+- Every `api` list says `checkedBy` a function or `unchecked`, and
+  every row `gatedBy` a function or `ungated`.
+- A gate's result is `Either<String, P>`, and `P` is the type of the
+  work's second parameter. A gate that reads an input takes the
+  work's input type, and stands in one row.
+- Gated work takes no `Request`, `Tx` or `Db`, and a gate answers
+  none of the three bare.
 - A gate reaches no statement that writes, by Postgres's answer, nor
   one that locks where its transaction is a `SerializableTx`.
 - A function that takes a `SerializableTx` is not handed a `Tx`.
 - A function that calls an action is an `action fun`, and an `action
-  fun` calls one.
-- An `action fun` takes no `Tx`, and a proof only as a gated
-  operation that runs wholly outside; none is called in a `db.tx { }`
-  block.
-- An action is not kept in a value: no `::` reference, no interface's
-  `fun`, and a lambda that acts goes straight to a prelude function
-  that runs it.
-- An operation that runs wholly outside passes no proof to a call.
-- Every `api` list says `checkedBy` a function or `unchecked`.
-- Every row is `gatedBy` a function or `ungated`.
-- The gate's result is `Either<String, P>`, and `P` is the type of the
-  work's second parameter.
-- A gate named with an input takes the work's input type.
-- Gated work takes no `Request`, `Tx` or `Db`.
-- A proof's transaction is written only as the receiver of one of the
-  five calls, or as a proof constructor's argument for that proof's
-  marked `tx`.
+  fun` calls one, takes no `Tx`, acts in no block that holds one and
+  is not kept in a value.
+- A row whose work is an `action fun` names a gate whose answer holds
+  no transaction (`action-gate`).
+- A `db.tx` block answers nothing that holds a transaction
+  (`tx-escapes`).
+- A private constructor is called, and copied, only in its file; a
+  marked one only in a file that opts in, and by no operation's
+  input.
 
-What a held value's marked constructor and marked `tx` already give
-(spec 11) does the rest: no operation makes a proof, or takes the
-transaction out of one.
+### What it does not hold
 
-## What it does not hold
+- **Whether the policy is right.** A gate that admits a caller it
+  should refuse compiles. The gate holds nothing but the policy, and
+  the printed table shows a change to it.
+- **Where a transaction goes.** It is kept in a name and passed to
+  any function. A statement in an operation's file compiles.
+- **Whether a statement's `where` scopes it.** `where number =
+  $number or status = 'sent'` compiles.
+- **A transaction that leaves a block another way than as its
+  answer's type.** A lambda that closes over one, answered as a `()
+  -> Int`, is not refused, nor one assigned to a `var` declared
+  outside the block.
+- **Whether a gate on a `Tx` locks enough**, or calls a function of
+  the database that writes.
+- **Which functions are marked**, and whether a model function takes
+  the held value it should.
+- **Anything in the files that make a call or a held value.** There
+  are few, and a reviewer reads them whole.
 
-- **Whether the policy is right.** Notes for an admin or an owner
-  where an admin alone was meant compiles. The gate function holds
-  nothing but the policy, and the printed table shows a change to it.
-- **Whether a gate's own code is right.** There are few gates, in one
-  file.
-- **Whether a gate on a `Tx` locks enough**, or calls a function
-  that writes ("Two kinds of transaction").
-- **Whether a bound value scopes its statement.**
-  `where id = $passengerId or booking_id = ${booking.id}` compiles.
-- **Whether a function takes the narrowest proof.**
-  `deletePassenger(at: AtTenant, passengerId: ID)` compiles, and work
-  that calls it with `booking.tenant` deletes any passenger of the
-  tenant. The signature and the call say so where they are written,
-  and the printed table marks the write `(tenant-wide)`.
-- **Anything in a file that opts in, past the rules above.** The model
-  and the gates are the trusted part; the two rules on a proof's
-  transaction hold in the model, the one place it is read.
-
-So the access matrix test stays: it sees policy, which no rule here
-does.
-
-## What stays the application's
-
-The gates, the roles and states, the refusals' words, the proofs and
-their facts. The language gains two words in the `api` list, the shape
-of gated work, and proofs. Constants are named in
-upper case, with `_ROLES` and `_STATES`, as Kotlin's conventions have
-it: a habit of the application's code, not a rule.
-
-## What it would change in the spec
-
-- **1 and 15:** lists are stated once, by one rule for a role's
-  shape and one table of roles (`doc/lists.md`).
-- **15.1:** a row names a gate or says `ungated`.
-- **15.2:** "Nothing runs before an operation" is reversed for a gated
-  one, whose shape becomes environment, proof, input.
-- **7:** a function that touches the database has a `Tx`, a `Db` or a
-  proof as a parameter.
-- **15, a new part:** proofs, the rule on a proof's
-  transaction and the read-only gate.
-- **3.4 and 11:** an interface may declare a marked `val`, so proofs
-  share one (`OnBooking`), and a data class may implement a `val`
-  with a type that fits it. Kotlin 2.4.0 accepts both (run on 17
-  Nov 2026).
-- **7, 10.7 and 15.3:** `SerializableTx` beside `Tx`; `db.tx` states
-  READ COMMITTED; the first parameter of a gate or an ungated
-  operation says which the server opens, where 15.3 has it always
-  SERIALIZABLE.
-- **13:** a binding that changes something outside says `action`;
-  any other says nothing.
-- **11 and 13:** a binding that acts is an `action fun`, and so is
-  every function that calls one; spec 1 lists `action fun` among the
-  deviations.
-- **12 and 15.2:** `Cookie` and `Reply` in `kogo.rpc`; an ungated
-  operation may answer `Either<String, Reply<A>>`.
-- `doc/design.md`, "The server": the handler calls the gate, in a
-  read-only savepoint; a command writes the
-  printed table; "Not designed, on purpose" loses the cookie. Its
-  sentence that paths and other routes stay out of the language
-  stands. "The SQL pass": a statement's signature carries its tables.
-- **12 and 15, a new part:** the `commands` list, a command's shape,
-  and its flags read by property name.
+So the application's access test stays: it sees policy, which no rule
+here does.
 
 ## Weighed and not taken
 
-- **A `routes` list in Kogo**, each route `(db: Db, env: Env,
-  request: Request): Response`, declared with its method and path as
-  literal strings; the prelude gaining `Response` with `status` and
-  `redirect`, `Secret`, and `Request.query` and `Request.body`.
-  Agreed on 17 Nov 2026 and reversed the same day (choice B of
-  `doc/lists-assessment.md`): two routes do not pay for a list, two
-  prelude types, two members of `Request` and a section of the spec,
-  perhaps 140 lines of Kogo's Go, and the reason it was taken, that
-  Greg does not read Go, is no hard rule. What it gave, the route's
-  path in the printed file and the checker's sight of each route's
-  translation, is lost. Reopen at five routes.
-- **Following a proof's transaction through `val`s and arguments**, so
-  that a helper it reaches is held to the rule on statements (since
-  taken out, below). A walk of
-  where each value goes, perhaps 100 lines, and a rule that holds
-  somewhere other than where it is written. The rule as first written,
-  on the receiver alone, was passed by any helper.
-- **`AtTenant` narrowed**: to reads, to reads and inserts, or to
-  tables under row-level security, with a policy that admits everyone
-  on cusoon2's platform tables. Each refused writes cusoon2's requests
-  make to rows no caller owns (journeys, booking and invoice numbers,
-  Google's answers, about 13 statements), and each patch for those
-  needed a list of tables of its own. `AtTenant` exists for those
-  writes; the mark in the printed table shows them instead.
+A sentence each, with its reason; `decisions.md` has the rest.
 
-- **The gate as a lambda in the list**
-  (`gatedBy { tx, env, request, input -> ... }`). It put the policy in
-  another file from the work that relies on it.
-- **The gate as the work's first statements**, held there by the
-  checker. The work would hold the request and the transaction, and
-  the checker would need rules about the order of statements.
-- **The row's arguments written with borrowed names** (`input.id` in
-  the list, `tx` and the rest left out). Too much was undeclared where
-  it was used.
-- **Row-level security for each caller**, as tenants have. It decides
-  by row, not by action, so a payer who may choose a card and not edit
-  the notes has no place in it; it does nothing for an admin; and it
-  needs a policy on about 15 tables. The rule on statements took its
-  place, and has since left too (below).
-- **A proof type for each role and state.** Eight sets of states for
-  14 operations is a type for nearly each one. The admin's type alone
-  was taken.
-- **Another form for small operations.** Shared gates removed the need.
-- **No change to the language**, and a wider matrix test. It sees
-  policy, but only for the cases someone put in the table.
-- **The gate's statements prepared a second time**, each wrapped as
-  `select 1 from (<statement>) _`, for Postgres to refuse one that
-  writes. It accepts a lock, which every run then refuses, and its
-  refusal of an `update` is a syntax error in text the author did not
-  write.
-- **The outside step handed a plain copy of the proof's facts.** The
-  rules as they stood would hold it, but each such operation gains a
-  data class, a function that fills it and a fourth name in its row.
-  And the step left as first sketched: its own example broke the rule
-  on actions, and SQL in it failed only when run. The outside step
-  itself is out since 21 Nov 2026 (`decisions.md`).
-- **A statement binds something of its proof**:
-  one of the five calls on a proof's transaction binds, in its
-  literal, another property of that proof, `${booking.id}` beside
-  `booking.tx`. Taken out on 20 Nov 2026
-  (Greg; DEV-1029). The survey of cusoon2's checks (cusoon2's
-  `doc/plans/checks-survey.md`, Q1) ran it against 82 gated
-  operations: in 27 the proof has nothing to bind and in 16 more only
-  the caller's id, and since the port's one `Model` carries the
-  transaction, no proof of the port is held to it. A rule that guards
-  nothing still costs every reader and every author it refuses.
-  Proofs, their marked transaction and the rule that it is used only
-  before the dot stay. Reopen with a port whose proofs each hold
-  their transaction and their rows (`decisions.md`, 20 Nov 2026).
-- **An empty work for an operation that writes nothing of ours**,
-  with the outside step's answer handed to it (the step itself is out
-  since 21 Nov 2026). A transaction for
-  nothing, and a second run of the gate that can refuse after the
-  service has been changed. And such an operation as `ungated` with a
-  `Db`: the printed table would lose its gate.
-- **A slot of the request that a login fills with its cookies**, as
-  the Kotlin has: it needs a guard against a second filling, and Kogo
-  code changes nothing else it is handed. And a handler that knows
-  what a session is: sessions are the application's.
-- **A function the server runs before every gate, which may write**,
-  to make the session. A layer in front of the gate again, and a
-  write that must outlast a refusal, so a transaction of its own on
-  every request. And a gate that writes: not safe to run twice.
-- **`kogo check` failing on a stale printed table.** It would read a
-  generated file, and the two generated files would be kept fresh in
-  two ways.
-- **A row lock printed as a read or as a write.** The first hides it;
-  the second has a login that only reads the session say it writes it.
-- **The gate's tables in one list with the work's**, or each gate's
-  once in a section of its own. The first hides what the work reads;
-  the second puts one operation in two places.
-- **A view printed as the tables under it.** A walk of the catalog,
-  about 25 lines, for cusoon2's three views, and the one place the
-  table would look past the statement's text.
-- **The endpoint's name on the `asks` and `acts` lines**, held by
-  two rules: the first argument of `ask`, `perform` and `performOnce`
-  written as a top-level `val` or a call of a top-level function,
-  and an endpoint made only at the top level. It shows both calls of
-  a function that makes two. But `perform` looks like any function,
-  and a rule on how one of its arguments is written is a
-  straitjacket on it: Greg, 17 Nov, took the slightly less useful
-  table. And the method and path as literal strings at the call,
-  which undoes "An endpoint is declared once" (`doc/work.md`).
+- **A proof's marked transaction, kept from every name** (`gate-proof`,
+  `proof-tx-escapes`, `outside-passes-proof`, `action-proof`). Built,
+  and taken out on 21 Nov 2026 (DEV-1040): it refused a transaction
+  kept in a name, which is harmless inside the work, and not the
+  mistake, a transaction used after it ended; the two refusals of
+  15.7 refuse that.
+- **A rule that a statement binds something of its proof, or is
+  written only in the model.** Nothing checks a `where`, so the rule
+  refused a stand-in and passed the mistake.
+- **The outside step, a row's `after`.** Built, and taken out on 21
+  Nov 2026 (DEV-1039): the one operation that needed it is `ungated`
+  on a `Db`.
+- **A gate function for each row, answering an envelope such as
+  `Admitted<P>`.** A row's own check is a step, the first line of its
+  work, and a model function that takes the held value means the step
+  cannot be left out; a gate for each row adds a function and a type
+  to every operation and holds nothing more.
+- **A `Model` around the transaction, so that the work can write no
+  SQL.** Kogo is made for writing SQL, and what a statement reaches is
+  Postgres's to hold, by its policies, whatever file the statement is
+  written in.
+- **An `enteredBy` clause on the list, run before each gate.** A gate
+  that reads no input already is the function that enters, and its
+  row names it: `gatedBy loggedIn` says it a row at a time, in a word
+  Kogo has.
+- **`requires` and `then` blocks in an operation.** A step is a plain
+  function whose line ends in `.bind()`; the blocks are new syntax and
+  one more departure from Kotlin.
+- **`steps` and `unread ids` lines in the printed table.** The table's
+  command is not built, and a second id is held by its `where` and a
+  test of the application's.
+- **Every mark on a model function going**, with the access test
+  alone as the wall between two callers a policy admits alike.
+- **`action-tx` widened to whatever holds a transaction.** No value
+  that holds one reaches an `action fun` once the two refusals hold,
+  so the rule would refuse a parameter's type and not a use.
+- **A `routes` list in Kogo.** Two routes do not pay for a list, two
+  prelude types and a section of the spec; reopen at five routes.
+- **The gate as a lambda in the list**, and **the gate as the work's
+  first statements**, held there by the checker: the first parts the
+  policy from the work, the second needs rules on the order of
+  statements.
+- **A slot of the request that a login fills with its cookies**, and
+  **a function the server runs before every gate, which may write**:
+  the answer carries the cookies, and the first call makes the
+  session.
+- **`kogo check` failing on a stale printed table**, **a row lock
+  printed as a read or as a write**, **a view printed as the tables
+  under it**, and **the endpoint's name on the `asks` and `acts`
+  lines**: each is in `decisions.md`.
+- **A third kind of call, `repeatable`**: it rests on the binding's
+  word, and retry is a judgment for each queue.
 
 ## Open
 
 - The printed table's command is deferred: named when it is built
-  (`doc/roadmap.md`, "Settled for the ops site").
-- **`driverJobs`**: settled 19 Nov 2026 as one call per operator,
-  `operatorJobs`, under `driverJob`'s gate (`doc/roadmap.md`,
-  "Settled for the ops site"). The daemon's loops over tenants
-  ("Discover, then enter" in `doc/work.md`) are cusoon2's to replace
-  on their own grounds.
-- Checked on paper against three fetchers only: setting a booking's
-  notes, setting its driver, and submitting a booking. The work of
-  adopting it is in the model: each of some 150 functions says which
-  proof it demands.
-- Not sized as a whole. The rule on a proof's transaction is perhaps
-  20 to 30 lines of checker. The tables of the printed table are perhaps 35
-  lines of the SQL pass to read them, 8 to tell a lock, 30 to print
-  and 15 for the command, with the walk of the functions an operation
-  reaches shared with the gate's read-only check, which is perhaps 10
-  lines more, and the `asks` and `acts` lines perhaps 25 on that
-  walk. An operation wholly outside is perhaps 20 of checker and 15 of handler.
-  A `Reply` is perhaps 50 lines over the prelude, the checker, the
-  handler and the TypeScript.
+  (`doc/roadmap.md`).
+- Commands are designed and not built.

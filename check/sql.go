@@ -89,7 +89,6 @@ func (c *checker) sql(e *syntax.Call, lit *syntax.SQL) Type {
 	for i, p := range lit.Params {
 		types[i] = c.expr(p.Expr, nil)
 	}
-	c.runsOn(sel)
 	if c.signer == nil {
 		c.errorf(lit, "sql-check", "there is no database to check this literal against")
 		return result

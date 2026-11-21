@@ -3912,3 +3912,78 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   numbers. The two Open items DEV-972 and DEV-975 went, both merged
   (cusoon2 PR 1536, 1537), and "Settled" says so. Not taken:
   renumbering the rows.
+
+## A gate's answer holds its transaction (DEV-1040), 21 Nov 2026
+
+- **A proof leaves the language** (Greg, 21 Nov 2026, ruling on the
+  gate design in DEV-1035): no data class is known as a proof by a
+  marked transaction, and `gate-proof`, `proof-tx-escapes` and
+  `outside-passes-proof` go, with spec 15.7 as it stood. A gate's
+  answer holds its transaction in a plain property, which is kept in
+  a name, destructured and passed on. This overrides DEV-1029's note,
+  above, that the rules on a proof's transaction stay. They refused a
+  stand-in, a transaction kept in a name, and not the mistake, a
+  transaction used after it ended; and cusoon2's ops port could not
+  be written under them, its gate answering a call with a plain
+  transaction. `doc/design.md`, principle 1, gains Greg's clause.
+  Reopen with a mistake the two refusals below let through and a rule
+  that refuses that mistake itself.
+- **Two refusals take their place, with one meaning of "holds a
+  transaction"** (the issue's Scope): `action-gate`, a row whose work
+  is an `action fun` names a gate whose answer holds none, and
+  `tx-escapes`, a `db.tx` block answers nothing that holds one. The
+  codes are this issue's. The meaning is the type's alone: a `Tx` or
+  a `SerializableTx`, or one in a property or a type argument at any
+  depth. It reads a sealed interface's variants and a function's
+  result too, as `gate-proof` did, which the Scope did not name. Not
+  taken: properties and type arguments alone, which `data class
+  Clerk(val f: () -> Tx)` would pass.
+- **Not held: a transaction that leaves a block another way than in
+  its answer's type.** A lambda that closes over one, answered as a
+  `() -> Int`, passes, and so does one assigned to a `var` declared
+  outside the block. Spec 15.7 says so. Not taken: following a
+  transaction through lambdas and assignments, a walk of where each
+  value goes that the ruling just took out.
+- **`action-proof` goes, and `action-tx` is not widened.** The rule
+  said an `action fun` takes a proof only as a row's gated work;
+  there is no proof to name. An `action fun` may declare a parameter
+  whose type holds a transaction, and no value reaches it: a row's
+  gate is refused by `action-gate`, a `db.tx` block answers none, and
+  an action is not called in a block that holds a `Tx`. Not taken:
+  `action-tx` refusing any parameter that holds a transaction, about
+  5 / 5, which refuses a type and not a use. Reopen if such a value
+  is found to reach an `action fun`.
+- **A gate still answers no bare `Tx`, `Db` or `Request`** (`gate`,
+  reworded): the design's work is never handed the request or a bare
+  transaction. Not taken: a gate that answers the `Tx` itself, which
+  a call with one property already is.
+- **`action-gate` is said on each row, at the gate's name**, where
+  `gate-proof` was said once for a gate: the same gate is right for
+  one row and wrong for another, by what the work is. `tx-escapes` is
+  said at `tx` of `db.tx`, and cites spec 10.7, which gains the rule
+  beside what a block is; 7 and 7.1 lose their sentences on a proof.
+- **`check.Op.Proof` is `check.Op.Given`**, what the gate answers and
+  the work takes. Nothing outside the checker's tests read it.
+- **`examples/24_gates.kg` is the design's shape in one file**: a
+  call made by private constructors, a step, a held value with a
+  marked constructor, model functions that take the transaction and
+  the held value, and `mayPrint`, which answers facts for the row
+  whose work is an `action fun`. An example is one file, so its
+  `private` and its marker hold nothing apart, and its comments name
+  the file each part would be in. Its gate takes a `SerializableTx`,
+  as the design's does. Not taken: an example of several files, which
+  no example is.
+- **A gate that reads its operation's input stays in the language**,
+  and leaves the example: the design's gates read none, and its list
+  of what changes in Kogo does not take the form out. Whether it goes
+  is the lead's.
+- **`doc/gates.md` is the design alone.** Left out with the proof:
+  "The gate binds the tenant", whose check was to rest on a proof and
+  is open in DEV-945, and the printed table's `(tenant-wide)` mark,
+  which was read from which proof's transaction a statement ran on.
+  cusoon2's own lists, the marks' functions and what its storefront's
+  port starts from, stay in cusoon2's `doc/plans/gates.md`. The other
+  documents that speak of proofs (`doc/charge.md`, `doc/lists.md`,
+  `doc/lists-assessment.md`, `doc/remains.md`, `doc/work.md`) are
+  dated designs and are not rewritten here; `doc/roadmap.md` is
+  DEV-1041's.

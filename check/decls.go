@@ -285,16 +285,11 @@ func (c *checker) importAll(f *syntax.File) {
 // renamed gives what an import with as brings: what from declares as
 // name, and the types nested in it, under the name local.
 func renamed(from *pkg, name, local string) *pkg {
-	p := &pkg{from.name, map[string]*TypeDecl{}, map[string]*TypeDecl{}, map[string]*alias{}, map[string][]*Func{}, map[string]*Var{}}
-	rename(p.types, from.types, name, local)
-	rename(p.objects, from.objects, name, local)
-	rename(p.aliases, from.aliases, name, local)
-	rename(p.funcs, from.funcs, name, local)
-	rename(p.vals, from.vals, name, local)
-	return p
+	return &pkg{from.name, rename(from.types, name, local), rename(from.objects, name, local), rename(from.aliases, name, local), rename(from.funcs, name, local), rename(from.vals, name, local)}
 }
 
-func rename[V any](to, from map[string]V, name, local string) {
+func rename[V any](from map[string]V, name, local string) map[string]V {
+	to := map[string]V{}
 	for k, v := range from {
 		if k == name {
 			to[local] = v
@@ -302,6 +297,7 @@ func rename[V any](to, from map[string]V, name, local string) {
 			to[local+"."+rest] = v
 		}
 	}
+	return to
 }
 
 // kotlinFix says what to write for an import a Kotlin program has,

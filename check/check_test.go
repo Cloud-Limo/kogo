@@ -280,6 +280,7 @@ func TestImportAs(t *testing.T) {
 		{"package a\nimport ‸a.Area\n---\npackage a\ndata class Area(val n: Int)", "own-import", "Area is package a's own, which needs no import: remove this import"},
 		{"package a\nimport c.g\nimport ‸b.g\n---\npackage c\nfun g(n: Int): Int = n" + rows, "duplicate", "g is already imported from package c: give one another name, import b.g as Other"},
 		{"package a\nimport b.Area as g\nimport ‸b.g" + rows, "duplicate", "g is already imported from package b"},
+		{"package a\nimport b.g\nimport ‸b.Area as g" + rows, "duplicate", "g is already imported from package b"},
 		{"package a\nimport b.Area as R\nfun f(): R = ‸Area(1, \"x\")" + rows, "unknown-name", "Area is not in scope"},
 	})
 }
@@ -306,6 +307,8 @@ func TestImportCycles(t *testing.T) {
 	refused(t, [][3]string{
 		{"package a\nimport ‸b.g\nimport b.h\nfun f(): Int = g() + h()\n---\npackage b\nimport a.f\nfun g(): Int = 1\nfun h(): Int = 2\nfun k(): Int = f()",
 			"import-cycle", "packages import each other: f1.kg:2 in a imports b.g, b.h; f2.kg:2 in b imports a.f; move what one package takes from another into a package both may import"},
+		// The cycle runs through an import with as, to package b.
+		{"package a\nimport ‸b.g as bg\nfun f(): Int = bg()\n---\npackage b\nimport a.f\nfun g(): Int = 1\nfun k(): Int = f()", "import-cycle", ": f1.kg:2 in a imports b.g;"},
 		{"package a\nimport ‸b.g\nfun f(): Int = 1\n---\npackage b\nimport c.h\nfun g(): Int = 1\n---\npackage c\nimport a.f\nfun h(): Int = 1",
 			"import-cycle", ": f1.kg:2 in a imports b.g; f2.kg:2 in b imports c.h; f3.kg:2 in c imports a.f;"},
 		// a takes from c and b, both of which take from a: of the two

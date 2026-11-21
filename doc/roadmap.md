@@ -25,7 +25,8 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   then Kotlin RPC to Kogo, where nothing may change and `kogo/run.sh`
   compares every answer and row.
 - **Kogo is built by the first port** (DEV-914, 19 Nov 2026, "3a"):
-  the ops site's 20 operations end to end, building only what they
+  the ops site's 21 operations end to end (20 when decided; cusoon2
+  PR 1523 split `driverJobs` in two), building only what they
   need, then the next area. Not taken: every designed piece first;
   the runner first.
 - **Behaviour changes are made in the Kotlin first**, under its tests,
@@ -88,7 +89,7 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   across tenants; a proof holding a list of operators. The runner's
   `find` keeps its review, which looks back at this.
 - **The lead's calls, Greg not objecting:** `updateJob`'s hours rounded
-  in SQL; the 20 operations switch together once all 20 compare clean;
+  in SQL; the 21 operations switch together once all 21 compare clean;
   a PDF compared by its marks (text, positions to 0.01 pt); only Go
   writes log lines for now; Go's port has a key of its own; the
   printed table's command is named when it is built.
@@ -117,7 +118,7 @@ issue where there is one.
 | 4 | Kogo | The Origin and CSRF check (`doc/origin.md`) | 120 / 150 | PR 92 |
 | 5 | Kogo | `SerializableTx` beside `Tx` | 70 / 70 | PR 93, 102 |
 | 6a | Kogo | The gate design: a gate's answer holds its transaction, the proof's rules (PR 98) out, two refusals (DEV-1040) | -60 / -20 | no, DEV-1040 |
-| 6b | Kogo | A gate only reads (DEV-977) | (in 6a's) | PR 96 |
+| 6b | Kogo | A gate only reads (DEV-977) | (in PR 98's 170 / 150) | PR 96 |
 | 7 | Kogo | `action fun` and the `action` binding (`lookup` out, PR 100) | 100 / 100 | PR 90 |
 | 8 | Kogo | `Reply` and `Cookie` | 50 / 50 | PR 89 |
 | 9 | Kogo | `kogo.http` (DEV-978) | 360 / 250 | PR 97 |
@@ -126,19 +127,19 @@ issue where there is one.
 | 12 | Kogo | `ByteArray` and `kogo.mail` | 130 / 120 | PR 103 |
 | 13a | cusoon2 | Ported as `ungated` rows: the business page's five, me and logout, four logins with a FusionAuth client, the four passkey operations | (in 13i's) | cusoon2 PR 1494, 1544, 1548, 1550 |
 | 13b | cusoon2 | Kotlin first: bind the person (DEV-1025) | 15 SQL / 20 / 20, 15 port | no, cusoon2 PR 1564 in review |
-| 13c | cusoon2 | Kotlin first: row-level security's slice 2, the policies on `supply_agreement`, `invite` and `debt_entry` | 112 SQL / 10 / 140 | no, not filed |
-| 13d | cusoon2 | Kotlin first: slice 3, `business` and `admin_grant`, `create_business`, the commands' role, `person`'s column grants | 60 SQL / 0 / 60, 10 port | no, not filed |
+| 13c | cusoon2 | Kotlin first: row-level security's slice 2, the policies on `supply_agreement`, `invite` and `debt_entry` | 112 SQL / 10 / 140 | no, DEV-1042 |
+| 13d | cusoon2 | Kotlin first: slice 3, `business` and `admin_grant`, `create_business`, the commands' role, `person`'s column grants | 60 SQL / 0 / 60, 10 port | no, DEV-1043 |
 | 13e | cusoon2 | The ops port's entry and the business page's five to the gate design (DEV-1030) | ~80 added, 75 removed, port | no, DEV-1030 |
-| 13f | cusoon2 | Slice 4: the gate asks the database; its statement Kotlin first, the marks in the port alone | -25 / 0, -10 port | no, not filed |
-| 13g | cusoon2 | The passkey rows as a gate that answers facts (`gates.md` section 7) | | no, not filed |
+| 13f | cusoon2 | Slice 4: the gate asks the database; its statement Kotlin first, the marks in the port alone | -25 / 0, -10 port | no, DEV-1044 |
+| 13g | cusoon2 | The passkey rows as a gate that answers facts (`gates.md` section 7), in the ops port's entry | (in 13e's) | no, DEV-1030 |
 | 13h | cusoon2 | Kotlin first: a place with no stored address filled when read (DEV-972) | | cusoon2 PR 1536 |
 | 13i | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13i's: ~1,600 / 850) | no |
 | 19 | cusoon2 | The ops site's Go `main`; settings move | 150 / 80 | no |
 | 20 | cusoon2 | Serve the ops site from Go | | no |
 
 Beside 13b to 13i, as tests in the Kotlin: the probes of each second id
-and admin-only field, the storefront's (DEV-1031, cusoon2 PR 1563 in
-review) and then the ops site's (DEV-1038, 0 / 40).
+and admin-only field, the storefront's (DEV-1031, cusoon2 PR 1563)
+and then the ops site's (DEV-1038, 0 / 40).
 
 Beside it, before the first list goes live (DEV-930, about 290 / 220):
 the release carries Go; units, health and CI; routing and the port

@@ -176,7 +176,9 @@ func (c *checker) errorf(at syntax.Node, code, format string, args ...any) Type 
 var notKogo = map[string][2]string{
 	"apply": {"kotlin-scope-function", "name the value and call it"}, "run": {"kotlin-scope-function", "name the value and call it"},
 	"with": {"kotlin-scope-function", "name the value and call it"}, "takeUnless": {"kotlin-scope-function", "use takeIf and turn the test around"},
-	"withError": {"with-error", "convert the failure of a block with either<E2, A> { ... }.mapLeft { e -> ... }.bind()"},
+	"orEmpty":       {"nullable-receiver", "write x ?: emptyList(), with emptyList<T>() where nothing else settles T"},
+	"isNullOrBlank": {"nullable-receiver", "write x == null || x.isBlank()"},
+	"withError":     {"with-error", "convert the failure of a block with either<E2, A> { ... }.mapLeft { e -> ... }.bind()"},
 }
 
 // missing reports a name that nothing in scope declares. One that

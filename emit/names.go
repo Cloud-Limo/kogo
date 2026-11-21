@@ -64,8 +64,6 @@ func head(t check.Type) string {
 	switch t := t.(type) {
 	case *check.Named:
 		return typeName(t.Decl)
-	case *check.Nullable:
-		return head(t.Elem)
 	case *check.TypeParam:
 		return export(t.Name)
 	}

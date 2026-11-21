@@ -333,6 +333,10 @@ func main() {
 		body, _ := goio.ReadAll(r.Body)
 		fmt.Printf("the depot is sent: %s %s?%s [%s %s] %s\n", r.Method, r.URL.EscapedPath(), r.URL.RawQuery, r.Header.Get("Authorization"), r.Header.Get("X-Shop"), body)
 		switch {
+		case r.URL.Path == "/v1/prices" && r.URL.Query().Get("item") == "anvil":
+			fmt.Fprint(w, `{"status": "REQUEST_DENIED"}`)
+		case r.URL.Path == "/v1/prices":
+			fmt.Fprint(w, `{"status": "OK", "cents": 250}`)
 		case r.Method == "GET":
 			fmt.Fprintf(w, `{"item": %q, "count": 9007199254740993}`, r.URL.Query().Get("item"))
 		case strings.Contains(r.URL.Path, "anvil"):
@@ -355,7 +359,15 @@ func main() {
 	show("reserved", depot.Reserved(theDepot, "acme", "nut/5?", 2))
 	show("sold out", kogo.Either_MapLeft[khttp.HttpFailure, string](depot.Reserved(theDepot, "acme", "anvil", 1), depot.Said))
 	show("no id", kogo.Either_MapLeft[khttp.HttpFailure, string](depot.Reserved(theDepot, "acme", "ghost", 1), depot.Said))
-	service.Address = "http://127.0.0.1:1"
+	// A refusal inside a 200 leaves one line, written here without its
+	// time, and a price the client accepts leaves none.
+	service.Log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+		return map[bool]slog.Attr{true: {}, false: a}[a.Key == slog.TimeKey]
+	}}))
+	priced, _ := khttp.New(service)
+	show("price", depot.PriceOf(priced, "bolt"))
+	show("price refused", depot.PriceOf(priced, "anvil"))
+	service.Address, service.Log = "http://127.0.0.1:1", slog.New(slog.DiscardHandler)
 	nowhere, _ := khttp.New(service)
 	show("nowhere", kogo.Either_MapLeft[khttp.HttpFailure, string](depot.Reserved(nowhere, "acme", "bolt", 1), func(f khttp.HttpFailure) bool { return rt.Is[khttp.HttpFailure_NotSent](f) }))
 

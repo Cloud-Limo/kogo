@@ -200,6 +200,20 @@ func List_Zip[T, R any](this List[T], other List[R]) List[Pair[T, R]] {
 	return out
 }
 
+// A joinToString's separator is ", " when the call gives none, as
+// Kotlin's is.
+func ListString_JoinToString_String(this List[string], separator *string) string {
+	return ListT_JoinToString_String_TToString(this, separator, func(s string) string { return s })
+}
+
+func ListT_JoinToString_String_TToString[T any](this List[T], separator *string, transform func(T) string) string {
+	sep := ", "
+	if separator != nil {
+		sep = *separator
+	}
+	return strings.Join(List_widen(this, transform), sep)
+}
+
 func List_Sum(this List[int64]) int64 {
 	return ListT_SumOf_TToLong(this, func(x int64) int64 { return x })
 }
@@ -224,13 +238,6 @@ func ListT_SumOf_TToLong[T any](this List[T], selector func(T) int64) int64 {
 // written.
 func List_Plus[T any](this, elements List[T]) List[T] {
 	return append(append(make(List[T], 0, len(this)+len(elements)), this...), elements...)
-}
-
-func List_OrEmpty[T any](this *List[T]) List[T] {
-	if this == nil {
-		return List[T]{}
-	}
-	return *this
 }
 
 // ordered holds each key once, in the order first given, comparing
@@ -316,9 +323,6 @@ func String_Trim_Char(this string, char rt.Char) string {
 
 func String_IsBlank(this string) bool    { return strings.TrimFunc(this, isWhitespace) == "" }
 func String_IsNotBlank(this string) bool { return !String_IsBlank(this) }
-func String_IsNullOrBlank(this *string) bool {
-	return this == nil || String_IsBlank(*this)
-}
 
 func String_IfEmpty(this string, defaultValue func() string) string {
 	if this == "" {

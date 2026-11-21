@@ -7,7 +7,6 @@ fun strings(f: String, s: String, t: String, n: Int, m: Int): String? = when (f)
     "trim" -> "<${s.trim()}>"
     "trimChar" -> "${t.map { s.trim(it) }}"
     "isBlank" -> "${s.isBlank()} ${s.isNotBlank()}"
-    "isNullOrBlank" -> "${s.takeIf { n > m }.isNullOrBlank()} ${t.takeIf { n <= m }.isNullOrBlank()}"
     "ifEmpty" -> s.ifEmpty { t }
     "ifBlank" -> s.ifBlank { t }
     "substringAfter" -> "<${s.substringAfter(t)}> <${(s + t + s).substringAfter(t)}>"

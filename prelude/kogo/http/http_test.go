@@ -414,6 +414,19 @@ func TestFailures(t *testing.T) {
 	}
 }
 
+// A no inside a 2xx, which the client read, is logged as a failed call
+// is, with the client's why cut as a refused body is.
+func TestLogRefusal(t *testing.T) {
+	h, log := serve(t, Service{Query: map[string]string{"key": "secret"}, Headers: map[string]string{"Authorization": "secret"}}, answer(200, "{}"))
+	Http_LogRefusal_Lookup_String(h, look, "REQUEST_DENIED")
+	Http_LogRefusal_Action_String(h, post, strings.Repeat("x", 5000))
+	lines := strings.Split(strings.TrimSuffix(log.String(), "\n"), "\n")
+	if len(lines) != 2 || !strings.HasSuffix(lines[0], ` level=WARN msg="kogo.http: refused in a 2xx" method=GET path=/thing why=REQUEST_DENIED`) ||
+		!strings.HasSuffix(lines[1], ` method=POST path=/thing why="`+strings.Repeat("x", 4096)+` [cut: the first 4096 of 5000 bytes]"`) {
+		t.Errorf("a refusal is not logged as one line with its why, cut at 4096 bytes:\n%s", log)
+	}
+}
+
 func TestNewRefuses(t *testing.T) {
 	for _, s := range []Service{
 		{Address: "http://a.example", Encoding: Form, Timeout: time.Second},

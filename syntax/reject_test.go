@@ -121,6 +121,9 @@ func TestFaults(t *testing.T) {
 		{"fun (‸String?).f(): String = this", "nullable-receiver", "take the value as a parameter"},
 		{"fun ‸String? .f(): String = this", "nullable-receiver", "take the value as a parameter"},
 		{"fun (‸(Int) -> Int)? .f(): Int = 1", "nullable-receiver", "take the value as a parameter"},
+		// A binding's receiver is not nullable either.
+		{"external fun String‸?.f(): Boolean", "nullable-receiver", "take the value as a parameter"},
+		{"external val <T> ‸List<T>? .n: Int", "nullable-receiver", "take the value as a parameter"},
 		// What a binding alone may write, and what it may not.
 		{"data class D<‸out T>(val x: T)", "syntax", "out goes only on the type parameter of a sealed interface or an external class"},
 		{"fun <‸out T> f(x: T) {}", "syntax", "out goes only on the type parameter of a sealed interface or an external class"},

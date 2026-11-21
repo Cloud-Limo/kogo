@@ -254,8 +254,8 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
   getter. Local functions are allowed inside a function body, without
   type parameters, though Kotlin allows them: declare a generic one at
   the top level. An
-  extension's receiver is not nullable: `fun String?.f()` does not exist;
-  take the value as a parameter.
+  extension's receiver is not nullable, a binding's included (section
+  13): `fun String?.f()` does not exist; take the value as a parameter.
 - Every top-level function states its parameter types and its return type.
   The return type may be omitted only for `Unit`. Inference works inside a
   function body only, so a top-level `val` states its type too, but
@@ -926,7 +926,7 @@ no import;
 `all`, `none`, `count`, `sum`, `sumOf`, `maxOrNull`, `minOrNull`,
 `sortedBy`, `sortedByDescending`, `sorted`, `reversed`, `distinct`,
 `take`, `drop`, `zip`, `plus` (`+`), `groupBy`, `associateBy`,
-`associate`, `toSet`, `toList`, `orEmpty`, `joinToString`, `forEach`,
+`associate`, `toSet`, `toList`, `joinToString`, `forEach`,
 `keys`, `values`, `listOfNotNull`. A `Map` and a `Set` iterate in
 insertion order and compare keys as `==` does, by value, so any type may
 be a key.
@@ -934,8 +934,8 @@ be a key.
 There are no mutable collections, sequences or arrays. Build a list with
 `map`/`filter`/`+`, or accumulate into a local `var` of an immutable list.
 
-**Strings.** `length`, `isEmpty`, `isBlank`, `isNotBlank`,
-`isNullOrBlank`, `ifEmpty`, `ifBlank`, `trim`, `trim(char)`, `trimEnd`,
+**Strings.** `length`, `isEmpty`, `isBlank`, `isNotBlank`, `ifEmpty`,
+`ifBlank`, `trim`, `trim(char)`, `trimEnd`,
 `lowercase`, `uppercase`, `startsWith`, `endsWith`, `contains`,
 `substring`, `substringAfter`, `take`, `replace`, `split(delimiter)`,
 `padStart`, `toIntOrNull`, `toLongOrNull`,
@@ -1117,7 +1117,25 @@ each form.
   one call's: a function that makes more than one call gives what the
   whole came to, in a type of its own. When a service says no inside
   a 2xx and its client raises that, the client raises it in a failure
-  type of its own.
+  type of its own, and logs it with `http.logRefusal(endpoint, why:
+  String)`, for an endpoint of either kind, `why` its own word for the
+  no. `logRefusal` is no action, as `ask`'s own logging is not, so a
+  lookup that reads its answer stays one:
+
+```kotlin
+private fun asked(google: Http, endpoint: Lookup, fields: List<Field>): Either<GoogleFailure, Json> = either {
+    val json = google.ask(endpoint, fields).mapLeft { GoogleFailure.Wire(it) }.bind()
+    val status = json.string("status")
+    when (status) {
+        "OK" -> json
+        "NOT_FOUND" -> raise(GoogleFailure.NotFound)
+        else -> {
+            google.logRefusal(endpoint, status ?: "no status")
+            raise(GoogleFailure.Refused(status ?: "no status"))
+        }
+    }
+}
+```
 
 Where Go's HTTP client would decide, Kogo states it:
 
@@ -1135,8 +1153,9 @@ Where Go's HTTP client would decide, Kogo states it:
 Every call that `ask` or `perform` ends in an `HttpFailure` is logged
 in Go, with its method, its path, its status where an answer came and
 why; a 3xx or a 4xx with its body too, the body's first 4 KiB with a
-mark where it is cut. A handle's own headers and query fields are
-never logged.
+mark where it is cut. So is every `logRefusal`, with its method, its
+path and its `why`, cut as a body is: no status and no body. A
+handle's own headers and query fields are never logged.
 
 **Mail** (`kogo.mail`). A message is data that Kogo builds, and
 `eml(mail: Mail): ByteArray` writes it as the bytes of an EML file, for
@@ -1237,7 +1256,6 @@ external fun <T> listOf(vararg elements: T): List<T>
 external val <T> List<T>.size: Int
 external fun <T, R> List<T>.map(transform: (T) -> R): List<R>
 external fun <T> List<T>.firstOrNull(): T?
-external fun <T> List<T>?.orEmpty(): List<T>
 external fun List<Long>.sum(): Long
 ```
 
@@ -1257,9 +1275,10 @@ external fun List<Long>.sum(): Long
   with no body. Every member of an external class is declared this way,
   with the class as the receiver. One with a receiver is a member: it is
   in scope wherever a value of that type is, and is never imported.
-- Three things are allowed in a binding and nowhere else: a nullable
-  receiver, `out` on an external class's type parameter, and `vararg` on
-  a parameter, which then takes any number of arguments.
+- Two things are allowed in a binding and nowhere else: `out` on an
+  external class's type parameter, and `vararg` on a parameter, which
+  then takes any number of arguments. A binding's receiver is not
+  nullable either (section 5).
 - `action external fun` marks a binding that changes something
   outside (7.1): `Console.println` and `Http.perform` are actions.
   Any other binding says nothing, `Console.readln`, `Clock.now` and
@@ -1296,9 +1315,10 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | jOOQ (`ctx.select...`, records, `.store()`, `into(X::class.java)`) | `sql"""` and a data class |
 | `X::class`, reflection | nothing; the only `::class` is inside `@file:OptIn(...)` |
 | annotations other than markers | nothing |
-| `String.format`, `Locale` | string templates, `padStart` |
+| `String.format`, `Locale` | string templates, `padStart`, or `plain`, or a prelude function |
 | `by lazy`, delegation | compute it once and pass it |
 | `vararg`, `*spread` | a `List` |
+| `fun T?.f()`, `x.orEmpty()`, `x.isNullOrBlank()` | a parameter; `x ?: emptyList()`, with `emptyList<T>()` where nothing else settles `T`; `x == null \|\| x.isBlank()` |
 | `inline`, `reified`, `operator`, `infix` | a plain function |
 | `println`, `readln` | a `Console` parameter, from `kogo.io` |
 | value classes | `typealias`, in v0 |

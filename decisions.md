@@ -35,7 +35,13 @@ Each entry: what was decided, why, and what would reopen it.
 - **An extension's receiver is not nullable** (15 Nov 2026). Allowing `fun String?.f()` makes
   the checker handle a `this` that may be null, and no example or stage-1 port writes one; a
   parameter does the job. The parser refuses it at the `?.` (`nullable-receiver`). Reopen
-  when a port needs one to read naturally.
+  when a port needs one to read naturally. Amended 22 Nov 2026 (Greg; DEV-1067): a binding's
+  receiver is not nullable either, so the rule holds for every extension and a reader
+  need not know which prelude names a plain `.` on a nullable value still reaches. The
+  prelude's two, `List<T>?.orEmpty()` and `String?.isNullOrBlank()`, are gone: write
+  `x ?: emptyList()`, with `emptyList<T>()` where nothing else settles `T` (DEV-1069), and
+  `x == null || x.isBlank()`, which narrows `x` where `isNullOrBlank` did not. Not taken: keeping the two as a convenience of the prelude;
+  cusoon2's port called them at three places, each as clear in the longer form.
 - **The columns under `exists` and `execute` are not typed** (15 Nov 2026). Both discard
   them, so `tx.execute(sql"select pg_advisory_xact_lock($key)")` passes though `void` has no
   Kogo type. Mapping `void` to `Unit` was the other way; it would let a row type carry a
@@ -364,9 +370,10 @@ Each entry: what was decided, why, and what would reopen it.
   change and put the prelude in the core (principle 8). Built into the checker all the same,
   because the core sections define them: the operators on numbers, `==`, ranges, the forms
   of section 9, the five SQL calls and `db.tx`, and what data classes and enums provide.
-  The other operators are bindings (the entry below). A binding may have a nullable receiver (`isNullOrBlank`,
-  `orEmpty`), which application code may not. Reopen if a prelude function's type cannot be
-  written in Kogo and is too useful to leave out.
+  The other operators are bindings (the entry below). A binding's receiver is not nullable,
+  as no extension's is (amended 22 Nov 2026, DEV-1067; it allowed one for `isNullOrBlank`
+  and `orEmpty`, both now gone). Reopen if a prelude function's type cannot be written in
+  Kogo and is too useful to leave out.
 - **Type arguments are settled in one fixed order, with no solver** (15 Nov 2026; spec 5.1):
   the receiver, the arguments that are not lambdas, the type the result must have, then
   what each lambda returns. Kotlin weighs every clue at once, in thousands of lines and
@@ -1895,7 +1902,7 @@ Each entry: what was decided, why, and what would reopen it.
 
 - **A type that Go implements is `external class Name<T>`, with no body.** Its members are
   `external fun` and `external val` with the class as the receiver, the one form that can
-  also say `List<Long>.sum()` and `String?.isNullOrBlank()`; members in a body would be a
+  also say `List<Long>.sum()`; members in a body would be a
   second way to write most of them. An `external object` of the same name gives
   `Uuid.parse(text)`. `class` is refused everywhere else, so the word marks the type as not
   Kogo's to construct.
@@ -1964,8 +1971,8 @@ Each entry: what was decided, why, and what would reopen it.
   prelude's may declare a binding** (spec 13). `kogo check` loads the prelude itself, so
   it knows which is which. Not taken: allowing `external` in package `kogo` and under it,
   which any file could claim with its package line. An `external` in a program's file is
-  refused where it is declared; with it go the nullable receiver, `out` and `vararg` that
-  only a binding may write. Reopen if a program needs Go bindings of its own.
+  refused where it is declared; with it go `out` and `vararg`, which only a binding may
+  write. Reopen if a program needs Go bindings of its own.
 
 ## Taken checking expected failures (DEV-826), not yet discussed
 
@@ -4087,3 +4094,77 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
 - **The built-ins check covers `Int`, `Long` and `Double`, not `Decimal`**: its inputs
   have no `Decimal`, which only a query gives. `Decimal.toString` is the emitter test's
   (`1.50` stays `1.50`). Reopen if the check gains a `Decimal` input.
+
+## A port weighs a write-around (DEV-1065), 21 Nov 2026
+
+- **"Longer" is against the Kotlin's form, in lines**: a write-around is weighed when it
+  takes more lines than what the Kotlin wrote in its place, as `eight()`'s ten did for the
+  one call to `toUrlValue`. Not taken: a measure in characters, which would weigh
+  `requireNotNull` for `!!`, the swap Greg's scope leaves out. Reopen if a one-line
+  write-around hides a library's rule.
+- **The rule is its own paragraph after "Add what the spec lists"**, not sentences inside it,
+  since it applies to both kinds of name that paragraph sorts and reads as a step of its own.
+- **It names no write-around but of a name**: matching what a Java client sends on the wire
+  (the FusionAuth request defaults in cusoon2's `idp.kg`) is not a missing name and stays
+  outside it. The handoff of DEV-1065 asked the lead whether the rule should reach those;
+  the lead's ruling of 22 Nov 2026 asks it again when the next such client is ported
+  (noted on DEV-1048).
+- **The port's Decided accepts a difference only the comparison sees** (22 Nov 2026, Greg;
+  `doc/design.md`, "Ports"; `doc/porting.md`). A difference weighed under "Weigh a
+  write-around" that nobody but the comparison sees is accepted by the port's Decided, and
+  the Code review checks the claim of who sees it. This reopens DEV-884's entry for that
+  case alone: every other accepted or owed difference stays Greg's. Not taken: Greg
+  accepting each such difference from the handoff, which puts a ruling before him for
+  every write-around. Reopen if a difference so accepted turns out to be seen.
+- **Spec section 14's `String.format` row adds "or `plain`, or a prelude function"** (22
+  Nov 2026, the lead's ruling on DEV-1065): read alone, "string templates, `padStart`" was
+  an order to rebuild a format by hand, as `eight()` did. Not taken: leaving the row as it
+  was, as the issue's Scope said, and filing it apart. Reopen if a port reads the row as
+  licence to skip a prelude function the spec lists.
+
+## A refusal inside a 2xx is logged (DEV-1063), 22 Nov 2026
+
+- **The client logs it with `http.logRefusal(endpoint, why: String)`** (Greg, 22 Nov
+  2026), two bindings in `prelude/http.kg`, one for a `Lookup` and one for an `Action`,
+  neither an action, so a client's fun that asks and reads the answer stays a lookup;
+  spec 7.1 already says a binding that says nothing may be called anywhere, and is
+  unchanged. Not taken: `json.logRefusal(why)` on the answer, since a `Json` is its text
+  and would have to hide a logger and its call inside a value; a function with no
+  endpoint, which cannot say which call was refused; `ask` taking the function that
+  reads the answer, so every `Left` is logged, which costs a lambda at each call and a
+  generic `ask`; general logging, which stays open under "Printing is an action" (19 Nov
+  2026) and is not reopened here.
+- **Its line is `kogo.http: refused in a 2xx`, with `method`, `path` and `why`**, at WARN
+  to the handle's logger, the one a failed call is written to; `why` is cut at 4 KiB as
+  a refused body is. Not taken: `kogo.http: failed`, the failed call's message, which
+  would count with the failures a call that `ask` ended as a success, and gives no way
+  to tell the two apart; `kogo.http: refused`, the message DEV-1050 retired for a 4xx,
+  which a search of old logs would mix with these. It has no `status`: the binding is
+  not handed the answer, and every such answer is a 2xx. Reopen if an op needs the exact
+  status.
+- **The test client is `priceOf` in `examples/29_http.kg`**, run by the emitted-Go test
+  against a local server, with the line written to its output. Not taken: a client of
+  its own in `cmd/kogo/testdata`, a second place the end-to-end test reads Kogo from.
+- **Spec 12's example leaves `NOT_FOUND` silent** (the lead's Ruling, 22 Nov 2026):
+  which answers a client logs is the client's to choose, and a stale id is an ordinary
+  answer, so a WARN line for each would bury the refused key the line is for. Not
+  taken: logging it as the Kotlin did.
+- **Its section is spec 12, "An outside service"**, where the `kogo.http` text is: the
+  issue names section 14, which is "Not in Kogo" and has no `kogo.http` text.
+
+## `joinToString` (DEV-1070), 21 Nov 2026
+
+- **`joinToString` is two prelude externals: `List<String>.joinToString(separator)` and
+  `<T> List<T>.joinToString(separator, transform: (T) -> String)`**, the forms the issue
+  scoped. Not taken: Kotlin's one signature with a nullable `transform` defaulting to
+  null, which would let a list of anything be joined bare. No use needs that, and a
+  `List<ByteArray>` would then be written as its bytes where Kotlin writes `[B@...`: a
+  template refuses that (`bytes-text`), but refusing it here would need checker code.
+  Calling the bare form on a `List<Long>` is `no-overload`, naming both, and so is
+  `List<String?>.joinToString(",")`, which Kotlin accepts (writing `null`): add
+  `{ "$it" }`. Reopen when a port needs it.
+- **The separator defaults to `", "` in both forms, as Kotlin's does**: the issue counted
+  two bare calls among the uses it covers, and `xs.joinToString { ... }` is Kotlin's
+  ordinary form. It is a `String`, Kogo having no `CharSequence`. Not built: `prefix`,
+  `postfix`, `limit` and `truncated` (one use in cusoon2's backend). Reopen when a port
+  needs one.

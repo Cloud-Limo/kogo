@@ -3,10 +3,12 @@ package rpc
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
 	"math"
+	"net/http"
 	"reflect"
 	"slices"
 	"strconv"
@@ -68,15 +70,21 @@ func bad(at, why string, args ...any) error {
 }
 
 // readBody reads one JSON value of type t from body, and nothing after
-// it. Its error names the key, never the value.
+// it. Its error names the key, never the value, or is body's
+// *http.MaxBytesError, let through for the Handler's 413.
 func (r reader) readBody(t reflect.Type, body io.Reader) (reflect.Value, error) {
 	d := json.NewDecoder(body)
 	d.UseNumber()
 	var j any
-	if err := d.Decode(&j); err != nil {
+	var tooLarge *http.MaxBytesError
+	if err := d.Decode(&j); errors.As(err, &tooLarge) {
+		return reflect.Value{}, err
+	} else if err != nil {
 		return reflect.Value{}, bad("the input", "is not JSON")
 	}
-	if _, err := d.Token(); err == nil {
+	if _, err := d.Token(); errors.As(err, &tooLarge) {
+		return reflect.Value{}, err
+	} else if err == nil {
 		return reflect.Value{}, bad("the input", "holds more than one JSON value")
 	} else if err != io.EOF {
 		return reflect.Value{}, bad("the input", "is not JSON")

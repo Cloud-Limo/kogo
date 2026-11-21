@@ -1042,7 +1042,11 @@ SQL's `=`, never read back to compare with `==`.
 HTTP request, passed to an operation (section 15):
 `request.header(name): String?`, `request.cookie(name): String?` and
 `request.clientAddress: String`. A header's name is matched whatever
-its case. Kogo code does not build or change one. An ungated
+its case. A `String` a program holds is text, so reading a header
+whose value is not UTF-8 ends the request with a 400 that names the
+header and never its value, `updateJob: the header Origin is not
+UTF-8`, from the list's check as from an operation; a header no
+program reads is not looked at. Kogo code does not build or change one. An ungated
 operation that sets cookies answers a `Reply<A>(answer: A, cookies:
 List<Cookie>)`, each a `Cookie(name, value, path, maxAgeSeconds: Long,
 sameSite: SameSite, secure, httpOnly)`, with `SameSite` one of
@@ -1582,6 +1586,9 @@ Inputs and answers are JSON.
   operation does not run. A whole number is written as digits, as
   JavaScript writes one: `1.0` and `1e3` are not whole. Where the
   input is `Unit` the body is not read.
+- A body past the list's limit, 64 KiB unless `main` sets another
+  where it mounts the list, is a 413, `updateJob: the input is past 65536
+  bytes`, and the operation does not run.
 - A `Long` crosses only from -9007199254740991 to 9007199254740991,
   the whole numbers JavaScript holds exactly. Reading one outside them
   is a 400; an answer that holds one is a bug, and panics. Send a
@@ -1617,6 +1624,8 @@ application chooses.
 | the operation or its gate refused | 200 | the `refused` object |
 | the list's check refused, whatever else is wrong | 403 | the check's words, as text |
 | the input does not read (15.4) | 400 | the operation and the key, never the value |
+| a header read is not UTF-8 (12) | 400 | the operation and the header, never its value |
+| the body is past the list's limit (15.4) | 413 | the operation and the limit |
 | no operation of that name | 404 | |
 | a method other than `POST` | 405 | |
 | a panic (section 8) | 500 | the request's id |

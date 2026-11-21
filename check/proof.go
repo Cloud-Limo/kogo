@@ -128,9 +128,6 @@ func (c *checker) runsOn(sel *syntax.Select) {
 // ended says why the fun that runs outside has no transaction, and
 // where what needs one goes: the statement or the call.
 func (c *checker) ended(what string) (why, fix string) {
-	if name := c.outside.Name; c.placed[c.outside] != workRole {
-		return "an outside step has no transaction", fmt.Sprintf("move the %s to the work, or to the gate where %s is the work", what, name)
-	}
 	return "work that runs outside has no transaction", fmt.Sprintf("move the %s into the gate, or make %s a fun, which runs in the transaction", what, c.outside.Name)
 }
 
@@ -185,7 +182,7 @@ func (c *checker) escaped() {
 
 // takesProof reads the parameters of the action fun f. It runs with
 // no transaction open, so it takes a proof only where an api list
-// puts it after a gate, as a step or as gated work, and hands it that
+// puts it after a gate, as gated work, and hands it that
 // gate's, second (spec.md 7.1). It reports whether f takes one.
 func (c *checker) takesProof(f *Func, d *syntax.FunDecl) bool {
 	takes := false
@@ -194,7 +191,7 @@ func (c *checker) takesProof(f *Func, d *syntax.FunDecl) bool {
 			continue
 		}
 		if takes = true; c.placed[f] == nil {
-			c.errorf(d.Params[i], "action-proof", "%s is an action fun and takes a proof, %s: an action runs with no transaction open, and a proof is handed to one only by an api list, as its row's step after a gate or as gated work, so name %s there, or take the facts it reads and no proof (spec.md 7.1)", f.Name, p.Name, f.Name)
+			c.errorf(d.Params[i], "action-proof", "%s is an action fun and takes a proof, %s: an action runs with no transaction open, and a proof is handed to one only by an api list, as gated work after a gate, so name %s there, or take the facts it reads and no proof (spec.md 7.1)", f.Name, p.Name, f.Name)
 		}
 	}
 	return takes

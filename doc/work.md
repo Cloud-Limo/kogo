@@ -5,7 +5,8 @@ from, beside `doc/gates.md`. It is not built and not in `spec.md`:
 until it is, the spec stands as written. No example here has been
 through `kogo check`, the names in them are invented, and every size
 is a guess. Built since: `kogo.http` but for the keyed action (spec 12,
-"An outside service"; `examples/29_http.kg`).
+"An outside service"; `examples/29_http.kg`). The outside step is out
+since 21 Nov 2026 (DEV-1039, `decisions.md`).
 
 ## Outside services
 

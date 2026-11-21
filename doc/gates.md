@@ -5,12 +5,13 @@ from. `doc/work.md` has the rest of that day: workers, outside
 services and time limits; `doc/measured.md` has the counts both rest
 on. Of it, the list's head and rows are parsed and checked, and in
 spec 15.1 and 15.2 (DEV-950, `examples/24_gates.kg`), and the server
-runs a check, a gate, a step and the work, with no transaction open
+runs a check, a gate and the work, with no transaction open
 where the work is an `action fun`, spec 15.3 and 15.5 (DEV-961),
 a gate is held to reading, spec 15.2 and 15.3 (DEV-977), and a
 proof's rules, spec 15.7 (DEV-976). The
 rest is not built and not in `spec.md`: until it is,
-the spec stands as written.
+the spec stands as written. The outside step, a row's `after`, was
+built and then taken out on 21 Nov 2026 (DEV-1039, `decisions.md`).
 No example here has been through `kogo check`, the
 names in them are invented, and every size is a guess.
 
@@ -151,9 +152,8 @@ Every gate of cusoon2 obeys this already: none writes a row, and three
 of the ops site's steps bind a tenant, which is a setting of the
 transaction. Its routes do write, in front of the gates: each makes a
 session for a request that comes without a live one ("The first call"
-below). It makes a gate safe to run twice, which the outside step
-below needs. A count of attempts writes, so it is no gate's: it
-belongs to an ungated operation or an outside step. Both checks were
+below). A count of attempts writes, so it is no gate's: it belongs
+to an ungated operation. Both checks were
 run on Postgres 18.7 on 17 Nov 2026:
 
 - **When it runs.** The server runs the gate in a savepoint with
@@ -565,6 +565,7 @@ The file enforces nothing: it is what a reviewer reads.
   after an outside step is left to the spec. Perhaps 5 / 5. Agreed
   with Greg on 17 Nov 2026 (`doc/lists-assessment.md`, choice C), over
   a line of order on every entry, which prints `gate, work` on most.
+  The outside step is out since 21 Nov 2026 (`decisions.md`).
 - **It lists no route**: routes are Go ("Routes that are not
   operations"), and what each writes is on its operation's lines.
 - **The tables are those a statement names**, over the statements the
@@ -578,8 +579,7 @@ The file enforces nothing: it is what a reviewer reads.
   alone.** Work that reads the session for itself then shows, where
   one list for the request would hide it behind the gate. A gate has
   no `writes`, since Postgres refuses one there; an ungated operation
-  has no `gate reads`; an outside step has no lines of tables, since
-  it holds no transaction. A shared gate that reads a new table
+  has no `gate reads`. A shared gate that reads a new table
   changes a line of every operation behind it, which is noisy and
   true.
 - **`locks` is a row lock, of any strength**, printed where there is
@@ -767,10 +767,11 @@ comments argue, call by call, what a rerun would do.
 - **An action is refused where a transaction is open**: in a function
   that holds a `Tx` or a proof, and in a `db.tx { }` block. A function
   that calls an action says so ("A function that acts says so"
-  below), so a helper hides none. The outside step is the one
-  function that holds a proof and may act.
+  below), so a helper hides none. Gated work that runs wholly
+  outside is the one function that holds a proof and may act.
 - **An action has three homes**: a worker, fed by a row; an ungated
-  operation, between its own transactions; and the outside step.
+  operation, between its own transactions; and gated work that runs
+  wholly outside.
 - **A lookup is allowed anywhere.** A slow one still holds a
   transaction open, as today. Which kind of operation to write, by
   where it asks and changes things outside, is the table in `spec.md`
@@ -799,8 +800,8 @@ is nothing to opt in to, and the checker holds three rules:
 - **The word stays true.** An `action fun` that calls no action is an
   error, and a function that calls one and is not one is refused.
 - **It keeps out of a transaction.** An `action fun` takes no `Tx`,
-  takes a proof only as an outside step or as a gated operation that
-  runs with no transaction, and is not called in a `db.tx { }` block.
+  takes a proof only as a gated operation that runs with no
+  transaction, and is not called in a `db.tx { }` block.
 - **It is not kept in a value.** There is no `::` reference to one,
   an interface's `fun` is not one, and a lambda that acts is passed
   straight to a prelude function that runs it, as a lambda that fails
@@ -836,77 +837,22 @@ perhaps 40 to 50 functions are one, by a guess. Weighed and not taken:
 
 Agreed with Greg on 17 Nov 2026; respelt `action fun` on 18 Nov 2026.
 
-### The outside step
-
-An operation may name, after `after`, a step that runs between its
-gate and its work with no transaction open. The step is an `action
-fun`, so the function says it runs with none:
-
-```kotlin
-api booker {
-    updateBooker gatedBy updateBookerGate after renameLogins
-}
-
-// In a transaction that then ends. Our own refusals belong here.
-fun updateBookerGate(tx: SerializableTx, env: Env, request: Request, input: BookerInput): Either<String, HeldBooker> = either {
-    val booker = booker(tx, env, request, input.id).bind()
-    if (input.email != booker.email) {
-        ensure(booker.isAdmin) { EMAIL_CHANGE_BY_US_MESSAGE }
-        ensure(emailIsFree(booker, input.email)) { "A booker with this email already exists." }
-    }
-    booker
-}
-
-// No transaction is open. The service may refuse, and nothing is written.
-action fun renameLogins(env: Env, booker: HeldBooker, input: BookerInput): Either<String, Unit> = either {
-    if (input.email != booker.email) {
-        booker.idpUserId?.let { ensure(setUserEmail(env.idp, it, input.email)) { EMAIL_HAS_LOGIN_MESSAGE } }
-        booker.stripeCustomerId?.let { updateCustomerEmail(env.stripe, it, input.email) }
-    }
-}
-
-// A new transaction, in which the server runs the gate again first.
-fun updateBooker(env: Env, booker: HeldBooker, input: BookerInput): Either<String, BookerView> = either {
-    saveBooker(booker, input)
-    bookerView(booker)
-}
-```
-
-The step is handed the gate's proof after that proof's transaction
-has ended, for the facts in it: an address, an id at the identity
-service. cusoon2's four read nothing else there. So an outside step
-passes no proof to a call, and SQL in one is an error of the checker
-and not a failure of the runs that reach it, after the service has
-been changed:
-
-```
-booker.kg:31:5 outside-passes-proof: renameLogins passes booker to saveBooker, and an outside step has no transaction: move the call to the work
-```
-
-The refusal comes before any write, so nothing is rolled back for it,
-and the order is in the shape of the code. It is the daemon's own
-shape for a remote write: prepare in a transaction, act with none,
-record in another.
-
-The two services can still disagree: when the step succeeds and the
-last transaction fails, the outside is ahead, as it is today, and
-saving again finishes the change. Only a row and a worker close that.
-
 ### An operation that runs wholly outside
 
 Six of cusoon2's seven write nothing of ours after the gate: the
 three passkey operations, on both sites, change the identity service
 and are done, and starting a registration answers with what the
-service said. So a gated operation may have no work in a transaction.
+service said. The seventh acts outside and then writes, and is
+`ungated` on a `Db` since 21 Nov 2026 (DEV-1035, `decisions.md`).
+So a gated operation may have no work in a transaction.
 Its row is an ordinary one: the operation being an `action fun` is
 what says it runs with none, as a `Db` does for an ungated one (spec
 15.3), and the list only labels the gates:
 
 ```kotlin
 api booker {
-    setBookingNotes           gatedBy setBookingNotesGate                    // gate, then work, in one transaction
-    updateBooker              gatedBy updateBookerGate   after renameLogins  // gate; outside step; gate again and work
-    startPasskeyRegistration  gatedBy booker                                 // an action fun: gate; then it, outside
+    setBookingNotes           gatedBy setBookingNotesGate  // gate, then work, in one transaction
+    startPasskeyRegistration  gatedBy booker               // an action fun: gate; then it, outside
 }
 
 // No transaction is open.
@@ -919,20 +865,18 @@ action fun startPasskeyRegistration(env: Env, booker: HeldBooker, input: Unit): 
 ```
 
 The server runs the gate in a transaction, ends it, and calls the
-operation with none open; its answer is the request's. It is held as
-an outside step is: it may act, and it passes its proof to nothing.
+operation with none open; its answer is the request's. It may act,
+and it passes its proof to nothing.
 The gate runs once. The printed table gives it a `gate reads` line
 and no other. What it needs of the request is a fact of the proof:
 the Kotlin names a new passkey from the User-Agent (`deviceName`).
 
-An outside step's answer is not handed to the work: `updateBooker`
-alone has both, and its step answers nothing. Nothing gated in
-cusoon2 needs a `Db`: by a scan of its mutations every gated one is
-one transaction but these seven.
+Nothing gated in cusoon2 needs a `Db`: by a scan of its mutations
+every gated one is one transaction but these six.
 
 A third kind of call, `repeatable` (an action that is safe to make
-twice, allowed in a transaction), was weighed for these four and not
-taken: it rests on the binding's word, and fits one of them. Nor does
+twice, allowed in a transaction), was weighed for the operations that
+act and not taken: it rests on the binding's word, and fits one of them. Nor does
 it decide a worker's retry: cusoon2's mail is not safe to repeat and
 is retried without limit, and its charge is safe to repeat under its
 key and is never retried. Retry is a judgment for each queue, so a
@@ -945,15 +889,13 @@ binding says `action` or nothing, and nothing more.
 - A function that takes a `SerializableTx` is not handed a `Tx`.
 - A function that calls an action is an `action fun`, and an `action
   fun` calls one.
-- An `action fun` takes no `Tx`, and a proof only as an outside step
-  or a gated operation that runs wholly outside; none is called in a
-  `db.tx { }` block.
+- An `action fun` takes no `Tx`, and a proof only as a gated
+  operation that runs wholly outside; none is called in a `db.tx { }`
+  block.
 - An action is not kept in a value: no `::` reference, no interface's
   `fun`, and a lambda that acts goes straight to a prelude function
   that runs it.
-- An outside step, or an operation that runs wholly outside, passes
-  no proof to a call.
-- The step named after `after` is an `action fun`.
+- An operation that runs wholly outside passes no proof to a call.
 - Every `api` list says `checkedBy` a function or `unchecked`.
 - Every row is `gatedBy` a function or `ungated`.
 - The gate's result is `Either<String, P>`, and `P` is the type of the
@@ -1009,7 +951,7 @@ it: a habit of the application's code, not a rule.
 - **7:** a function that touches the database has a `Tx`, a `Db` or a
   proof as a parameter.
 - **15, a new part:** proofs, the rule on a proof's
-  transaction, the read-only gate and the outside step.
+  transaction and the read-only gate.
 - **3.4 and 11:** an interface may declare a marked `val`, so proofs
   share one (`OnBooking`), and a data class may implement a `val`
   with a type that fits it. Kotlin 2.4.0 accepts both (run on 17
@@ -1026,7 +968,7 @@ it: a habit of the application's code, not a rule.
 - **12 and 15.2:** `Cookie` and `Reply` in `kogo.rpc`; an ungated
   operation may answer `Either<String, Reply<A>>`.
 - `doc/design.md`, "The server": the handler calls the gate, in a
-  read-only savepoint, and the outside step; a command writes the
+  read-only savepoint; a command writes the
   printed table; "Not designed, on purpose" loses the cookie. Its
   sentence that paths and other routes stay out of the language
   stands. "The SQL pass": a statement's signature carries its tables.
@@ -1089,7 +1031,8 @@ it: a habit of the application's code, not a rule.
   rules as they stood would hold it, but each such operation gains a
   data class, a function that fills it and a fourth name in its row.
   And the step left as first sketched: its own example broke the rule
-  on actions, and SQL in it failed only when run.
+  on actions, and SQL in it failed only when run. The outside step
+  itself is out since 21 Nov 2026 (`decisions.md`).
 - **A statement binds something of its proof**:
   one of the five calls on a proof's transaction binds, in its
   literal, another property of that proof, `${booking.id}` beside
@@ -1104,7 +1047,8 @@ it: a habit of the application's code, not a rule.
   before the dot stay. Reopen with a port whose proofs each hold
   their transaction and their rows (`decisions.md`, 20 Nov 2026).
 - **An empty work for an operation that writes nothing of ours**,
-  with the outside step's answer handed to it. A transaction for
+  with the outside step's answer handed to it (the step itself is out
+  since 21 Nov 2026). A transaction for
   nothing, and a second run of the gate that can refuse after the
   service has been changed. And such an operation as `ungated` with a
   `Db`: the printed table would lose its gate.
@@ -1156,7 +1100,6 @@ it: a habit of the application's code, not a rule.
   and 15 for the command, with the walk of the functions an operation
   reaches shared with the gate's read-only check, which is perhaps 10
   lines more, and the `asks` and `acts` lines perhaps 25 on that
-  walk. The rule on an outside step's proof is perhaps 15,
-  and an operation wholly outside 20 of checker and 15 of handler.
+  walk. An operation wholly outside is perhaps 20 of checker and 15 of handler.
   A `Reply` is perhaps 50 lines over the prelude, the checker, the
   handler and the TypeScript.

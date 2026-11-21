@@ -119,7 +119,8 @@ work daemon alertedBy opsAlert {
 - **The outside step is spelt `after`**, which says the order, and
   is an `action fun`. Not taken: the chain as the list (`gate -> step
   -> work`), since the words carry the checker's rules and a chain of
-  one would be an unmarked ungated row.
+  one would be an unmarked ungated row. The outside step is out since
+  21 Nov 2026 (DEV-1039, `decisions.md`).
 - **There is no bare `outside`.** A gated operation that is an
   `action fun` runs with no transaction and its gate once, as a `Db`
   means no transaction in spec 15.3: the list only labels the gates.

@@ -200,10 +200,8 @@ ungated, after the check: 200 {"type":"ok","value":2}
 unpaid: 200 {"type":"ok","value":["INV-1","INV-2"]}
 refused by its own gate: 200 {"type":"refused","message":"Invoice INV-2 cannot be changed."}
 refused by the work: 200 {"type":"refused","message":"There is no invoice INV-9."}
-refused by the step: 200 {"type":"refused","message":"No printer is set up."}
 refused by work that is an action: 200 {"type":"refused","message":"No printer is set up."}
-with 0 transactions open, front: invoice INV-1
-sent after the step: 200 {"type":"ok","value":{"number":"INV-1","printer":"front"}}
+sent: 200 {"type":"ok","value":{"number":"INV-1","printer":"front"}}
 mark paid: 200 {"type":"ok","value":1000}
 mark paid again: 200 {"type":"refused","message":"Invoice INV-1 cannot be changed."}
 status: 200 {"type":"ok","value":"paid"}

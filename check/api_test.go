@@ -133,8 +133,7 @@ func TestReply(t *testing.T) {
 	})
 }
 
-// Sections 15.1 and 15.2: a list's check, a row's gate and its step,
-// and that what one gives is what the next takes.
+// Sections 15.1 and 15.2: a list's check and a row's gate, and that what one gives is what the next takes.
 func TestGates(t *testing.T) {
 	head := rpc("import kogo.rpc.ring\n") + `data class P(val n: Int)
 data class Q(val n: Int)
@@ -145,22 +144,21 @@ fun g(tx: Tx, env: Env, request: Request): Either<String, P> = either { P(1) }
 fun own(tx: SerializableTx, env: Env, request: Request, input: In): Either<String, P> = either { P(input.n) }
 fun w(env: Env, p: P, input: In): Either<String, Int> = either { p.n }
 fun v(env: Env, p: P, input: Unit): Either<String, Unit> = either { }
-action fun s(env: Env, p: P, input: In): Either<String, Unit> = either { ring() }
 `
-	info, errs := run(t, head+"api ops checkedBy ours {\n    w gatedBy own after s\n    v gatedBy g\n    me ungated\n}\napi more unchecked { w gatedBy g, v gatedBy g }")
+	info, errs := run(t, head+"api ops checkedBy ours {\n    w gatedBy own\n    v gatedBy g\n    me ungated\n}\napi more unchecked { w gatedBy g, v gatedBy g }")
 	if errs != nil {
 		t.Fatal(errs)
 	}
 	for d, a := range info.APIs {
 		got := fmt.Sprint(a.Check != nil, a.Env)
 		for _, op := range a.Ops {
-			got += fmt.Sprintf(" %s %v %v %v %v %v %v", op.Func.Name, op.Gate != nil, op.Proof, op.After != nil, op.Input, op.Tx, op.Serializable)
+			got += fmt.Sprintf(" %s %v %v %v %v %v", op.Func.Name, op.Gate != nil, op.Proof, op.Input, op.Tx, op.Serializable)
 		}
 		// The first parameter of the gate, or of an ungated fun, names
 		// the transaction the server opens.
 		want := map[string]string{
-			"ops":  "true Env w true P true In false true v true P false Unit false false me false <nil> false Unit true false",
-			"more": "false Env w true P false In false false v true P false Unit false false",
+			"ops":  "true Env w true P In false true v true P Unit false false me false <nil> Unit true false",
+			"more": "false Env w true P In false false v true P Unit false false",
 		}[d.Name]
 		if got != want {
 			t.Errorf("api %s:\n got %s\nwant %s", d.Name, got, want)
@@ -193,14 +191,5 @@ action fun s(env: Env, p: P, input: In): Either<String, Unit> = either { ring() 
 		{fun("x(env: Env, q: Q, input: Unit): Either<String, Unit>") + "api ops unchecked { ‸x gatedBy g }", "operation", "x takes a Q second, and its gate g gives a P: gated work takes its gate's proof, so take a P or name the gate that gives a Q"},
 		// Ungated work takes no proof.
 		{head + "api ops unchecked { ‸v ungated }", "operation", "v takes 3 parameters: an ungated operation takes four, as fun v(tx: Tx, env: Env, request: Request, input: Input), with a Db for the Tx to open its own transactions and Unit for no input; work that takes a gate's proof names the gate in its row, with gatedBy"},
-		// A step.
-		{head + "api ops unchecked { w gatedBy g after ‸nope }", "unknown-name", "nothing named nope"},
-		{head + "api ops unchecked { w gatedBy g after ‸me }", "step", "me takes 4 parameters: a step named with after takes three, as fun me(env: Env, proof: Proof, input: Input), with its gate's proof and its operation's input"},
-		{fun("x(env: Env, q: Q, input: In): Either<String, Unit>") + "api ops unchecked { w gatedBy g after ‸x }", "step", "x takes a Q second, and w's gate g gives a P: a step takes its row's gate's proof"},
-		{head + "api ops unchecked { v gatedBy g after ‸s }", "step", "s takes a In third, and v's input is a Unit: a step takes its operation's input"},
-		{head + "api ops unchecked { w gatedBy g after ‸w }", "step", "w returns Either<String, Int>: a step named with after returns Either<String, Unit>"},
-		{fun("x(env: E2, p: P, input: In): Either<String, Unit>") + "api ops unchecked { w gatedBy g after ‸x }", "step", "x takes the environment E2, and g takes Env"},
-		{head + "action fun a(env: Env, p: P, input: In): Either<String, Int> = either { ring(); 1 }\napi ops unchecked { a gatedBy g after ‸s }", "step", "a is an action fun, and its row names the step s too: work that is an action fun runs with no transaction open, after its gate alone, so make s's call in a, or write a as a fun"},
-		{fun("x(env: Env, p: P, input: In): Either<String, Unit>") + "api ops unchecked { w gatedBy g after ‸x }", "step", "x is not an action fun: a step named with after runs with no transaction open, to change something outside, so write action fun x"},
 	})
 }

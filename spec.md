@@ -488,7 +488,7 @@ action fun announce(console: Console, message: String) {
   It calls no action in a block that is handed a `Tx`, as `db.tx`'s
   is (`action-in-tx`).
 - An `action fun` takes a proof (15.7) only where an `api` list hands
-  it one: as a row's step or as its gated work, second
+  it one: as a row's gated work, second
   (`action-proof`). That proof's transaction has ended, so the fun
   passes no proof to a call and runs no statement on one
   (`outside-passes-proof`).
@@ -1322,7 +1322,7 @@ fun updateJob(tx: Tx, env: OpsEnv, request: Request, input: UpdateJobInput): Eit
 api desk checkedBy fromOurPage {
     unpaid       gatedBy clerk
     markPaid     gatedBy markPaidGate
-    sendInvoice  gatedBy sendInvoiceGate after tellPrinter
+    sendInvoice  gatedBy sendInvoiceGate
     looks        ungated
 }
 
@@ -1333,7 +1333,7 @@ api hooks unchecked {
 
 - `api name checkedBy check { rows }` is a top-level declaration, the
   third thing Kogo adds to Kotlin. Its words are bare: `api`,
-  `checkedBy`, `unchecked`, `gatedBy`, `after` and `ungated` are names
+  `checkedBy`, `unchecked`, `gatedBy` and `ungated` are names
   like any other elsewhere, a fun's in a list among them.
 - Every fun a list names is a top-level fun in scope where the list
   is written, its own package's or an imported one, and one fun: not
@@ -1343,15 +1343,14 @@ api hooks unchecked {
   with no check says `unchecked` in its place, and is served to no
   browser: its table is a Go type that the server's handler does not
   take. A head with neither is a compile error.
-- A row is an operation and who may call it, in one of three forms.
-  With what the operation's fun is (15.2), that is five kinds. Take
+- A row is an operation and who may call it, in one of two forms.
+  With what the operation's fun is (15.2), that is four kinds. Take
   the first that does the job:
 
   | The operation | Write | Transactions (15.3) | May ask outside | May change outside |
   | -- | -- | -- | -- | -- |
   | reads and writes our database | `op gatedBy gate` | one: the gate, then the work | in the gate or the work; the transaction waits | nowhere |
   | changes something outside and writes nothing of ours | `op gatedBy gate`, with `op` an `action fun` | one for the gate; none for the work | anywhere | in the work |
-  | changes something outside, then writes | `op gatedBy gate after step` | one for the gate; none for the step; one for the gate again and the work | anywhere | in the step |
   | finds out who is asking itself | `op ungated`, taking a `SerializableTx` or a `Tx` | one | in it; the transaction waits | nowhere |
   | finds out who is asking itself, and must keep a write after a refusal or write what an action answered, or asks outside with no transaction open | `op ungated`, taking a `Db` | its own, each a `db.tx` | anywhere | between its transactions |
 
@@ -1366,15 +1365,15 @@ api hooks unchecked {
     transactions, and find out who is asking by hand.
 
   A row that neither names a gate nor says `ungated` is a compile
-  error, and so is `after` in an ungated row or in one whose work is
-  an `action fun`.
+  error, and so is a row with any word after its gate or `ungated`:
+  the error says what a row is.
 - A list's rows are separated by a comma, a new line or both, as
   Kotlin separates a collection's, with a comma allowed after the
-  last. A row stays on one line: a line that begins with `gatedBy`,
-  `after` or `ungated`, or with a gate's or a step's name, is a
-  compile error that says which row to move it onto. A line that
-  begins with one of the three words and goes on with `gatedBy` or
-  `ungated` is the row of an operation of that name.
+  last. A row stays on one line: a line that begins with `gatedBy` or
+  `ungated`, or with a gate's name, is a compile error that says
+  which row to move it onto. A line that begins with one of the two
+  words and goes on with `gatedBy` or `ungated` is the row of an
+  operation of that name.
 - An operation's fun's name is its name on the wire, so a list holds
   no operation twice. A fun may stand in more than one list, and a
   gate that reads no input in more than one row (15.2).
@@ -1397,21 +1396,20 @@ one returns an `Either` whose `Left` is a refusal in words:
 | the check | a `Tx`, the environment, a `Request` | `Either<String, Unit>` |
 | a gate | a `SerializableTx` or a `Tx`, the environment, a `Request`, and the operation's input if it reads it | `Either<String, P>`, with `P` its proof |
 | gated work, the `op` of a gated row | the environment, the proof, the input | `Either<String, A>` |
-| a step, an `action fun` (7.1) | the environment, the proof, the input | `Either<String, Unit>` |
 | an ungated operation | a `SerializableTx`, a `Tx` or a `Db` (15.3), the environment, a `Request`, the input | `Either<String, A>` or `Either<String, Reply<A>>` |
 
 - The environment is one type of the application's, the same for
-  every fun of a list, its check, gates and steps included: a data
+  every fun of a list, its check and gates included: a data
   class of what lives as long as the server, the clock and the handles
   of outbound calls (sections 7 and 13).
 - A `Request` is `kogo.rpc.Request` (section 12): the caller's
   cookies, headers and address.
 - The input is a wire type (15.4), or `Unit` for none, and `A` is a
   wire type, or `Unit` for an operation with nothing to say.
-- What one fun gives, the next takes. The proof that gated work and a
-  step take is the very type their row's gate gives; a step's input
-  and the input of a gate that reads one are the operation's input
-  type. Anything else is a compile error.
+- What one fun gives, the next takes. The proof that gated work takes
+  is the very type its row's gate gives; the input of a gate that
+  reads one is the operation's input type. Anything else is a compile
+  error.
 - A gate reads and decides; it does not write. A statement that a
   gate reaches, in its own body or through the funs it calls or names,
   and that inserts into, updates or deletes from a table or a view is
@@ -1480,17 +1478,11 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   operation's `Tx` is: the gate, then the work with the gate's proof.
   An answer commits it, a refusal of either rolls it back, and a rerun
   runs the gate again.
-- A row with a step runs its gate first in a transaction of its own,
-  which the server rolls back; then the step, once, with no
-  transaction open; then the gate again and the work, in one
-  transaction as above. The step is handed the first proof for the
-  facts in it: that proof's `Tx` has ended, so a step passes no proof
-  on and runs no statement on one (15.7). A refusal of the step has
-  written nothing.
 - A gated row whose work is an `action fun` (7.1) runs its gate once,
   in a transaction of its own that the server commits, and then the
   work with no transaction open. The work's answer or refusal is the
-  request's. Its proof's `Tx` has ended, as a step's has.
+  request's. Its proof's `Tx` has ended, so the work passes no proof
+  on and runs no statement on one (15.7).
 - A gate on a `SerializableTx` runs held to reading, each time it
   runs: in a savepoint that Postgres holds read-only and the server
   releases before the work. There a write, one inside a function of
@@ -1507,8 +1499,8 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
 - The first parameter of the gate, or of an ungated operation that
   takes a transaction, names the kind the server opens (10.7): at
   SERIALIZABLE for a `SerializableTx`, at READ COMMITTED for a `Tx`.
-  Each transaction a row opens is of that kind: the gate's before a
-  step or an `action fun` too. A list's check takes a `Tx`.
+  Each transaction a row opens is of that kind: the gate's before an
+  `action fun` too. A list's check takes a `Tx`.
 - An operation that takes a `SerializableTx` or a `Tx` runs in one
   transaction, which the server opens as above. An answer commits it.
   A refusal rolls it back, so a refused request has changed nothing. A
@@ -1607,7 +1599,7 @@ application chooses.
 | What happened | Status | Body |
 | --- | --- | --- |
 | the operation answered | 200 | the `ok` object, and a `Reply`'s cookies |
-| the operation, its gate or its step refused | 200 | the `refused` object |
+| the operation or its gate refused | 200 | the `refused` object |
 | the list's check refused, whatever else is wrong | 403 | the check's words, as text |
 | the input does not read (15.4) | 400 | the operation and the key, never the value |
 | no operation of that name | 404 | |
@@ -1683,10 +1675,9 @@ and in such a file two rules hold:
   takes a proof (7.1) is handed one whose transaction has ended
   (15.3). It reads the proof's facts, passes no proof to a call, as
   an argument, as a receiver or in a block that takes or gives one,
-  and runs no statement on one (`outside-passes-proof`): what writes
-  belongs in the work, and what reads in the gate; where the fun is
-  itself the work, in the gate or in a `fun`, which runs in the
-  transaction.
+  and runs no statement on one (`outside-passes-proof`): what needs
+  the transaction goes in the gate, or the work is written a `fun`,
+  which runs in it.
 
 A data class that is not of this shape is held to neither.
 A gate gives none that holds a transaction but in a proof's own

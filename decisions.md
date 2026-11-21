@@ -3863,3 +3863,31 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   step's, on an issue In Review; in any other state Greg, who ends the
   sitting, brings it to his next "Lead". No row or word is added for
   it. Not taken: keeping the lead's lettered options as its default.
+
+## A row has no step (DEV-1039), 21 Nov 2026
+
+- **The `after` form of a row leaves the language** (Greg, 21 Nov
+  2026, ruling on the gate design in DEV-1035): `op gatedBy gate
+  after step` goes from spec 15.1, 15.2, 15.3 and 15.5, the parser,
+  the checker's rules for a step, the emitter and `rpc.Gated`, which
+  loses its step. None of the 94 rows cusoon2's survey counted uses
+  it, and it has no place for an undo. The one operation that acts
+  outside and then writes is `ungated` on a `Db` and calls its gate
+  in each of its own transactions. `action fun` work, proofs and
+  `outside-passes-proof` stay; that rule's cases written on a step
+  are written on work that runs outside. Not taken: keeping the form
+  unused. Reopen with a port of an operation that acts outside and
+  then writes, which cannot be written `ungated` on a `Db`.
+- **A row with a word after its gate or `ungated` is refused by the
+  parser, saying what a row is**, `after` among them and with no
+  message of its own (the issue's Scope). Before, such a word fell
+  to the list's "expected , or a new line between a list's entries",
+  which does not say what a row is; that message stays for a tests
+  list. Not taken: leaving the list's message, which the Scope asked
+  to say what a row is.
+- **`examples/24_gates.kg` keeps `sendInvoice` as a plain gated row**
+  and loses `tellPrinter`, which no row names now and which takes a
+  proof, so `action-proof` would refuse it. The end-to-end run loses
+  "refused by the step" and calls the row's success "sent". Not
+  taken: keeping `tellPrinter` as a called helper, which is the next
+  issue's rewrite of the example.

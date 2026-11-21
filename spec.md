@@ -285,9 +285,11 @@ by the first of these that mentions it:
 2. the arguments that are not lambdas; when several mention it, their
    common type;
 3. the type the result must have: a declared type, a parameter's type,
-   the function's return type; for a call on the right of `?:` where
-   none of these is known, the type of the left made non-null, so that
-   `xs ?: emptyList()` is a `List<Long>` for `xs: List<Long>?`;
+   the function's return type; for a call with no lambda argument on
+   the right of `?:` where none of these is known, the type of the left
+   made non-null, so that `xs ?: emptyList()` is a `List<Long>` for
+   `xs: List<Long>?` (a call with a lambda argument there is settled by
+   its lambdas, and `?:` takes the common type of its two sides);
 4. what a lambda argument returns, lambdas taken left to right.
 
 Every argument and the result are then checked against what was

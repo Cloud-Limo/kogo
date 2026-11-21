@@ -254,8 +254,8 @@ fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallbac
   getter. Local functions are allowed inside a function body, without
   type parameters, though Kotlin allows them: declare a generic one at
   the top level. An
-  extension's receiver is not nullable: `fun String?.f()` does not exist;
-  take the value as a parameter.
+  extension's receiver is not nullable, a binding's included (section
+  13): `fun String?.f()` does not exist; take the value as a parameter.
 - Every top-level function states its parameter types and its return type.
   The return type may be omitted only for `Unit`. Inference works inside a
   function body only, so a top-level `val` states its type too, but
@@ -926,7 +926,7 @@ no import;
 `all`, `none`, `count`, `sum`, `sumOf`, `maxOrNull`, `minOrNull`,
 `sortedBy`, `sortedByDescending`, `sorted`, `reversed`, `distinct`,
 `take`, `drop`, `zip`, `plus` (`+`), `groupBy`, `associateBy`,
-`associate`, `toSet`, `toList`, `orEmpty`, `joinToString`, `forEach`,
+`associate`, `toSet`, `toList`, `joinToString`, `forEach`,
 `keys`, `values`, `listOfNotNull`. A `Map` and a `Set` iterate in
 insertion order and compare keys as `==` does, by value, so any type may
 be a key.
@@ -934,8 +934,8 @@ be a key.
 There are no mutable collections, sequences or arrays. Build a list with
 `map`/`filter`/`+`, or accumulate into a local `var` of an immutable list.
 
-**Strings.** `length`, `isEmpty`, `isBlank`, `isNotBlank`,
-`isNullOrBlank`, `ifEmpty`, `ifBlank`, `trim`, `trim(char)`, `trimEnd`,
+**Strings.** `length`, `isEmpty`, `isBlank`, `isNotBlank`, `ifEmpty`,
+`ifBlank`, `trim`, `trim(char)`, `trimEnd`,
 `lowercase`, `uppercase`, `startsWith`, `endsWith`, `contains`,
 `substring`, `substringAfter`, `take`, `replace`, `split(delimiter)`,
 `padStart`, `toIntOrNull`, `toLongOrNull`,
@@ -1237,7 +1237,6 @@ external fun <T> listOf(vararg elements: T): List<T>
 external val <T> List<T>.size: Int
 external fun <T, R> List<T>.map(transform: (T) -> R): List<R>
 external fun <T> List<T>.firstOrNull(): T?
-external fun <T> List<T>?.orEmpty(): List<T>
 external fun List<Long>.sum(): Long
 ```
 
@@ -1257,9 +1256,10 @@ external fun List<Long>.sum(): Long
   with no body. Every member of an external class is declared this way,
   with the class as the receiver. One with a receiver is a member: it is
   in scope wherever a value of that type is, and is never imported.
-- Three things are allowed in a binding and nowhere else: a nullable
-  receiver, `out` on an external class's type parameter, and `vararg` on
-  a parameter, which then takes any number of arguments.
+- Two things are allowed in a binding and nowhere else: `out` on an
+  external class's type parameter, and `vararg` on a parameter, which
+  then takes any number of arguments. A binding's receiver is not
+  nullable either (section 5).
 - `action external fun` marks a binding that changes something
   outside (7.1): `Console.println` and `Http.perform` are actions.
   Any other binding says nothing, `Console.readln`, `Clock.now` and
@@ -1299,6 +1299,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `String.format`, `Locale` | string templates, `padStart` |
 | `by lazy`, delegation | compute it once and pass it |
 | `vararg`, `*spread` | a `List` |
+| `fun T?.f()`, `x.orEmpty()`, `x.isNullOrBlank()` | a parameter; `x ?: emptyList()`, with `emptyList<T>()` where nothing else settles `T`; `x == null \|\| x.isBlank()` |
 | `inline`, `reified`, `operator`, `infix` | a plain function |
 | `println`, `readln` | a `Console` parameter, from `kogo.io` |
 | value classes | `typealias`, in v0 |

@@ -42,7 +42,6 @@ external fun List<Long>.sum(): Long
 external fun <T> List<T>.sumOf(selector: (T) -> Int): Int
 external fun <T> List<T>.sumOf(selector: (T) -> Long): Long
 external fun <T> List<T>.plus(elements: List<T>): List<T>
-external fun <T> List<T>?.orEmpty(): List<T>
 
 external fun <T> setOf(vararg elements: T): Set<T>
 external fun <T> Set<T>.contains(element: T): Boolean
@@ -54,7 +53,6 @@ external fun String.trim(char: Char): String
 external fun String.trimEnd(): String
 external fun String.isBlank(): Boolean
 external fun String.isNotBlank(): Boolean
-external fun String?.isNullOrBlank(): Boolean
 external fun String.ifEmpty(defaultValue: () -> String): String
 external fun String.ifBlank(defaultValue: () -> String): String
 external fun String.startsWith(prefix: String): Boolean

@@ -226,13 +226,6 @@ func List_Plus[T any](this, elements List[T]) List[T] {
 	return append(append(make(List[T], 0, len(this)+len(elements)), this...), elements...)
 }
 
-func List_OrEmpty[T any](this *List[T]) List[T] {
-	if this == nil {
-		return List[T]{}
-	}
-	return *this
-}
-
 // ordered holds each key once, in the order first given, comparing
 // keys as == does (decisions.md). Set is built on it, and Map is to be
 // built on it, with a value beside each key. A lookup walks the keys.
@@ -316,9 +309,6 @@ func String_Trim_Char(this string, char rt.Char) string {
 
 func String_IsBlank(this string) bool    { return strings.TrimFunc(this, isWhitespace) == "" }
 func String_IsNotBlank(this string) bool { return !String_IsBlank(this) }
-func String_IsNullOrBlank(this *string) bool {
-	return this == nil || String_IsBlank(*this)
-}
 
 func String_IfEmpty(this string, defaultValue func() string) string {
 	if this == "" {

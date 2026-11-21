@@ -155,11 +155,9 @@ func TestDeclarations(t *testing.T) {
 		{"@go(\"httpx\")\nexternal object http {\n    fun get(url: String): Either<E, R>\n}",
 			`[(ClassDecl (Modifiers [(Annotation go [(StringLit [(Literal String httpx)])])] External) "external object" http [(FunDecl get [(Param url (NamedType String))] (NamedType Either [(NamedType E) (NamedType R)]))])]`},
 		// The binding forms of section 13: a class with no body, and
-		// there only, out, a nullable receiver and vararg.
-		{"external class List<out T>\nexternal val <T> List<T>.size: Int\nexternal fun <T> List<T>?.orEmpty(): List<T>",
-			`[(ClassDecl (Modifiers External) "external class" List [(TypeParam Out T)]) (ValDecl (Modifiers External) [(TypeParam T)] (NamedType List [(NamedType T)]) size (NamedType Int)) (FunDecl (Modifiers External) [(TypeParam T)] (NamedType List [(NamedType T)] Nullable) orEmpty (NamedType List [(NamedType T)]))]`},
-		{"external fun <T> listOf(vararg elements: T): List<T>\nexternal fun String?.isNullOrBlank(): Boolean",
-			`[(FunDecl (Modifiers External) [(TypeParam T)] listOf [(Param Vararg elements (NamedType T))] (NamedType List [(NamedType T)])) (FunDecl (Modifiers External) (NamedType String Nullable) isNullOrBlank (NamedType Boolean))]`},
+		// there only, out and vararg.
+		{"external class List<out T>\nexternal val <T> List<T>.size: Int\nexternal fun <T> listOf(vararg elements: T): List<T>",
+			`[(ClassDecl (Modifiers External) "external class" List [(TypeParam Out T)]) (ValDecl (Modifiers External) [(TypeParam T)] (NamedType List [(NamedType T)]) size (NamedType Int)) (FunDecl (Modifiers External) [(TypeParam T)] listOf [(Param Vararg elements (NamedType T))] (NamedType List [(NamedType T)]))]`},
 		// The kind and external go in either order.
 		{"external action fun Bell.ring()\naction external fun Bell.ring()",
 			`[(FunDecl (Modifiers External action) (NamedType Bell) ring) (FunDecl (Modifiers External action) (NamedType Bell) ring)]`},

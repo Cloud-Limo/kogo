@@ -440,14 +440,12 @@ func (p *parser) decl(abstract bool) Decl {
 	return nil
 }
 
-// receiverAndName reads Name, or Receiver.name for an extension. Only
-// a binding's receiver may be nullable.
-func (p *parser) receiverAndName(external bool) (Type, string) {
+// receiverAndName reads Name, or Receiver.name for an extension. No
+// extension's receiver is nullable, a binding's included.
+func (p *parser) receiverAndName() (Type, string) {
 	t := p.typ()
 	refuse := func(pos Pos) {
-		if !external {
-			p.fail(pos, "nullable-receiver", "an extension's receiver is not nullable: take the value as a parameter")
-		}
+		p.fail(pos, "nullable-receiver", "an extension's receiver is not nullable: take the value as a parameter")
 	}
 	if p.at("?.") { // Receiver?.name: the ? is the receiver's
 		refuse(p.tok.pos)
@@ -495,7 +493,7 @@ func nullable(t Type) bool {
 func (p *parser) funDecl(m Modifiers, abstract bool) *FunDecl {
 	d := &FunDecl{Pos: p.want("fun"), Mods: m}
 	d.TypeParams = p.typeParams(false)
-	d.Receiver, d.Name = p.receiverAndName(m.External)
+	d.Receiver, d.Name = p.receiverAndName()
 	d.Params = p.params(false, m.External)
 	if p.got(":") {
 		d.Result = p.typ()
@@ -593,7 +591,7 @@ func (p *parser) valDecl(m Modifiers, abstract bool) *ValDecl {
 	if p.at("(") {
 		d.Destructure = p.names()
 	} else {
-		d.Receiver, d.Name = p.receiverAndName(m.External)
+		d.Receiver, d.Name = p.receiverAndName()
 	}
 	if p.got(":") {
 		d.Type = p.typ()

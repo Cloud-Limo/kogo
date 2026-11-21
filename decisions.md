@@ -4168,3 +4168,24 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   ordinary form. It is a `String`, Kogo having no `CharSequence`. Not built: `prefix`,
   `postfix`, `limit` and `truncated` (one use in cusoon2's backend). Reopen when a port
   needs one.
+
+## The guide settles each piece (DEV-1075), 22 Nov 2026
+
+- **A guide's sitting settles each piece of a design as it is shown** (Greg, 22 Nov 2026,
+  at the end of DEV-1068's sitting): a piece ends in one proposal, his "next" is
+  agreement to it, and the end is the tally and only what is left: what was postponed
+  and two rulings that pull against each other. The first form built the whole design
+  and then took its choices one a message; in DEV-1064 and DEV-1068 he had judged each
+  piece as it landed, and the second pass asked again what was settled. Not taken: the
+  two passes kept for a design whose pieces lean on each other. Postponing a piece that
+  cannot be judged yet, and reopening a ruling a later piece disturbs, stand in for
+  them. Reopen if a sitting on such a design commits him before he has seen the whole.
+- **A piece carries what he asked for in DEV-1068**: what Kotlin does, from a run, the
+  slip or "I cannot build one", the size, and what was not taken in a clause. A test he
+  gives in the sitting is held against every later piece. Not taken: leaving these to
+  his questions, which asked for Kotlin's rule four times.
+- **The form of a choice keeps a heading of its own in `doc/guide.md`**, since the lead
+  brings its choices in it (DEV-1036); `doc/lead.md` names the new heading.
+- **The guide is revised with Greg at the end of a sitting that chafed**, in place of
+  "when it has been used twice more", which this revision met. Not taken: a count of
+  uses, which would hold a fix back or force one that nobody wants.

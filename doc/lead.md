@@ -105,7 +105,7 @@ naming it, you approve. One that would give a different answer is not
 allowed.
 
 Bring Greg one choice at a time, never a list of choices, in the
-form of `doc/guide.md`, "Then the choices":
+form of `doc/guide.md`, "The form of a choice":
 
 - two or three sentences of context that stand on their own;
 - a short piece of code, in Kogo or SQL, that shows the thing;

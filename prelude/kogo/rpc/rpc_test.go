@@ -514,6 +514,7 @@ func TestLimits(t *testing.T) {
 		{0, sized(64<<10 + 1), "", "", "413 add: the input is past 65536 bytes"},
 		{100, sized(100), "", "", ok},
 		{100, sized(101), "", "", "413 add: the input is past 100 bytes"},
+		{100, `{"name":"` + strings.Repeat("x", 100) + `"}`, "", "", "413 add: the input is past 100 bytes"},
 		{0, `{"name":"x"}`, "", "\xff", "400 add: the header X-Check is not UTF-8"},
 		{0, `{"name":"x"}`, "\xffsecret", "", ok},
 		{0, ``, "\xffsecret", "", "400 who: the header X-Who is not UTF-8"},
@@ -539,7 +540,7 @@ func TestLimits(t *testing.T) {
 		json.Unmarshal([]byte(l), &m)
 		served = append(served, fmt.Sprint(m["msg"], " ", m["operation"], " ", m["outcome"]))
 	}
-	if got, want := strings.Join(served, ","), "served add ok,served add 413,served add ok,served add 413,served add 400,served add ok,served who 400,served who ok"; got != want || strings.Contains(log.String(), "secret") {
+	if got, want := strings.Join(served, ","), "served add ok,served add 413,served add ok,served add 413,served add 413,served add 400,served add ok,served who 400,served who ok"; got != want || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log is %s, want %s, with no value:\n%s", got, want, log.String())
 	}
 }

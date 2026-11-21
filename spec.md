@@ -1323,9 +1323,9 @@ fun updateJob(tx: Tx, env: OpsEnv, request: Request, input: UpdateJobInput): Eit
 
 ```kotlin
 api desk checkedBy fromOurPage {
-    unpaid       gatedBy clerk
-    markPaid     gatedBy markPaidGate
-    sendInvoice  gatedBy sendInvoiceGate
+    unpaid       gatedBy atDesk
+    markPaid     gatedBy atDesk
+    testPrinter  gatedBy mayPrint
     looks        ungated
 }
 
@@ -1658,9 +1658,11 @@ fun atDesk(tx: SerializableTx, env: DeskEnv, request: Request): Either<String, D
     DeskCall(tx, Clerk(request.clientAddress))
 }
 
+// The work: a step answers a held value, and the model function takes it.
 fun markPaid(env: DeskEnv, call: DeskCall, input: InvoiceRef): Either<String, Long> = either {
     val invoice = requireOpenInvoice(call, input.number).bind()
-    markPaid(call.tx, invoice)
+    ensure(setStatus(call.tx, invoice, true)) { "Invoice ${invoice.number} is gone." }
+    invoice.totalCents
 }
 ```
 
@@ -1696,9 +1698,10 @@ login.kg:9:19 tx-escapes: this db.tx block answers DeskCall, which holds a trans
 "Holds a transaction" is one meaning for both: the type is a `Tx` or
 a `SerializableTx`, or has one in a property or a type argument, at
 any depth. A nullable, a `List<DeskCall>`, a `Box<Tx>`, a variant of
-a sealed interface and a function's result each count. The type
-alone is read: a lambda that closes over a transaction, answered as
-a `() -> Int`, is not refused.
+a sealed interface and a function's result each count. The type of
+the answer alone is read. A lambda that closes over a transaction,
+answered as a `() -> Int`, is not refused, nor is a transaction that
+a block assigns to a `var` declared outside it.
 
 ## 16. Tests
 

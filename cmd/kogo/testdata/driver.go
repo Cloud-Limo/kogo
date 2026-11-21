@@ -258,7 +258,7 @@ func main() {
 		panic(err)
 	}
 	post("unpaid", "unpaid", "")
-	post("refused by its own gate", "markPaid", `{"number": "INV-2"}`)
+	post("refused by the work's step", "markPaid", `{"number": "INV-2"}`)
 	post("refused by the work", "statusOf", `{"number": "INV-9"}`)
 	post("refused by work that is an action", "testPrinter", "")
 	desk("front")

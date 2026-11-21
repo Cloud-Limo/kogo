@@ -198,7 +198,7 @@ the check before the name: 403 Open the desk's page first.
 refused by a shared gate: 200 {"type":"refused","message":"This address may not use the desk."}
 ungated, after the check: 200 {"type":"ok","value":2}
 unpaid: 200 {"type":"ok","value":["INV-1","INV-2"]}
-refused by its own gate: 200 {"type":"refused","message":"Invoice INV-2 cannot be changed."}
+refused by the work's step: 200 {"type":"refused","message":"Invoice INV-2 cannot be changed."}
 refused by the work: 200 {"type":"refused","message":"There is no invoice INV-9."}
 refused by work that is an action: 200 {"type":"refused","message":"No printer is set up."}
 sent: 200 {"type":"ok","value":{"number":"INV-1","printer":"front"}}

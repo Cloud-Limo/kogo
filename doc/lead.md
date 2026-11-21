@@ -140,9 +140,13 @@ against the code before passing it on.
   clerk raises none of it twice, and says what changes or that nothing
   does: the clerk then launches the Fix, quoting it, or merges. New
   work it names, you file.
-- A move of Greg's (a cusoon2 PR ready to merge, a Zed step) goes in
-  You can do now. When the clerk's `ready` line gives an order, `merge
-  before PR N` or `after`, the row's How says it.
+- A move of Greg's (a Zed step, a walkthrough) goes in You can do
+  now. A cusoon2 PR ready to merge does not, unless he asks for it:
+  once Cloud CI passes on the sha the clerk's line names, `lin clerk`
+  tells him in his Linear inbox, with any order the line gave, and
+  takes `lead` off, so the merge is his from there. When CI fails, its
+  `Clerk: Cloud CI failed on <PR> at <sha>` keeps `lead`: tell Greg
+  the cause, as for a step that failed.
 - Then take the label off, `lin label DEV-NNN lead --remove`: after
   a `Lead:` comment that follows `lin rule --keep-label`, or once
   Greg's move is in the boxes. The clerk leaves a labelled issue
@@ -179,13 +183,18 @@ restates them in full. A box with nothing in it keeps its heading and
 says so. "Unchanged", or a sentence, never stands in for the rows. A
 move changes box only when you tell him so.
 
-Not yet holds at most three rows: Greg's own moves that follow from
-work running now or a question just asked of him. Parked work, a
-choice of his included, is in Backlog, not in the box. A run in the
-labelled line takes a row only when the step after the clerk's is
-Greg's, such as merging a cusoon2 PR once its Fix run is back; the
-clerk's steps after a run are not rows, since he cannot start them too
-soon. When the cap binds, keep the rows nearest to release.
+Not yet holds at most three rows: Greg's own moves that follow from work
+running now or a question just asked of him. Parked work, a choice of
+his included, is in Backlog, not in the box. A run in the labelled line
+takes a row only when the step after the clerk's is Greg's, such as
+walking through a PR once its Fix run is back; the clerk's steps after a
+run are not rows, since he cannot start them too soon. A cusoon2 merge
+waiting on Cloud CI is a row: while the clerk's `Clerk: Greg's: merge
+<PR> at <sha> once Cloud CI passes` is the issue's newest comment and
+`lead` is on, its row is "waits on Cloud CI, then your inbox". The watch
+takes `lead` off on green and the row goes with it, so a row still there
+after CI has ended says the watch failed. When the cap binds, keep the
+rows nearest to release.
 
 An issue has one row across the two boxes: its next step. That step is
 in You can do now if Greg can do it, and in Not yet if he cannot; what
@@ -198,7 +207,7 @@ it each session `lin local --list` shows, by ID with its place and
 minutes so far: `lin brief --runs`, run afresh for each reply. It
 lets Greg see the runs have not got out of hand.
 Open every reply with what waits on Greg, in bold, in one of three
-forms: "**I suggest: `1`, merge PR 1512 on GitHub.**" for a move, by
+forms: "**I suggest: `1`, walk through DEV-902.**" for a move, by
 its number; "**Waiting for you:** ..." for a question that is his;
 "**Nothing waits on you.**" when neither.
 
@@ -212,14 +221,14 @@ over may get a new number. Anything else he types is plain words.
 
 | # | Move | How |
 | --- | --- | --- |
-| 1 | Merge DEV-905's PR (the booking screen's dates), which the clerk checked | merge PR 1512 on GitHub |
-| 2 | Walk through DEV-902 (the booking screen) on stack B | open http://127.0.0.1:3010, then say "done" |
+| 1 | Walk through DEV-902 (the booking screen) on stack B | open http://127.0.0.1:3010, then say "done" |
+| 2 | Take DEV-905 (the booking screen's dates) through its design | say "Guide DEV-905" in `~/Dev/cusoon2` |
 
 **Not yet**
 
 | Move | Waits on |
 | --- | --- |
-| Merge DEV-907's PR (the invoice dates) | its Fix run, then the clerk's checks |
+| Walk through DEV-907 (the invoice dates) | its Fix run, then the clerk's checks |
 
 Labelled `agent`: DEV-904 (running), DEV-906 (queued). Local:
 DEV-908 (cusoon2-b, 12 min).

@@ -328,15 +328,33 @@ func TestImportCyclesAgainstPrelude(t *testing.T) {
 // randomString is Kogo's own as newId is: no import, and its String
 // goes wherever a String does (spec.md 12).
 func TestRandomString(t *testing.T) {
+	preludeCases(t, [][2]string{
+		{"data class S(val token: String)\nfun f(n: Int): Boolean {\n    val s = S(randomString(n))\n    return \"${randomString(2)}\".length + s.token.length > 0 && randomString(1) != \"a\"\n}\nfun g(): String = randomString(20).let { it + it }", ""},
+		{"fun f(): Int = randomString(1)", "t.kg:2:16: type-mismatch: this is a String where a Int"},
+		{"fun f(): String = randomString(\"1\")", "t.kg:2:32: type-mismatch: this is a String where a Int"},
+	})
+}
+
+// toString is Int's, Long's, Double's and Decimal's, as spec.md 12
+// lists it, and no other built-in type's.
+func TestNumberToString(t *testing.T) {
+	preludeCases(t, [][2]string{
+		{"fun f(n: Long): String = n.toString()\nfun g(n: Int, d: Double, m: Decimal): String = n.toString() + d.toString() + m.toString()", ""},
+		{"data class P(val a: Int)\nfun f(p: P): String = p.toString() + p.a.toString()", ""},
+		{"fun f(b: Boolean): String = b.toString()", "t.kg:2:31: no-overload: no toString fits this call with (): the candidates are fun Int.toString()"},
+	})
+}
+
+// preludeCases checks each case's source, after "package t", against
+// the real prelude: it passes when the case wants "", and otherwise
+// gives one error that starts with what the case wants.
+func preludeCases(t *testing.T, cases [][2]string) {
+	t.Helper()
 	pre, err := prelude.Files()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, c := range [][2]string{
-		{"data class S(val token: String)\nfun f(n: Int): Boolean {\n    val s = S(randomString(n))\n    return \"${randomString(2)}\".length + s.token.length > 0 && randomString(1) != \"a\"\n}\nfun g(): String = randomString(20).let { it + it }", ""},
-		{"fun f(): Int = randomString(1)", "t.kg:2:16: type-mismatch: this is a String where a Int"},
-		{"fun f(): String = randomString(\"1\")", "t.kg:2:32: type-mismatch: this is a String where a Int"},
-	} {
+	for _, c := range cases {
 		f, err := syntax.Parse("t.kg", []byte("package t\n"+c[0]))
 		if err != nil {
 			t.Fatal(err)

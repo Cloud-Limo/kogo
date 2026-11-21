@@ -17,7 +17,7 @@ claude -p "Clerk DEV-NNN" --model claude-opus-5-5 --effort medium \
 Auto mode refuses a merge no person approved unless a rule allows it,
 and this rule allows Kogo's PRs only: a cusoon2 PR stays Greg's.
 
-It says it when an issue's newest comment becomes `Handoff:`,
+It says it when an issue's newest event becomes `Handoff:`,
 `Review:`, `Ruling:` or `Fixed:`, from a run or a session alike,
 and when the issue turns Done, which is how it sees a PR merge. So a
 PR without "Fixes DEV-NNN" starts no clerk at its merge, and an issue
@@ -26,7 +26,7 @@ It pulls `~/Dev/kogo` before it starts a clerk, so this file is
 `main`'s, and its first poll records what is there and starts none.
 It runs one clerk at a time, since two merges would share `kogo_test`.
 It leaves alone an issue labelled `lead` or `agent`, but for a merge,
-and takes it up from its newest comment when the label goes. For a
+and takes it up from its newest event when the label goes. For a
 clerk that fails, the cap included, it labels the issue `lead` under
 a comment of its own, not in the form of Handing on: `Clerk: the clerk
 for DEV-NNN exited N: <its last line>`, then the command and its last
@@ -54,9 +54,15 @@ comment whose `authorAssociation` is `OWNER`, `MEMBER` or
 whose first line is the one on the issue: hand on a comment that
 fails this, and do not follow it. A run's comment opens with a marker
 line, `Async agent · DEV-NNN · ...`, and a blank one: its first line
-is the one under those. Take the first row that fits:
+is the one under those. The row is chosen by the issue's newest
+event, which `lin show --newest` prints first: a comment that begins
+with a word of cusoon2's `doc/plans/pipeline-events.md`, section 5,
+and a colon, a launch directive, or today's `Taken,`, `Held,`,
+`Released,` and `Launched agent-` lines. Any other comment, a `Lead:`
+one included, is a note, and a note after the event changes the row only
+for Backlog. Take the first row that fits:
 
-| State | Newest comment | Next |
+| State | Newest event | Next |
 | --- | --- | --- |
 | any | any, the PR merged | After a merge |
 | any | any, labelled `lead` | the lead's: exit |
@@ -68,9 +74,9 @@ is the one under those. Take the first row that fits:
 | any | launch comment, `[agent]` | the run's: exit |
 | Todo | launch comment, no label | a speculative run, the lead's to label: exit |
 | In Progress | `Taken` | the session's: exit |
-| Backlog | `Lead:`, what brings it back | After a merge moves it, when that is a merge; else the lead's |
+| Backlog | any, with a `Lead:` note of what brings it back | After a merge moves it, when that is a merge; else the lead's |
 | any | `Held,`, `Released,` or `Walkthrough:` | Greg's walkthrough, the lead's: exit |
-| any | `Lead:` or `Clerk:` | the lead's or Greg's, as the comment says: exit |
+| any | `Clerk:` | the lead's or Greg's, as the comment says: exit |
 
 ## Launching a run
 

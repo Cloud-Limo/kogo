@@ -55,11 +55,13 @@ with them. `$LINEAR_API_KEY` is already in the shell.
 Linear holds the state of every piece of work and GitHub holds its
 code. The PR holds each step's comment in full, and the issue the
 first line of each, which is all the board shows. An issue goes Todo,
-In Progress, In Review, Done, and the first line of its newest comment
-says what happens next. Each step below can run in Zed, as an async
-run or as a local run, in any mix. So whatever a later step needs is
-on the issue, the PR or the pushed branch, never only in a session or
-a worktree.
+In Progress, In Review, Done, and the first line of its newest event
+says what happens next. An event is a comment that begins with a word
+of cusoon2's `doc/plans/pipeline-events.md`, section 5, and a colon;
+any other is a note, which no reader takes for a step. Each step
+below can run in Zed, as an async run or as a local run, in any mix.
+So whatever a later step needs is on the issue, the PR or the pushed
+branch, never only in a session or a worktree.
 
 One lead, started in `~/Dev/kogo`, directs the work of both
 repositories. Kogo's issues are in the Linear project Kogo and its PRs
@@ -81,7 +83,7 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   file.
 - **Clerk.** "Clerk DEV-NNN", said in `~/Dev/kogo`, takes one step of
   the pipeline for that issue and exits: read Kogo's `doc/clerk.md`
-  and follow it. `lin clerk` says it when an issue's newest comment
+  and follow it. `lin clerk` says it when an issue's newest event
   becomes `Handoff:`, `Review:`, `Ruling:` or `Fixed:`, from a run or
   a session alike, or its PR merges, so no session reports a step
   back. It starts the Code review and the Fix, checks and tidies.

@@ -202,10 +202,15 @@ func (p *parser) file() {
 	f.Package = p.path()
 	p.end()
 	for p.got("import") {
-		f.Imports = append(f.Imports, p.path())
-		if p.at(".") || p.at("as") {
-			p.fail(p.tok.pos, "syntax", "an import names one declaration: no wildcard and no as")
+		imp := &Import{Ident: p.path()}
+		if p.at(".") {
+			p.fail(p.tok.pos, "syntax", "an import names one declaration: no wildcard")
 		}
+		if p.got("as") {
+			pos, name := p.ident()
+			imp.As = &Ident{pos, name}
+		}
+		f.Imports = append(f.Imports, imp)
 		p.end()
 	}
 	for p.tok.kind != tEOF {

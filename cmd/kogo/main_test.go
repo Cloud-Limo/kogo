@@ -65,8 +65,8 @@ func examples(t *testing.T, patterns ...string) map[string]string {
 func TestExamples(t *testing.T) {
 	testDB(t)
 	files := examples(t, "*.kg")
-	if len(files) != 31 {
-		t.Fatalf("%d examples, want 31", len(files))
+	if len(files) != 32 {
+		t.Fatalf("%d examples, want 32", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)

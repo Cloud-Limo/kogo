@@ -67,8 +67,8 @@ func write(b *strings.Builder, v reflect.Value) {
 // line a declaration, then one an api or a tests list.
 func TestExamples(t *testing.T) {
 	files, _ := filepath.Glob("../examples/*.kg")
-	if len(files) != 31 {
-		t.Fatalf("%d examples, want 31", len(files))
+	if len(files) != 32 {
+		t.Fatalf("%d examples, want 32", len(files))
 	}
 	var got strings.Builder
 	for _, file := range files {
@@ -163,8 +163,8 @@ func TestDeclarations(t *testing.T) {
 			`[(FunDecl (Modifiers External action) (NamedType Bell) ring) (FunDecl (Modifiers External action) (NamedType Bell) ring)]`},
 	}, func(t *testing.T, src string) string { return show(parse(t, src).Decls) })
 
-	f, err := Parse("t.kg", []byte("@file:OptIn(A::class, b.B::class)\n\npackage x.y\n\nimport a.b.C\nimport d.e\n"))
-	if got := show(f); err != nil || got != `(File t.kg [(Annotation OptIn [(ClassRef A) (ClassRef b.B)])] (Ident x.y) [(Ident a.b.C) (Ident d.e)] 7)` {
+	f, err := Parse("t.kg", []byte("@file:OptIn(A::class, b.B::class)\n\npackage x.y\n\nimport a.b.C\nimport d.e as F\n"))
+	if got := show(f); err != nil || got != `(File t.kg [(Annotation OptIn [(ClassRef A) (ClassRef b.B)])] (Ident x.y) [(Import (Ident a.b.C)) (Import (Ident d.e) (Ident F))] 7)` {
 		t.Errorf("file head: %s %v", got, err)
 	}
 

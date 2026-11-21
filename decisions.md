@@ -4168,3 +4168,30 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   ordinary form. It is a `String`, Kogo having no `CharSequence`. Not built: `prefix`,
   `postfix`, `limit` and `truncated` (one use in cusoon2's backend). Reopen when a port
   needs one.
+
+## `import ... as`, and an import that hides the package's own (DEV-1076), 21 Nov 2026
+
+- **Any import may take an `as`, a `kogo.` one included, as in Kotlin** (Greg's ruling on
+  DEV-1068, `doc/plans/packages-and-names-design.md` section 3). This reverses spec 2's
+  "no `import ... as`", which had no entry. The file writes the new name for the type,
+  its constructor, constants and variants; `kogo emit` and `kogo ts` write the declared
+  name. One name brought into a file twice stays `duplicate`, two funs included. Not
+  taken: a package written in code, `a.b.Name`; renaming as the only answer to two
+  types of one name; `as` only where a name is taken.
+- **An import is refused (`own-import`) where the file's own package declares its name,
+  as it writes it, as a type, a typealias or a top-level `val`**, though in Kotlin the
+  import wins (design section 4). A fun of that name stays one more candidate.
+- **The refusal takes an import from the file's own package of such a name, with its own
+  message: "remove this import"**. Not taken: exempting it, which leaves an import that
+  does nothing; refusing every import from the file's own package, which also takes one
+  of a fun, harmless, and grows the change past this issue. Reopen if a file needs the
+  latter.
+- **An `api` list names an operation by its fun's declared name, not an alias**: the
+  name on the wire is the declared one (15.1), and the list is where a reader finds it;
+  `listed` also keys duplicates by the written name. A list whose file imports the fun
+  under another name moves to a file that imports it by its own. A check or a gate,
+  never on the wire, may be named by an alias. Not taken: accepting the alias, as Kotlin
+  would any name in scope. Reopen if a port needs the alias in a list.
+- **An import of one declaration twice under the same alias is `duplicate`**, as is an
+  alias that meets another import's name; an import without `as` repeated stays
+  accepted, as before. Not taken: comparing aliases' targets, a line for nothing.

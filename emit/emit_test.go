@@ -1031,6 +1031,19 @@ fun texts(n: Int, x: Long, d: Double, m: Decimal): List<String> =
 `)
 }
 
+// joinToString writes its separator between the elements, ", " when
+// the call gives none (spec 12).
+func TestJoinToString(t *testing.T) {
+	expect(t, [][2]string{
+		{`t.Joined([]int64{1, -2})`, "[a,b, 1, -2, <1>|<-2>, , ]"},
+	}, `package t
+
+fun joined(ns: List<Long>): List<String> =
+    listOf(listOf("a", "b").joinToString(","), ns.joinToString { "$it" }, ns.joinToString("|") { "<$it>" },
+        listOf<String>().joinToString(), emptyList<Long>().joinToString("-") { "$it" })
+`)
+}
+
 // What is not emitted yet is refused where it stands, never emitted
 // wrongly, and so are two declarations that Go cannot tell apart,
 // an enum's entries among them.

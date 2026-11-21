@@ -38,6 +38,8 @@ external fun <T> List<T>.filter(predicate: (T) -> Boolean): List<T>
 external fun <T, R> List<T>.map(transform: (T) -> R): List<R>
 external fun <T, R> List<T>.mapIndexed(transform: (Int, T) -> R): List<R>
 external fun <T, R> List<T>.zip(other: List<R>): List<Pair<T, R>>
+external fun List<String>.joinToString(separator: String = ", "): String
+external fun <T> List<T>.joinToString(separator: String = ", ", transform: (T) -> String): String
 external fun List<Long>.sum(): Long
 external fun <T> List<T>.sumOf(selector: (T) -> Int): Int
 external fun <T> List<T>.sumOf(selector: (T) -> Long): Long

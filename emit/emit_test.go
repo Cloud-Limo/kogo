@@ -1313,3 +1313,68 @@ func main() {
 	fmt.Println(rpc.Call(calls, r, t.Note_op, in))
 }
 `
+
+// A when that must cover every case panics on a value none of its
+// branches names (spec.md 8), as a row's enum may hold a label the
+// program lacks, in each form it is written in; a statement when over
+// an Int, which need not cover every case, runs on.
+func TestWhenNoBranch(t *testing.T) {
+	const want = "panics: when: no branch for InviteType Partner"
+	p := `t.InviteType("Partner")`
+	expect(t, [][2]string{
+		{"t.Share(" + p + ", 5)", want},
+		{"t.Assigned(" + p + ", 5)", want},
+		{"t.Stated(" + p + ")", want},
+		{"t.Result(" + p + ")", want},
+		{"t.Wrapped(" + p + ")", want},
+		{"t.Counted(3)", "none"},
+	}, `package t
+
+enum class InviteType { InHouse, Outside }
+
+fun share(type: InviteType, percent: Int): Int {
+    val share = when (type) {
+        InviteType.InHouse -> 100
+        InviteType.Outside -> percent
+    }
+    return share
+}
+
+fun assigned(type: InviteType, percent: Int): Int {
+    var share = 0
+    share = when (type) {
+        InviteType.InHouse -> 100
+        InviteType.Outside -> percent
+    }
+    return share
+}
+
+fun stated(type: InviteType): String {
+    var said = "none"
+    when (type) {
+        InviteType.InHouse -> said = "in"
+        InviteType.Outside -> said = "out"
+    }
+    return said
+}
+
+fun result(type: InviteType): String = when (type) {
+    InviteType.InHouse -> "in"
+    InviteType.Outside -> "out"
+}
+
+fun wrapped(type: InviteType): String = "is ${when (type) {
+    InviteType.InHouse -> "in"
+    InviteType.Outside -> "out"
+}}"
+
+fun counted(n: Int): String {
+    var said = "none"
+    when (n) {
+        1 -> said = "one"
+        2 -> said = "two"
+    }
+    return said
+}
+`)
+}

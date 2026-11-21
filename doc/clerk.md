@@ -101,7 +101,8 @@ queues the rest. Then exit: the run's comment starts the next clerk.
   issue's other comments. So quote a Ruling in the brief, and point a
   review or a fix at the PR, where the Handoff and Review also are.
 - The Review and Fix briefs name the step in `AGENTS.md` and add only
-  what is particular to this PR.
+  what is particular to this PR. A port's Review brief names
+  `doc/porting.md`'s "Keep the Kotlin's shape".
 - A run clones the repository of its issue's project, Kogo for Kogo
   and cusoon2 for any other. When the PR is in the other one, the
   step is a local run, below.

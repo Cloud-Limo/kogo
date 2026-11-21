@@ -152,7 +152,7 @@ fun v(env: Env, p: P, input: Unit): Either<String, Unit> = either { }
 	for d, a := range info.APIs {
 		got := fmt.Sprint(a.Check != nil, a.Env)
 		for _, op := range a.Ops {
-			got += fmt.Sprintf(" %s %v %v %v %v %v", op.Func.Name, op.Gate != nil, op.Proof, op.Input, op.Tx, op.Serializable)
+			got += fmt.Sprintf(" %s %v %v %v %v %v", op.Func.Name, op.Gate != nil, op.Given, op.Input, op.Tx, op.Serializable)
 		}
 		// The first parameter of the gate, or of an ungated fun, names
 		// the transaction the server opens.
@@ -175,21 +175,21 @@ fun v(env: Env, p: P, input: Unit): Either<String, Unit> = either { }
 		{fun("c(tx: Tx, env: E2, request: Request): Either<String, Unit>") + "api ops checkedBy c { ‸me ungated }", "operation", "me takes the environment Env, and c takes E2"},
 		// A gate.
 		{head + "api ops unchecked { w gatedBy ‸nope }", "unknown-name", "nothing named nope"},
-		{head + "fun x(tx: Tx, env: Env, request: Request): P = P(1)\napi ops unchecked { v gatedBy ‸x }", "gate", "x returns P: a gate returns Either<String, Proof>"},
+		{head + "fun x(tx: Tx, env: Env, request: Request): P = P(1)\napi ops unchecked { v gatedBy ‸x }", "gate", "x returns P: a gate returns Either<String, Call>"},
 		{fun("x(db: Db, env: Env, request: Request): Either<String, P>") + "api ops unchecked { v gatedBy ‸x }", "gate", "x takes a Db first: a gate takes a SerializableTx or a Tx"},
 		{fun("x(tx: SerializableTx, env: Env, request: Request): Either<String, Unit>") + "api ops checkedBy ‸x { me ungated }", "check-shape", "x takes a SerializableTx first: a list's check takes a Tx"},
 		{fun("x(tx: Tx, env: Env): Either<String, P>") + "api ops unchecked { v gatedBy ‸x }", "gate", "x takes 2 parameters: a gate takes three, as fun x(tx: Tx, env: Env, request: Request), and its operation's input fourth where it reads it"},
 		{fun("x(tx: Tx, env: E2, request: Request): Either<String, P>") + "api ops unchecked { me ungated, v gatedBy ‸x }", "gate", "x takes the environment E2, and me takes Env"},
 		{fun("x(tx: Tx, env: Env, request: Request, input: Unit): Either<String, P>") + "api ops unchecked { w gatedBy ‸x }", "gate", "x reads a Unit, and w's input is a In: a gate that reads an input takes its operation's"},
 		{fun("w2(env: Env, p: P, input: In): Either<String, Unit>") + "api ops unchecked { w gatedBy own, w2 gatedBy ‸own }", "gate", "own is w's gate too, and it reads an input: a gate that more than one row names reads none, so write w2 a gate of its own or take the input out of own"},
-		{fun("x(tx: Tx, env: Env, request: Request): Either<String, Tx>") + "fun y(env: Env, tx: Tx, input: Unit): Either<String, Unit> = either { }\n" + "api ops unchecked { y gatedBy ‸x }", "gate", "x gives a Tx: a gate gives a proof, not the handle, so give a proof that holds the Tx and what the gate read (spec.md 15.7), or the facts alone"},
-		{fun("x(tx: Tx, env: Env, request: Request): Either<String, Db>") + "fun y(env: Env, db: Db, input: Unit): Either<String, Unit> = either { }\n" + "api ops unchecked { y gatedBy ‸x }", "gate", "x gives a Db: a gate gives a proof, not the handle"},
-		{fun("x(tx: Tx, env: Env, request: Request): Either<String, Request>") + "fun y(env: Env, r: Request, input: Unit): Either<String, Unit> = either { }\n" + "api ops unchecked { y gatedBy ‸x }", "gate", "x gives a Request: a gate gives a proof, not the handle"},
+		{fun("x(tx: Tx, env: Env, request: Request): Either<String, Tx>") + "fun y(env: Env, tx: Tx, input: Unit): Either<String, Unit> = either { }\n" + "api ops unchecked { y gatedBy ‸x }", "gate", "x answers a Tx: gated work is handed no bare transaction, Db or Request, so answer a call, a data class that holds the transaction and what the gate found, or the facts alone"},
+		{fun("x(tx: Tx, env: Env, request: Request): Either<String, Db>") + "fun y(env: Env, db: Db, input: Unit): Either<String, Unit> = either { }\n" + "api ops unchecked { y gatedBy ‸x }", "gate", "x answers a Db: gated work is handed no bare transaction, Db or Request"},
+		{fun("x(tx: Tx, env: Env, request: Request): Either<String, Request>") + "fun y(env: Env, r: Request, input: Unit): Either<String, Unit> = either { }\n" + "api ops unchecked { y gatedBy ‸x }", "gate", "x answers a Request: gated work is handed no bare transaction, Db or Request"},
 		// Gated work.
-		{head + "api ops unchecked { ‸me gatedBy g }", "operation", "me takes 4 parameters: gated work takes three, as fun me(env: Env, proof: Proof, input: Input)"},
+		{head + "api ops unchecked { ‸me gatedBy g }", "operation", "me takes 4 parameters: gated work takes three, as fun me(env: Env, call: Call, input: Input)"},
 		{fun("x(tx: Tx, p: P, input: Unit): Either<String, Unit>") + "api ops unchecked { ‸x gatedBy g }", "operation", "x takes a Tx first: gated work takes the list's environment there"},
-		{fun("x(env: Env, q: Q, input: Unit): Either<String, Unit>") + "api ops unchecked { ‸x gatedBy g }", "operation", "x takes a Q second, and its gate g gives a P: gated work takes its gate's proof, so take a P or name the gate that gives a Q"},
-		// Ungated work takes no proof.
-		{head + "api ops unchecked { ‸v ungated }", "operation", "v takes 3 parameters: an ungated operation takes four, as fun v(tx: Tx, env: Env, request: Request, input: Input), with a Db for the Tx to open its own transactions and Unit for no input; work that takes a gate's proof names the gate in its row, with gatedBy"},
+		{fun("x(env: Env, q: Q, input: Unit): Either<String, Unit>") + "api ops unchecked { ‸x gatedBy g }", "operation", "x takes a Q second, and its gate g answers a P: gated work takes what its gate answers, so take a P or name the gate that answers a Q"},
+		// Ungated work takes no gate's answer.
+		{head + "api ops unchecked { ‸v ungated }", "operation", "v takes 3 parameters: an ungated operation takes four, as fun v(tx: Tx, env: Env, request: Request, input: Input), with a Db for the Tx to open its own transactions and Unit for no input; work that takes what a gate answers names the gate in its row, with gatedBy"},
 	})
 }

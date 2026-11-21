@@ -395,9 +395,6 @@ func (c *checker) member(at, recv syntax.Expr, rt Type, name string) (Type, bool
 			if v.Name == name {
 				c.info.Uses[at] = v
 				c.demand(at, name, v.vis)
-				if c.proofTx(n) == v {
-					c.txReads[at] = v
-				}
 				return subst(v.Type, bind(n.Decl.Params, n.Args)), true
 			}
 		}

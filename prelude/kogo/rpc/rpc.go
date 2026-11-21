@@ -144,8 +144,8 @@ func Db[Env, I, A any](name string, f func(kogo.Db, Env, Request, I) kogo.Either
 }
 
 // Gated is a gated row: the gate runs in the operation's transaction
-// and gives a proof or a refusal, and the work takes the proof where
-// an ungated operation takes the request (doc/gates.md). A refusal of
+// and answers a call, or facts, or a refusal, and the work takes that
+// answer where an ungated operation takes the request (doc/gates.md). A refusal of
 // either is the operation's, and rolls back. The transaction is of
 // the kind serializable says, as the gate's first parameter names.
 func Gated[Env, I, P, A any](name string, serializable bool, gate func(kogo.Tx, Env, Request, I) kogo.Either[string, P],
@@ -154,25 +154,25 @@ func Gated[Env, I, P, A any](name string, serializable bool, gate func(kogo.Tx, 
 		in := input.(I)
 		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) answered {
 			return kogo.InTx(db, serializable, again, func(tx kogo.Tx) answered {
-				proof := bind[P](reading(tx, serializable, func() kogo.Either[string, P] { return gate(tx, env, r, in) }), raise)
-				return answer(name, bind[A](work(env, proof, in), raise))
+				given := bind[P](reading(tx, serializable, func() kogo.Either[string, P] { return gate(tx, env, r, in) }), raise)
+				return answer(name, bind[A](work(env, given, in), raise))
 			})
 		})
 	}}
 }
 
 // Outside is a gated row whose work is an action fun, so that it runs
-// with no transaction open (doc/gates.md, "An operation that runs
-// wholly outside"): the gate runs once, in a transaction that commits
+// with no transaction open (doc/gates.md, "Work that changes
+// something outside"): the gate runs once, in a transaction that commits
 // before the work is called, of the kind serializable says. A refusal of either is the operation's.
 func Outside[Env, I, P, A any](name string, serializable bool, gate func(kogo.Tx, Env, Request, I) kogo.Either[string, P], work func(Env, P, I) kogo.Either[string, A]) Operation[Env] {
 	return Operation[Env]{name, reflect.TypeFor[I](), func(db kogo.Db, again func(*pgconn.PgError) bool, env Env, r Request, input any) kogo.Either[string, answered] {
 		in := input.(I)
 		return kogo.Either_RaiseEToA(func(raise kogo.Raise[string]) answered {
-			proof := kogo.InTx(db, serializable, again, func(tx kogo.Tx) P {
+			given := kogo.InTx(db, serializable, again, func(tx kogo.Tx) P {
 				return bind[P](reading(tx, serializable, func() kogo.Either[string, P] { return gate(tx, env, r, in) }), raise)
 			})
-			return answer(name, bind[A](work(env, proof, in), raise))
+			return answer(name, bind[A](work(env, given, in), raise))
 		})
 	}}
 }

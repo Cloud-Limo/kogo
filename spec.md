@@ -455,7 +455,7 @@ A function can only do what its parameters let it do.
   changes what a program does.
 - `Tx` is an open database transaction and `Db` is a connection pool
   (section 10). A function that touches the database has one of them,
-  or a proof that holds a `Tx` (15.7), as a parameter.
+  or a value that holds a `Tx` (15.7), as a parameter.
 - `Clock` gives the time: `clock.now(): Instant`.
 - `newId()` gives an id that no other call gives. Kogo's own sort by
   when they were made and increase within a process. An application's
@@ -487,11 +487,10 @@ action fun announce(console: Console, message: String) {
   (`action-tx`): it takes a `Db` and acts between its transactions.
   It calls no action in a block that is handed a `Tx`, as `db.tx`'s
   is (`action-in-tx`).
-- An `action fun` takes a proof (15.7) only where an `api` list hands
-  it one: as a row's gated work, second
-  (`action-proof`). That proof's transaction has ended, so the fun
-  passes no proof to a call and runs no statement on one
-  (`outside-passes-proof`).
+- An `action fun` that is a row's gated work is handed what its gate
+  answered after the gate's transaction has ended (15.3). So that
+  gate answers nothing that holds a transaction (`action-gate`,
+  15.7).
 - An action is not kept in a value (`action-kept`): there is no `::`
   reference to an `action fun`, no member of an interface or a data
   class is one, and a lambda that acts is passed straight to a fun of
@@ -806,6 +805,10 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
 - `db.tx(serializable = true) { ... }` runs at SERIALIZABLE and reruns the
   block from the start on a serialization failure or deadlock, so the
   block must have no effect outside the transaction.
+- The transaction ends with the block, so the block answers nothing
+  that holds one (`tx-escapes`, 15.7): not the `Tx`, and not a value
+  with one in a property. It answers the facts the lines after it
+  need.
 - A transaction's kind is its handle's type. `Tx` is any transaction: a
   function that takes one assumes nothing, and locks what it needs.
   `SerializableTx` is one at SERIALIZABLE, where a conflict is a
@@ -1394,8 +1397,8 @@ one returns an `Either` whose `Left` is a refusal in words:
 | Place | Parameters, in this order | Returns |
 | --- | --- | --- |
 | the check | a `Tx`, the environment, a `Request` | `Either<String, Unit>` |
-| a gate | a `SerializableTx` or a `Tx`, the environment, a `Request`, and the operation's input if it reads it | `Either<String, P>`, with `P` its proof |
-| gated work, the `op` of a gated row | the environment, the proof, the input | `Either<String, A>` |
+| a gate | a `SerializableTx` or a `Tx`, the environment, a `Request`, and the operation's input if it reads it | `Either<String, P>`, with `P` its answer: a call (15.7), or facts |
+| gated work, the `op` of a gated row | the environment, what its gate answers, the input | `Either<String, A>` |
 | an ungated operation | a `SerializableTx`, a `Tx` or a `Db` (15.3), the environment, a `Request`, the input | `Either<String, A>` or `Either<String, Reply<A>>` |
 
 - The environment is one type of the application's, the same for
@@ -1406,8 +1409,8 @@ one returns an `Either` whose `Left` is a refusal in words:
   cookies, headers and address.
 - The input is a wire type (15.4), or `Unit` for none, and `A` is a
   wire type, or `Unit` for an operation with nothing to say.
-- What one fun gives, the next takes. The proof that gated work takes
-  is the very type its row's gate gives; the input of a gate that
+- What one fun answers, the next takes. What gated work takes second
+  is the very type its row's gate answers; the input of a gate that
   reads one is the operation's input type. Anything else is a compile
   error.
 - A gate reads and decides; it does not write. A statement that a
@@ -1427,17 +1430,16 @@ one returns an `Either` whose `Left` is a refusal in words:
   have no gate of their own. A gate that reads an input stands in one
   row of a list.
 - Gated work takes no `Request`, `Tx` or `Db`: its gate has read the
-  request, and the proof is all it is handed. So a proof is none of
-  the three either: a gate gives a data class of the application's
-  that holds the `Tx` and what it read, a proof (15.7), or what it
-  read alone. A `P` that holds a `Tx` or a `SerializableTx` anywhere,
-  at any depth, but as a proof's own marked transaction, is a compile
-  error (`gate-proof`): in a property, a nullable, a type argument
-  (`List<Plain>`, `Box<Tx>`), a sealed interface's variant, a
-  function's result, or a proof's second, unmarked `Tx`. Mark the
-  constructor and the transaction of the class that holds it (an
-  interface's `val`), take the second one out of the proof, or give
-  the facts alone. An ungated operation takes no proof.
+  request, and the gate's answer is all it is handed. So a gate
+  answers none of the three either (`gate`). It answers a call
+  (15.7), a data class of the application's that holds the
+  transaction in a plain property beside what the gate found, or the
+  facts alone, as `data class Enrolling(val subject: String)`.
+- A row whose work is an `action fun` names a gate whose answer holds
+  no transaction (`action-gate`, 15.7): the work runs after that
+  transaction has ended (15.3), so its gate answers the facts the
+  work needs.
+- An ungated operation takes no gate's answer.
 - The parameters' names are the author's. None of these funs has type
   parameters or default values.
 - A `Left` is a refusal: words for the person using the page. Each
@@ -1475,14 +1477,16 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   of its own that Postgres holds to reading and the server rolls back.
   Its refusal is not an operation's (15.5), and nothing else runs.
 - A gated row runs in one transaction, opened as an ungated
-  operation's `Tx` is: the gate, then the work with the gate's proof.
+  operation's `Tx` is: the gate, then the work with what the gate
+  answered.
   An answer commits it, a refusal of either rolls it back, and a rerun
   runs the gate again.
 - A gated row whose work is an `action fun` (7.1) runs its gate once,
   in a transaction of its own that the server commits, and then the
   work with no transaction open. The work's answer or refusal is the
-  request's. Its proof's `Tx` has ended, so the work passes no proof
-  on and runs no statement on one (15.7).
+  request's. The gate's transaction has ended before the work
+  begins, so the gate answers facts and nothing that holds a
+  transaction (15.7).
 - A gate on a `SerializableTx` runs held to reading, each time it
   runs: in a savepoint that Postgres holds read-only and the server
   releases before the work. There a write, one inside a function of
@@ -1510,7 +1514,8 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   have no effect outside the transaction, as the block of
   `db.tx(serializable = true)` must not (10.7).
 - An operation that takes a `Db` runs in no transaction and opens its
-  own with `db.tx` (10.7). Write one where something must stay after a
+  own with `db.tx` (10.7). Each ends with its block, which answers
+  facts and nothing that holds a transaction (15.7). Write one where something must stay after a
   refusal, as the count of a failed login does, or must happen once, as
   redeeming a code with another service must.
 
@@ -1637,53 +1642,63 @@ export interface Ops {
 The code that calls `fetch` is the application's own, typed by this
 file.
 
-### 15.7 Proofs
+### 15.7 A value that holds its transaction
 
-A proof is what a gate found and the transaction it found it in. The
-compiler knows one by its shape: a data class whose constructor is
-marked (section 11) and which has a marked property that is a `Tx` or
-a `SerializableTx`, its transaction; or an interface that declares
-such a `val`, for work done under several proofs.
+A gate's answer may hold the gate's transaction, in a plain property
+beside what the gate found. Such an answer is a call:
 
 ```kotlin
-// The gates' file and the model's opt in; an operation's does not.
-data class AtDesk @DeskOnly constructor(@property:DeskOnly val tx: Tx)
+// One file makes a call: private is the file (section 2), and covers copy (3.1).
+data class Clerk private constructor(val address: String)
 
-data class OpenInvoice @DeskOnly constructor(
-    val number: String, val desk: AtDesk, @property:DeskOnly val tx: Tx)
+data class DeskCall private constructor(val tx: SerializableTx, val clerk: Clerk)
 
-fun markPaid(invoice: OpenInvoice): Int =
-    invoice.tx.execute(sql"update invoice set status = 'paid' where number = ${invoice.number}")
+fun atDesk(tx: SerializableTx, env: DeskEnv, request: Request): Either<String, DeskCall> = either {
+    ensure(mayUseDesk(tx, request.clientAddress)) { "This address may not use the desk." }
+    DeskCall(tx, Clerk(request.clientAddress))
+}
 
-fun renumber(invoice: OpenInvoice, number: String): OpenInvoice {
-    invoice.tx.execute(sql"update invoice set number = $number where number = ${invoice.number}")
-    return OpenInvoice(number, invoice.desk, invoice.tx)
+fun markPaid(env: DeskEnv, call: DeskCall, input: InvoiceRef): Either<String, Long> = either {
+    val invoice = requireOpenInvoice(call, input.number).bind()
+    markPaid(call.tx, invoice)
 }
 ```
 
-So only a file that opts in makes a proof or reads its transaction,
-and in such a file two rules hold:
+- A call is an ordinary data class, and its transaction an ordinary
+  property. The work reads it, keeps it in a name, destructures it
+  and passes it to any function that takes a `Tx`. No rule knows a
+  class as a call, and none follows the transaction it holds.
+- What makes a call mean that its gate ran is its constructor: private,
+  so that only the gate's file makes one (section 2), or marked, so
+  that only a file that opts in does (section 11). The same makes a
+  held value, which a function answers when it has checked an id of
+  the input: a function that takes a held value cannot be called
+  where that check was left out.
 
-- **A proof's transaction is used only before the dot.** It is
-  written as the receiver of one of the five calls, or as an argument
-  of a proof's constructor or `copy` that fills that proof's own
-  transaction, so that making a thing gives its proof. Kept in a
-  `val`, returned, destructured to a name (a `_` takes nothing out),
-  or passed to anything else, it is a compile error
-  (`proof-tx-escapes`): pass the proof.
-- **A fun that runs outside uses no proof.** An `action fun` that
-  takes a proof (7.1) is handed one whose transaction has ended
-  (15.3). It reads the proof's facts, passes no proof to a call, as
-  an argument, as a receiver or in a block that takes or gives one,
-  and runs no statement on one (`outside-passes-proof`): what needs
-  the transaction goes in the gate, or the work is written a `fun`,
-  which runs in it.
+A value that outlives its transaction holds none. There are two such
+places, and each is a compile error:
 
-A data class that is not of this shape is held to neither.
-A gate gives none that holds a transaction but in a proof's own
-marked one (15.2): a transaction a gate hands on is always held by the
-two, and a gate's `P` is a proof, or holds proofs, or facts alone, as `data class Clerk(val address: String)`,
-which work that runs outside reads with no transaction to have ended.
+- **Work that runs outside.** A row whose work is an `action fun`
+  (7.1) runs its gate in a transaction that the server ends before
+  the work begins (15.3). Its gate answers nothing that holds a
+  transaction (`action-gate`): it answers the facts the work needs,
+  and what needs the transaction goes in the gate, or the work is
+  written a `fun`, which runs in it.
+- **A `db.tx` block.** The transaction ends with the block (10.7), so
+  the block answers nothing that holds one (`tx-escapes`): it answers
+  the facts the lines after it need.
+
+```
+api.kg:4:25 action-gate: testPrinter is an action fun, and its gate atDesk answers DeskCall, which holds a transaction, tx, a property of DeskCall: the server ends the gate's transaction before work that is an action fun runs, so name a gate that answers the facts testPrinter needs, or make testPrinter a fun, which runs in the transaction (spec.md 15.7)
+login.kg:9:19 tx-escapes: this db.tx block answers DeskCall, which holds a transaction, tx, a property of DeskCall: the transaction ends with the block, so answer the facts the lines after it need (spec.md 10.7)
+```
+
+"Holds a transaction" is one meaning for both: the type is a `Tx` or
+a `SerializableTx`, or has one in a property or a type argument, at
+any depth. A nullable, a `List<DeskCall>`, a `Box<Tx>`, a variant of
+a sealed interface and a function's result each count. The type
+alone is read: a lambda that closes over a transaction, answered as
+a `() -> Int`, is not refused.
 
 ## 16. Tests
 

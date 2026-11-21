@@ -72,7 +72,8 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   worktree add -b <branch> ~/Dev/kogo-dev-NNN origin/main`; a later
   step that finds it missing fetches and makes it from
   `origin/<branch>`. `~/Dev/kogo` stays on `main` for Greg, the lead
-  and the clerk: never edit, commit or switch branch there, and never work in another issue's worktree.
+  and the clerk: never edit, commit or switch branch there, and never
+  work in another issue's worktree.
 - **Lead.** "Lead", said in `~/Dev/kogo`, starts the session Greg
   talks to: read Kogo's `doc/lead.md` and follow it. It decides, and
   answers what the clerk hands on; it starts an issue's first step,
@@ -174,10 +175,11 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   cap and no time limit, and ends with its step's comment as any
   session does; one that ends without it is handed to the lead, as a
   clerk that fails is. It refuses a `<where>` another issue holds: by
-  its newest `Taken` while that issue is In Progress or In Review, or
-  by the lead's `Held, <where>` for a walkthrough until `Released,
-  <where>`. `lin local --list` shows each one running, with its
-  minutes and its log.
+  its newest `Taken` while that issue is In Progress or In Review, by
+  its session running there before that Taken is posted, or by the
+  lead's `Held, <where>` for a walkthrough until `Released, <where>`.
+  `lin local --list` shows each one running, with its minutes and its
+  log.
 - A comment with no PR to hold it stays on the issue in full: a
   launch comment, a `Lead:` comment, an answer of Greg's given before
   a PR exists. A `Clerk:` comment does too, PR or none: the lead reads

@@ -72,6 +72,7 @@ clerk's, by the table in `doc/clerk.md`: leave it alone.
 | any, labelled `lead` | Answering the clerk, below |
 | Todo, no comment, or a `Clerk:` that moved it there | choose where it runs, below |
 | any, `Held,` or `Walkthrough:` | Greg's walkthrough, below |
+| any, `Released,` | the walkthrough is over: as the comment before its `Held,` says |
 | Todo, launch comment, no label | a speculative run: label up to three a night |
 | In Review, a comment that is no step's | a speculative run's answer, or a run that failed: read it |
 | Backlog, `Lead:`, what brings it back | Todo, when Greg says so; the clerk moves one that waited on a merge |

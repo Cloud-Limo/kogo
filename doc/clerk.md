@@ -231,11 +231,7 @@ and nothing is Open, hand on with `Clerk: Greg's: merge <PR url> at
 there, with the sizes under it when the Budget was outgrown, posted on
 the PR too, where he merges. Otherwise hand on with what failed. Do
 not wait for Cloud CI, which runs `mise run check-all` and the tests:
-`lin clerk` watches that sha's run. Green, it tells Greg in his Linear
-inbox, as a Linear application, since he hears of no comment written
-with his own key, and takes `lead` off; red, it posts `Clerk: Cloud CI
-failed on <PR> at <sha>` with the first error, and `lead` stays.
-Neither starts a clerk.
+`lin clerk` watches that sha's run and tells Greg.
 
 Say the order on that line when it matters. A port's PR, as above,
 that goes behind `renew` costs a local Fix round. So list the others

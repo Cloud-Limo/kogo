@@ -183,13 +183,18 @@ restates them in full. A box with nothing in it keeps its heading and
 says so. "Unchanged", or a sentence, never stands in for the rows. A
 move changes box only when you tell him so.
 
-Not yet holds at most three rows: Greg's own moves that follow from
-work running now or a question just asked of him. Parked work, a
-choice of his included, is in Backlog, not in the box. A run in the
-labelled line takes a row only when the step after the clerk's is
-Greg's, such as walking through a PR once its Fix run is back; the
-clerk's steps after a run are not rows, since he cannot start them too
-soon, nor is a cusoon2 merge, which his inbox brings him. When the cap binds, keep the rows nearest to release.
+Not yet holds at most three rows: Greg's own moves that follow from work
+running now or a question just asked of him. Parked work, a choice of
+his included, is in Backlog, not in the box. A run in the labelled line
+takes a row only when the step after the clerk's is Greg's, such as
+walking through a PR once its Fix run is back; the clerk's steps after a
+run are not rows, since he cannot start them too soon. A cusoon2 merge
+waiting on Cloud CI is a row: while the clerk's `Clerk: Greg's: merge
+<PR> at <sha> once Cloud CI passes` is the issue's newest comment and
+`lead` is on, its row is "waits on Cloud CI, then your inbox". The watch
+takes `lead` off on green and the row goes with it, so a row still there
+after CI has ended says the watch failed. When the cap binds, keep the
+rows nearest to release.
 
 An issue has one row across the two boxes: its next step. That step is
 in You can do now if Greg can do it, and in Not yet if he cannot; what

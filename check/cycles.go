@@ -34,16 +34,17 @@ func (c *checker) cycles(program []*syntax.File) {
 			if i < 0 {
 				continue
 			}
-			to := c.imports[f][imp.Name[i+1:]]
-			if to == nil || to.name != imp.Name[:i] || to == own {
+			to := c.imports[f][imp.Local()]
+			if to == nil || to.name != imp.Name[:i] || c.pkgs[to.name] == own {
 				continue
 			}
+			to = c.pkgs[to.name] // not what an import with as brings
 			if byPkg[to] == nil {
 				s := &step{file: f, from: own, to: to}
 				byPkg[to], steps = s, append(steps, s)
 				into[to], out[own] = append(into[to], s), append(out[own], s)
 			}
-			byPkg[to].imps = append(byPkg[to].imps, imp)
+			byPkg[to].imps = append(byPkg[to].imps, imp.Ident)
 		}
 	}
 	// back[p] gives each package that reaches p its least count of

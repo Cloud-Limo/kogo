@@ -43,9 +43,9 @@ and holds only what a decision needs.
   board, labelled `lead`, when Greg next speaks. When he asks where
   things stand, read the board again.
 - Read an escalation, not a PR: `lin show DEV-NNN --newest`, the
-  `Clerk:` comment alone, which stands on its own. When a decision needs code read, send an
-  Explore subagent the question, with the file and line the clerk
-  gave, and keep its answer, not the files.
+  `Clerk:` comment alone, which stands on its own. When a decision
+  needs code read, send an Explore subagent the question, with the
+  file and line the clerk gave, and keep its answer, not the files.
 - When nothing waits on Greg, end the reply by saying that a fresh
   "Lead" is the next step, whenever he likes.
 - After an hour idle your cache has expired, and the next call reads
@@ -143,13 +143,14 @@ against the code before passing it on.
 - A move of Greg's (a cusoon2 PR ready to merge, a Zed step) goes in
   You can do now. When the clerk's `ready` line gives an order, `merge
   before PR N` or `after`, the row's How says it.
-- With no Ruling, take the label off once Greg's move is in the boxes:
-  `lin label DEV-NNN lead --remove`. The clerk leaves a
-  labelled issue alone, and takes it up from its newest comment when
-  the label goes.
+- Then take the label off, `lin label DEV-NNN lead --remove`: after
+  a `Lead:` comment that follows `lin rule --keep-label`, or once
+  Greg's move is in the boxes. The clerk leaves a labelled issue
+  alone, and takes it up from its newest comment when the label goes.
 - To have the next step in Zed, post the Ruling with `lin rule
   DEV-NNN --keep-label`, then a `Lead:` comment naming it, then take
-  the label off: a `Lead:` starts no clerk. To hold every step of an issue, label it `lead` yourself.
+  the label off: a `Lead:` starts no clerk. To hold every step of an
+  issue, label it `lead` yourself.
 - `Clerk: the clerk for DEV-NNN exited N: ...` is the poller's, for a
   step that failed, and no choice. Read its last lines and tell Greg
   the cause. Once the cause is gone, put "Clerk DEV-NNN", said by hand
@@ -194,8 +195,8 @@ the clerk sees its comment: Greg reports nothing back.
 After the boxes, one line: every issue labelled `agent`, by ID, each
 running (its newest comment starts `Launched`) or queued, and beside
 it each session `lin local --list` shows, by ID with its place and
-minutes so far: the last line of `lin brief`, run afresh for each
-reply. It lets Greg see the runs have not got out of hand.
+minutes so far: `lin brief --runs`, run afresh for each reply. It
+lets Greg see the runs have not got out of hand.
 Open every reply with what waits on Greg, in bold, in one of three
 forms: "**I suggest: `1`, merge PR 1512 on GitHub.**" for a move, by
 its number; "**Waiting for you:** ..." for a question that is his;

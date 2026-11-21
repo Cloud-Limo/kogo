@@ -39,7 +39,7 @@ Each entry: what was decided, why, and what would reopen it.
   receiver is not nullable either, so the rule holds for every extension and a reader
   need not know which prelude names a plain `.` on a nullable value still reaches. The
   prelude's two, `List<T>?.orEmpty()` and `String?.isNullOrBlank()`, are gone: write
-  `x ?: emptyList()`, with `emptyList<T>()` where nothing else settles `T` (DEV-1069), and
+  `x ?: emptyList()`, whose `T` the left of `?:` settles (DEV-1069), and
   `x == null || x.isBlank()`, which narrows `x` where `isNullOrBlank` did not. Not taken: keeping the two as a convenience of the prelude;
   cusoon2's port called them at three places, each as clear in the longer form.
 - **The columns under `exists` and `execute` are not typed** (15 Nov 2026). Both discard
@@ -4168,3 +4168,21 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   ordinary form. It is a `String`, Kogo having no `CharSequence`. Not built: `prefix`,
   `postfix`, `limit` and `truncated` (one use in cusoon2's backend). Reopen when a port
   needs one.
+
+## `emptyList`'s type from the left of `?:` (DEV-1069), 21 Nov 2026
+
+- **A call on the right of `?:` takes the left's type, made non-null, as the type its
+  result must have, when nothing outside the `?:` gives one** (spec 5.1, rule 3; the
+  lead approved it, 22 Nov 2026). Kotlin settles `T` in `xs ?: emptyList()` from `xs`
+  with the same meaning, so this grows the subset and changes no program that checked
+  before: rule 3 fills only what the receiver and the arguments left open. Not taken:
+  keeping `emptyList<T>()` where nothing else settles `T`, which DEV-1067 made the form
+  a reader writes for `orEmpty`.
+- **Only a call takes it**, written directly on the right: a literal there still has
+  its own type, so `n ?: 0` for `n: Long?` stays `no-common-type` with its fix `0L`, as
+  before. Not taken: handing the left's type to any right side, which would make that
+  `0` a Long here and nowhere else a literal stands without a wanted type. Nor a left
+  that is `null` or `Nothing`, which settles nothing.
+- **`if`/`else` and `when` branches do not settle one another**: `if (c) xs else
+  emptyList()` with no wanted type is still `type-arguments`, though Kotlin accepts it.
+  The issue scoped `?:` alone. Reopen when a port writes one.

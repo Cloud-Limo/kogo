@@ -558,7 +558,13 @@ func (c *checker) binary(e *syntax.Binary, want Type) Type {
 		if want == nil {
 			xt = c.expr(e.X, nil)
 			c.straight = e.Y
-			yt = c.expr(e.Y, nil)
+			// A call on the right takes the left's type as the type
+			// its result must have (spec.md 5.1).
+			var hint Type
+			if _, call := e.Y.(*syntax.Call); call && xt != unknown && !is(nonNull(xt), tNothing) {
+				hint = nonNull(xt)
+			}
+			yt = c.expr(e.Y, hint)
 		} else {
 			if xt = c.expr(e.X, nullable(want)); !fits(nonNull(xt), want) {
 				c.mismatch(e.X, nonNull(xt), want)

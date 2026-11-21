@@ -4087,3 +4087,15 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
 - **The built-ins check covers `Int`, `Long` and `Double`, not `Decimal`**: its inputs
   have no `Decimal`, which only a query gives. `Decimal.toString` is the emitter test's
   (`1.50` stays `1.50`). Reopen if the check gains a `Decimal` input.
+
+## A port weighs a write-around (DEV-1065), 21 Nov 2026
+
+- **"Longer" is against the Kotlin's form, in lines**: a write-around is weighed when it
+  takes more lines than what the Kotlin wrote in its place, as `eight()`'s ten did for the
+  one call to `toUrlValue`. Not taken: a measure in characters, which would weigh
+  `requireNotNull` for `!!`, the swap Greg's scope leaves out. Reopen if a one-line write-around hides a library's rule.
+- **The rule is its own paragraph after "Add what the spec lists"**, not sentences inside it,
+  since it applies to both kinds of name that paragraph sorts and reads as a step of its own.
+- **It names no write-around but of a name**: matching what a Java client sends on the wire
+  (the FusionAuth request defaults in cusoon2's `idp.kg`) is not a missing name and stays
+  outside it. The handoff of DEV-1065 asks the lead whether the rule should reach those.

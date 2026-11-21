@@ -1117,7 +1117,25 @@ each form.
   one call's: a function that makes more than one call gives what the
   whole came to, in a type of its own. When a service says no inside
   a 2xx and its client raises that, the client raises it in a failure
-  type of its own.
+  type of its own, and logs it with `http.logRefusal(endpoint, why:
+  String)`, for an endpoint of either kind, `why` its own word for the
+  no. `logRefusal` is no action, as `ask`'s own logging is not, so a
+  lookup that reads its answer stays one:
+
+```kotlin
+private fun asked(google: Http, endpoint: Lookup, fields: List<Field>): Either<GoogleFailure, Json> = either {
+    val json = google.ask(endpoint, fields).mapLeft { GoogleFailure.Wire(it) }.bind()
+    val status = json.string("status")
+    when (status) {
+        "OK" -> json
+        "NOT_FOUND" -> raise(GoogleFailure.NotFound)
+        else -> {
+            google.logRefusal(endpoint, status ?: "no status")
+            raise(GoogleFailure.Refused(status ?: "no status"))
+        }
+    }
+}
+```
 
 Where Go's HTTP client would decide, Kogo states it:
 
@@ -1135,8 +1153,9 @@ Where Go's HTTP client would decide, Kogo states it:
 Every call that `ask` or `perform` ends in an `HttpFailure` is logged
 in Go, with its method, its path, its status where an answer came and
 why; a 3xx or a 4xx with its body too, the body's first 4 KiB with a
-mark where it is cut. A handle's own headers and query fields are
-never logged.
+mark where it is cut. So is every `logRefusal`, with its method, its
+path and its `why`, cut as a body is: no status and no body. A
+handle's own headers and query fields are never logged.
 
 **Mail** (`kogo.mail`). A message is data that Kogo builds, and
 `eml(mail: Mail): ByteArray` writes it as the bytes of an EML file, for

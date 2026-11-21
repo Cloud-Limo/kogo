@@ -257,6 +257,32 @@ func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 	return answer, f
 }
 
+// Http_LogRefusal_Lookup_String and its Action twin log a no that a
+// service said inside a 2xx, which its client read and raised: the
+// endpoint's method and path, as a failed call is logged, and why,
+// the client's word, cut as a refused body is. It is no action, as
+// ask's own logging is not.
+func Http_LogRefusal_Lookup_String(this Http, endpoint Lookup, why string) rt.Unit {
+	return this.refused(endpoint.endpoint, why)
+}
+func Http_LogRefusal_Action_String(this Http, endpoint Action, why string) rt.Unit {
+	return this.refused(endpoint.endpoint, why)
+}
+
+func (h Http) refused(e endpoint, why string) rt.Unit {
+	h.s.Log.Warn("kogo.http: refused in a 2xx", "method", e.method, "path", e.path, "why", cut(why))
+	return rt.Unit{}
+}
+
+// cut is what of a text is logged: its first 4 KiB, with a mark
+// where it is cut.
+func cut(s string) string {
+	if len(s) > maxLogged {
+		return fmt.Sprintf("%s [cut: the first %d of %d bytes]", s[:maxLogged], maxLogged, len(s))
+	}
+	return s
+}
+
 func (h Http) call(e endpoint, fields kogo.List[Field], again bool) (*Json, *failed) {
 	u := *h.base
 	u.RawPath = e.path // keeps an escaped id as it was written
@@ -331,10 +357,7 @@ func (h Http) call(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 	// (decisions.md).
 	var logged *string
 	if status >= 300 && status < 500 {
-		l := string(text)
-		if len(l) > maxLogged {
-			l = fmt.Sprintf("%s [cut: the first %d of %d bytes]", l[:maxLogged], maxLogged, len(l))
-		}
+		l := cut(string(text))
 		logged = &l
 	}
 	answered := fmt.Sprintf("the service answered %d", status)

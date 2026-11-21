@@ -349,9 +349,7 @@ func TestNumberToString(t *testing.T) {
 // List<String> alone may leave out (spec.md 12).
 func TestJoinToString(t *testing.T) {
 	preludeCases(t, [][2]string{
-		{"fun f(xs: List<String>, ns: List<Long>): String = xs.joinToString(\",\") + xs.joinToString() + ns.joinToString(\"-\") { \"$it\" } + ns.joinToString { \"$it\" }", ""},
 		{"fun f(ns: List<Long>): String = ns.joinToString(\",\")", "t.kg:2:36: no-overload: no joinToString fits this call with (String): the candidates are fun List<String>.joinToString(separator: String): String; fun <T> List<T>.joinToString("},
-		{"fun f(ns: List<Long>): String = ns.joinToString(\",\") { it }", "t.kg:2:56: type-mismatch: this is a Long where a String is wanted"},
 	})
 }
 

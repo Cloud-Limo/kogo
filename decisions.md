@@ -4120,9 +4120,12 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
 - **`joinToString` is two prelude externals: `List<String>.joinToString(separator)` and
   `<T> List<T>.joinToString(separator, transform: (T) -> String)`**, the forms the issue
   scoped. Not taken: Kotlin's one signature with a nullable `transform` defaulting to
-  null, which would let a list of anything be joined bare, and that needs a `toString` on
-  any `T` that the prelude does not have. Calling the bare form on a `List<Long>` is
-  `no-overload`, naming both. Reopen if the prelude gains a `toString` on every type.
+  null, which would let a list of anything be joined bare. No use needs that, and a
+  `List<ByteArray>` would then be written as its bytes where Kotlin writes `[B@...`: a
+  template refuses that (`bytes-text`), but refusing it here would need checker code.
+  Calling the bare form on a `List<Long>` is `no-overload`, naming both, and so is
+  `List<String?>.joinToString(",")`, which Kotlin accepts (writing `null`): add
+  `{ "$it" }`. Reopen when a port needs it.
 - **The separator defaults to `", "` in both forms, as Kotlin's does**: the issue counted
   two bare calls among the uses it covers, and `xs.joinToString { ... }` is Kotlin's
   ordinary form. It is a `String`, Kogo having no `CharSequence`. Not built: `prefix`,

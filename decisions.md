@@ -4114,3 +4114,17 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   an order to rebuild a format by hand, as `eight()` did. Not taken: leaving the row as it
   was, as the issue's Scope said, and filing it apart. Reopen if a port reads the row as
   licence to skip a prelude function the spec lists.
+
+## `joinToString` (DEV-1070), 21 Nov 2026
+
+- **`joinToString` is two prelude externals: `List<String>.joinToString(separator)` and
+  `<T> List<T>.joinToString(separator, transform: (T) -> String)`**, the forms the issue
+  scoped. Not taken: Kotlin's one signature with a nullable `transform` defaulting to
+  null, which would let a list of anything be joined bare, and that needs a `toString` on
+  any `T` that the prelude does not have. Calling the bare form on a `List<Long>` is
+  `no-overload`, naming both. Reopen if the prelude gains a `toString` on every type.
+- **The separator defaults to `", "` in both forms, as Kotlin's does**: the issue counted
+  two bare calls among the uses it covers, and `xs.joinToString { ... }` is Kotlin's
+  ordinary form. It is a `String`, Kogo having no `CharSequence`. Not built: `prefix`,
+  `postfix`, `limit` and `truncated` (one use in cusoon2's backend). Reopen when a port
+  needs one.

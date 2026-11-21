@@ -26,6 +26,8 @@ fun lists(f: String, xs: List<Long>, ys: List<Long>, n: Int, m: Int): String? = 
     "map" -> "${xs.map { it * m }}"
     "mapIndexed" -> "${xs.mapIndexed { i, x -> x - i }}"
     "zip" -> "${xs.zip(ys)}"
+    "joinToString" -> xs.map { "<$it>" }.joinToString(",") + " " + ys.map { "$it" }.joinToString() + " " + listOf<String>().joinToString("-")
+    "joinToStringBy" -> xs.joinToString("; ") { "${it * m}" } + " " + ys.joinToString { if (it > n) "big" else "$it" }
     "sum" -> "${xs.sum()}"
     "sumOfInt" -> "${xs.sumOf { if (it > 0L) n else m }}"
     "sumOfLong" -> "${xs.sumOf { it * it }}"

@@ -246,6 +246,9 @@ func TestNames(t *testing.T) {
 		// Section 6: the scope functions that do not exist.
 		{"fun f(x: Int): Int = x.‸apply { 1 }", "kotlin-scope-function", "name the value and call it"},
 		{"fun f(x: Int): Int? = x.‸takeUnless { it > 1 }", "kotlin-scope-function", "use takeIf"},
+		// Section 14: the prelude has no nullable receiver.
+		{"fun f(s: String?): Boolean = s.‸isNullOrBlank()", "nullable-receiver", "isNullOrBlank is not Kogo: write x == null || x.isBlank()"},
+		{"fun f(xs: List<Int>?): List<Int> = xs.‸orEmpty()", "nullable-receiver", "orEmpty is not Kogo: write x ?: emptyList()"},
 	})
 	// A hint names only an import Kogo has.
 	for src, want := range map[string]string{

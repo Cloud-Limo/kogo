@@ -449,8 +449,6 @@ func (p *parser) receiverAndName() (Type, string) {
 	}
 	if p.at("?.") { // Receiver?.name: the ? is the receiver's
 		refuse(p.tok.pos)
-		setNullable(t)
-		p.tok.text = "."
 	}
 	if p.got(".") {
 		if nullable(t) {

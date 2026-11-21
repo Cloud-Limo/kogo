@@ -39,8 +39,8 @@ Each entry: what was decided, why, and what would reopen it.
   receiver is not nullable either, so the rule holds for every extension and a reader
   need not know which prelude names a plain `.` on a nullable value still reaches. The
   prelude's two, `List<T>?.orEmpty()` and `String?.isNullOrBlank()`, are gone: write
-  `x ?: emptyList()` and `x == null || x.isBlank()`, which narrows `x` where
-  `isNullOrBlank` did not. Not taken: keeping the two as a convenience of the prelude;
+  `x ?: emptyList()`, with `emptyList<T>()` where nothing else settles `T` (DEV-1069), and
+  `x == null || x.isBlank()`, which narrows `x` where `isNullOrBlank` did not. Not taken: keeping the two as a convenience of the prelude;
   cusoon2's port called them at three places, each as clear in the longer form.
 - **The columns under `exists` and `execute` are not typed** (15 Nov 2026). Both discard
   them, so `tx.execute(sql"select pg_advisory_xact_lock($key)")` passes though `void` has no

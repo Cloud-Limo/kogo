@@ -92,8 +92,8 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   a session alike, or its PR merges, so no session reports a step
   back. It starts the Code review and the Fix, checks and tidies.
   What it cannot settle it hands to the lead: a `Clerk:` comment,
-  which `lin step` posts with the label `lead`, which wait for Greg's next "Lead". It leaves an
-  issue labelled `lead` alone.
+  which `lin step` posts with the label `lead`; both wait for Greg's
+  next "Lead". It leaves an issue labelled `lead` alone.
 - **Guide.** "Guide DEV-NNN", said in the repository the design is
   about, starts a session that takes Greg through a design to his
   rulings: read Kogo's `doc/guide.md` and follow it. It ends with one
@@ -128,8 +128,8 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   url> · <branch>`, then Landed / Verified / Decided / Next step /
   Gotcha. Post it with `lin step DEV-NNN < handoff.md`, which puts it
   on the PR, its first line on the issue, and moves the issue to In
-  Review; print it, and stop. A PR that outgrows its Budget, or adds what the
-  Scope did not name, says so in the handoff.
+  Review; print it, and stop. A PR that outgrows its Budget, or adds
+  what the Scope did not name, says so in the handoff.
 - **Code review.** "Code review DEV-NNN": `lin show DEV-NNN` and take
   the PR and branch from the newest Handoff; its text is on the PR.
   Work as Where a step works says, on the branch fast-forwarded with

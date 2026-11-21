@@ -29,7 +29,8 @@ It leaves alone an issue labelled `lead` or `agent`, but for a merge,
 and takes it up from its newest event when the label goes. For a
 clerk that fails, the cap included, it labels the issue `lead` under
 a comment of its own: `Failed: the clerk for DEV-NNN exited N · <its
-last line>`, then the command and its last lines. Anyone may say "Clerk DEV-NNN" by hand.
+last line>`, then the command and its last lines. Anyone may say
+"Clerk DEV-NNN" by hand.
 
 You start runs, async or local, check, merge and tidy. You write no
 code and make no commit but the merge of `main` into a Kogo PR that
@@ -59,7 +60,8 @@ with a word of cusoon2's `doc/plans/pipeline-events.md`, section 5,
 and a colon, a launch directive, a `Launched agent-` line, or a
 `Taken,`, `Held,` or `Released,` line as they were written before
 DEV-1073. Any other comment, a `Lead:` one included, is a note, and a
-note after the event changes the row only for Backlog's older lines. Take the first row that fits:
+note after the event changes the row only for Backlog's older lines.
+Take the first row that fits:
 
 | State | Newest event | Next |
 | --- | --- | --- |
@@ -278,9 +280,10 @@ it is. A worktree that is not clean stays: hand on, naming it.
 
 Then `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list backlog`:
 move to Todo each issue whose `Parked:`, or older `Lead:` line,
-waits on this merge, with `lin comment DEV-MMM --state Todo < /dev/null`,
-which posts nothing. The lead starts it from the board. Then take `lead` off this
-issue if it is on: `lin label DEV-NNN lead --remove`.
+waits on this merge, with
+`lin comment DEV-MMM --state Todo < /dev/null`, which posts nothing.
+The lead starts it from the board. Then take `lead` off this issue if
+it is on: `lin label DEV-NNN lead --remove`.
 
 When the merged PR changed cusoon2's `mise-tasks/linear-clerk`, hand
 on with `Clerk: Greg's: systemctl --user restart lin-clerk`: the
@@ -291,9 +294,9 @@ would stop itself.
 
 Post one `Clerk:` comment with `lin step DEV-NNN < clerk.md`, which
 puts it in full on the issue, where the lead reads it instead of the
-PR, and the label `lead` on; then exit. It takes the place of the step: launch
-nothing and merge nothing on that event. It waits for Greg's next
-"Lead".
+PR, and the label `lead` on; then exit. It takes the place of the
+step: launch nothing and merge nothing on that event. It waits for
+Greg's next "Lead".
 
 The first line is `Clerk: <what waits, in a line>`, or `Clerk: Greg's:
 <the move>` for a move that is no choice, which needs no more. Under

@@ -83,8 +83,8 @@ clerk's, by the table in `doc/clerk.md`: leave it alone.
 Todo holds only what we mean to start within days. Everything else
 goes to Backlog, with `Parked: until <issue keys, or what>; then
 <what>` posted by `lin step`, and you move it to Todo when Greg says
-so. You can do
-now draws only from Todo, In Progress and In Review, never Backlog.
+so. You can do now draws only from Todo, In Progress and In Review,
+never Backlog.
 
 ## What goes to Greg
 
@@ -195,8 +195,8 @@ run are not rows, since he cannot start them too soon. A cusoon2 merge
 waiting on Cloud CI is a row: while the clerk's `Checked: <PR> at
 <sha>` is the issue's newest event, its row is "waits on Cloud CI, then
 your inbox". The watch's `Ready to merge:` or `Failed:` ends it, so a
-`Checked:` still newest after CI has ended says the watch failed. When the cap binds, keep the
-rows nearest to release.
+`Checked:` still newest after CI has ended says the watch failed. When
+the cap binds, keep the rows nearest to release.
 
 An issue has one row across the two boxes: its next step. That step is
 in You can do now if Greg can do it, and in Not yet if he cannot; what

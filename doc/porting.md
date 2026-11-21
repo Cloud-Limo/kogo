@@ -70,7 +70,30 @@ use, is Greg's. Until either is built the port writes round it as a
 marked departure. An operator on a prelude type is such a name: `a < b`
 is `compareTo` and `a + b` is `plus` (spec section 6).
 
+**Weigh a write-around before writing it.** Before writing round a name
+in more lines than the Kotlin took, most often a hand-built copy of a
+Java library's function, the port asks who would see the difference if
+the short form were written: a customer, an op, a stored row, or the
+answer of an outside service. If nobody but the comparison, it writes
+the short form, leaves that difference out of the comparison on its
+case, and puts it under Decided with the form not taken; rule 6 of
+`AGENTS.md` lets Decided loosen the comparison so. If somebody, the
+handoff names the prelude function that would do it, of either kind
+above: the prelude may grow to keep a port short. Until it is built
+the port writes the shortest thing that keeps what is seen, under
+Decided with its size and who sees it. A copy of a library's function
+that Decided does not name is never written. A swap for a form as long
+(`requireNotNull` for `!!`) is not weighed.
+
+For one, `LatLng.toUrlValue` is Java's `String.format("%.8f,%.8f")`,
+rounding half up to eight places. cusoon2's first port of it (DEV-1052)
+was `eight()`, ten lines of digit arithmetic, where one line,
+`"${plain(at.lat)},${plain(at.lng)}"`, was the short form: only the
+stand-in's lookup by text and the comparison's check of the calls sent
+told them apart.
+
 **The handoff reports:** the cusoon2 commit the port matches; each
-departure with its case; "N of M statements run" and each not reached;
-the run's cases, differences, any accepted ones and each one owed with
-its issue.
+departure with its case, and under Decided each write-around weighed,
+with its size, who sees the difference and the form not taken; "N of M
+statements run" and each not reached; the run's cases, differences, any
+accepted ones and each one owed with its issue.

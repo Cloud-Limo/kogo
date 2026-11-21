@@ -26,6 +26,8 @@ func TestHeldTransactions(t *testing.T) {
 		// Work that is an action fun takes the facts its gate answers.
 		model+"api a unchecked { out gatedBy facts }\n"+
 			"action fun out(env: Env, f: Facts, input: Unit): Either<String, Int> = either {\n    env.bell.ring()\n    f.id\n}",
+		// A type that holds itself ends, and holds none.
+		model+out+"data class Clerk(val n: Int, val next: Clerk?)\nfun g(tx: Tx, env: Env, request: Request): Either<String, Clerk> = either { raise(\"no\") }\napi a unchecked { out gatedBy g }",
 		// A db.tx block answers facts, and a nested block does not end the transaction.
 		model+"fun f(db: Db, env: Env, request: Request): Either<String, Int> = either {\n    val id = db.tx(serializable = true) { tx -> gate(tx, env, request).bind().person.id }.bind()\n    id\n}",
 		model+"fun f(call: Call): Tx = call.tx.atomically { call.tx }",

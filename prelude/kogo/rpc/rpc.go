@@ -5,6 +5,7 @@ package rpc
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -13,6 +14,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,16 +29,27 @@ import (
 type Request struct{ r *http.Request }
 
 // Request_Header matches the header's name whatever its case, and
-// gives its first value. Go keeps Host out of the headers.
+// gives its first value. Go keeps Host out of the headers. A value
+// that is not UTF-8 ends the request: it panics with a notText, which
+// run answers 400 and does not log.
 func Request_Header(this Request, name string) *string {
+	v := this.r.Header.Values(name)
 	if strings.EqualFold(name, "Host") {
-		return &this.r.Host
+		v = []string{this.r.Host}
 	}
-	if v := this.r.Header.Values(name); len(v) > 0 {
-		return &v[0]
+	if len(v) == 0 {
+		return nil
+	} else if !utf8.ValidString(v[0]) {
+		panic(notText(http.CanonicalHeaderKey(name)))
 	}
-	return nil
+	return &v[0]
 }
+
+// A notText is the panic of a header read whose value is not UTF-8,
+// with the header's name, never its value.
+type notText string
+
+func (n notText) String() string { return "the header " + string(n) + " is not UTF-8" }
 
 func Request_Cookie(this Request, name string) *string {
 	if c, err := this.r.Cookie(name); err == nil {
@@ -276,7 +289,15 @@ func NewUnserved[Env any](operations []Operation[Env], enums []any) Unserved[Env
 
 // A Handler serves a table at the names of its operations, POST
 // /name, under the path where main mounts it with http.StripPrefix.
-type Handler[Env any] struct{ *server[Env] }
+type Handler[Env any] struct {
+	*server[Env]
+	// MaxBody is the most bytes of a body the Handler reads: 64 KiB
+	// unless main sets it. Past it the answer is 413. A body is built
+	// whole into a tree before its type is checked, so until it is
+	// answered one request can take up to 35 times MaxBody in memory:
+	// 2 MB at the default, 35 MB at 1 MiB.
+	MaxBody int64
+}
 
 // A server is what a Handler and Calls share: a list, its check if
 // it has one, and what its operations run with.
@@ -293,13 +314,13 @@ type server[Env any] struct {
 }
 
 // NewHandler serves t over pool with env, and logs to log. Its Limit
-// is 90 seconds. It panics if t has no check, or lacks an enum's
-// entries that an input reaches.
+// is 90 seconds and its MaxBody 64 KiB. It panics if t has no check,
+// or lacks an enum's entries that an input reaches.
 func NewHandler[Env any](t Table[Env], pool *pgxpool.Pool, env Env, log *slog.Logger) *Handler[Env] {
 	if t.Check == nil {
 		panic("the table has no check: a list that a browser calls names one, api name checkedBy check")
 	}
-	return &Handler[Env]{newServer(t.Check, t.Operations, t.Enums, pool, env, log)}
+	return &Handler[Env]{newServer(t.Check, t.Operations, t.Enums, pool, env, log), 64 << 10}
 }
 
 func newServer[Env any](check func(kogo.Tx, Env, Request) kogo.Either[string, rt.Unit], ops []Operation[Env], enums []any, pool *pgxpool.Pool, env Env, log *slog.Logger) *server[Env] {
@@ -324,7 +345,10 @@ func (h *Handler[Env]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return nil, result{status: http.StatusMethodNotAllowed}
 		} else if op.input != input.Type() {
 			var err error
-			if input, err = h.read.readBody(op.input, r.Body); err != nil {
+			var tooLarge *http.MaxBytesError
+			if input, err = h.read.readBody(op.input, http.MaxBytesReader(w, r.Body, h.MaxBody)); errors.As(err, &tooLarge) {
+				return nil, result{status: http.StatusRequestEntityTooLarge, text: fmt.Sprintf("%s: the input is past %d bytes", name, tooLarge.Limit)}
+			} else if err != nil {
 				return nil, result{status: http.StatusBadRequest, text: name + ": " + err.Error()}
 			}
 		}
@@ -373,7 +397,10 @@ func (h *server[Env]) run(r *http.Request, name string, input func(Operation[Env
 	}()
 	ranOut := false
 	defer func() {
-		if p := recover(); p != nil && ranOut {
+		p := recover()
+		if header, ok := p.(notText); ok {
+			res = result{status: http.StatusBadRequest, text: name + ": " + header.String()}
+		} else if p != nil && ranOut {
 			res = result{status: http.StatusServiceUnavailable, text: "request " + id}
 		} else if p != nil {
 			log.Error("panic", "message", fmt.Sprint(p), "trace", string(debug.Stack()))
@@ -446,8 +473,9 @@ func (r Refused) Error() string { return string(r) }
 // limit and the reruns. It reads no body: the input is Go's, and only
 // its enums can be wrong, which Call checks as the strict reader
 // does. Its error is a Refused, or the status and text a browser
-// would be answered: 400 for an enum, 404 for an operation not of the
-// list, 500 with the request's id for a panic, 503 past the limit.
+// would be answered: 400 for an enum or a header that is not UTF-8,
+// 404 for an operation not of the list, 500 with the request's id for
+// a panic, 503 past the limit.
 func Call[Env, I, A any](c *Calls[Env], r *http.Request, op Op[Env, I, A], input I) (A, error) {
 	res := c.run(r, op.name, func(Operation[Env]) (any, result) {
 		if err := c.read.valid(reflect.ValueOf(&input).Elem(), "input"); err != nil {

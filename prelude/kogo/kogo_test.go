@@ -457,9 +457,6 @@ func TestPortCalls(t *testing.T) {
 	CheckNotNull[int](nil, func() string { return "gone" })
 }
 
-// A Decimal is a numeric as Postgres writes it, digit for digit, and
-// goes back as it came. A null is no Decimal and no Uuid. The rest of
-// db.go needs a database: emit's tests run it.
 // The four names of DEV-1050 at their corners, each as Kotlin 2.4
 // gives it.
 func TestGoogleStringCorners(t *testing.T) {
@@ -502,6 +499,9 @@ func TestGoogleStringCorners(t *testing.T) {
 	String_PadStart("a", -1, nil)
 }
 
+// A Decimal is a numeric as Postgres writes it, digit for digit, and
+// goes back as it came. A null is no Decimal and no Uuid. The rest of
+// db.go needs a database: emit's tests run it.
 func TestPostgres(t *testing.T) {
 	for _, text := range []string{"12.50", "-0.001", "1500", "NaN", "Infinity", "-Infinity"} {
 		var back Decimal

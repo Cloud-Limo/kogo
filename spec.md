@@ -1296,7 +1296,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | jOOQ (`ctx.select...`, records, `.store()`, `into(X::class.java)`) | `sql"""` and a data class |
 | `X::class`, reflection | nothing; the only `::class` is inside `@file:OptIn(...)` |
 | annotations other than markers | nothing |
-| `String.format`, `Locale` | string templates, `padStart` |
+| `String.format`, `Locale` | string templates, `padStart`, or `plain`, or a prelude function |
 | `by lazy`, delegation | compute it once and pass it |
 | `vararg`, `*spread` | a `List` |
 | `inline`, `reified`, `operator`, `infix` | a plain function |

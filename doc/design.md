@@ -65,7 +65,9 @@ same inputs and compared exactly before it replaces it. A difference
 the run finds is fixed, or it is accepted: Greg decides, and it is
 recorded with what differs, why matching it costs too much, and the
 cases it covers, so that the comparison forgives those cases and
-nothing else. A difference may also be owed: the port leaves out
+nothing else. One that nobody but the comparison sees, weighed as a
+write-around, the port's Decided accepts, and the Code review checks
+who sees it. A difference may also be owed: the port leaves out
 something the Kotlin does, because Kogo cannot yet do it. Greg
 decides, and it is recorded with what is left out, the issue that will
 close it, and the cases it covers, and the comparison forgives those

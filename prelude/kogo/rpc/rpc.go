@@ -289,7 +289,6 @@ func NewUnserved[Env any](operations []Operation[Env], enums []any) Unserved[Env
 
 // A Handler serves a table at the names of its operations, POST
 // /name, under the path where main mounts it with http.StripPrefix.
-// Its Limit is its server's.
 type Handler[Env any] struct {
 	*server[Env]
 	// MaxBody is the most bytes of a body the Handler reads: 64 KiB
@@ -315,8 +314,8 @@ type server[Env any] struct {
 }
 
 // NewHandler serves t over pool with env, and logs to log. Its Limit
-// is 90 seconds and its MaxBody 64 KiB. It panics if t has no check, or lacks an enum's
-// entries that an input reaches.
+// is 90 seconds and its MaxBody 64 KiB. It panics if t has no check,
+// or lacks an enum's entries that an input reaches.
 func NewHandler[Env any](t Table[Env], pool *pgxpool.Pool, env Env, log *slog.Logger) *Handler[Env] {
 	if t.Check == nil {
 		panic("the table has no check: a list that a browser calls names one, api name checkedBy check")
@@ -474,8 +473,9 @@ func (r Refused) Error() string { return string(r) }
 // limit and the reruns. It reads no body: the input is Go's, and only
 // its enums can be wrong, which Call checks as the strict reader
 // does. Its error is a Refused, or the status and text a browser
-// would be answered: 400 for an enum, 404 for an operation not of the
-// list, 500 with the request's id for a panic, 503 past the limit.
+// would be answered: 400 for an enum or a header that is not UTF-8,
+// 404 for an operation not of the list, 500 with the request's id for
+// a panic, 503 past the limit.
 func Call[Env, I, A any](c *Calls[Env], r *http.Request, op Op[Env, I, A], input I) (A, error) {
 	res := c.run(r, op.name, func(Operation[Env]) (any, result) {
 		if err := c.read.valid(reflect.ValueOf(&input).Elem(), "input"); err != nil {

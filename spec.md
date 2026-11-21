@@ -1046,11 +1046,11 @@ its case. A `String` a program holds is text, so reading a header
 whose value is not UTF-8 ends the request with a 400 that names the
 header and never its value, `updateJob: the header Origin is not
 UTF-8`, from the list's check as from an operation; a header no
-program reads is not looked at. Kogo code does not build or change one. An ungated
-operation that sets cookies answers a `Reply<A>(answer: A, cookies:
-List<Cookie>)`, each a `Cookie(name, value, path, maxAgeSeconds: Long,
-sameSite: SameSite, secure, httpOnly)`, with `SameSite` one of
-`Strict`, `Lax` and `None` (15.2).
+program reads is not looked at. Kogo code does not build or change
+one. An ungated operation that sets cookies answers a
+`Reply<A>(answer: A, cookies: List<Cookie>)`, each a `Cookie(name,
+value, path, maxAgeSeconds: Long, sameSite: SameSite, secure,
+httpOnly)`, with `SameSite` one of `Strict`, `Lax` and `None` (15.2).
 
 **An outside service** (`kogo.http`). The prelude's one outbound call.
 An `Http` is a handle for one service, made in `main` with its address,

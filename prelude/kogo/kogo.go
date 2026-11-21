@@ -571,6 +571,12 @@ func expand(b *strings.Builder, re *regexp.Regexp, replacement, s string, m []in
 func Int_ToLong(this int32) int64      { return int64(this) }
 func Long_ToDouble(this int64) float64 { return float64(this) }
 
+// A number's toString is its text in a template, by the same call.
+func Int_ToString(this int32) string       { return rt.ToString(this) }
+func Long_ToString(this int64) string      { return rt.ToString(this) }
+func Double_ToString(this float64) string  { return rt.ToString(this) }
+func Decimal_ToString(this Decimal) string { return rt.ToString(this) }
+
 // Decimal_ToDouble is the closest Double, as Java's is; NaN and
 // Infinity, which Postgres holds, are Double's own.
 func Decimal_ToDouble(this Decimal) float64 {

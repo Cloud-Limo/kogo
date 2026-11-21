@@ -1020,6 +1020,18 @@ fun names(s: String): List<String> =
 `)
 }
 
+// toString on a number writes what a template of it writes (spec 12).
+func TestNumberToString(t *testing.T) {
+	expect(t, [][2]string{
+		{`t.Texts(-2147483648, 9223372036854775807, 1.0, "1.50")`, "[-2147483648, 9223372036854775807, 1.0, 1.50]"},
+		{`t.Texts(7, -1, 1e7, "0")`, "[7, -1, 1.0E7, 0]"},
+	}, `package t
+
+fun texts(n: Int, x: Long, d: Double, m: Decimal): List<String> =
+    listOf(n.toString(), x.toString(), d.toString(), m.toString())
+`)
+}
+
 // What is not emitted yet is refused where it stands, never emitted
 // wrongly, and so are two declarations that Go cannot tell apart,
 // an enum's entries among them.

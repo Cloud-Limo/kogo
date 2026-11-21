@@ -9,6 +9,7 @@ fun numbers(f: String, x: Long, y: Long, d: Double, n: Int): String? = when (f) 
     "doubleToLong" -> "${d.toLong()} ${(d * 2.0).toLong()}"
     "doubleToInt" -> "${d.toInt()} ${(d / 3.0).toInt()}"
     "double" -> "$d"
+    "toString" -> n.toString() + " " + x.toString() + " " + d.toString() + " " + 1.0.toString() + " " + 0.5.toString()
     "roundTrip" -> "${x.toDouble().toLong()} ${d.toLong().toDouble()} ${d.toInt().toLong()}"
     "clamp" -> "${n.toLong().coerceAtLeast(x).coerceAtMost(y)} ${d.toLong().coerceAtMost(x)}"
     else -> null

@@ -348,6 +348,29 @@ func TestRandomString(t *testing.T) {
 	}
 }
 
+// toString is Int's, Long's, Double's and Decimal's, as spec.md 12
+// lists it, and no other built-in type's.
+func TestNumberToString(t *testing.T) {
+	pre, err := prelude.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range [][2]string{
+		{"fun f(n: Long): String = n.toString()\nfun g(n: Int, d: Double, m: Decimal): String = n.toString() + d.toString() + m.toString()", ""},
+		{"data class P(val a: Int)\nfun f(p: P): String = p.toString() + p.a.toString()", ""},
+		{"fun f(b: Boolean): String = b.toString()", "t.kg:2:31: no-overload: no toString fits this call with (): the candidates are fun Int.toString()"},
+	} {
+		f, err := syntax.Parse("t.kg", []byte("package t\n"+c[0]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, errs := Check(pre, []*syntax.File{f}, nil)
+		if c[1] == "" && errs != nil || c[1] != "" && (len(errs) != 1 || !strings.HasPrefix(errs[0].Error(), c[1])) {
+			t.Errorf("%s\n got %v\nwant %q", c[0], errs, c[1])
+		}
+	}
+}
+
 // Section 3: the types, the number rules and what each declaration
 // may hold.
 func TestTypes(t *testing.T) {

@@ -4070,3 +4070,20 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   $25 cap, is decided in cusoon2's `doc/plans/linear-workflow.md`, "The 21 Nov 2026 local
   runs". It changes "The lead does not run other sessions' steps": Greg starts only a
   step he wants to watch, and a guide. Reopen if two issues contend for a clone often.
+
+## `toString` on numbers (DEV-1061), 21 Nov 2026
+
+- **`toString` on `Int`, `Long`, `Double` and `Decimal` is four prelude externals, each
+  calling `rt.ToString`**, the call a string template makes, so `n.toString()` and
+  `"$n"` cannot write a number two ways. `Decimal` had none, though spec 12 lists it.
+  Not taken: the emitter writing `rt.ToString` for the call itself, as it does for a
+  data class's, which would make `toString` a name the checker knows rather than a
+  binding (spec 13).
+- **`toString` on any other built-in type is now `no-overload`, naming the four
+  candidates**, where it was `unknown-name`: the message every overloaded prelude name
+  gives (`toLong` on a `Boolean` too). Not taken: special-casing the message back to
+  `unknown-name`, which would be code for no gain. A data class's own `toString` is a
+  member and is found first, as before. Reopen if a type gains its own `toString`.
+- **The built-ins check covers `Int`, `Long` and `Double`, not `Decimal`**: its inputs
+  have no `Decimal`, which only a query gives. `Decimal.toString` is the emitter test's
+  (`1.50` stays `1.50`). Reopen if the check gains a `Decimal` input.

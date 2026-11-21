@@ -126,7 +126,7 @@ type Held struct {
 	tx   kogo.Tx
 }
 
-// gate, step and work each refuse a name of their own. The work
+// gate and work each refuse a name of their own. The work
 // inserts first: its refusal leaves no row.
 func gate(tx kogo.Tx, e env, _ Request, p Person) kogo.Either[string, Held] {
 	e.gates.Add(1)
@@ -142,13 +142,6 @@ func ended(tx kogo.Tx) (ended bool) {
 	defer func() { ended = recover() != nil }()
 	count(tx)
 	return
-}
-
-func step(_ env, h Held, p Person) kogo.Either[string, rt.Unit] {
-	if !ended(h.tx) || h.name != p.Name || strings.HasPrefix(p.Name, "unsent") {
-		return kogo.Either_Left[string]{Value: "secret step"}
-	}
-	return kogo.Either_Right[rt.Unit]{}
 }
 
 func work(e env, h Held, p Person) kogo.Either[string, string] {
@@ -200,12 +193,12 @@ func levelWork(_ env, l string, _ rt.Unit) kogo.Either[string, string] {
 var table = Table[env]{Check: ours, Operations: []Operation[env]{
 	Tx("add", true, add), Tx("race", true, race), Tx("deadlocked", true, deadlocked), Tx("deadlockedPlain", false, deadlocked),
 	Db("login", login), Db("who", who), Tx("signIn", true, signIn),
-	Gated("held", true, gate, nil, work), Gated("sent", true, gate, step, work), Gated("heldRace", true, raceGate, nil, raceWork), Outside("rung", true, gate, act),
-	Tx("plain", false, level), Tx("serializable", true, level), Gated("plainGated", false, level, nil, levelWork),
-	Gated("serializableGated", true, level, nil, levelWork), Outside("plainOutside", false, level, levelWork),
+	Gated("held", true, gate, work), Gated("heldRace", true, raceGate, raceWork), Outside("rung", true, gate, act),
+	Tx("plain", false, level), Tx("serializable", true, level), Gated("plainGated", false, level, levelWork),
+	Gated("serializableGated", true, level, levelWork), Outside("plainOutside", false, level, levelWork),
 	Outside("serializableOutside", true, level, levelWork),
-	Gated("strays", true, strays, nil, bound), Gated("straysSent", true, strays, step, bound), Outside("straysOutside", true, strays, act),
-	Gated("straysPlain", false, strays, nil, bound),
+	Gated("strays", true, strays, bound), Outside("straysOutside", true, strays, act),
+	Gated("straysPlain", false, strays, bound),
 }}
 
 func TestHandler(t *testing.T) {
@@ -258,8 +251,7 @@ func TestHandler(t *testing.T) {
 		{"POST", "nothing", `{}`, `404 `},
 		{"GET", "add", ``, `405 `},
 		// The check runs first, before the name is looked up or the
-		// method read, and only reads; then the gate, the step and
-		// the work.
+		// method read, and only reads; then the gate and the work.
 		{"POST", "add", `check forged`, `403 secret check`},
 		{"GET", "add", `check forged`, `403 secret check`},
 		{"POST", "nothing", `check forged`, `403 secret check`},
@@ -267,10 +259,6 @@ func TestHandler(t *testing.T) {
 		{"POST", "held", `{"name":"held"}`, `200 {"type":"ok","value":"secret answer"}`},
 		{"POST", "held", `{"name":"nobody held"}`, `200 {"type":"refused","message":"secret gate"}`},
 		{"POST", "held", `{"name":"refused held"}`, `200 {"type":"refused","message":"secret refusal"}`},
-		{"POST", "sent", `{"name":"nobody sent"}`, `200 {"type":"refused","message":"secret gate"}`},
-		{"POST", "sent", `{"name":"unsent"}`, `200 {"type":"refused","message":"secret step"}`},
-		{"POST", "sent", `{"name":"refused sent"}`, `200 {"type":"refused","message":"secret refusal"}`},
-		{"POST", "sent", `{"name":"sent"}`, `200 {"type":"ok","value":"secret answer"}`},
 		{"POST", "rung", `{"name":"rung"}`, `200 {"type":"ok","value":"secret answer"}`},
 		{"POST", "rung", `{"name":"nobody rung"}`, `200 {"type":"refused","message":"secret gate"}`},
 		{"POST", "rung", `{"name":"refused rung"}`, `200 {"type":"refused","message":"secret refusal"}`},
@@ -283,13 +271,12 @@ func TestHandler(t *testing.T) {
 		{"POST", "serializableOutside", ``, `200 {"type":"ok","value":"serializable"}`},
 		// A gate on a SerializableTx is held to reading by Postgres: a
 		// write, a row lock and nextval are each a bug of ours, before
-		// a step and before an action fun too. A setting it binds is
+		// an action fun too. A setting it binds is
 		// still set in the work, which writes. A gate on a Tx may lock,
 		// and its work writes: the one row of "bound locks".
 		{"POST", "strays", `{"name":"updates"}`, `500 request `},
 		{"POST", "strays", `{"name":"locks"}`, `500 request `},
 		{"POST", "strays", `{"name":"counts"}`, `500 request `},
-		{"POST", "straysSent", `{"name":"updates"}`, `500 request `},
 		{"POST", "straysOutside", `{"name":"updates"}`, `500 request `},
 		{"POST", "strays", `{"name":"binds"}`, `200 {"type":"ok","value":"me"}`},
 		{"POST", "straysPlain", `{"name":"locks"}`, `200 {"type":"ok","value":"`},
@@ -320,14 +307,12 @@ func TestHandler(t *testing.T) {
 	if rows("answers") != 1 || rows("refused") != 0 || rows("panics") != 0 || rows("kept") != 1 {
 		t.Error("an answer does not commit, or a refusal or a panic does not roll back, or a Db operation's db.tx does not stay")
 	}
-	// A gated row: the gate and the work are one transaction, and a
-	// step's gate ran before it in one that was rolled back, so the
-	// gate runs twice where the step passes and once where it or the
-	// gate refuses: 3 runs for held, and 1, 1, 2 and 2 for sent. The
-	// gate of work that is an action fun runs once, in a transaction
-	// that commits unless the gate refuses: 3 runs for rung, and their
-	// transactions, by id, commit for rung and refused rung.
-	for name, want := range map[string]int{"held": 1, "refused held": 0, "refused sent": 0, "sent": 1, "checked": 0,
+	// A gated row: the gate and the work are one transaction, and the
+	// gate runs once: 3 runs for held. The gate of work that is an
+	// action fun runs once, in a transaction that commits unless the
+	// gate refuses: 3 runs for rung, and their transactions, by id,
+	// commit for rung and refused rung.
+	for name, want := range map[string]int{"held": 1, "refused held": 0, "checked": 0,
 		"bound updates": 0, "bound counts": 0, "bound binds": 1, "bound locks": 1} {
 		if rows(name) != want {
 			t.Errorf("%d rows of %q, want %d: a gated row keeps what it wrote, or a refusal does not roll back", rows(name), name, want)
@@ -341,8 +326,8 @@ func TestHandler(t *testing.T) {
 			t.Errorf("the gate's transaction of %q is %q, want %q: the gate of an action fun commits before the work", name, got, want)
 		}
 	}
-	if n := h.env.gates.Swap(0); n != 12 {
-		t.Errorf("the gate ran %d times, want 12", n)
+	if n := h.env.gates.Swap(0); n != 6 {
+		t.Errorf("the gate ran %d times, want 6", n)
 	}
 	h.Limit = 50 * time.Millisecond
 	for _, name := range []string{"deadlocked", "deadlockedPlain"} {
@@ -401,7 +386,7 @@ func TestHandler(t *testing.T) {
 	if len(readOnly) != 4 || !readOnly["INSERT"] || !readOnly["UPDATE"] || !readOnly["SELECT"] || !readOnly["nextval()"] {
 		t.Errorf("a check that writes, or a gate that writes, locks or counts, is not refused by Postgres: %v", readOnly)
 	}
-	if len(ids) != 50 || strings.Contains(log.String(), "secret") {
+	if len(ids) != 45 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
 	causes := map[string]bool{}

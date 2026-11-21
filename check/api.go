@@ -34,7 +34,6 @@ type Op struct {
 	Serializable bool
 	Gate         *Func // nil for an ungated operation
 	Proof        Type  // what the gate gives and the work takes
-	After        *Func // the step between the gate and the work; nil for none
 	Input        Type  // Unit for none
 	Answer       Type  // the A of its Either<String, A>, or of an ungated one's Reply<A>
 }
@@ -66,8 +65,6 @@ var (
 	inputGateRole = &role{"gate", "a gate", []string{"tx", "env", "request", ""}, gateRole.as, gateRole.gives}
 	checkRole     = &role{"check-shape", "a list's check", []string{"tx", "env", "request"},
 		"tx: Tx, env: Env, request: Request)", "Either<String, Unit>"}
-	stepRole = &role{"step", "a step named with after", []string{"env", "", ""},
-		"env: Env, proof: Proof, input: Input), with its gate's proof and its operation's input", "Either<String, Unit>"}
 )
 
 // apis checks the api lists of the program.
@@ -189,29 +186,6 @@ func (c *checker) operation(row *syntax.Row, env func(*syntax.Ident, *Func, *rol
 			c.errorf(row.Gate, "gate-proof", "%s gives %s, which holds a transaction, %s, %s, or give the facts alone (spec.md 15.7)", g.Name, proof, held, c.holdFix(in, held))
 		}
 	}
-	if row.After != nil {
-		s, gives := c.shaped(row.After, stepRole)
-		if s == nil {
-			return nil
-		}
-		env(row.After, s, stepRole)
-		if t := s.Params[1].Type; !same(t, proof) {
-			c.errorf(row.After, "step", "%s takes a %s second, and %s's gate %s gives a %s: a step takes its row's gate's proof (spec.md 15.2)", s.Name, t, id.Name, g.Name, proof)
-		}
-		if t := s.Params[2].Type; !same(t, op.Input) {
-			c.errorf(row.After, "step", "%s takes a %s third, and %s's input is a %s: a step takes its operation's input (spec.md 15.2)", s.Name, t, id.Name, op.Input)
-		}
-		if !is(gives, tUnit) && gives != unknown {
-			c.errorf(row.After, "step", "%s returns %s: a step named with after returns Either<String, Unit>, a refusal or nothing, and the work gives the answer (spec.md 15.2)", s.Name, s.Result)
-		}
-		if !s.Action && len(c.errs) == errs { // said of a step that otherwise fits
-			c.errorf(row.After, "step", "%s is not an action fun: a step named with after runs with no transaction open, to change something outside, so write action fun %s; what only checks or writes belongs in the gate or in %s (spec.md 15.2)", s.Name, s.Name, id.Name)
-		}
-		if f.Action && len(c.errs) == errs {
-			c.errorf(row.After, "step", "%s is an action fun, and its row names the step %s too: work that is an action fun runs with no transaction open, after its gate alone, so make %s's call in %s, or write %s as a fun (spec.md 15.2)", id.Name, s.Name, s.Name, id.Name, id.Name)
-		}
-		op.After = s
-	}
 	if len(c.errs) > errs {
 		return nil
 	}
@@ -228,7 +202,7 @@ func named(t Type) *TypeDecl {
 
 // shaped finds the one fun that an api list names at id and checks
 // that it has the shape of r, but for a gate's fourth parameter and
-// what a check or a step gives, which the list fits. It gives the fun
+// what a check gives, which the list fits. It gives the fun
 // and the A of its Either<String, A>, or nil where it reports an
 // error.
 func (c *checker) shaped(id *syntax.Ident, r *role) (*Func, Type) {
@@ -244,7 +218,7 @@ func (c *checker) shaped(id *syntax.Ident, r *role) (*Func, Type) {
 	}
 	f, errs := fs[0], len(c.errs)
 	c.info.Uses[id] = f
-	if r == workRole || r == stepRole {
+	if r == workRole {
 		c.placed[f] = r
 	}
 	if r == gateRole && len(f.Params) == 4 {

@@ -84,7 +84,7 @@ type checker struct {
 	reads   map[Object][]Object                 // the top-level vals and the funs each val's value and each fun refers to
 	stmts   map[Object][]reached                // the sql literals in each val's value and each fun's body, for gate.go
 	tested  map[*syntax.ValDecl]Type            // the Test<E> of each val a tests list names
-	placed  map[*Func]*role                     // the funs an api list names as gated work or as a step, and as which
+	placed  map[*Func]*role                     // the funs an api list names as gated work, and as which
 
 	// Where the checker is.
 	owner      Object // the val whose value, or the fun whose body, is being read

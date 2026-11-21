@@ -238,8 +238,8 @@ func (p *parser) api() *API {
 	return a
 }
 
-// row reads one row of an api list: op gatedBy gate, op gatedBy gate
-// after step, or op ungated, on one line.
+// row reads one row of an api list: op gatedBy gate, or op ungated,
+// on one line.
 func (p *parser) row() *Row {
 	pos, op := p.ident()
 	r := &Row{Op: &Ident{pos, op}}
@@ -265,11 +265,8 @@ func (p *parser) row() *Row {
 	} else if !word("ungated") {
 		p.fail(pos, "syntax", "%s names no gate: a row is %s gatedBy <gate>, or %s ungated for an operation that finds out who is asking itself (spec.md 15.1)", op, op, op)
 	}
-	if at := p.tok.pos; word("after") {
-		if r.Gate == nil {
-			p.fail(at, "syntax", "%s is ungated, and after names a step between a gate and its work: remove after and its step, or give %s a gate (spec.md 15.1)", op, op)
-		}
-		r.After = name()
+	if !p.tok.nl && !p.at(",") && !p.at("}") {
+		p.fail(p.tok.pos, "syntax", "a row is %s gatedBy <gate>, or %s ungated, and nothing more: remove %s, or end the row with a comma or a new line (spec.md 15.1)", op, op, describe(p.tok))
 	}
 	return r
 }

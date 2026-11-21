@@ -1119,8 +1119,8 @@ func TestPrelude(t *testing.T) {
 // Each api list is a table in its package: its check, its operations
 // in order, by their names on the wire, an imported one among them,
 // and the entries of each enum they reach. A gated row is its gate, a
-// shared one given the row's input, its step and its work, whose
-// types Go fits. An unchecked list is an rpc.Unserved, which no
+// shared one given the row's input, and its work, whose types Go
+// fits. An unchecked list is an rpc.Unserved, which no
 // handler takes. A table whose name a type or a fun has takes _api,
 // and a val named as an enum's entries takes _val.
 func TestTables(t *testing.T) {
@@ -1151,14 +1151,13 @@ import kogo.io.Console
 import kogo.rpc.Request
 import u.g
 import u.theirs
-api ops checkedBy ours { me ungated, f ungated, held gatedBy who, sent gatedBy asked after step, rung gatedBy who }
+api ops checkedBy ours { me ungated, f ungated, held gatedBy who, sent gatedBy asked, rung gatedBy who }
 api other checkedBy theirs { g ungated }
 api hooks unchecked { me ungated }
 data class Who(val n: Int)
 fun ours(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }
 fun who(tx: SerializableTx, env: Env, request: Request): Either<String, Who> = either { Who(1) }
 fun asked(tx: Tx, env: Env, request: Request, input: Ask): Either<String, Who> = either { Who(1) }
-action fun step(env: Env, who: Who, input: Ask): Either<String, Unit> = either { env.console.println("") }
 action fun rung(env: Env, who: Who, input: Unit): Either<String, Unit> = either { env.console.println("") }
 fun held(env: Env, who: Who, input: Unit): Either<String, Unit> = either { }
 fun sent(env: Env, who: Who, input: Ask): Either<String, State> = either { State.Done }

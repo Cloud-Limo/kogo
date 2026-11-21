@@ -61,12 +61,11 @@ type API struct {
 	Rows      []*Row
 }
 
-// A Row is one operation of an api list: op gatedBy gate, op gatedBy
-// gate after step, or op ungated.
+// A Row is one operation of an api list: op gatedBy gate, or op
+// ungated.
 type Row struct {
-	Op    *Ident
-	Gate  *Ident // nil in an ungated row
-	After *Ident // the step that runs outside; nil where there is none
+	Op   *Ident
+	Gate *Ident // nil in an ungated row
 }
 
 // A Tests is a tests list, tests name<Env> { a, b }: the top-level

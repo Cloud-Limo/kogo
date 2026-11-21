@@ -171,12 +171,12 @@ func TestDeclarations(t *testing.T) {
 	}
 
 	// An api list's head says checkedBy a fun or unchecked, and a row
-	// is one of three forms (spec.md 15.1). A list may end with a
+	// is one of two forms (spec.md 15.1). A list may end with a
 	// comma, and api and a list's words are names elsewhere, an
 	// operation's among them.
-	f = parse(t, "api ops checkedBy ours { a gatedBy g, b gatedBy g after s, c ungated, }\napi other unchecked {\n    after ungated\n    ungated gatedBy gatedBy\n    after gatedBy unchecked after after\n}\nfun api(api: Int, ungated: Int): Int = api + ungated")
-	if got := show(f.APIs); got != `[(API ops (Ident ours) [(Row (Ident a) (Ident g)) (Row (Ident b) (Ident g) (Ident s)) (Row (Ident c))])`+
-		` (API other Unchecked [(Row (Ident after)) (Row (Ident ungated) (Ident gatedBy)) (Row (Ident after) (Ident unchecked) (Ident after))])]` || len(f.Decls) != 1 {
+	f = parse(t, "api ops checkedBy ours { a gatedBy g, c ungated, }\napi other unchecked {\n    after ungated\n    ungated gatedBy gatedBy\n    after gatedBy unchecked\n}\nfun api(api: Int, ungated: Int): Int = api + ungated")
+	if got := show(f.APIs); got != `[(API ops (Ident ours) [(Row (Ident a) (Ident g)) (Row (Ident c))])`+
+		` (API other Unchecked [(Row (Ident after)) (Row (Ident ungated) (Ident gatedBy)) (Row (Ident after) (Ident unchecked))])]` || len(f.Decls) != 1 {
 		t.Errorf("api lists: %s, %d declarations", got, len(f.Decls))
 	}
 	// A head with neither word parses, for the checker to refuse.
@@ -196,8 +196,8 @@ func TestDeclarations(t *testing.T) {
 			}
 		}
 	}
-	f = parse(t, "api l unchecked { a gatedBy g, b ungated\n    c gatedBy g after s,\n    d ungated, }")
-	if got := show(f.APIs); got != `[(API l Unchecked [(Row (Ident a) (Ident g)) (Row (Ident b)) (Row (Ident c) (Ident g) (Ident s)) (Row (Ident d))])]` {
+	f = parse(t, "api l unchecked { a gatedBy g, b ungated\n    c gatedBy g,\n    d ungated, }")
+	if got := show(f.APIs); got != `[(API l Unchecked [(Row (Ident a) (Ident g)) (Row (Ident b)) (Row (Ident c) (Ident g)) (Row (Ident d))])]` {
 		t.Errorf("an api list of commas and new lines mixed: %s", got)
 	}
 	// A blank line or a comment between entries still separates them,

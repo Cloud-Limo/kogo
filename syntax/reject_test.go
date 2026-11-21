@@ -131,22 +131,20 @@ func TestFaults(t *testing.T) {
 		{"fun f(‸@M x: Int) {}", "syntax", "a parameter takes no modifier"},
 		{"data class D(‸@M val x: Int)", "syntax", "a marker on a data class's property is written @property:M, as Kotlin has it"},
 		// A list's entries are separated by a comma or a line end.
-		{"api ops unchecked { a ungated ‸b ungated }", "syntax", "expected , or a new line between a list's entries"},
+		{"api ops unchecked { a ungated, b ungated ‸c }", "syntax", "a row is b gatedBy <gate>, or b ungated, and nothing more: remove \"c\", or end the row with a comma or a new line"},
 		// A row of an api list names its gate or says ungated, on one
 		// line (spec.md 15.1).
 		{"api ops unchecked { ‸a }", "syntax", "a names no gate: a row is a gatedBy <gate>, or a ungated"},
 		{"api ops unchecked { ‸a, b ungated }", "syntax", "a names no gate"},
 		{"api ops unchecked { ‸a after s }", "syntax", "a names no gate"},
-		{"api ops unchecked { a ungated ‸after s }", "syntax", "a is ungated, and after names a step between a gate and its work: remove after and its step, or give a a gate"},
+		// after, as any word after the gate or ungated, is a word too many.
+		{"api ops unchecked { a ungated ‸after s }", "syntax", "a row is a gatedBy <gate>, or a ungated, and nothing more: remove \"after\""},
+		{"api ops unchecked { a gatedBy g ‸after s }", "syntax", "a row is a gatedBy <gate>, or a ungated, and nothing more: remove \"after\""},
 		{"api ops unchecked { a gatedBy ‸}", "syntax", "expected a name"},
-		{"api ops unchecked { a gatedBy g after ‸}", "syntax", "expected a name"},
-		{"api ops unchecked { a gatedBy g ‸gatedBy h }", "syntax", "expected , or a new line between a list's entries"},
+		{"api ops unchecked { a gatedBy g ‸gatedBy h }", "syntax", "a row is a gatedBy <gate>, or a ungated, and nothing more: remove \"gatedBy\""},
 		{"api ops unchecked {\n    a\n    ‸gatedBy g\n}", "syntax", "a row stays on one line: move gatedBy onto a's line"},
 		{"api ops unchecked {\n    a\n    ‸ungated\n}", "syntax", "a row stays on one line: move ungated onto a's line"},
-		{"api ops unchecked {\n    a gatedBy g\n    ‸after s\n}", "syntax", "a row stays on one line: move after onto a's line"},
-		{"api ops unchecked {\n    a ungated\n    ‸after s\n}", "syntax", "a row stays on one line: move after onto a's line"},
 		{"api ops unchecked {\n    a gatedBy\n    ‸g\n}", "syntax", "a row stays on one line: move g onto a's line"},
-		{"api ops unchecked {\n    a gatedBy g after\n    ‸s\n}", "syntax", "a row stays on one line: move s onto a's line"},
 		{"api ops checkedBy ‸{ a ungated }", "syntax", "expected a name"},
 		{"api ops ‸checked { a ungated }", "syntax", "expected {"},
 		{"tests ts<Unit> { a ‸b }", "syntax", "expected , or a new line between a list's entries"},

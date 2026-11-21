@@ -246,7 +246,7 @@ func (e *emitter) chains() {
 }
 
 // table writes an api list's rpc.Table: its check, each operation's
-// name on the wire and its fun, or its gate, step and work, in the
+// name on the wire and its fun, or its gate and work, in the
 // list's order, and the entries of each enum the operations reach, by
 // which the server reads an input's enum. An unchecked list is an
 // rpc.Unserved, which no handler takes. Beside it goes each of its
@@ -266,18 +266,15 @@ func (e *emitter) table(d *syntax.API) {
 		}
 		if op.Gate != nil {
 			// A gate that reads no input is shared: rpc.Shared gives
-			// it the row's input. A row with no step has a nil one.
-			gate, step := fun(op.Gate), "nil"
+			// it the row's input.
+			gate := fun(op.Gate)
 			if len(op.Gate.Params) == 3 {
 				gate = fmt.Sprintf("%s[%s](%s)", rpc("Shared"), e.typ(op.Input), gate)
 			}
-			if op.After != nil {
-				step = fun(op.After)
-			}
-			if kind, funs = "Gated", gate+", "+step+", "+funs; op.Func.Action {
+			if kind, funs = "Gated", gate+", "+funs; op.Func.Action {
 				// Work that is an action fun runs after its gate's
-				// transaction, with none open; it has no step.
-				kind, funs = "Outside", gate+", "+fun(op.Func)
+				// transaction, with none open.
+				kind = "Outside"
 			}
 		}
 		if kind != "Db" { // the kind of transaction the server opens

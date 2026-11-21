@@ -33,18 +33,14 @@ func TestProofs(t *testing.T) {
 			"fun w(env: Env, f: Facts, input: Unit): Either<String, Int> = either { f.n }\napi a unchecked { w gatedBy g }",
 		model+"data class Facts(val held: List<Held>)\nfun g(tx: Tx, env: Env, request: Request): Either<String, Facts> = either { Facts(listOf()) }\n"+
 			"fun w(env: Env, f: Facts, input: Unit): Either<String, Int> = either { f.held.size }\napi a unchecked { w gatedBy g }",
-		// A step and work that runs outside read the proof's facts.
-		model+"api a unchecked {\n    work gatedBy gate after step\n    out gatedBy gate\n}\n"+
-			"action fun step(env: Env, booking: Held, input: Unit): Either<String, Unit> = either {\n    ensure(booking.id > 0) { \"no\" }\n    env.bell.ring()\n}\n"+
-			"fun work(env: Env, booking: Held, input: Unit): Either<String, Int> = either { save(booking, 1) }\n"+
+		// Work that runs outside reads the proof's facts.
+		model+"api a unchecked { out gatedBy gate }\n"+
 			"action fun out(env: Env, booking: Held, input: Unit): Either<String, Int> = either {\n    env.bell.ring()\n    booking.id\n}",
 	)
-	step := model + "api a unchecked { work gatedBy gate after step }\nfun work(env: Env, booking: Held, input: Unit): Either<String, Int> = either { save(booking, 1) }\n" +
-		"action fun step(env: Env, booking: Held, input: Unit): Either<String, Unit> = either {\n    env.bell.ring()\n"
+	out := model + "api a unchecked { out gatedBy gate }\naction fun out(env: Env, booking: Held, input: Unit): Either<String, Unit> = either {\n    env.bell.ring()\n"
 	refused(t, [][3]string{
 		// The design's refused samples (doc/gates.md).
 		{model + "fun deletePassenger(tx: Tx, passengerId: Int): Int = tx.execute(sql\"$passengerId: Int\")\nfun removePassenger(booking: Held, passengerId: Int): Int =\n    ‸deletePassenger(booking.tx, passengerId)", "proof-tx-escapes", "booking.tx is passed to deletePassenger; a proof's transaction is used only as booking.tx.query/execute/...: pass booking instead"},
-		{step + "    ‸save(booking, 1)\n}", "outside-passes-proof", "step passes booking to save, and an outside step has no transaction: move the call to the work"},
 		// The transaction leaves by no other way.
 		{model + "fun f(booking: Held): Int {\n    val tx = ‸booking.tx\n    return 1\n}", "proof-tx-escapes", "booking.tx is kept or handed on here; a proof's transaction is used only as booking.tx.query/execute/...: keep and pass booking instead"},
 		{model + "fun f(booking: Held): Tx = ‸booking.tx", "proof-tx-escapes", "booking.tx is kept or handed on here"},
@@ -56,10 +52,10 @@ func TestProofs(t *testing.T) {
 		// An action fun takes a proof only from an api list, and uses none.
 		{model + "action fun f(env: Env, ‸booking: Held?) {\n    env.bell.ring()\n}", "action-proof", "f is an action fun and takes a proof, booking"},
 		{model + "action fun f(env: Env, ‸booking: Held) {\n    env.bell.ring()\n}", "action-proof", "f is an action fun and takes a proof, booking: an action runs with no transaction open, and a proof is handed to one only by an api list"},
-		{step + "    ‸booking.tx.execute(sql\"${booking.id}: Int\")\n}", "outside-passes-proof", "step runs a statement on booking.tx, and an outside step has no transaction: that one has ended, so move the statement to the work"},
-		{step + "    ‸places(booking.tenant)\n}\nfun places(at: AtTenant): Int = at.tx.execute(sql\"\")", "outside-passes-proof", "step passes booking.tenant to places"},
-		{step + "    ‸booking.show()\n}\nfun Held.show(): Int = tx.execute(sql\"${id}: Int\")", "outside-passes-proof", "step passes booking to show"},
-		{step + "    ‸retry { booking }\n}\nfun retry(f: () -> Held): Int = save(f(), 1)", "outside-passes-proof", "step passes a proof to retry"},
+		{out + "    ‸booking.tx.execute(sql\"${booking.id}: Int\")\n}", "outside-passes-proof", "out runs a statement on booking.tx, and work that runs outside has no transaction: that one has ended, so move the statement into the gate, or make out a fun"},
+		{out + "    ‸places(booking.tenant)\n}\nfun places(at: AtTenant): Int = at.tx.execute(sql\"\")", "outside-passes-proof", "out passes booking.tenant to places"},
+		{out + "    ‸booking.show()\n}\nfun Held.show(): Int = tx.execute(sql\"${id}: Int\")", "outside-passes-proof", "out passes booking to show"},
+		{out + "    ‸retry { booking }\n}\nfun retry(f: () -> Held): Int = save(f(), 1)", "outside-passes-proof", "out passes a proof to retry"},
 		{model + "api a unchecked { out gatedBy gate }\naction fun out(env: Env, booking: Held, input: Unit): Either<String, Int> = either {\n    env.bell.ring()\n    ‸save(booking, 1)\n}", "outside-passes-proof",
 			"out passes booking to save, and work that runs outside has no transaction: move the call into the gate, or make out a fun, which runs in the transaction"},
 		// A gate that gives a transaction gives it in a proof.

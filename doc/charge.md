@@ -1,5 +1,7 @@
 # cusoon2's charge, written in the agreed forms
 
+Proofs left the language with DEV-1040; `doc/gates.md` is the design.
+
 DEV-900, 17 Nov 2026. The flow by which a payer on the hosted invoice
 page pays by card, written in the forms of `doc/gates.md`,
 `doc/work.md` and `doc/lists.md`, to find what does not fit. Read from

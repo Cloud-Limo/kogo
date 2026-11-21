@@ -1,5 +1,7 @@
 # Workers, outside services and time limits
 
+Proofs left the language with DEV-1040; `doc/gates.md` is the design.
+
 Agreed with Greg in discussion on 17 Nov 2026, as the design to work
 from, beside `doc/gates.md`. It is not built and not in `spec.md`:
 until it is, the spec stands as written. No example here has been

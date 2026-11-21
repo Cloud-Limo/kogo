@@ -1515,9 +1515,10 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   `db.tx(serializable = true)` must not (10.7).
 - An operation that takes a `Db` runs in no transaction and opens its
   own with `db.tx` (10.7). Each ends with its block, which answers
-  facts and nothing that holds a transaction (15.7). Write one where something must stay after a
-  refusal, as the count of a failed login does, or must happen once, as
-  redeeming a code with another service must.
+  facts and nothing that holds a transaction (15.7). Write one where
+  something must stay after a refusal, as the count of a failed login
+  does, or must happen once, as redeeming a code with another service
+  must.
 
 ```kotlin
 action fun completeLogin(db: Db, env: OpsEnv, request: Request, input: CompleteLoginInput): Either<String, DriverAccount> = either {

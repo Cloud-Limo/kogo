@@ -1,5 +1,7 @@
 # Lists: one mechanism
 
+Proofs left the language with DEV-1040; `doc/gates.md` is the design.
+
 Agreed with Greg in discussion on 17 Nov 2026, beside `doc/gates.md`
 and `doc/work.md`, which hold each list's own design, and spelt on
 18 Nov 2026 (DEV-894, "How a list is written" below). The `api`

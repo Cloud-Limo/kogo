@@ -5,7 +5,8 @@ reaches the database. Greg ruled on this design on 21 Nov 2026
 (DEV-1035), from cusoon2's `doc/plans/gates.md`, which is the same
 design written for cusoon2's port and has its counts. This document
 is the design alone, in Kogo's terms. What was weighed and not taken
-keeps a sentence each, at the end; `decisions.md` has the reasons.
+keeps a sentence each, with its reason, at the end; `decisions.md`
+has the rest.
 
 What is built: the list, its check, the gate and the work (spec 15.1
 to 15.3, 15.5), a gate held to reading (15.2, 15.3), `action fun`
@@ -243,6 +244,9 @@ action fun testPrinter(env: DeskEnv, printing: Printing, input: Unit): Either<St
   ```
 - What the work needs of the request is a fact of the gate's answer,
   as the address is here.
+- Such a row has no transaction for a step to run in, so a check on
+  the thing its input names is its gate's: a gate may read the
+  operation's input, and then stands in that one row (spec 15.2).
 - This is the one place a gate and an answer type are written for
   particular rows. In cusoon2 they are the passkey registrations,
   which share a gate on each site, and deleting a passkey.
@@ -282,7 +286,7 @@ action answered, is `ungated` on a `Db` and calls its gate itself in
 each of its transactions:
 
 ```kotlin
-// a sketch, cut to the first transaction
+// cut to the first transaction
     val number = db.tx(serializable = true) { tx ->
         val call = atDesk(tx, env, request).bind()
         requireOpenInvoice(call, input.number).bind().number
@@ -717,29 +721,39 @@ here does.
 
 ## Weighed and not taken
 
-A sentence each; `decisions.md` and cusoon2's `gate-design.md` have
-the reasons.
+A sentence each, with its reason; `decisions.md` has the rest.
 
-- **A proof**: a data class the checker knew by a marked transaction,
-  whose transaction was written only before the dot of a statement
-  and passed only into another proof (`gate-proof`,
+- **A proof's marked transaction, kept from every name** (`gate-proof`,
   `proof-tx-escapes`, `outside-passes-proof`, `action-proof`). Built,
   and taken out on 21 Nov 2026 (DEV-1040): it refused a transaction
-  kept in a name, a stand-in, and not one used after it ended.
-- **A statement binds something of its proof.** Taken out on 20 Nov
-  2026 (DEV-1029): it guarded nothing in the port it was written for.
+  kept in a name, which is harmless inside the work, and not the
+  mistake, a transaction used after it ended; the two refusals of
+  15.7 refuse that.
+- **A rule that a statement binds something of its proof, or is
+  written only in the model.** Nothing checks a `where`, so the rule
+  refused a stand-in and passed the mistake.
 - **The outside step, a row's `after`.** Built, and taken out on 21
   Nov 2026 (DEV-1039): the one operation that needed it is `ungated`
   on a `Db`.
-- **A gate function for each row.** A gate says who is asking and a
-  step what they may touch, so rows share a gate.
-- **A rule that statements are written only in the model**, or bind
-  something of a held value. Postgres holds what a statement reaches,
-  from whatever file it is written in.
-- **`Admitted<P>`, a `Model` around the transaction, an `enteredBy`
-  clause, `requires` and `then` blocks, and `steps` or `unread ids`
-  lines in the printed table**: each weighed in cusoon2's
-  `gate-design.md` or on its review, and left out.
+- **A gate function for each row, answering an envelope such as
+  `Admitted<P>`.** A row's own check is a step, the first line of its
+  work, and a model function that takes the held value means the step
+  cannot be left out; a gate for each row adds a function and a type
+  to every operation and holds nothing more.
+- **A `Model` around the transaction, so that the work can write no
+  SQL.** Kogo is made for writing SQL, and what a statement reaches is
+  Postgres's to hold, by its policies, whatever file the statement is
+  written in.
+- **An `enteredBy` clause on the list, run before each gate.** A gate
+  that reads no input already is the function that enters, and its
+  row names it: `gatedBy loggedIn` says it a row at a time, in a word
+  Kogo has.
+- **`requires` and `then` blocks in an operation.** A step is a plain
+  function whose line ends in `.bind()`; the blocks are new syntax and
+  one more departure from Kotlin.
+- **`steps` and `unread ids` lines in the printed table.** The table's
+  command is not built, and a second id is held by its `where` and a
+  test of the application's.
 - **Every mark on a model function going**, with the access test
   alone as the wall between two callers a policy admits alike.
 - **`action-tx` widened to whatever holds a transaction.** No value
@@ -767,6 +781,3 @@ the reasons.
 - The printed table's command is deferred: named when it is built
   (`doc/roadmap.md`).
 - Commands are designed and not built.
-- A gate may still read its operation's input, and then stands in one
-  row (spec 15.2). The design's gates read none; whether the form
-  stays is not decided here.

@@ -28,6 +28,7 @@ func TestHeldTransactions(t *testing.T) {
 			"action fun out(env: Env, f: Facts, input: Unit): Either<String, Int> = either {\n    env.bell.ring()\n    f.id\n}",
 		// A type that holds itself ends, and holds none.
 		model+out+"data class Clerk(val n: Int, val next: Clerk?)\nfun g(tx: Tx, env: Env, request: Request): Either<String, Clerk> = either { raise(\"no\") }\napi a unchecked { out gatedBy g }",
+		model+out+"data class X<T>(val v: T, val next: X<List<T>>?)\ntypealias Clerk = X<Int>\nfun g(tx: Tx, env: Env, request: Request): Either<String, Clerk> = either { raise(\"no\") }\napi a unchecked { out gatedBy g }",
 		// A db.tx block answers facts, and a nested block does not end the transaction.
 		model+"fun f(db: Db, env: Env, request: Request): Either<String, Int> = either {\n    val id = db.tx(serializable = true) { tx -> gate(tx, env, request).bind().person.id }.bind()\n    id\n}",
 		model+"fun f(call: Call): Tx = call.tx.atomically { call.tx }",
@@ -41,6 +42,7 @@ func TestHeldTransactions(t *testing.T) {
 		{model + out + gives("interface Clerk {\n    val tx: Tx\n}"), "action-gate", "tx, a property of Clerk"},
 		{model + out + gives("data class Clerk(val xs: List<Call>)"), "action-gate", "xs.tx, a property of Call"},
 		{model + out + gives("data class Box<T>(val v: T)\ntypealias Clerk = Box<Tx>"), "action-gate", "answers Box<Tx>, which holds a transaction, Tx:"},
+		{model + out + gives("data class Clerk(val calls: List<List<Call>>)"), "action-gate", "calls.tx, a property of Call"},
 		{model + out + gives("sealed interface Clerk {\n    data class V(val tx: Tx) : Clerk\n}"), "action-gate", "tx, a property of Clerk.V"},
 		{model + out + gives("data class Clerk(val f: () -> Tx)"), "action-gate", "which holds a transaction, f():"},
 		// A db.tx block answers nothing that holds a transaction.
@@ -49,6 +51,7 @@ func TestHeldTransactions(t *testing.T) {
 		{model + "fun f(db: Db): Tx = db.‸tx { tx -> tx }", "tx-escapes", "this db.tx block answers Tx, the transaction itself"},
 		{model + "fun f(db: Db, env: Env, request: Request): Either<String, Call> = db.‸tx(serializable = true) { tx -> gate(tx, env, request).bind() }", "tx-escapes",
 			"this db.tx block answers Call, which holds a transaction, tx, a property of Call: the transaction ends with the block"},
+		{model + "data class Box<T>(val v: T)\nfun f(db: Db): Box<Box<Tx>> = db.‸tx { tx -> Box(Box(tx)) }", "tx-escapes", "answers Box<Box<Tx>>, which holds a transaction, Tx"},
 		{model + "data class Kept(val n: Int, val tx: Tx?)\nfun f(db: Db): Kept = db.‸tx { tx -> Kept(1, tx) }", "tx-escapes", "answers Kept, which holds a transaction, tx, a property of Kept"},
 		// A private constructor is its file's: no other makes a call (section 2).
 		{model + "---\npackage u\nimport t.Call\nimport t.Person\nfun f(tx: SerializableTx, p: Person): Call = ‸Call(tx, p)", "not-visible", "Call's constructor is private to f2.kg"},

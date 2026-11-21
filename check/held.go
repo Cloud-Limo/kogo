@@ -19,7 +19,7 @@ import (
 // argument or a function's result; or gives "". It looks at any
 // depth: properties, type arguments, a sealed interface's variants
 // and a function's result.
-func (c *checker) holdsTx(t Type, seen []*TypeDecl) (string, *TypeDecl) {
+func (c *checker) holdsTx(t Type, seen []string) (string, *TypeDecl) {
 	held := func(t Type, name string, holder *TypeDecl) (string, *TypeDecl) {
 		if c.isTx(nonNull(t)) {
 			return cmp.Or(name, t.String()), holder
@@ -34,10 +34,13 @@ func (c *checker) holdsTx(t Type, seen []*TypeDecl) (string, *TypeDecl) {
 	case *FuncType:
 		return held(t.Result, "()", nil)
 	case *Named:
-		if slices.Contains(seen, t.Decl) {
+		// Keyed on the type with its arguments: List<List<Call>> reads
+		// its inner List. Properties are read before substitution, so
+		// a type that holds itself, X<List<T>> in X<T>, still ends.
+		if slices.Contains(seen, t.String()) {
 			return "", nil
 		}
-		seen = append(seen, t.Decl)
+		seen = append(seen, t.String())
 		for _, a := range t.Args {
 			if path, in := held(a, "", nil); path != "" {
 				return path, in

@@ -142,6 +142,8 @@ func TestFaults(t *testing.T) {
 		{"api ops unchecked { a gatedBy g ‸after s }", "syntax", "a row is a gatedBy <gate>, or a ungated, and nothing more: remove \"after\""},
 		{"api ops unchecked { a gatedBy ‸}", "syntax", "expected a name"},
 		{"api ops unchecked { a gatedBy g ‸gatedBy h }", "syntax", "a row is a gatedBy <gate>, or a ungated, and nothing more: remove \"gatedBy\""},
+		// A row left open at the end of the file gets the list's error.
+		{"api ops unchecked { a ungated‸", "syntax", "expected , or a new line between a list's entries, found the end"},
 		{"api ops unchecked {\n    a\n    ‸gatedBy g\n}", "syntax", "a row stays on one line: move gatedBy onto a's line"},
 		{"api ops unchecked {\n    a\n    ‸ungated\n}", "syntax", "a row stays on one line: move ungated onto a's line"},
 		{"api ops unchecked {\n    a gatedBy\n    ‸g\n}", "syntax", "a row stays on one line: move g onto a's line"},

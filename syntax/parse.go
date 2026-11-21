@@ -265,7 +265,7 @@ func (p *parser) row() *Row {
 	} else if !word("ungated") {
 		p.fail(pos, "syntax", "%s names no gate: a row is %s gatedBy <gate>, or %s ungated for an operation that finds out who is asking itself (spec.md 15.1)", op, op, op)
 	}
-	if !p.tok.nl && !p.at(",") && !p.at("}") {
+	if p.tok.kind != tEOF && !p.tok.nl && !p.at(",") && !p.at("}") {
 		p.fail(p.tok.pos, "syntax", "a row is %s gatedBy <gate>, or %s ungated, and nothing more: remove %s, or end the row with a comma or a new line (spec.md 15.1)", op, op, describe(p.tok))
 	}
 	return r

@@ -261,6 +261,30 @@ func TestNames(t *testing.T) {
 	}
 }
 
+// Section 2: import ... as gives a declaration another name in the
+// file, for its type, constructor, constants and variants; and an
+// import does not hide what the file's own package declares.
+func TestImportAs(t *testing.T) {
+	rows := "\n---\npackage b\ndata class Area(val id: Int, val label: String)\nenum class Tone { warm, cold }\nsealed interface O {\n    data class Ok(val n: Int) : O\n}\nfun g(): Int = 1\nval limit: Int = 2"
+	passes(t,
+		"package a\nimport b.Area as AreaRow\ndata class Area(val label: String)\nfun f(r: AreaRow): Area = Area(r.label)\nfun h(): AreaRow = AreaRow(1, \"x\")"+rows,
+		"package a\nimport b.Tone as T\nimport b.O as Out\nimport b.g as bg\nimport b.limit as cap\nfun f(o: Out): T = when (o) {\n    is Out.Ok -> T.warm\n}\nfun h(): Int = bg() + cap + Out.Ok(1).n"+rows,
+		"package a\nimport kogo.Either as KogoEither\ndata class Either(val n: Int)\nfun f(e: Either): KogoEither<String, Int> = e.n.right()",
+		// A fun of the package's own name is one more candidate.
+		"package a\nimport b.g\nfun g(n: Int): Int = n\nfun f(): Int = g() + g(1)"+rows,
+	)
+	refused(t, [][3]string{
+		{"package a\nimport ‸b.Area\ndata class Area(val label: String)" + rows, "own-import", "package a declares Area, which this import would hide: give the import another name, import b.Area as Other, or rename one"},
+		{"package a\nimport ‸b.limit\ntypealias limit = Int" + rows, "own-import", "package a declares limit"},
+		{"package a\nimport ‸b.g as Area\nval Area: Int = 1" + rows, "own-import", "package a declares Area"},
+		{"package a\nimport ‸a.Area\n---\npackage a\ndata class Area(val n: Int)", "own-import", "Area is package a's own, which needs no import: remove this import"},
+		{"package a\nimport c.g\nimport ‸b.g\n---\npackage c\nfun g(n: Int): Int = n" + rows, "duplicate", "g is already imported from package c: give one another name, import b.g as Other"},
+		{"package a\nimport b.Area as g\nimport ‸b.g" + rows, "duplicate", "g is already imported from package b"},
+		{"package a\nimport b.g\nimport ‸b.Area as g" + rows, "duplicate", "g is already imported from package b"},
+		{"package a\nimport b.Area as R\nfun f(): R = ‸Area(1, \"x\")" + rows, "unknown-name", "Area is not in scope"},
+	})
+}
+
 // A program's file is not the prelude's for claiming its package.
 func TestBindingsOnlyInPrelude(t *testing.T) {
 	f, err := syntax.Parse("p.kg", []byte("package kogo\nexternal class Box\n"))
@@ -283,6 +307,8 @@ func TestImportCycles(t *testing.T) {
 	refused(t, [][3]string{
 		{"package a\nimport ‸b.g\nimport b.h\nfun f(): Int = g() + h()\n---\npackage b\nimport a.f\nfun g(): Int = 1\nfun h(): Int = 2\nfun k(): Int = f()",
 			"import-cycle", "packages import each other: f1.kg:2 in a imports b.g, b.h; f2.kg:2 in b imports a.f; move what one package takes from another into a package both may import"},
+		// The cycle runs through an import with as, to package b.
+		{"package a\nimport ‸b.g as bg\nfun f(): Int = bg()\n---\npackage b\nimport a.f\nfun g(): Int = 1\nfun k(): Int = f()", "import-cycle", ": f1.kg:2 in a imports b.g;"},
 		{"package a\nimport ‸b.g\nfun f(): Int = 1\n---\npackage b\nimport c.h\nfun g(): Int = 1\n---\npackage c\nimport a.f\nfun h(): Int = 1",
 			"import-cycle", ": f1.kg:2 in a imports b.g; f2.kg:2 in b imports c.h; f3.kg:2 in c imports a.f;"},
 		// a takes from c and b, both of which take from a: of the two
@@ -534,6 +560,10 @@ func TestCalls(t *testing.T) {
 		"fun f(): List<Int?> = listOf(1, null)",
 		"fun f(): List<Long> = emptyList()\nfun g(): List<Long> = listOf<Long>(1, 2)\nfun h(xs: List<Long>?): List<Long> = xs ?: emptyList()",
 		"fun f(): Int = emptyList<Int>().size + listOf(1).map { it }.first()",
+		// The left of ?: settles a call's on its right.
+		"fun f(xs: List<Long>?): Int {\n    val ys = xs ?: emptyList()\n    return ys.size + (xs ?: emptyList()).size\n}",
+		// but not one with a lambda argument, whose lambda settles it.
+		"sealed interface S {\n    data class A(val v: Long) : S\n    data class B(val v: Long) : S\n}\nfun <R> make(block: () -> R): R = block()\nfun f(a: S.A?, b: S.B): S {\n    val s = a ?: make { b }\n    return s\n}",
 		"fun <T> twice(use: (T) -> Int, make: () -> T): Int = use(make())\nfun f(): Int = twice({ x: String -> x.length }, { \"\" })",
 		"fun <T> firstOr(items: List<T>, fallback: T): T = if (items.size > 0) items.first() else fallback\nfun f(xs: List<Long>): Long = firstOr(xs, 0L) + firstOr(emptyList<Long>(), 0L)",
 		"sealed interface S<out T> {\n    data class A<T>(val v: T) : S<T>\n    data object B : S<Nothing>\n}\nfun f(): List<S<Int>> = listOf(S.A(1), S.B)",

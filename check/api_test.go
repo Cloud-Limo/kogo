@@ -33,6 +33,9 @@ func TestOperations(t *testing.T) {
 	time := "\n---\npackage kogo.time\nexternal class Instant"
 	refused(t, [][3]string{
 		{rpc() + "api ops unchecked { ‸nope ungated }", "unknown-name", "nothing named nope"},
+		// The name on the wire is the fun's own, so the list writes it.
+		{"package kogo.rpc\nexternal class Request\n---\npackage a\nimport b.me as other\napi ops unchecked { ‸other ungated }\n---\npackage b\nimport kogo.rpc.Request\ndata class E(val n: Int)\nfun me(db: Db, env: E, request: Request, input: Unit): Either<String, Unit> = either { }",
+			"operation", "me is imported as other: a list names an operation by its fun's own name, its name on the wire, so write me in a file that imports it by that name"},
 		{rpc() + "val v: Int = 1\napi ops unchecked { ‸v ungated }", "operation", "v is not a top-level fun"},
 		{rpc() + "api ops unchecked { me ungated, ‸me ungated }", "duplicate", "me is already in api ops"},
 		{rpc() + "fun me(s: String): Int = 1\napi ops unchecked { ‸me ungated }", "operation", "2 funs called me are in scope"},

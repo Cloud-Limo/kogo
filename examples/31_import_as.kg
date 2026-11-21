@@ -1,0 +1,26 @@
+// import ... as (spec.md 2): the table's row from example 12 beside
+// the wire type of the same name, which this package declares. The
+// file writes the row as BusinessRow, its type and its constructor
+// alike; kogo emit and kogo ts write each by its own name.
+package example.front
+
+import example.Business as BusinessRow
+import example.businessBySlug
+import kogo.rpc.Request
+
+api front unchecked {
+    business  ungated
+}
+
+data class FrontEnv(val site: String)
+
+data class Business(val slug: String, val name: String)
+
+private fun wire(row: BusinessRow): Business = Business(row.slug, row.legalName)
+
+fun business(tx: Tx, env: FrontEnv, request: Request, input: String): Either<String, Business> = either {
+    wire(businessBySlug(tx, input) ?: raise("There is no business $input."))
+}
+
+// The constructor, by the file's name for it.
+fun sample(row: BusinessRow): BusinessRow = BusinessRow(row.id, "sample", row.legalName, row.createdAt, null, null, null, null)

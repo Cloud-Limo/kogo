@@ -43,12 +43,28 @@ type File struct {
 	Name    string
 	OptIn   []*Annotation // the @file:OptIn(...) lines
 	Package *Ident        // a dotted name, as cusoon.model
-	Imports []*Ident
+	Imports []*Import
 	Decls   []Decl
 	APIs    []*API   // the api lists
 	Tests   []*Tests // the tests lists
 	SQL     []*SQL   // every sql literal of the file, in source order
 	Lines   int      // the line the source ends on
+}
+
+// An Import is one import line: the declaration's dotted name, and
+// the name the file gives it, as in import a.b.C as D; As is nil
+// without one.
+type Import struct {
+	*Ident
+	As *Ident
+}
+
+// Local gives the name the file writes for what the import names.
+func (i *Import) Local() string {
+	if i.As != nil {
+		return i.As.Name
+	}
+	return i.Name[strings.LastIndexByte(i.Name, '.')+1:]
 }
 
 // An API is an api list, api name checkedBy check { rows }: its check

@@ -39,7 +39,7 @@ Each entry: what was decided, why, and what would reopen it.
   receiver is not nullable either, so the rule holds for every extension and a reader
   need not know which prelude names a plain `.` on a nullable value still reaches. The
   prelude's two, `List<T>?.orEmpty()` and `String?.isNullOrBlank()`, are gone: write
-  `x ?: emptyList()`, with `emptyList<T>()` where nothing else settles `T` (DEV-1069), and
+  `x ?: emptyList()`, whose `T` the left of `?:` settles (DEV-1069), and
   `x == null || x.isBlank()`, which narrows `x` where `isNullOrBlank` did not. Not taken: keeping the two as a convenience of the prelude;
   cusoon2's port called them at three places, each as clear in the longer form.
 - **The columns under `exists` and `execute` are not typed** (15 Nov 2026). Both discard
@@ -4171,6 +4171,32 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   `postfix`, `limit` and `truncated` (one use in cusoon2's backend). Reopen when a port
   needs one.
 
+## `emptyList`'s type from the left of `?:` (DEV-1069), 21 Nov 2026
+
+- **A call with no lambda argument on the right of `?:` takes the left's type, made
+  non-null, as the type its result must have, when nothing outside the `?:` gives one**
+  (spec 5.1, rule 3; the lead approved it, 22 Nov 2026). Kotlin settles `T` in
+  `xs ?: emptyList()` from `xs` with the same meaning. With no lambda, rule 3 fills
+  only the type parameters the receiver and the arguments left open, which were
+  `type-arguments` errors before, so this grows the subset and changes no program that
+  checked before. Not taken: keeping `emptyList<T>()` where nothing else settles `T`,
+  which DEV-1067 made the form a reader writes for `orEmpty`.
+- **A call with a lambda argument there keeps what it did before** (Greg's ruling on
+  the review, 22 Nov 2026): its lambdas settle it, and `?:` takes the common type of its
+  two sides. Rule 3 comes before rule 4, so the left's type would override the lambda:
+  `a ?: make { b }` for `a: S.A?`, `b: S.B` checked as an `S` and would become a
+  `type-mismatch` at `b`. Not taken: handing the left's type to these calls too, which
+  would accept `xs ?: make { emptyList() }` but refuse that program, which checked
+  before. Reopen when a port needs the first.
+- **Only a call takes it**, written directly on the right: a literal there still has
+  its own type, so `n ?: 0` for `n: Long?` stays `no-common-type` with its fix `0L`, as
+  before. Not taken: handing the left's type to any right side, which would make that
+  `0` a Long here and nowhere else a literal stands without a wanted type. Nor a left
+  that is `null` or `Nothing`, which settles nothing.
+- **`if`/`else` and `when` branches do not settle one another**: `if (c) xs else
+  emptyList()` with no wanted type is still `type-arguments`, though Kotlin accepts it.
+  The issue scoped `?:` alone. Reopen when a port writes one.
+
 ## The guide settles each piece (DEV-1075), 22 Nov 2026
 
 - **A guide's sitting settles each piece of a design as it is shown** (Greg, 22 Nov 2026,
@@ -4192,3 +4218,30 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
 - **The guide is revised with Greg at the end of a sitting that chafed**, in place of
   "when it has been used twice more", which this revision met. Not taken: a count of
   uses, which would hold a fix back or force one that nobody wants.
+
+## `import ... as`, and an import that hides the package's own (DEV-1076), 21 Nov 2026
+
+- **Any import may take an `as`, a `kogo.` one included, as in Kotlin** (Greg's ruling on
+  DEV-1068, `doc/plans/packages-and-names-design.md` section 3). This reverses spec 2's
+  "no `import ... as`", which had no entry. The file writes the new name for the type,
+  its constructor, constants and variants; `kogo emit` and `kogo ts` write the declared
+  name. One name brought into a file twice stays `duplicate`, two funs included. Not
+  taken: a package written in code, `a.b.Name`; renaming as the only answer to two
+  types of one name; `as` only where a name is taken.
+- **An import is refused (`own-import`) where the file's own package declares its name,
+  as it writes it, as a type, a typealias or a top-level `val`**, though in Kotlin the
+  import wins (design section 4). A fun of that name stays one more candidate.
+- **The refusal takes an import from the file's own package of such a name, with its own
+  message: "remove this import"**. Not taken: exempting it, which leaves an import that
+  does nothing; refusing every import from the file's own package, which also takes one
+  of a fun, harmless, and grows the change past this issue. Reopen if a file needs the
+  latter.
+- **An `api` list names an operation by its fun's declared name, not an alias**: the
+  name on the wire is the declared one (15.1), and the list is where a reader finds it;
+  `listed` also keys duplicates by the written name. A list whose file imports the fun
+  under another name moves to a file that imports it by its own. A check or a gate,
+  never on the wire, may be named by an alias. Not taken: accepting the alias, as Kotlin
+  would any name in scope. Reopen if a port needs the alias in a list.
+- **An import of one declaration twice under the same alias is `duplicate`**, as is an
+  alias that meets another import's name; an import without `as` repeated stays
+  accepted, as before. Not taken: comparing aliases' targets, a line for nothing.

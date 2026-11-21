@@ -35,10 +35,22 @@ import cusoon.pricing.Cents
 import kogo.time.Instant
 ```
 
-- One `package` line, then imports, then declarations. No wildcard imports,
-  no `import ... as`. A package is the files that share a package line,
-  wherever they lie. An import names one declaration of another package;
-  a name of the file's own package needs none.
+- One `package` line, then imports, then declarations. No wildcard imports.
+  A package is the files that share a package line, wherever they lie. An
+  import names one declaration of another package; a name of the file's
+  own package needs none.
+- `import cusoon.schema.Area as AreaRow` gives the declaration another
+  name in this file, as in Kotlin: the file writes `AreaRow`, also for its
+  constructor, constants and variants. Any import may take one, a `kogo.`
+  one included. The name is the file's alone: `kogo emit` and `kogo ts`
+  write the declared one, and an `api` list names a fun by that (15.1). No
+  name comes into a file twice: one name imported from two packages is an
+  error at the second, two funs included, though Kotlin overloads those.
+  Give one `as`.
+- An import does not name what the file's own package declares as a
+  type, a typealias or a top-level `val`, though in Kotlin the import
+  wins: give it another name with `as`, or rename one. A fun of that name
+  is one more candidate (5.2).
 - Packages do not import each other, directly or through others, though
   Kotlin allows it.
 - A file holds any number of top-level declarations: functions, `val`
@@ -285,7 +297,11 @@ by the first of these that mentions it:
 2. the arguments that are not lambdas; when several mention it, their
    common type;
 3. the type the result must have: a declared type, a parameter's type,
-   the function's return type;
+   the function's return type; for a call with no lambda argument on
+   the right of `?:` where none of these is known, the type of the left
+   made non-null, so that `xs ?: emptyList()` is a `List<Long>` for
+   `xs: List<Long>?` (a call with a lambda argument there is settled by
+   its lambdas, and `?:` takes the common type of its two sides);
 4. what a lambda argument returns, lambdas taken left to right.
 
 Every argument and the result are then checked against what was
@@ -1318,7 +1334,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `String.format`, `Locale` | string templates, `padStart`, or `plain`, or a prelude function |
 | `by lazy`, delegation | compute it once and pass it |
 | `vararg`, `*spread` | a `List` |
-| `fun T?.f()`, `x.orEmpty()`, `x.isNullOrBlank()` | a parameter; `x ?: emptyList()`, with `emptyList<T>()` where nothing else settles `T`; `x == null \|\| x.isBlank()` |
+| `fun T?.f()`, `x.orEmpty()`, `x.isNullOrBlank()` | a parameter; `x ?: emptyList()`; `x == null \|\| x.isBlank()` |
 | `inline`, `reified`, `operator`, `infix` | a plain function |
 | `println`, `readln` | a `Console` parameter, from `kogo.io` |
 | value classes | `typealias`, in v0 |
@@ -1329,6 +1345,8 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | a top-level `val` that reads one below it through a function | declare the one it reads above it |
 | two files whose top-level `val`s use each other's files | move the `val`s into one file, or make one a fun |
 | `==` on a value that holds a function, as `rule == rule` | compare the other properties |
+| two funs of one name imported from two packages | `import ... as` on one |
+| an import of a name the file's own package declares | `import ... as`, or rename one |
 
 ## 15. Operations
 

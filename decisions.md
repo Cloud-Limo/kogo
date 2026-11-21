@@ -4057,3 +4057,16 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   would refuse headers no program reads. A panic that is a real fault stays a 500.
 - **The header is named as Go canonicalises it**, `X-Check` for `header("x-check")`,
   so one header reads one way in every 400 whatever case the program wrote.
+
+## Local runs on the dev VM (DEV-1057), 21 Nov 2026
+
+- **A step that needs the dev VM runs there headless** (Greg, 21 Nov). The lead starts an
+  issue's first step and the clerk each later one with `lin local DEV-NNN <where>
+  "<phrase>"`, in place of a phrase Greg said in Zed; a stack's clone is one issue's from
+  Pickup to merge, no time limit stops a session, one that ends without its step's
+  comment is handed to the lead as a failed clerk is, a walkthrough holds a clone, a guide
+  is still Greg's to start, and cusoon2's PRs are still his to merge. What the issue left
+  open, chiefly that a hold is read from `Taken`, `Held` and `Released` comments and the
+  $25 cap, is decided in cusoon2's `doc/plans/linear-workflow.md`, "The 21 Nov 2026 local
+  runs". It changes "The lead does not run other sessions' steps": Greg starts only a
+  step he wants to watch, and a guide. Reopen if two issues contend for a clone often.

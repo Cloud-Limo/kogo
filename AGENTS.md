@@ -56,9 +56,10 @@ Linear holds the state of every piece of work and GitHub holds its
 code. The PR holds each step's comment in full, and the issue the
 first line of each, which is all the board shows. An issue goes Todo,
 In Progress, In Review, Done, and the first line of its newest comment
-says what happens next. Each step below can run in Zed or as an async
-run, in any mix. So whatever a later step needs is on the issue, the
-PR or the pushed branch, never only in a session or a worktree.
+says what happens next. Each step below can run in Zed, as an async
+run or as a local run, in any mix. So whatever a later step needs is
+on the issue, the PR or the pushed branch, never only in a session or
+a worktree.
 
 One lead, started in `~/Dev/kogo`, directs the work of both
 repositories. Kogo's issues are in the Linear project Kogo and its PRs
@@ -66,22 +67,24 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
 `renew`. Both are in team DEV.
 
 - **Where a step works.** Kogo: a worktree per issue,
-  `~/Dev/kogo-dev-NNN`, with `<where>` `kogo-dev-NNN`. Pickup makes it:
-  `git -C ~/Dev/kogo fetch origin`, then `git worktree add -b <branch>
-  ~/Dev/kogo-dev-NNN origin/main`; a later step that finds it missing
-  fetches and makes it from `origin/<branch>`. `~/Dev/kogo` stays on
-  `main` for Greg, the lead and the clerk: never edit, commit or
-  switch branch there, and never work in another issue's worktree.
+  `~/Dev/kogo-dev-NNN`, with `<where>` `kogo-dev-NNN`. Pickup makes it,
+  or `lin local` before it: `git -C ~/Dev/kogo fetch origin`, then `git
+  worktree add -b <branch> ~/Dev/kogo-dev-NNN origin/main`; a later
+  step that finds it missing fetches and makes it from
+  `origin/<branch>`. `~/Dev/kogo` stays on `main` for Greg, the lead
+  and the clerk: never edit, commit or switch branch there, and never
+  work in another issue's worktree.
 - **Lead.** "Lead", said in `~/Dev/kogo`, starts the session Greg
   talks to: read Kogo's `doc/lead.md` and follow it. It decides, and
-  answers what the clerk hands on; it waits on no run and merges
-  nothing. No other session needs that file.
+  answers what the clerk hands on; it starts an issue's first step,
+  waits on no run and merges nothing. No other session needs that
+  file.
 - **Clerk.** "Clerk DEV-NNN", said in `~/Dev/kogo`, takes one step of
   the pipeline for that issue and exits: read Kogo's `doc/clerk.md`
   and follow it. `lin clerk` says it when an issue's newest comment
   becomes `Handoff:`, `Review:`, `Ruling:` or `Fixed:`, from a run or
-  a Zed session alike, or its PR merges, so no session reports a step
-  back. It launches the Code review and the Fix, checks and tidies.
+  a session alike, or its PR merges, so no session reports a step
+  back. It starts the Code review and the Fix, checks and tidies.
   What it cannot settle it hands to the lead: a `Clerk:` comment and
   the label `lead`, which wait for Greg's next "Lead". It leaves an
   issue labelled `lead` alone.
@@ -89,8 +92,9 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   about, starts a session that takes Greg through a design to his
   rulings: read Kogo's `doc/guide.md` and follow it. It ends with one
   comment on the issue for the lead, and posts no step's comment,
-  launches nothing and merges nothing. No other session needs that
-  file.
+  launches nothing and merges nothing. Greg starts it, since it is a
+  conversation; it reads, or takes a worktree of its own, and holds no
+  stack. No other session needs that file.
 - **File.** `lin file --project <project> --state <state> "Title" <
   desc.md`, into the project of the repository the work lands in, and
   in Todo if it is ready to start, in Backlog if it waits on something
@@ -156,13 +160,26 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   no Linear access and its clone is its worktree. It clones the
   repository of its issue's project: Kogo for Kogo, cusoon2 for any
   other. Work that lands in another repository than its issue's
-  project's runs in Zed.
+  project's runs as a local run.
   Post the step's comment on the PR yourself, under the marker line the
   run's prompt gives, and write the same, in full, as the run's
   `answer.md`. The wrapper posts on the issue the first line when the
   PR has that text, and `answer.md` whole when not: what an interrupted
   run leaves behind. A review or fix run leaves its tree clean: whatever
   is left is pushed to the PR's branch. No run merges.
+- **Local runs.** A step that needs this VM, a stack or the other
+  repository runs here as a headless session: the lead or the clerk
+  starts it with `lin local DEV-NNN <where> "<phrase>"`, which returns
+  at once. It works in `~/Dev/<where>`, made first when that is a
+  missing issue worktree, with an async run's model and effort, a $25
+  cap and no time limit, and ends with its step's comment as any
+  session does; one that ends without it is handed to the lead, as a
+  clerk that fails is. It refuses a `<where>` another issue holds: by
+  its newest `Taken` while that issue is In Progress or In Review, by
+  its session running there before that Taken is posted, or by the
+  lead's `Held, <where>` for a walkthrough until `Released, <where>`.
+  `lin local --list` shows each one running, with its minutes and its
+  log.
 - A comment with no PR to hold it stays on the issue in full: a
   launch comment, a `Lead:` comment, an answer of Greg's given before
   a PR exists. A `Clerk:` comment does too, PR or none: the lead reads

@@ -42,8 +42,8 @@ and holds only what a decision needs.
   the clerk watches the runs, and what it cannot settle is on the
   board, labelled `lead`, when Greg next speaks. When he asks where
   things stand, read the board again.
-- Read an escalation, not a PR: `lin show DEV-NNN`, whose `Clerk:`
-  comment stands on its own. When a decision needs code read, send an
+- Read an escalation, not a PR: `lin show DEV-NNN --newest`, the
+  `Clerk:` comment alone, which stands on its own. When a decision needs code read, send an
   Explore subagent the question, with the file and line the clerk
   gave, and keep its answer, not the files.
 - When nothing waits on Greg, end the reply by saying that a fresh
@@ -53,14 +53,13 @@ and holds only what a decision needs.
 
 ## Starting
 
-1. `git -C ~/Dev/kogo pull --ff-only` and
-   `git -C ~/Dev/cusoon2-tasks pull --ff-only`.
-2. `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list board`: every
-   open issue of both projects with its state and the first line of
-   its newest comment. `lin list backlog`, with the same projects, is
-   the parked work, each with what brings it back.
-3. `lin show` each issue labelled `lead`, for its `Clerk:` comment.
-4. Tell Greg, briefly and as "Talking to Greg" says. Open with what
+1. `lin brief`: it pulls both checkouts, then prints every open issue
+   of both projects with its state and the first line of its newest
+   comment, the newest comment in full of each issue labelled `lead`,
+   and the line of runs. Backlog is not in it: when Greg asks to bring
+   something back, `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list
+   backlog` is the parked work, each with what brings it back.
+2. Tell Greg, briefly and as "Talking to Greg" says. Open with what
    waits on him, in bold, the issues labelled `lead` first; end with
    the two boxes, You can do now and Not yet, then the line of runs.
 
@@ -133,10 +132,10 @@ A `Clerk:` comment is a move of Greg's, or choices, lettered as
 against the code before passing it on.
 
 - A choice that is yours: post `Ruling: <n>: <the answer>`. One that
-  is Greg's: bring it to him, then post his answer as the Ruling. It
-  goes in full on the PR and its first line alone on the issue (`head
-  -1 ruling.md | lin comment DEV-NNN`), as every step's comment does;
-  for an issue whose PR is in another repository, the PR is that one.
+  is Greg's: bring it to him, then post his answer as the Ruling.
+  `lin rule DEV-NNN < ruling.md` posts it in full on the PR of the
+  issue's newest Handoff, in whichever repository, its first line on
+  the issue, and then takes the label `lead` off.
 - A Ruling answers everything the `Clerk:` comment raised, since the
   clerk raises none of it twice, and says what changes or that nothing
   does: the clerk then launches the Fix, quoting it, or merges. New
@@ -144,13 +143,13 @@ against the code before passing it on.
 - A move of Greg's (a cusoon2 PR ready to merge, a Zed step) goes in
   You can do now. When the clerk's `ready` line gives an order, `merge
   before PR N` or `after`, the row's How says it.
-- Then take the label off, `lin label DEV-NNN lead --remove`: after
-  the Ruling, or once Greg's move is in the boxes. The clerk leaves a
+- With no Ruling, take the label off once Greg's move is in the boxes:
+  `lin label DEV-NNN lead --remove`. The clerk leaves a
   labelled issue alone, and takes it up from its newest comment when
   the label goes.
-- To have the next step in Zed, post a `Lead:` comment naming it,
-  after the Ruling and before the label goes: a `Lead:` starts no
-  clerk. To hold every step of an issue, label it `lead` yourself.
+- To have the next step in Zed, post the Ruling with `lin rule
+  DEV-NNN --keep-label`, then a `Lead:` comment naming it, then take
+  the label off: a `Lead:` starts no clerk. To hold every step of an issue, label it `lead` yourself.
 - `Clerk: the clerk for DEV-NNN exited N: ...` is the poller's, for a
   step that failed, and no choice. Read its last lines and tell Greg
   the cause. Once the cause is gone, put "Clerk DEV-NNN", said by hand
@@ -193,11 +192,10 @@ follows it is not a row. A step in Zed is a row in You can do now, and
 the clerk sees its comment: Greg reports nothing back.
 
 After the boxes, one line: every issue labelled `agent`, by ID, each
-running (its newest comment starts `Launched`) or queued, read afresh
-from the `[agent]` rows of `lin list board` and `lin list backlog` for
-each reply. Beside it, each session `lin local --list` shows, by ID
-with its place and minutes so far. It lets Greg see the runs have not
-got out of hand.
+running (its newest comment starts `Launched`) or queued, and beside
+it each session `lin local --list` shows, by ID with its place and
+minutes so far: the last line of `lin brief`, run afresh for each
+reply. It lets Greg see the runs have not got out of hand.
 Open every reply with what waits on Greg, in bold, in one of three
 forms: "**I suggest: `1`, merge PR 1512 on GitHub.**" for a move, by
 its number; "**Waiting for you:** ..." for a question that is his;
@@ -270,18 +268,16 @@ edit it.
 
 ## A walkthrough
 
-When Greg asks to try a change in a browser, hold for him a stack's
-clone that no issue holds, on the issue the change is from: `echo
-"Held, cusoon2-b, for Greg's walkthrough" | lin comment DEV-NNN`.
-`lin local` refuses that clone to any other issue until you release
-it. Start the setup as a local run, `lin local DEV-NNN cusoon2-b
-"Walkthrough DEV-NNN: ..."`, the phrase saying what to check out,
-migrate and start; that each server starts under `systemd-run --user
---unit walk-cusoon2-b-<name>`, since the session's own processes end
-with it; and that it ends with a comment whose first line is
-`Walkthrough: <address>`. Give Greg the address as a row of You can do
-now. On his word, `systemctl --user stop 'walk-cusoon2-b-*'` and
-`echo "Released, cusoon2-b" | lin comment DEV-NNN`.
+When Greg asks to try a change in a browser, take a stack's clone
+that no issue holds and run `lin local --walkthrough DEV-NNN <clone>`,
+DEV-NNN the issue the change is from, and a branch after the clone
+when it is not the newest Handoff's. In a minute or two it posts
+`Held, <clone>, ...` on the issue, checks the branch out, migrates,
+starts the backend and vite as user units that outlive it, and posts
+and prints `Walkthrough: <address>`. `lin local` refuses that clone to
+any other issue until it is released. Give Greg the address as a row
+of You can do now. On his word, `lin local --release <clone>` stops
+the servers and posts `Released, <clone>`.
 
 ## Ending
 

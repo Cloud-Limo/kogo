@@ -17,6 +17,8 @@ func TestTestLists(t *testing.T) {
 		kt+"tests ts<Unit> { a }\nval a: Test<Unit> = test(\"a\") { tx, env -> }",
 		// A test file's declarations, used by another test file.
 		"/*test*/fun f(): Int = g()\n---\n/*test*/fun g(): Int = 1",
+		// Each test file's private val is its own (spec.md 2).
+		kt+"private val a = test(\"one\") { tx, env -> }\ntests ts<Env> { a }\n---\n/*test*/import kogo.test.test\nprivate val a = test(\"two\") { tx, env -> }\ntests us<Env> { a }",
 	)
 	refused(t, [][3]string{
 		{"data class Env(val n: Int)\n‸tests ts<Env> { a }", "test-file", "tests ts is in f1.kg: a tests list stands in a file named _test.kg"},

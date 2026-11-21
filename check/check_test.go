@@ -210,6 +210,11 @@ func TestNames(t *testing.T) {
 		"package a\nfun f(): Int = g()\ninternal fun g(): Int = 1\n---\npackage a\nprivate fun h(): Int = 2\nfun k(): Int = g() + h()\n---\npackage a\nprivate fun h(): Int = 3\nfun m(): Int = h()",
 		"package a\nimport kogo.time.ZoneId\nfun f(s: String): List<ZoneId> = listOf(ZoneId.of(\"Zulu\"), ZoneId.of(\"UTC\"), ZoneId.of(s), ZoneId.of(\"$s+1\"))\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}",
 		"package a\nimport kogo.time.Stamp\nfun f(s: Stamp, xs: List<Int>): Int = s.seconds() + xs.size\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int",
+		// One table of names (spec.md 2): a file's private val is its own,
+		// and the package's own val or type is meant before the prelude's.
+		"private val limit: Int = 50\nfun f(): Int = limit\n---\npackage t\nprivate val limit: String = \"\"\nfun g(): String = limit",
+		"data class Either(val n: Int)\nfun f(): Either = Either(1)\nval limit: Int = 50\n---\npackage kogo\nval limit: String = \"\"\n---\npackage t\nfun h(): Int = limit",
+		"package a\nimport b.twice\nfun f(): Int = 2.twice()\n---\npackage b\nfun Int.twice(): Int = this * 2",
 		"package a\nimport b.Shape\nfun f(s: Shape): Int = when (s) {\n    is Shape.Dot -> 0\n    is Shape.Line -> s.length\n}\nfun g(): Shape = Shape.Line(2)\n---\npackage b\nsealed interface Shape {\n    data object Dot : Shape\n    data class Line(val length: Int) : Shape\n}",
 	)
 	refused(t, [][3]string{
@@ -242,6 +247,16 @@ func TestNames(t *testing.T) {
 		{"package a\nimport c.P\nimport c.make\nfun f(): P = make().‸copy(n = 2)\n---\npackage c\ndata class P internal constructor(val n: Int)\nfun make(): P = P(1)", "not-visible", "P's constructor is internal to package c"},
 		{"data class P(val n: Int)\n‸typealias P = Int", "duplicate", "package t already declares P: rename one"},
 		{"val n: Int = 1\n---\npackage t\n‸val n: Int = 2", "duplicate", "already declares n"},
+		{"data class Area(val n: Int)\n---\npackage t\n‸private data class Area(val code: String)", "duplicate", "already declares Area"},
+		{"private val n: Int = 1\n---\npackage t\n‸val n: Int = 2", "duplicate", "already declares n"},
+		{"val n: Int = 1\n---\npackage t\nprivate ‸val n: Int = 2", "duplicate", "already declares n"},
+		{"private val n: Int = 1\nprivate ‸val n: Int = 2", "duplicate", "already declares n"},
+		{"private val n: Int = 1\n---\npackage t\nprivate val n: Int = 2\nprivate ‸val n: Int = 3", "duplicate", "already declares n"},
+		// A name is written bare, an import names a top-level name, and
+		// an extension is imported by its own.
+		{"package a\nfun f(): Int = ‸b.g()\n---\npackage b\nfun g(): Int = 1", "unknown-name", "nothing named b"},
+		{"package a\nimport ‸b.Shape.Dot\n---\npackage b\nsealed interface Shape {\n    data object Dot : Shape\n}", "unknown-import", "no package b.Shape"},
+		{"package a\nfun f(): Int = 2.‸twice()\n---\npackage b\nfun Int.twice(): Int = this * 2", "unknown-name", "has no function twice"},
 		{"package a\nimport b.g\nimport ‸c.g\n---\npackage b\nfun g(): Int = 1\n---\npackage c\nfun g(): Int = 2", "duplicate", "g is already imported from package b"},
 		// Section 6: the scope functions that do not exist.
 		{"fun f(x: Int): Int = x.‸apply { 1 }", "kotlin-scope-function", "name the value and call it"},
@@ -285,14 +300,26 @@ func TestImportAs(t *testing.T) {
 	})
 }
 
-// A program's file is not the prelude's for claiming its package.
+// A program's file is not the prelude's for claiming its package, and
+// a program's package is not kogo or under it (spec.md 2).
 func TestBindingsOnlyInPrelude(t *testing.T) {
-	f, err := syntax.Parse("p.kg", []byte("package kogo\nexternal class Box\n"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, errs := Check(nil, []*syntax.File{f}, nil); len(errs) != 1 || errs[0].Code != "external" {
-		t.Errorf("got %v, want one external error", errs)
+	for src, want := range map[string][]string{
+		"package kogo\nexternal class Box\n":  {"kogo-package", "external"},
+		"package kogo.time\nval n: Int = 1\n": {"kogo-package"},
+		"package shop.kogo\nval n: Int = 1\n": nil,
+	} {
+		f, err := syntax.Parse("p.kg", []byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, errs := Check(nil, []*syntax.File{f}, nil)
+		var got []string
+		for _, e := range errs {
+			got = append(got, e.Code)
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s\n got %v, want %v", src, errs, want)
+		}
 	}
 }
 
@@ -424,6 +451,10 @@ func TestTypes(t *testing.T) {
 		"interface I {\n    fun card(key: Int): Int\n}\nfun <T> card(i: I, key: T, n: Int = 0): T = key",
 	)
 	refused(t, [][3]string{
+		// Section 3.2: only a sealed interface holds types, its variants.
+		{"interface GoogleMaps {\n    ‸data class Place(val id: String)\n}", "nested-type", "declare Place at the top level"},
+		{"sealed interface O {\n    data class Ok(val id: Int) : O\n    ‸data class Note(val text: String)\n}", "nested-type", "O.Note is not a variant of O"},
+		{"interface I {\n    ‸typealias N = Int\n}", "nested-type", "a typealias is declared at the top level"},
 		{"fun f(n: Int): Long = ‸n", "type-mismatch", "this is a Int where a Long is wanted: write .toLong()"},
 		{"fun f(n: Long): Int = ‸n", "type-mismatch", "write .toInt()"},
 		{"fun f(): Double = ‸1", "type-mismatch", "this is a Int where a Double is wanted: write .toDouble()"},

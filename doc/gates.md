@@ -417,9 +417,9 @@ Every gate of cusoon2 obeys this already: none writes a row. A gate
 binds the person or the tenant, which is a setting of the
 transaction and no write. cusoon2's routes do write, in front of the
 gates: each makes a session for a request that comes without a live
-one ("The first call makes the session" below). A count of attempts writes, so it is no gate's: it belongs
-to an ungated operation. Both checks were
-run on Postgres 18.7 on 17 Nov 2026:
+one ("The first call makes the session" above). A count of attempts
+writes, so it is no gate's: it belongs to an ungated operation. Both
+checks were run on Postgres 18.7 on 17 Nov 2026:
 
 - **When it runs.** The server runs the gate in a savepoint with
   `transaction_read_only` on and releases it before the work. Postgres

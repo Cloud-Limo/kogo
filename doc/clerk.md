@@ -18,7 +18,7 @@ Auto mode refuses a merge no person approved unless a rule allows it,
 and this rule allows Kogo's PRs only: a cusoon2 PR stays Greg's.
 
 It says it when an issue's newest comment becomes `Handoff:`,
-`Review:`, `Ruling:` or `Fixed:`, from a run or a Zed session alike,
+`Review:`, `Ruling:` or `Fixed:`, from a run or a session alike,
 and when the issue turns Done, which is how it sees a PR merge. So a
 PR without "Fixes DEV-NNN" starts no clerk at its merge, and an issue
 moved to Done by hand starts one, which fits no row and is handed on.
@@ -32,13 +32,13 @@ a comment of its own, not in the form of Handing on: `Clerk: the clerk
 for DEV-NNN exited N: <its last line>`, then the command and its last
 lines. Anyone may say "Clerk DEV-NNN" by hand.
 
-You launch runs, check, merge and tidy. You write no code and make no
-commit but the merge of `main` into a Kogo PR that Merging gives, you
-run no Pickup, Code review or Fix yourself, and you make no choice a
-step left open: that goes to the lead. Write every file a
-command reads (`clerk.md`, `brief.md`, the `Merged:` text) under
-`/tmp`, in a directory of its own from `mktemp -d`, and never in a
-checkout: one left in the issue's worktree makes it not clean, so
+You start runs, async or local, check, merge and tidy. You write no
+code and make no commit but the merge of `main` into a Kogo PR that
+Merging gives, you run no Pickup, Code review or Fix yourself, and you
+make no choice a step left open: that goes to the lead. Write every
+file a command reads (`clerk.md`, `brief.md`, the `Merged:` text)
+under `/tmp`, in a directory of its own from `mktemp -d`, and never in
+a checkout: one left in the issue's worktree makes it not clean, so
 After a merge leaves it and hands on, and `~/Dev/kogo` is never
 written to.
 
@@ -60,15 +60,16 @@ is the one under those. Take the first row that fits:
 | --- | --- | --- |
 | any | any, the PR merged | After a merge |
 | any | any, labelled `lead` | the lead's: exit |
-| In Review | `Handoff:` | launch a Code review |
+| In Review | `Handoff:` | start a Code review |
 | In Review | `Review:` | On a Review |
 | In Review | `Ruling:` | On a Review, its last paragraph |
 | In Review | `Fixed:` | Merging |
-| Todo | none | the lead's, who chooses Zed or async: exit |
+| Todo | none | the lead's, who chooses where it runs: exit |
 | any | launch comment, `[agent]` | the run's: exit |
 | Todo | launch comment, no label | a speculative run, the lead's to label: exit |
 | In Progress | `Taken` | the session's: exit |
 | Backlog | `Lead:`, what brings it back | After a merge moves it, when that is a merge; else the lead's |
+| any | `Held,`, `Released,` or `Walkthrough:` | Greg's walkthrough, the lead's: exit |
 | any | `Lead:` or `Clerk:` | the lead's or Greg's, as the comment says: exit |
 
 ## Launching a run
@@ -95,9 +96,8 @@ queues the rest. Then exit: the run's comment starts the next clerk.
 - The Review and Fix briefs name the step in `AGENTS.md` and add only
   what is particular to this PR.
 - A run clones the repository of its issue's project, Kogo for Kogo
-  and cusoon2 for any other. When the PR is in the other one, no run
-  can do the step: hand on, with the first line as `Clerk: Greg's:
-  say "Code review DEV-NNN" in Zed, in <clone>`.
+  and cusoon2 for any other. When the PR is in the other one, start
+  the step as a local run, below.
 - A cusoon2 run that needs Kogo's documents or the `kogo` tool is told
   how in its brief: `gh repo clone Cloud-Limo/kogo` outside its clone,
   and `go build ./cmd/kogo` there. cusoon2's `kogo/go/go.mod` names no
@@ -108,6 +108,19 @@ queues the rest. Then exit: the run's comment starts the next clerk.
   answer each thing that could go, or was added, as a Fix (cut it), a
   Won't fix (it stays) or a Question.
 - A Code run is the lead's to launch, by this section.
+
+## Starting a local run
+
+Start the step on this VM instead when the PR is in the other
+repository than the issue's project's, or a `Lead:` comment on the
+issue says its steps run locally: `lin local DEV-NNN <where>
+"<phrase>"`, `<where>` being the newest Handoff's. The phrase is the
+step's, "Code review DEV-NNN" or "Fix DEV-NNN", and a Fix's quotes
+each Ruling in full after it, as a brief would. It returns at once,
+with the model and effort of the step's run; then exit, since the
+session's comment starts the next clerk. When it refuses, a clone
+another issue holds or a session already running for the issue, hand
+on with its line.
 
 ## On a Review
 
@@ -151,8 +164,8 @@ nothing and write no `ready`: launch that Fix. But when a cusoon2
 PR's own diff (`git diff --name-only origin/renew...HEAD`) touches
 `kogo/` or a file `renew`'s `kogo/pins` names
 (`git show origin/renew:kogo/pins`), that Fix runs `kogo/run.sh`,
-which no run can: hand on with `Clerk: Greg's: say "Fix DEV-NNN:
-merge renew, run kogo/run.sh, move the pin" in Zed, in <clone>`.
+which no run can: start it as a local run, `lin local DEV-NNN <where>
+"Fix DEV-NNN: merge renew, run kogo/run.sh, move the pin"`.
 What `renew` alone gained does not count: the merge leaves the port,
 the pins and each pinned file `renew`'s, which its checks passed.
 Nor does that Fix run it when every path the merge brings (`git diff
@@ -220,7 +233,7 @@ it when the Budget was outgrown, posted on the PR too, where he
 merges. Otherwise hand on with what failed.
 
 Say the order on that line when it matters. A port's PR, as above,
-that goes behind `renew` costs Greg a Zed round. So list the others
+that goes behind `renew` costs a local Fix round. So list the others
 open, `gh pr list --base renew` there, with `gh pr diff N --name-only`
 for each, and count only those with a `Review:` on the PR (`gh pr view
 N --json comments`). When exactly one of the two is a port and the

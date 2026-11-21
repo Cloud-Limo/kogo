@@ -460,6 +460,48 @@ func TestPortCalls(t *testing.T) {
 // A Decimal is a numeric as Postgres writes it, digit for digit, and
 // goes back as it came. A null is no Decimal and no Uuid. The rest of
 // db.go needs a database: emit's tests run it.
+// The four names of DEV-1050 at their corners, each as Kotlin 2.4
+// gives it.
+func TestGoogleStringCorners(t *testing.T) {
+	split := func(s, d string) string { return rt.ToString(String_Split(s, d)) + rt.ToString(int32(len(String_Split(s, d)))) }
+	zero := rt.Char('0')
+	for _, c := range [][2]string{
+		{split("", ","), "[]1"},
+		{split(",", ","), "[, ]2"},
+		{split("a::b", "::"), "[a, b]2"},
+		{split("ab", ""), "[, a, b, ]4"},
+		{split("😀", ""), "[, \uFFFD, \uFFFD, ]4"},
+		{String_PadStart("😀", 3, &zero) + String_PadStart("abc", 2, nil) + String_PadStart("", 0, nil), "0😀abc"},
+	} {
+		if c[0] != c[1] {
+			t.Errorf("got %q, want %q", c[0], c[1])
+		}
+	}
+	for s, want := range map[string]string{
+		"": "null", " 1": "null", "1 ": "null", "+": "null", "-": "null", "+-1": "null", "1.0": "null", "0x1": "null",
+		"+7": "7", "-0": "0", "007": "7", "٣": "3", "2147483647": "2147483647", "2147483648": "null",
+		"-2147483648": "-2147483648", "-2147483649": "null",
+	} {
+		if got := rt.ToString(String_ToIntOrNull(s)); got != want {
+			t.Errorf("%q.toIntOrNull() is %s, want %s", s, got, want)
+		}
+	}
+	for s, want := range map[string]string{
+		"": "null", "-": "null", "9223372036854775807": "9223372036854775807", "9223372036854775808": "null",
+		"-9223372036854775808": "-9223372036854775808", "-9223372036854775809": "null", "99999999999999999999": "null",
+	} {
+		if got := rt.ToString(String_ToLongOrNull(s)); got != want {
+			t.Errorf("%q.toLongOrNull() is %s, want %s", s, got, want)
+		}
+	}
+	defer func() {
+		if got := recover(); got != "Desired length -1 is less than zero." {
+			t.Errorf("padStart(-1) panics %v", got)
+		}
+	}()
+	String_PadStart("a", -1, nil)
+}
+
 func TestPostgres(t *testing.T) {
 	for _, text := range []string{"12.50", "-0.001", "1500", "NaN", "Infinity", "-Infinity"} {
 		var back Decimal

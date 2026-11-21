@@ -1007,6 +1007,19 @@ fun fail(left: Boolean): Int {
 `)
 }
 
+// The four string names the Google client's port needs (DEV-1050).
+func TestGoogleStringNames(t *testing.T) {
+	expect(t, [][2]string{
+		{`t.Names(",a,,b,")`, "[[, a, , b, ], 00,a,,b,, <  7>, null, null]"},
+		{`t.Names("-2147483648")`, "[[-2147483648], -2147483648, <  7>, -2147483648, -2147483648]"},
+		{`t.Names("")`, "[[], 00000000, <  7>, null, null]"},
+	}, `package t
+
+fun names(s: String): List<String> =
+    listOf("${s.split(",")}", s.padStart(8, '0'), "<${"7".padStart(3)}>", "${s.toIntOrNull()}", "${s.toLongOrNull()}")
+`)
+}
+
 // What is not emitted yet is refused where it stands, never emitted
 // wrongly, and so are two declarations that Go cannot tell apart,
 // an enum's entries among them.

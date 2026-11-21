@@ -3858,6 +3858,8 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   2026): the form the DEV-1035 session fell into, taken as it stands
   and wrapped as `doc/lead.md` is. Not taken: rewording it on the way
   in. Reopen when it has been used twice more, as it says.
+  *Superseded 22 Nov 2026 by "The guide is revised with Greg at the
+  end of a sitting that chafed" (DEV-1075) below.*
 - **"Guide DEV-NNN" is said in the repository the design is about**
   (the lead, 21 Nov 2026), as the draft and the Workflow line have it:
   a guide checks the design against that repository's code and commits
@@ -4173,19 +4175,20 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
 
 - **A guide's sitting settles each piece of a design as it is shown** (Greg, 22 Nov 2026,
   at the end of DEV-1068's sitting): a piece ends in one proposal, his "next" is
-  agreement to it, and the end is the tally and only what is left: what was postponed
-  and two rulings that pull against each other. The first form built the whole design
-  and then took its choices one a message; in DEV-1064 and DEV-1068 he had judged each
-  piece as it landed, and the second pass asked again what was settled. Not taken: the
-  two passes kept for a design whose pieces lean on each other. Postponing a piece that
-  cannot be judged yet, and reopening a ruling a later piece disturbs, stand in for
-  them. Reopen if a sitting on such a design commits him before he has seen the whole.
+  agreement to it, and the end is the tally and only what is left: what was postponed,
+  two rulings that pull against each other, and anything the document asks that no
+  piece showed, which catches a question once the choices pass is gone. The first form
+  built the whole design and then took its choices one a message; in DEV-1064 and
+  DEV-1068 he had judged each piece as it landed, and the second pass asked again what
+  was settled. Not taken: the two passes kept for a design whose pieces lean on each
+  other. Postponing a piece that cannot be judged yet, and reopening a ruling a later
+  piece disturbs, stand in for them. Reopen if a sitting on such a design commits him
+  before he has seen the whole.
 - **A piece carries what he asked for in DEV-1068**: what Kotlin does, from a run, the
   slip or "I cannot build one", the size, and what was not taken in a clause. A test he
   gives in the sitting is held against every later piece. Not taken: leaving these to
-  his questions, which asked for Kotlin's rule four times.
-- **The form of a choice keeps a heading of its own in `doc/guide.md`**, since the lead
-  brings its choices in it (DEV-1036); `doc/lead.md` names the new heading.
+  his questions, which asked for Kotlin's rule four times; holding a test only to the
+  piece it was said on.
 - **The guide is revised with Greg at the end of a sitting that chafed**, in place of
   "when it has been used twice more", which this revision met. Not taken: a count of
   uses, which would hold a fix back or force one that nobody wants.

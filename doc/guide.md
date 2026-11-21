@@ -9,7 +9,7 @@ happens next. `AGENTS.md` has the steps every session follows.
 
 This file rests on three sittings: DEV-1035 on 21 Nov 2026, and
 DEV-1064 and DEV-1068 on the 22nd. Revise it with Greg at the end of
-a sitting that chafed, and not otherwise.
+a sitting that chafed.
 
 ## Who carries what
 
@@ -62,7 +62,7 @@ When he asks, the piece is open until he rules:
 
 So that a ruling made early is not made blind:
 
-- **Postpone what he cannot judge yet**, say that you are, and bring
+- **Postpone only what he cannot judge yet**, say that you are, and bring
   it back last: the choice between whole designs, usually, or a piece
   that leans on one not yet shown.
 - **A later piece that disturbs an earlier ruling reopens it** there
@@ -82,8 +82,8 @@ choices have one you would make.
 
 ## What is left at the end
 
-Show the tally as a table. Then bring only what it does not settle,
-in one message, each with your proposal, for one yes: what was
+Show the tally as a table and, in the same message, only what it
+does not settle, each with your proposal, for one yes: what was
 postponed, two of his rulings that pull against each other, and
 anything the document asks that no piece showed. When nothing is
 left, say so.

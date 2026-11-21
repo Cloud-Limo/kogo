@@ -113,8 +113,9 @@ left, say so.
   Show Greg the short one before it is pushed.
 - **One comment for the lead**, in full on the issue: the rulings as a
   table, the answer to anything the clerk asked, what earlier answers
-  they override, and an order of events. Its first line begins with no
-  step's word, so the clerk starts nothing from it.
+  they override, and an order of events. Its first line begins
+  `Guide:`, a note, posted with `lin comment`, so the clerk starts
+  nothing from it.
 - You post no Ruling, launch no run and merge nothing: those are the
   lead's, the clerk's and Greg's. You commit the short document to the
   PR's branch on his word, and nothing else.

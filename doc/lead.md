@@ -70,18 +70,20 @@ clerk's, by the table in `doc/clerk.md`: leave it alone.
 | On the board | Next |
 | --- | --- |
 | any, labelled `lead` | Answering the clerk, below |
-| Todo, no comment, or a `Clerk:` that moved it there | choose where it runs, below |
-| any, `Held,` or `Walkthrough:` | Greg's walkthrough, below |
-| any, `Released,` | the walkthrough is over: as the comment before its `Held,` says |
+| Todo, no event, or a `Parked:` that the clerk moved there | choose where it runs, below |
+| any, `Held:` or `Walkthrough:` | Greg's walkthrough, below |
+| any, `Released:` | the walkthrough is over: as the comment before its `Held:` says |
 | Todo, launch comment, no label | a speculative run: label up to three a night |
 | In Review, a comment that is no step's | a speculative run's answer, or a run that failed: read it |
-| Backlog, `Lead:`, what brings it back | Todo, when Greg says so; the clerk moves one that waited on a merge |
-| any, `Lead:` or `Clerk:`, no label | as the comment says |
+| Backlog, `Parked:` or an older `Lead:`, what brings it back | Todo, when Greg says so; the clerk moves one that waited on a merge |
+| In Review, `Checked:` | waits on Cloud CI, then Greg's inbox |
+| any, `Clerk:` or `Failed:`, no label | as the comment says |
 | In Review, a step's comment that no run or clerk has followed | `lin clerk` has stopped: tell Greg |
 
 Todo holds only what we mean to start within days. Everything else
-goes to Backlog, with a `Lead:` comment whose first line says what
-brings it back, and you move it to Todo when Greg says so. You can do
+goes to Backlog, with `Parked: until <issue keys, or what>; then
+<what>` posted by `lin step`, and you move it to Todo when Greg says
+so. You can do
 now draws only from Todo, In Progress and In Review, never Backlog.
 
 ## What goes to Greg
@@ -134,7 +136,7 @@ against the code before passing it on.
 
 - A choice that is yours: post `Ruling: <n>: <the answer>`. One that
   is Greg's: bring it to him, then post his answer as the Ruling.
-  `lin rule DEV-NNN < ruling.md` posts it in full on the PR of the
+  `lin step DEV-NNN < ruling.md` posts it in full on the PR of the
   issue's newest Handoff, in whichever repository, its first line on
   the issue, and then takes the label `lead` off.
 - A Ruling answers everything the `Clerk:` comment raised, since the
@@ -143,24 +145,24 @@ against the code before passing it on.
   work it names, you file.
 - A move of Greg's (a Zed step, a walkthrough) goes in You can do
   now. A cusoon2 PR ready to merge does not, unless he asks for it:
-  once Cloud CI passes on the sha the clerk's line names, `lin clerk`
-  tells him in his Linear inbox, with any order the line gave, and
-  takes `lead` off, so the merge is his from there. When CI fails, its
-  `Clerk: Cloud CI failed on <PR> at <sha>` keeps `lead`: tell Greg
-  the cause, as for a step that failed.
+  once Cloud CI passes on the sha of the clerk's `Checked:`, `lin
+  clerk` tells him in his Linear inbox with `Ready to merge:`, with
+  any order the line gave, so the merge is his from there. When CI
+  fails, its `Failed: <PR> at <sha> · Cloud CI ...` puts `lead` on:
+  tell Greg the cause, as for a step that failed.
 - Then take the label off, `lin label DEV-NNN lead --remove`, once
   Greg's move is in the boxes, or for a Zed step once its comment is
   on the issue. The clerk leaves a labelled issue alone, and takes it
   up from its newest event when the label goes.
-- To have the next step in Zed, post the Ruling with `lin rule
+- To have the next step in Zed, post the Ruling with `lin step
   DEV-NNN --keep-label` and leave the label on: a `Lead:` comment is a
   note and holds nothing, so without the label the clerk takes up the
   Ruling. To hold every step of an issue, label it `lead` yourself.
-- `Clerk: the clerk for DEV-NNN exited N: ...` is the poller's, for a
+- `Failed: the clerk for DEV-NNN exited N · ...` is the poller's, for a
   step that failed, and no choice. Read its last lines and tell Greg
   the cause. Once the cause is gone, put "Clerk DEV-NNN", said by hand
   in `~/Dev/kogo`, in You can do now: the poller starts no step twice.
-- `Clerk: the session lin local started for DEV-NNN ended without its
+- `Failed: the session lin local started for DEV-NNN ended without its
   step's comment` is the same for a local run, with `claude --resume`
   for its session. Once the cause is gone, start the step again with
   `lin local`, yourself: it is no move of Greg's.
@@ -190,11 +192,10 @@ his included, is in Backlog, not in the box. A run in the labelled line
 takes a row only when the step after the clerk's is Greg's, such as
 walking through a PR once its Fix run is back; the clerk's steps after a
 run are not rows, since he cannot start them too soon. A cusoon2 merge
-waiting on Cloud CI is a row: while the clerk's `Clerk: Greg's: merge
-<PR> at <sha> once Cloud CI passes` is the issue's newest event and
-`lead` is on, its row is "waits on Cloud CI, then your inbox". The watch
-takes `lead` off on green and the row goes with it, so a row still there
-after CI has ended says the watch failed. When the cap binds, keep the
+waiting on Cloud CI is a row: while the clerk's `Checked: <PR> at
+<sha>` is the issue's newest event, its row is "waits on Cloud CI, then
+your inbox". The watch's `Ready to merge:` or `Failed:` ends it, so a
+`Checked:` still newest after CI has ended says the watch failed. When the cap binds, keep the
 rows nearest to release.
 
 An issue has one row across the two boxes: its next step. That step is
@@ -286,12 +287,12 @@ When Greg asks to try a change in a browser, take a stack's clone
 that no issue holds and run `lin local --walkthrough DEV-NNN <clone>`,
 DEV-NNN the issue the change is from, and a branch after the clone
 when it is not the newest Handoff's. In a minute or two it posts
-`Held, <clone>, ...` on the issue, checks the branch out, migrates,
+`Held: <clone>` on the issue, checks the branch out, migrates,
 starts the backend and vite as user units that outlive it, and posts
 and prints `Walkthrough: <address>`. `lin local` refuses that clone to
 any other issue until it is released. Give Greg the address as a row
 of You can do now. On his word, `lin local --release <clone>` stops
-the servers and posts `Released, <clone>`.
+the servers and posts `Released: <clone>`.
 
 ## Ending
 

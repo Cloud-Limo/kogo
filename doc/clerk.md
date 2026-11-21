@@ -74,6 +74,7 @@ for Backlog. Take the first row that fits:
 | any | launch comment, `[agent]` | the run's: exit |
 | Todo | launch comment, no label | a speculative run, the lead's to label: exit |
 | In Progress | `Taken` | the session's: exit |
+| any | `Start:` | the step's, running: exit |
 | Backlog | any, with a `Lead:` note of what brings it back | After a merge moves it, when that is a merge; else the lead's |
 | any | `Held,`, `Released,` or `Walkthrough:` | Greg's walkthrough, the lead's: exit |
 | any | `Clerk:` | the lead's or Greg's, as the comment says: exit |
@@ -102,8 +103,8 @@ queues the rest. Then exit: the run's comment starts the next clerk.
 - The Review and Fix briefs name the step in `AGENTS.md` and add only
   what is particular to this PR.
 - A run clones the repository of its issue's project, Kogo for Kogo
-  and cusoon2 for any other. When the PR is in the other one, start
-  the step as a local run, below.
+  and cusoon2 for any other. When the PR is in the other one, the
+  step is a local run, below.
 - A cusoon2 run that needs Kogo's documents or the `kogo` tool is told
   how in its brief: `gh repo clone Cloud-Limo/kogo` outside its clone,
   and `go build ./cmd/kogo` there. cusoon2's `kogo/go/go.mod` names no
@@ -115,18 +116,28 @@ queues the rest. Then exit: the run's comment starts the next clerk.
   Won't fix (it stays) or a Question.
 - A Code run is the lead's to launch, by this section.
 
+## How the next step starts
+
+Start each later step the way the issue's newest `Start:` ran, or its
+newest launch comment when that is newer, until launches post a
+`Start:` too: `Start: <step> · local · <where> · ...` makes it a
+local run in that `<where>`, a launch comment an async run. With
+neither, a Pickup said in a session, launch a run, but start a local
+one in the newest `Taken`'s `<where>` when the PR is in the other
+repository than the issue's project's. A `Lead:` comment does not
+choose: the lead holds an issue whose next step is Greg's with the
+label `lead`. The Fix that runs `kogo/run.sh` (Merging) is a local
+run however the steps before it ran.
+
 ## Starting a local run
 
-Start the step on this VM instead when the PR is in the other
-repository than the issue's project's, or a `Lead:` comment on the
-issue says its steps run locally: `lin local DEV-NNN <where>
-"<phrase>"`, `<where>` being the newest Handoff's. The phrase is the
-step's, "Code review DEV-NNN" or "Fix DEV-NNN", and a Fix's quotes
-each Ruling in full after it, as a brief would. It returns at once,
-with the model and effort of the step's run; then exit, since the
-session's comment starts the next clerk. When it refuses, a clone
-another issue holds or a session already running for the issue, hand
-on with its line.
+`lin local DEV-NNN <where> "<phrase>"`, `<where>` as above. It posts
+the `Start:` itself. The phrase is the step's, "Code review DEV-NNN"
+or "Fix DEV-NNN", and a Fix's quotes each Ruling in full after it, as
+a brief would. It returns at once, with the model and effort of the
+step's run; then exit, since the session's comment starts the next
+clerk. When it refuses, a clone another issue holds or a session
+already running for the issue, hand on with its line.
 
 ## On a Review
 

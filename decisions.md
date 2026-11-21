@@ -4222,17 +4222,13 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
 ## A port keeps its Kotlin's shape (DEV-1080), 22 Nov 2026
 
 - **A port is no longer than its Kotlin and reads no worse, and lists where it is not**
-  (the lead, 22 Nov 2026, from an audit of cusoon2's 23 ported files that Greg asked
-  for): the ports came to 1,407 lines against about 1,704 of Kotlin, but 11 places were
-  written longer or more awkwardly than the Kotlin where Kogo had the Kotlin's form, and
-  the Reviews of the two newest ports raised none of them. The handoff lists each
-  declaration not the Kotlin's by name, kind and receiver and each function three or
-  more lines longer, with one cause each (spec section 14, a name section 12 lacks, a
-  design); the Code review reads each function beside its Kotlin and tries the Kotlin's
-  form in `kogo check`, and a short form that passes is a Fix. Not taken: the list
-  alone, which would have named 9 of the 11 and missed a ladder in a function no longer
-  than its Kotlin; a rule that only asks for short code, which binds neither author nor
-  reviewer; a script that makes the list (about 100 lines, and cusoon2's to hold).
+  (the lead, 22 Nov 2026, from an audit of cusoon2's 23 ported files): the ports came
+  to 1,407 lines against about 1,704 of Kotlin, but 11 places were written longer or
+  more awkwardly than the Kotlin where Kogo had the Kotlin's form, and the Reviews of
+  the two newest ports raised none of them. Not taken: the list alone, which would have
+  named 9 of the 11 and missed a ladder in a function no longer than its Kotlin; a rule
+  that only asks for short code, which binds neither author nor reviewer; a script that
+  makes the list (about 100 lines, and cusoon2's to hold).
   Reopen if a Review's tries of the Kotlin's form keep finding nothing.
 - **Comments stay the Kotlin's, plus marks and what a Ruling asks for**; what the port
   went through goes in the handoff. The audit counted 0.59 comment lines a code line in

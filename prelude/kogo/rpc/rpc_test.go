@@ -480,3 +480,67 @@ func TestCall(t *testing.T) {
 		t.Errorf("SetCookies set %q", got)
 	}
 }
+
+// A body past the Handler's MaxBody is a 413, at the default and
+// where main sets it. A header read that is not UTF-8 is a 400 that
+// names it, from the check as from an operation, and logs nothing
+// but the served line; one no program reads is left alone.
+func TestLimits(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://kogo:kogo@127.0.0.1/kogo_test")
+	pool, drop := testdb.Open(context.Background(), "../../../testdata/schema.sql")
+	defer drop()
+	var log bytes.Buffer
+	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}, &sync.Map{}}, slog.New(slog.NewJSONHandler(&log, nil)))
+	post := func(name, body string, header ...string) string {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("POST", "/"+name, strings.NewReader(body))
+		for i := 0; i < len(header); i += 2 {
+			r.Header.Set(header[i], header[i+1])
+		}
+		h.ServeHTTP(w, r)
+		return fmt.Sprint(w.Code, " ", w.Body.String())
+	}
+	sized := func(n int) string {
+		j := fmt.Sprintf(`{"name":"sized %d"}`, n)
+		return j + strings.Repeat(" ", n-len(j))
+	}
+	ok, unset := `200 {"type":"ok","value":"secret answer"}`, h.MaxBody
+	for _, c := range []struct {
+		max            int64
+		body, x, check string
+		want           string
+	}{
+		{0, sized(64 << 10), "", "", ok},
+		{0, sized(64<<10 + 1), "", "", "413 add: the input is past 65536 bytes"},
+		{100, sized(100), "", "", ok},
+		{100, sized(101), "", "", "413 add: the input is past 100 bytes"},
+		{100, `{"name":"` + strings.Repeat("x", 100) + `"}`, "", "", "413 add: the input is past 100 bytes"},
+		{0, `{"name":"x"}`, "", "\xff", "400 add: the header X-Check is not UTF-8"},
+		{0, `{"name":"x"}`, "\xffsecret", "", ok},
+		{0, ``, "\xffsecret", "", "400 who: the header X-Who is not UTF-8"},
+		{0, ``, "café", "", `200 {"type":"ok","value":{"header":"café",`},
+	} {
+		if h.MaxBody = unset; c.max != 0 {
+			h.MaxBody = c.max
+		}
+		name, header := "add", []string{"X-Unread", c.x}
+		if c.body == `` {
+			name, header = "who", []string{"X-Who", c.x}
+		}
+		if c.check != "" {
+			header = append(header, "X-Check", c.check)
+		}
+		if got := post(name, c.body, header...); !strings.HasPrefix(got, c.want) {
+			t.Errorf("%s of %d bytes with %q, %q and MaxBody %d answers %.80s, want %s", name, len(c.body), c.x, c.check, c.max, got, c.want)
+		}
+	}
+	var served []string
+	for _, l := range strings.Split(strings.TrimSpace(log.String()), "\n") {
+		var m map[string]any
+		json.Unmarshal([]byte(l), &m)
+		served = append(served, fmt.Sprint(m["msg"], " ", m["operation"], " ", m["outcome"]))
+	}
+	if got, want := strings.Join(served, ","), "served add ok,served add 413,served add ok,served add 413,served add 413,served add 400,served add ok,served who 400,served who ok"; got != want || strings.Contains(log.String(), "secret") {
+		t.Errorf("the log is %s, want %s, with no value:\n%s", got, want, log.String())
+	}
+}

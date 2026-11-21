@@ -236,7 +236,7 @@ func open(ctx context.Context, c Config) (*pgxpool.Pool, error) {
 func web(ctx context.Context, c Config, env app.Env, pool *pgxpool.Pool, clock ktime.Clock, log *slog.Logger) error {
 	handler := func(t rpc.Table[app.Env]) *rpc.Handler[app.Env] {
 		h := rpc.NewHandler(t, pool, env, clock, log)
-		h.Limit = requestLimit
+		h.Limit = requestLimit // h.MaxBody stays 64 KiB: no input here comes near it
 		return h
 	}
 	mux := http.NewServeMux()
@@ -377,6 +377,7 @@ days after a deploy). **Never** means no test sees it.
 | [4] the client's address | 8 | nothing | X-Forwarded-For, or the server not on loopback | never: a client picks its own address |
 | | | | `behindProxy` left out | use: every request is 127.0.0.1, and everyone shares one per-address login limit |
 | [4] the limit, the body's limit, the drain | 17 | nothing | no `ReadHeaderTimeout`, `MaxBytesHandler` or drain | use, under load or at a deploy: a stop cuts requests mid-way |
+| | | | a list whose inputs pass 64 KiB, its `MaxBody` not raised in `handler`; `MaxBytesHandler` is for the routes, which the Handler's `MaxBody` does not cover, but it wraps the lists as well: a `MaxBody` above 1 MiB needs it raised too | use: 413 |
 | [4] logout | 11 | a route: 10 to 35 | cookies not written before the redirect | use: the browser stays logged in on its side, its session gone |
 | [4] the webhook | 34 | | the secret unset or blank let through | never: anyone can mark a message bounced. `==` instead of `subtle` leaks timing |
 | | | | a 400 for a body that is not JSON | never: form-encoded events are dropped, not kept for 48 hours |

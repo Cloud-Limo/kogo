@@ -2521,9 +2521,8 @@ Each entry: what was decided, why, and what would reopen it.
   sets the request's `RemoteAddr` from the proxy's header before the handler sees it,
   since only `main` knows which proxy to trust. A header's first value is its value;
   `header("Host")` is the request's host, which Go keeps out of its headers.
-- **Not handled**: a limit on the body's size, which `main` sets with Go's
-  `http.MaxBytesHandler` (a body past it reads as not JSON, a 400); the request's
-  `Content-Type`, which belongs with the CSRF checks.
+- **Not handled**: the request's `Content-Type`, which belongs with the CSRF checks.
+  The body's size is the Handler's `MaxBody` (DEV-1056).
 
 ## Taken refusing import cycles (DEV-844), not yet discussed
 
@@ -4020,6 +4019,44 @@ From Greg's rulings of 21 Nov 2026 on DEV-1049; these are the calls they left op
   failure type it needs.
 - **Rows 13i to 13k are new in `doc/roadmap.md`**, and the six job operations become
   13l, as rows 13 to 18 became 13a to 13i (DEV-1041). Row 6a is marked built, PR 119.
+
+## A body's limit and a header that is not text (DEV-1056), 21 Nov 2026
+
+From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
+
+- **`MaxBody` is a field of the Handler, beside `Limit`: 64 KiB unless `main` sets it
+  where it mounts a list.** A body is built whole into a tree before its type is
+  checked, so one request can take up to 35 times its body in memory before it is
+  refused; a limit each `main` had to remember left a list open when one forgot it. One
+  limit for a mounted list. Not taken: a line in the table, which would be syntax; a
+  constant, which no list could raise; a limit for each operation, which no list needs
+  yet. `doc/main.md`'s `http.MaxBytesHandler` stays, for the routes `main` reads in Go.
+  The field is the Handler's, not the server's that `Calls` shares, since `Call` reads
+  no body.
+- **A body past it is `413 <name>: the input is past <N> bytes`**: `readBody` lets
+  `http.MaxBytesError` through, from the value and from the read after it. Not taken:
+  the reader's `400 ... is not JSON`, which tells the caller to fix what is not wrong.
+- **No token reader now**, one that checks the type as it reads and so never holds the
+  tree. Reopen when a list needs a limit large enough that 35 times it, across the
+  requests in flight, is no longer small beside the process's memory.
+- **A header read that is not UTF-8 ends the request with a 400** that names the header
+  and never its value: a `String` a program holds is text, and such a value, bound in
+  SQL, ended as a panic and a logged trace. `Host` is held to the same. A null still
+  means absent; a header no program reads is not looked at, nor is a cookie, whose
+  parser already drops a value it cannot carry. Not taken: reading it as absent, which
+  passes a check written `origin == null || ...`; reading it as ISO-8859-1; refusing
+  the whole request for any header, which would refuse a visitor for a cookie another
+  site on the domain set.
+- **The refusal travels as a panic of its own type, `notText`, which `run` recovers
+  into the 400** before it looks at the limit or logs a trace, so the `served` line is
+  the request's only line. `Request_Header` gives a `*string` that the emitted code
+  uses as it is, and a panic is the one way out of a check and of an operation alike,
+  through every transaction's rollback, with no change to the emitter. Not taken: an
+  error slot on the `Request` that `run` reads after, which lets the program go on with
+  some value it should not have; a check of every header before the list runs, which
+  would refuse headers no program reads. A panic that is a real fault stays a 500.
+- **The header is named as Go canonicalises it**, `X-Check` for `header("x-check")`,
+  so one header reads one way in every 400 whatever case the program wrote.
 
 ## Local runs on the dev VM (DEV-1057), 21 Nov 2026
 

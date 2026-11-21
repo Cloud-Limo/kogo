@@ -137,7 +137,7 @@ Read the Handoff and the Review on the PR, and `gh pr diff <PR url>
 
 Otherwise launch a Fix when the Review has one to make, and go to
 Merging when it has none. A Budget outgrown's sizes go in your
-`Merged:` or `ready` comment.
+`Merged:` or `merge` comment.
 
 A `Ruling:` answers what the `Clerk:` comment before it raised: raise
 none of it again. Launch a Fix, each Ruling quoted in full, when the
@@ -160,7 +160,7 @@ and test `--is-ancestor` again: if `main` moved, do the same once more;
 if it moves a third time, hand on. When the merge conflicts,
 `git merge --abort`, merge nothing, launch a Fix whose brief asks only
 that it merge the base, test and push. For a cusoon2 PR, merge
-nothing and write no `ready`: launch that Fix. But when a cusoon2
+nothing and write no `merge` line: launch that Fix. But when a cusoon2
 PR's own diff (`git diff --name-only origin/renew...HEAD`) touches
 `kogo/` or a file `renew`'s `kogo/pins` names
 (`git show origin/renew:kogo/pins`), that Fix runs `kogo/run.sh`,
@@ -222,15 +222,20 @@ worktree add --detach ~/Dev/cusoon2-dev-NNN origin/<branch>`, which
 works whichever clone has the branch checked out; otherwise moved to
 it, with `git pull --ff-only` on a branch or `git fetch origin` and
 `git checkout --detach origin/<branch>` when detached. There, read
-any fix commits against the Review and its Rulings, and check that
-Cloud CI passed on its head, `mise run ci-status <PR>` there: CI runs
-`mise run check-all` and the tests. Where the PR changes Kotlin that a
-Kogo port was taken from, also run that checkout's own `kogo/run.sh`,
-which compares its Kotlin, with `KOGO=~/Dev/kogo`, and read its last
-three lines as above. If all pass and nothing is Open, hand on with
-`Clerk: Greg's: merge <PR url> at <sha>, ready`, with the sizes under
-it when the Budget was outgrown, posted on the PR too, where he
-merges. Otherwise hand on with what failed.
+any fix commits against the Review and its Rulings. Where the PR
+changes Kotlin that a Kogo port was taken from, also run that
+checkout's own `kogo/run.sh`, which compares its Kotlin, with
+`KOGO=~/Dev/kogo`, and read its last three lines as above. If all pass
+and nothing is Open, hand on with `Clerk: Greg's: merge <PR url> at
+<sha> once Cloud CI passes`, the sha full, from `git rev-parse HEAD`
+there, with the sizes under it when the Budget was outgrown, posted on
+the PR too, where he merges. Otherwise hand on with what failed. Do
+not wait for Cloud CI, which runs `mise run check-all` and the tests:
+`lin clerk` watches that sha's run. Green, it tells Greg in his Linear
+inbox, as a Linear application, since he hears of no comment written
+with his own key, and takes `lead` off; red, it posts `Clerk: Cloud CI
+failed on <PR> at <sha>` with the first error, and `lead` stays.
+Neither starts a clerk.
 
 Say the order on that line when it matters. A port's PR, as above,
 that goes behind `renew` costs a local Fix round. So list the others
@@ -238,8 +243,8 @@ open, `gh pr list --base renew` there, with `gh pr diff N --name-only`
 for each, and count only those with a `Review:` on the PR (`gh pr view
 N --json comments`). When exactly one of the two is a port and the
 other changes a file outside the four directories above, the port's
-line ends `ready: merge before PR N` and the other's `ready: merge
-after PR N`.
+line ends `once Cloud CI passes: merge before PR N` and the other's
+`once Cloud CI passes: merge after PR N`.
 
 ## After a merge
 

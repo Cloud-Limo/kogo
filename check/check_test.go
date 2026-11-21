@@ -347,6 +347,14 @@ func TestNumberToString(t *testing.T) {
 	})
 }
 
+// joinToString takes a lambda giving each element's String, which a
+// List<String> alone may leave out (spec.md 12).
+func TestJoinToString(t *testing.T) {
+	preludeCases(t, [][2]string{
+		{"fun f(ns: List<Long>): String = ns.joinToString(\",\")", "t.kg:2:36: no-overload: no joinToString fits this call with (String): the candidates are fun List<String>.joinToString(separator: String): String; fun <T> List<T>.joinToString("},
+	})
+}
+
 // preludeCases checks each case's source, after "package t", against
 // the real prelude: it passes when the case wants "", and otherwise
 // gives one error that starts with what the case wants.

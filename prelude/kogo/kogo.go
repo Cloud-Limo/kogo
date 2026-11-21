@@ -200,6 +200,20 @@ func List_Zip[T, R any](this List[T], other List[R]) List[Pair[T, R]] {
 	return out
 }
 
+// A joinToString's separator is ", " when the call gives none, as
+// Kotlin's is.
+func ListString_JoinToString_String(this List[string], separator *string) string {
+	return ListT_JoinToString_String_TToString(this, separator, func(s string) string { return s })
+}
+
+func ListT_JoinToString_String_TToString[T any](this List[T], separator *string, transform func(T) string) string {
+	sep := ", "
+	if separator != nil {
+		sep = *separator
+	}
+	return strings.Join(List_widen(this, transform), sep)
+}
+
 func List_Sum(this List[int64]) int64 {
 	return ListT_SumOf_TToLong(this, func(x int64) int64 { return x })
 }

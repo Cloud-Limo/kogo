@@ -28,6 +28,8 @@ external fun group(name: String, fields: List<Field>): Field
 external fun Http.ask(endpoint: Lookup, fields: List<Field>): Either<HttpFailure, Json>
 action external fun Http.perform(endpoint: Action, fields: List<Field>): Either<HttpFailure, Json>
 external fun Http.withHeader(name: String, value: String): Http
+external fun Http.logRefusal(endpoint: Lookup, why: String)
+external fun Http.logRefusal(endpoint: Action, why: String)
 
 external fun Json.string(key: String): String?
 external fun Json.long(key: String): Long?

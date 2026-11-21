@@ -4138,6 +4138,10 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
 - **The test client is `priceOf` in `examples/29_http.kg`**, run by the emitted-Go test
   against a local server, with the line written to its output. Not taken: a client of
   its own in `cmd/kogo/testdata`, a second place the end-to-end test reads Kogo from.
+- **Spec 12's example leaves `NOT_FOUND` silent** (the lead's Ruling, 22 Nov 2026):
+  which answers a client logs is the client's to choose, and a stale id is an ordinary
+  answer, so a WARN line for each would bury the refused key the line is for. Not
+  taken: logging it as the Kotlin did.
 - **Its section is spec 12, "An outside service"**, where the `kogo.http` text is: the
   issue names section 14, which is "Not in Kogo" and has no `kogo.http` text.
 

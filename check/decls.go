@@ -250,7 +250,7 @@ func (c *checker) importAll(f *syntax.File) {
 			c.errorf(imp, "unknown-import", "an import names a declaration in a package, as import shop.model.Order")
 			continue
 		}
-		from, name := c.pkgs[imp.Name[:i]], imp.Name[i+1:]
+		from, name, local := c.pkgs[imp.Name[:i]], imp.Name[i+1:], imp.Local()
 		switch {
 		case from != nil && testOnly[from.name] && !f.IsTest():
 			c.errorf(imp, "test-import", "package %s is for test files, those named _test.kg: move what uses %s into one (spec.md 16)", from.name, name)
@@ -262,15 +262,42 @@ func (c *checker) importAll(f *syntax.File) {
 			c.errorf(imp, "member-import", "%s is a member, in scope wherever a value of its receiver's type is: remove this import", name)
 		case from.named(name) == nil:
 			c.errorf(imp, "unknown-import", "package %s declares nothing named %s", from.name, name)
-		case c.imports[f][name] != nil && c.imports[f][name] != from:
-			c.errorf(imp, "duplicate", "%s is already imported from package %s", name, c.imports[f][name].name)
+		case c.pkg.types[local] != nil || c.pkg.aliases[local] != nil || c.pkg.vals[local] != nil:
+			if from == c.pkg {
+				c.errorf(imp, "own-import", "%s is package %s's own, which needs no import: remove this import", local, from.name)
+			} else {
+				c.errorf(imp, "own-import", "package %s declares %s, which this import would hide: give the import another name, import %s as Other, or rename one (spec.md 2)", c.pkg.name, local, imp.Name)
+			}
+		case c.imports[f][local] != nil && (c.imports[f][local] != from || imp.As != nil):
+			c.errorf(imp, "duplicate", "%s is already imported from package %s: give one another name, import %s as Other (spec.md 2)", local, c.imports[f][local].name, imp.Name)
 		default:
-			c.imports[f][name] = from
+			c.imports[f][local] = from
+			if imp.As != nil {
+				c.imports[f][local] = renamed(from, name, local)
+			}
 			if all := from.named(name); !slices.ContainsFunc(all, c.visible) {
 				c.see(imp, name, all[0])
 			}
 		}
 	}
+}
+
+// renamed gives what an import with as brings: what from declares as
+// name, and the types nested in it, under the name local.
+func renamed(from *pkg, name, local string) *pkg {
+	return &pkg{from.name, rename(from.types, name, local), rename(from.objects, name, local), rename(from.aliases, name, local), rename(from.funcs, name, local), rename(from.vals, name, local)}
+}
+
+func rename[V any](from map[string]V, name, local string) map[string]V {
+	to := map[string]V{}
+	for k, v := range from {
+		if k == name {
+			to[local] = v
+		} else if rest, ok := strings.CutPrefix(k, name+"."); ok {
+			to[local+"."+rest] = v
+		}
+	}
+	return to
 }
 
 // kotlinFix says what to write for an import a Kotlin program has,

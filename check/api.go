@@ -218,6 +218,10 @@ func (c *checker) shaped(id *syntax.Ident, r *role) (*Func, Type) {
 	}
 	f, errs := fs[0], len(c.errs)
 	c.info.Uses[id] = f
+	if f.Name != id.Name && r.code == "operation" {
+		c.errorf(id, "operation", "%s is imported as %s: a list names an operation by its fun's own name, its name on the wire, so write %s in a file that imports it by that name (spec.md 2)", f.Name, id.Name, f.Name)
+		return nil, nil
+	}
 	if r == gateRole && len(f.Params) == 4 {
 		r = inputGateRole
 	}

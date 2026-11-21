@@ -17,7 +17,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
 	"regexp"
 	"slices"
@@ -431,7 +430,7 @@ func String_PadStart(this string, length int32, padChar *rt.Char) string {
 }
 
 func String_ToIntOrNull(this string) *int32 {
-	if n, ok := whole(this, math.MaxInt32); ok {
+	if n, ok := whole(this, 32); ok {
 		v := int32(n)
 		return &v
 	}
@@ -439,41 +438,28 @@ func String_ToIntOrNull(this string) *int32 {
 }
 
 func String_ToLongOrNull(this string) *int64 {
-	if n, ok := whole(this, math.MaxInt64); ok {
+	if n, ok := whole(this, 64); ok {
 		return &n
 	}
 	return nil
 }
 
 // whole reads a whole number as Kotlin's toIntOrNull does: an
-// optional + or - and then decimal digits alone, any of Unicode's, up
-// to max or down to -max-1. Blank, a sign alone and one out of range
-// are not one.
-func whole(s string, max int64) (int64, bool) {
-	u := units(s)
-	neg := len(u) > 0 && u[0] == '-'
-	if len(u) > 0 && (u[0] == '-' || u[0] == '+') {
-		u = u[1:]
-	}
-	if len(u) == 0 {
-		return 0, false
-	}
-	// Built downwards, as Kotlin's is, so -max-1 fits.
-	n, limit := int64(0), -max
-	if neg {
-		limit = -max - 1
-	}
-	for _, c := range u {
-		d := digit(c)
-		if d < 0 || n < limit/10 || n*10 < limit+int64(d) {
+// optional + or - and then decimal digits alone, any of Unicode's,
+// within bits. Blank, a sign alone and one out of range are not one.
+func whole(s string, bits int) (int64, bool) {
+	var ascii []byte
+	for i, u := range units(s) {
+		if d := digit(u); d >= 0 {
+			ascii = append(ascii, byte('0'+d))
+		} else if i == 0 && (u == '+' || u == '-') {
+			ascii = append(ascii, byte(u))
+		} else {
 			return 0, false
 		}
-		n = n*10 - int64(d)
 	}
-	if neg {
-		return n, true
-	}
-	return -n, true
+	n, err := strconv.ParseInt(string(ascii), 10, bits)
+	return n, err == nil
 }
 
 // digit is a UTF-16 unit's value as a decimal digit, or -1: Unicode's

@@ -1007,8 +1007,8 @@ fun fail(left: Boolean): Int {
 `)
 }
 
-// The four string names the Google client's port needs (DEV-1050).
-func TestGoogleStringNames(t *testing.T) {
+// split, padStart, toIntOrNull and toLongOrNull, checked, emitted and run.
+func TestSplitPadParse(t *testing.T) {
 	expect(t, [][2]string{
 		{`t.Names(",a,,b,")`, "[[, a, , b, ], 00,a,,b,, <  7>, null, null]"},
 		{`t.Names("-2147483648")`, "[[-2147483648], -2147483648, <  7>, -2147483648, -2147483648]"},

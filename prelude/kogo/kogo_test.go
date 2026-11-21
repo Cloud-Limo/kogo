@@ -457,10 +457,12 @@ func TestPortCalls(t *testing.T) {
 	CheckNotNull[int](nil, func() string { return "gone" })
 }
 
-// The four names of DEV-1050 at their corners, each as Kotlin 2.4
-// gives it.
-func TestGoogleStringCorners(t *testing.T) {
-	split := func(s, d string) string { return rt.ToString(String_Split(s, d)) + rt.ToString(int32(len(String_Split(s, d)))) }
+// split, padStart, toIntOrNull and toLongOrNull at their corners, each
+// as Kotlin 2.4 gives it.
+func TestSplitPadParseCorners(t *testing.T) {
+	split := func(s, d string) string {
+		return rt.ToString(String_Split(s, d)) + rt.ToString(int32(len(String_Split(s, d))))
+	}
 	zero := rt.Char('0')
 	for _, c := range [][2]string{
 		{split("", ","), "[]1"},

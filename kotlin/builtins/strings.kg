@@ -31,7 +31,7 @@ fun strings(f: String, s: String, t: String, n: Int, m: Int): String? = when (f)
     "substringPlus" -> s.substring(0, n) + t + s.substring(n)
     "lowercaseContains" -> "${s.lowercase().contains(t.lowercase())} ${(s + t).lowercase()}"
     "split" -> "${s.split(t)} ${(t + s + t).split(t)} ${s.split(t).size}"
-    "padStart" -> "<${s.padStart(n)}> ${t.map { s.padStart(m, it) }}"
+    "padStart" -> "<${s.padStart(n % 9)}> ${t.map { s.padStart(m % 9, it) }}"
     "toIntOrNull" -> "${s.toIntOrNull()} ${"$n".toIntOrNull()} ${"${n}0".toIntOrNull()} ${"+$m".toIntOrNull()} ${"$t$n".toIntOrNull()}"
     "toLongOrNull" -> "${s.toLongOrNull()} ${"$n$m".toLongOrNull()} ${"${n}0000000000".toLongOrNull()} ${"-$m$n$m".toLongOrNull()}"
     else -> null

@@ -3576,7 +3576,8 @@ Each entry: what was decided, why, and what would reopen it.
   choice for each handle, which no application has asked for. What of a body is safe
   to log at all stays open in `doc/work.md`. The query is not logged, nor any header: a
   credential may be in either. A 4xx is logged as `kogo.http: refused` and a 3xx as
-  `kogo.http: redirect not followed` (the lead's Ruling on PR 97, 20 Nov 2026), since
+  `kogo.http: redirect not followed` (the lead's Ruling on PR 97, 20 Nov 2026; both
+  became `kogo.http: failed` with DEV-1050, below), since
   `Refused` is a 4xx and nothing else and a 3xx is `Unknown`. Not taken: `refused` for
   both, the words of Q9, which say of a `302` what its value does not. Each is logged
   before the answer is judged whole, so a refusal past the limit or broken off is
@@ -3987,3 +3988,35 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   `doc/lists-assessment.md`, `doc/remains.md`, `doc/work.md`) are
   dated designs and are not rewritten here; `doc/roadmap.md` is
   DEV-1041's.
+
+## `Json.strings`, four string names, every failed call logged (DEV-1050), 21 Nov 2026
+
+From Greg's rulings of 21 Nov 2026 on DEV-1049; these are the calls they left open.
+
+- **A 5xx's body is not logged**; a 3xx's and a 4xx's still are, their first 4 KiB. A
+  4xx's body is logged for what support reads in it, a decline's code and request id
+  (Q9); a 5xx's is the service's own trouble, often an error page, which no client acts
+  on and which may echo what was sent. Nor is the body of a 2xx that is `Unreadable`,
+  which may be a whole answer of personal data. Not taken: a 5xx's body logged as a
+  4xx's is, more of what `doc/work.md`'s Open asks whether it is safe to log, for no
+  reader. Reopen when support needs something only a 5xx's body says.
+- **One message, `kogo.http: failed`, for every failed call**, with `method`, `path`,
+  `status` where an answer came, `why`, and `body` for a 3xx or a 4xx. It replaces PR
+  97's `kogo.http: refused` and `kogo.http: redirect not followed`: one word true of
+  every failure is counted with one search, and `status` tells a 3xx from a 4xx. Not
+  taken: the two kept and a third added for the rest. The line is written once the
+  call has ended, so a 4xx past the limit or broken off is logged with its status, its
+  `why` and what was read of its body.
+- **`split` takes one `String` delimiter**, as spec 12 now writes it, `split(delimiter)`.
+  Not taken: Kotlin's whole signature, with `vararg`, `ignoreCase`, `limit` and a `Char`
+  delimiter, which no port needs yet. `padStart(length, padChar = ' ')` is Kotlin's
+  one form on a `String`.
+- **The check against Kotlin pads to `n % 9`**: an input is `Int.MAX_VALUE`, which
+  neither side can build. A negative length is among the cases, and panics alike.
+- **`doc/work.md`'s Open loses its whole bullet on errors a service puts in its body**:
+  past the question spec 12 now settles, it said only that each client reads its own.
+  The sketch of `timeZone` above it still raises `Unreadable` for a status that is not
+  `OK`, which spec 12 now rules out; it is left for the Google client's port, whose
+  failure type it needs.
+- **Rows 13i to 13k are new in `doc/roadmap.md`**, and the six job operations become
+  13l, as rows 13 to 18 became 13a to 13i (DEV-1041). Row 6a is marked built, PR 119.

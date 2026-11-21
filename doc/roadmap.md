@@ -77,10 +77,14 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   DEV-968): an action is never made inside one; a lookup may be asked
   in one, the transaction waiting for it. An operation is one of the
   five kinds in `spec.md` 15.1's table (PR 94), which says where it
-  may ask outside and where it may change it. The driver's job pages
-  still show the stored address (`place.address`, kept fresh by the
-  daemon; cusoon2 PR 1523); a place with none is filled when read
-  (cusoon2 DEV-972, PR 1536). The booker's Google operations became
+  may ask outside and where it may change it. Since cusoon2's DEV-991
+  the driver's job pages read a place through
+  `PlaceModel.compositePlace`, which asks Place Details when the cache
+  is cold, and show the stored address (`place.address`) in three
+  cases: a parked row, a render that meets not found, and a cold cache
+  with Google unreachable or refusing (DEV-1046 to DEV-1049, 21 Nov
+  2026). A place with no stored address is filled when read (cusoon2
+  DEV-972, PR 1536). The booker's Google operations became
   actions between transactions (cusoon2 PR 1531); under the rule,
   three of them folded back into one transaction (cusoon2 DEV-975,
   PR 1537).
@@ -117,7 +121,7 @@ issue where there is one.
 | 3 | Kogo | Serve a gated row: check, gate, work | 150 / 150 | PR 91 |
 | 4 | Kogo | The Origin and CSRF check (`doc/origin.md`) | 120 / 150 | PR 92 |
 | 5 | Kogo | `SerializableTx` beside `Tx` | 70 / 70 | PR 93, 102 |
-| 6a | Kogo | The gate design: a gate's answer holds its transaction, the proof's rules (PR 98) out, two refusals (DEV-1040) | -60 / -20 | no, DEV-1040 |
+| 6a | Kogo | The gate design: a gate's answer holds its transaction, the proof's rules (PR 98) out, two refusals (DEV-1040) | -60 / -20 | PR 119 |
 | 6b | Kogo | A gate only reads (DEV-977) | (in PR 98's 170 / 150) | PR 96 |
 | 7 | Kogo | `action fun` and the `action` binding (`lookup` out, PR 100) | 100 / 100 | PR 90 |
 | 8 | Kogo | `Reply` and `Cookie` | 50 / 50 | PR 89 |
@@ -125,7 +129,7 @@ issue where there is one.
 | 10 | Kogo | Compare and shift an `Instant` | 30 / 30 | PR 79 |
 | 11 | Kogo | `main`'s prelude: `rpc.Call`, `_op`, settings | 150 / 150 | PR 101, 106 |
 | 12 | Kogo | `ByteArray` and `kogo.mail` | 130 / 120 | PR 103 |
-| 13a | cusoon2 | Ported as `ungated` rows: the business page's five, me and logout, four logins with a FusionAuth client, the four passkey operations | (in 13i's) | cusoon2 PR 1494, 1544, 1548, 1550 |
+| 13a | cusoon2 | Ported as `ungated` rows: the business page's five, me and logout, four logins with a FusionAuth client, the four passkey operations | (in 13l's) | cusoon2 PR 1494, 1544, 1548, 1550 |
 | 13b | cusoon2 | Kotlin first: bind the person (DEV-1025) | 15 SQL / 20 / 20, 15 port | no, cusoon2 PR 1564 in review |
 | 13c | cusoon2 | Kotlin first: row-level security's slice 2, the policies on `supply_agreement`, `invite` and `debt_entry` | 112 SQL / 10 / 140 | no, DEV-1042 |
 | 13d | cusoon2 | Kotlin first: slice 3, `business` and `admin_grant`, `create_business`, the commands' role, `person`'s column grants | 60 SQL / 0 / 60, 10 port | no, DEV-1043 |
@@ -133,11 +137,14 @@ issue where there is one.
 | 13f | cusoon2 | Slice 4: the gate asks the database; its statement Kotlin first, the marks in the port alone | -25 / 0, -10 port | no, DEV-1044 |
 | 13g | cusoon2 | The passkey rows as a gate that answers facts (`gates.md` section 7), in the ops port's entry | (in 13e's) | no, DEV-1030 |
 | 13h | cusoon2 | Kotlin first: a place with no stored address filled when read (DEV-972) | | cusoon2 PR 1536 |
-| 13i | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13i's: ~1,600 / 850) | no |
+| 13i | Kogo | `Json.strings`; `split`, `padStart`, `toIntOrNull`, `toLongOrNull`; a log line for every failed call | 45 / 65 | PR 120 |
+| 13j | cusoon2 | A Google stand-in for the comparison and the port's tests | ~160 / 40 | no |
+| 13k | cusoon2 | The port of Place Details, the time zone and `compositePlace` | ~230 / 120 | no |
+| 13l | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13l's: ~1,600 / 850) | no |
 | 19 | cusoon2 | The ops site's Go `main`; settings move | 150 / 80 | no |
 | 20 | cusoon2 | Serve the ops site from Go | | no |
 
-Beside 13b to 13i, as tests in the Kotlin: the probes of each second id
+Beside 13b to 13l, as tests in the Kotlin: the probes of each second id
 and admin-only field, the storefront's (DEV-1031, cusoon2 PR 1563)
 and then the ops site's (DEV-1038, 0 / 40).
 
@@ -148,14 +155,19 @@ concurrency test.
 
 ### 2. The rest of cusoon2
 
+Mail's, the PDF's, Stripe's and Google's sizes were measured by four
+explorations of cusoon2's Kotlin (DEV-1046 to DEV-1049, 21 Nov 2026);
+the rest are estimates.
+
 | Area | Size |
 | --- | --- |
 | The `commands` list, then the ten `--op` commands | 350 / 180 |
 | The work list and the runner (`find`'s review here) | 750 / 600 |
-| Mail: templates, outbox, bounces | 1,300 / 400 |
-| PDF: our own small writer (about 380 Go and font data) and the layouts | 1,700 / 300 |
-| The daemon's 16 queues | 1,400 / 600 |
-| Stripe and Google (legacy endpoints) through `kogo.http` | 850 / 400 |
+| Mail: templates, outbox, bounces | 1,345 / 415 in the port, 295 / 260 in the prelude |
+| PDF: our own small writer (about 380 Go and font data) and the layouts | 1,610 / 640, the tests holding a comparison harness of about 200 |
+| The daemon's 16 queues, Stripe's two among them (245 / 200) | 1,400 / 600 |
+| Stripe's client through `kogo.http`, with the keyed call (`keyedAction`, `performOnce`, `EffectKey`) 45 / 90 in Kogo | 127 / 150 |
+| Google's client (legacy endpoints) through `kogo.http`, of which 13k's 230 / 120 is in table 1, with 70 / 80 in the prelude | 600 / 300 |
 | A paged list (not designed) | |
 | The booker's 70 operations: all in Kotlin RPC since GraphQL left cusoon2 (DEV-893's first step, cusoon2 PR 1557); its second step, the port, is sliced when this row is reached | 4,500 / 2,000 |
 | Translating cusoon2's tests into the test form, area by area | |

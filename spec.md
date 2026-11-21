@@ -937,13 +937,14 @@ There are no mutable collections, sequences or arrays. Build a list with
 **Strings.** `length`, `isEmpty`, `isBlank`, `isNotBlank`,
 `isNullOrBlank`, `ifEmpty`, `ifBlank`, `trim`, `trim(char)`, `trimEnd`,
 `lowercase`, `uppercase`, `startsWith`, `endsWith`, `contains`,
-`substring`, `substringAfter`, `take`, `replace`,
-`split`, `padStart`, `toIntOrNull`, `toLongOrNull`, `equals(other,
-ignoreCase = true)`, `filter`, `filterNot`, `map` (over `Char`), and on
-`Char`: `isWhitespace`, `isDigit`, `digitToInt`. `Regex(pattern)` with
-`matches`, `containsMatchIn`, `find` and `String.replace(regex, text)`;
-the pattern syntax is RE2 (no lookaround, no backreferences). Case
-conversion never reads a locale.
+`substring`, `substringAfter`, `take`, `replace`, `split(delimiter)`,
+`padStart`, `toIntOrNull`, `toLongOrNull`,
+`equals(other, ignoreCase = true)`, `filter`, `filterNot`, `map` (over
+`Char`), and on `Char`: `isWhitespace`, `isDigit`, `digitToInt`.
+`Regex(pattern)` with `matches`, `containsMatchIn`, `find` and
+`String.replace(regex, text)`; the pattern syntax is RE2 (no
+lookaround, no backreferences). Case conversion never reads a
+locale.
 
 **Where the prelude differs from Kotlin.** A name that Kotlin has means
 what Kotlin's means in ordinary use. The corners where it does not are
@@ -958,6 +959,8 @@ all listed here:
   `"-a--c-"`. The text is read as Kotlin reads it: `$1` and `${name}`
   are groups, and a backslash takes the next character as it is.
 - `trim(char)` takes one `Char`, where Kotlin's takes any number.
+- `split(delimiter)` takes one `String`, where Kotlin's also takes
+  several, a `Char`, `ignoreCase` and `limit`.
 - A bug's message is Kotlin's but for these two. Kotlin words an index
   outside a list by the list's class, so `emptyList<Int>()[0]` is
   `Empty list doesn't contain element at index 0.` there and `Index 0
@@ -1087,8 +1090,10 @@ each form.
   has, from `main` or an earlier `withHeader`, panics.
 - An answer is one JSON object, read by key: `json.string(key)`,
   `long`, `double`, `boolean`, `at(key): Json?` (a nested object) and
-  `list(key): List<Json>?` (an array of objects). A read gives `null`
-  where the key is absent, is JSON's `null` or holds another type: a
+  `list(key): List<Json>?` (an array of objects) and
+  `strings(key): List<String>?` (an array of strings). A read gives
+  `null` where the key is absent, is JSON's `null` or holds another
+  type, an array with one element of another type among them: a
   string that holds digits is not a number. `json.raw(): String` is the
   object's text untouched, and `Json.parse(text): Json?` is `null` for
   text that is not one JSON object. A 2xx answer with no body reads as
@@ -1104,8 +1109,10 @@ each form.
   not one JSON object. What a refusal means is the client's to say, and
   a client raises `Unreadable` itself for an answer that lacks what the
   service always sends.
-- An `HttpFailure` is one call's: how far that call got. A function
-  that makes more than one call gives what the whole came to, in a
+- An `HttpFailure` says how far a call got and nothing else. It is
+  one call's: a function that makes more than one call gives what the
+  whole came to, in a type of its own. When a service says no inside
+  a 2xx and its client raises that, the client raises it in a failure
   type of its own.
 
 Where Go's HTTP client would decide, Kogo states it:
@@ -1121,9 +1128,11 @@ Where Go's HTTP client would decide, Kogo states it:
 | A JSON number | `long` is exact, and `null` for a number written with a fraction or an exponent, or past a `Long`. `double` is the nearest `Double`. |
 | A time limit | The handle's own, which `main` must state, from the call's start to the end of its answer; past it a call that left is `Unknown`. |
 
-Every 3xx and 4xx is logged in Go, with its method, path, status and
-body, the body's first 4 KiB with a mark where it is cut. A handle's
-own headers and query fields are never logged.
+Every call that `ask` or `perform` ends in an `HttpFailure` is logged
+in Go, with its method, its path, its status where an answer came and
+why; a 3xx or a 4xx with its body too, the body's first 4 KiB with a
+mark where it is cut. A handle's own headers and query fields are
+never logged.
 
 **Mail** (`kogo.mail`). A message is data that Kogo builds, and
 `eml(mail: Mail): ByteArray` writes it as the bytes of an EML file, for

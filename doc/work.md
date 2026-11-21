@@ -283,7 +283,6 @@ fun timeZone(google: Http, at: LatLng, now: Instant): Either<HttpFailure, ZoneId
     val answer = google.ask(TIME_ZONE, listOf(
         field("location", "${at.lat},${at.lng}"),
         field("timestamp", now.epochSeconds))).bind()
-    // What a no inside a 2xx is raised as is open: see Open.
     ensure(answer.string("status") == "OK") { HttpFailure.Unreadable("the answer's status is not OK") }
     zoneOf(answer.string("timeZoneId") ?: raise(HttpFailure.Unreadable("the answer has no timeZoneId")))
 }
@@ -463,12 +462,14 @@ made. Not checked against this rule: the Go already written (the
 handler and the prelude) and `kogo.mail`. Agreed with Greg on 17 Nov
 2026.
 
-**Every refused send is logged.** The binding logs a 3xx or a 4xx in
-Go, with its method, path, status and body (the body's first 4 KiB,
-with a mark that says it was cut and how long it was: it may echo
-what was sent), so a decline's code and
-request id reach support and what a queue stores for a payer stays
-fixed words (Q9, `decisions.md`).
+**Every failed call is logged.** The binding logs each call that
+ends in an `HttpFailure` in Go, with its method, path, status where an
+answer came and why, so a month's failed calls can be counted. A 3xx
+or a 4xx is logged with its body too (the body's first 4 KiB, with a
+mark that says it was cut and how long it was: it may echo what was
+sent), so a decline's code and request id reach support and what a
+queue stores for a payer stays fixed words (Q9, `decisions.md`). A
+5xx's body is not logged (DEV-1050, `decisions.md`).
 
 ## Workers
 
@@ -1297,17 +1298,9 @@ built once. Agreed with Greg on 17 Nov 2026.
 
 ## Open
 
-- Errors a service puts in its body: Stripe's `card_error`, legacy
-  Google's `status`. Each client reads its own. What a client raises
-  for a no inside a 2xx is open, for Greg when Google's client is
-  ported. (a) `Unreadable`, with spec 12 widened to say a client
-  raises it for an answer that says no in a 2xx. (b) `Refused(200,
-  answer)`: but `Refused` is a 4xx and nothing else, an `act` reads a
-  `Refused` as "nothing done", and a no inside a 2xx may follow a
-  change. (c) A failure type of the client's own for that call.
 - What of a refused body is safe to log at all, for every service:
-  `kogo.http` logs its first 4 KiB ("What Go would decide, Kogo
-  states").
+  `kogo.http` logs the first 4 KiB of a 3xx's or a 4xx's, and none of
+  a 5xx's ("What Go would decide, Kogo states").
 - The name of the column a waiting payer's charge is stamped with:
   cusoon2's to choose. `payer_waiting_since` is the sketches' name.
 - Reading Postgres's idle limit at start, as the role is set there.

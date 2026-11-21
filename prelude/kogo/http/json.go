@@ -115,3 +115,21 @@ func Json_List(this Json, key string) *kogo.List[Json] {
 	}
 	return &list
 }
+
+// Json_Strings is an array of strings, and nil when any of its
+// elements is not one: read as pointers, since Go reads a null into a
+// string as "".
+func Json_Strings(this Json, key string) *kogo.List[string] {
+	elements := read[[]*string](this, key)
+	if elements == nil {
+		return nil
+	}
+	list := kogo.List[string]{}
+	for _, e := range *elements {
+		if e == nil {
+			return nil
+		}
+		list = append(list, *e)
+	}
+	return &list
+}

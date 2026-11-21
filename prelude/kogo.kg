@@ -69,6 +69,10 @@ external fun String.substring(startIndex: Int): String
 external fun String.substring(startIndex: Int, endIndex: Int): String
 external fun String.substringAfter(delimiter: String): String
 external fun String.take(n: Int): String
+external fun String.split(delimiter: String): List<String>
+external fun String.padStart(length: Int, padChar: Char = ' '): String
+external fun String.toIntOrNull(): Int?
+external fun String.toLongOrNull(): Long?
 external fun <R> String.map(transform: (Char) -> R): List<R>
 external fun Char.digitToInt(): Int
 external fun Char.isWhitespace(): Boolean

@@ -152,7 +152,7 @@ func TestNoRedirectIsFollowed(t *testing.T) {
 	if followed.Load() != 0 {
 		t.Errorf("%d redirects were followed", followed.Load())
 	}
-	if !strings.Contains(log.String(), `msg="kogo.http: redirect not followed" method=POST path=/thing status=302`) || strings.Contains(log.String(), "refused") {
+	if !strings.Contains(log.String(), `msg="kogo.http: failed" method=POST path=/thing status=302 why="the service answered 302" body=`) {
 		t.Errorf("the redirect is not logged as one:\n%s", log)
 	}
 }
@@ -222,6 +222,17 @@ func TestReaders(t *testing.T) {
 		if got := Json_Parse(text); got != nil {
 			t.Errorf("parse(%q) is %s, want null", text, rt.ToString(got))
 		}
+	}
+}
+
+// strings reads an array of strings, and gives null where the key is
+// absent, is not an array, or holds an element that is not a string.
+func TestStrings(t *testing.T) {
+	j := *Json_Parse(`{"types": ["street_address", "", "é"], "none": [], "s": "a", "mixed": ["a", 1], "null": ["a", null]}`)
+	want(t, "types", rt.ToString(Json_Strings(j, "types")), "[street_address, , é]")
+	want(t, "none", rt.ToString(Json_Strings(j, "none")), "[]")
+	for _, key := range []string{"absent", "s", "mixed", "null"} {
+		want(t, key, rt.ToString(Json_Strings(j, key)), "null")
 	}
 }
 
@@ -347,20 +358,26 @@ func TestFailures(t *testing.T) {
 		{600, `{}`, `Either.Left(Unknown(why=the service answered 600))`},
 		{200, `[1]`, `Either.Left(Unreadable(why=the answer is not a JSON object))`},
 		{200, ``, `Either.Right({})`},
+		{200, `{"status": "ZERO_RESULTS"}`, `Either.Right({"status": "ZERO_RESULTS"})`},
 	} {
-		h, log := serve(t, Service{Query: map[string]string{"key": "secret"}}, answer(c.status, c.body))
+		h, log := serve(t, Service{Query: map[string]string{"key": "secret"}, Headers: map[string]string{"Authorization": "secret"}}, answer(c.status, c.body))
 		asked, performed := both(h)
 		want(t, "ask", asked, c.want)
 		want(t, "perform", performed, c.want)
-		refused := c.status >= 400 && c.status < 500
-		if got := strings.Count(log.String(), "kogo.http: refused"); got != map[bool]int{true: 2}[refused] {
-			t.Errorf("%d: %d refused sends are logged:\n%s", c.status, got, log)
+		// Every call that fails is logged, once, with its status; a 4xx
+		// with its body, a 5xx and a 2xx without.
+		refused, failed := c.status >= 400 && c.status < 500, strings.HasPrefix(c.want, "Either.Left")
+		if got := strings.Count(log.String(), `msg="kogo.http: failed" method=`); got != map[bool]int{true: 2}[failed] {
+			t.Errorf("%d: %d failed calls are logged:\n%s", c.status, got, log)
 		}
-		if refused && !strings.Contains(log.String(), "body="+strconv.Quote(c.body)) {
-			t.Errorf("%d: the refused body is not logged:\n%s", c.status, log)
+		if failed && !strings.Contains(log.String(), "path=/thing status="+strconv.Itoa(c.status)+" why=") {
+			t.Errorf("%d: the status is not logged:\n%s", c.status, log)
+		}
+		if refused != strings.Contains(log.String(), "body=") || refused && !strings.Contains(log.String(), "body="+strconv.Quote(c.body)) {
+			t.Errorf("%d: the body is logged %v, want %v:\n%s", c.status, !refused, refused, log)
 		}
 		if strings.Contains(log.String(), "secret") {
-			t.Errorf("the handle's query is logged:\n%s", log)
+			t.Errorf("the handle's query or headers are logged:\n%s", log)
 		}
 	}
 	// A long refusal is logged to 4 KiB, and says so.
@@ -373,21 +390,27 @@ func TestFailures(t *testing.T) {
 	// A refusal past the limit is logged, with what was read.
 	h, log = serve(t, Service{MaxAnswer: 1 << 10}, answer(404, long))
 	want(t, "a refusal past the limit", rt.ToString(Http_Perform(h, post, nil)), "Either.Left(Unknown(why=the answer is longer than 1024 bytes))")
-	if !strings.Contains(log.String(), `msg="kogo.http: refused" method=POST path=/thing status=404 body="{\"echo\": \"xxx`) {
+	if !strings.Contains(log.String(), `msg="kogo.http: failed" method=POST path=/thing status=404 why="the answer is longer than 1024 bytes" body="{\"echo\": \"xxx`) {
 		t.Errorf("a refusal past the limit is not logged:\n%s", log)
 	}
 	// A slow service: the call left, so its end is unknown.
-	slow, _ := serve(t, Service{Timeout: 50 * time.Millisecond, Query: map[string]string{"key": "secret"}}, func(w http.ResponseWriter, r *http.Request) { time.Sleep(200 * time.Millisecond) })
+	slow, log := serve(t, Service{Timeout: 50 * time.Millisecond, Query: map[string]string{"key": "secret"}}, func(w http.ResponseWriter, r *http.Request) { time.Sleep(200 * time.Millisecond) })
 	asked, performed := both(slow)
 	want(t, "ask of a slow service", asked, "Either.Left(Unknown(why=context deadline exceeded))")
 	want(t, "perform on a slow service", performed, "Either.Left(Unknown(why=context deadline exceeded))")
+	if !strings.Contains(log.String(), `msg="kogo.http: failed" method=POST path=/thing why="context deadline exceeded"`+"\n") || strings.Contains(log.String(), "secret") {
+		t.Errorf("a call that timed out is not logged without its query:\n%s", log)
+	}
 	// A service that is not there: nothing left.
-	gone, _ := serve(t, Service{}, answer(200, "{}"))
+	gone, log := serve(t, Service{Query: map[string]string{"key": "secret"}}, answer(200, "{}"))
 	gone.base.Host = "127.0.0.1:1"
 	for what, sent := range map[string]kogo.Either[HttpFailure, Json]{"ask": Http_Ask(gone, look, nil), "perform": Http_Perform(gone, post, nil)} {
 		if _, notSent := sent.(kogo.Either_Left[HttpFailure]).Value.(HttpFailure_NotSent); !notSent {
 			t.Errorf("%s on a closed port is not NotSent", what)
 		}
+	}
+	if !strings.Contains(log.String(), `msg="kogo.http: failed" method=POST path=/thing why="dial tcp 127.0.0.1:1: connect: connection refused"`+"\n") || strings.Contains(log.String(), "secret") {
+		t.Errorf("a call that never left is not logged without its query:\n%s", log)
 	}
 }
 

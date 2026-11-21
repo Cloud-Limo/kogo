@@ -397,6 +397,82 @@ func String_Take(this string, n int32) string {
 	return String_Substring_Int_Int(this, 0, min(n, String_Length(this)))
 }
 
+// String_Split cuts at each delimiter, as Kotlin's does: a delimiter
+// at either end gives an empty string there, and an empty string is
+// one empty string. An empty delimiter is found before every UTF-16
+// unit and at the end.
+func String_Split(this, delimiter string) List[string] {
+	if delimiter != "" {
+		return strings.Split(this, delimiter)
+	}
+	out := List[string]{""}
+	for _, u := range units(this) {
+		out = append(out, string(utf16.Decode([]uint16{u})))
+	}
+	return append(out, "")
+}
+
+// String_PadStart counts in UTF-16 units and panics with Kotlin's
+// message for a negative length.
+func String_PadStart(this string, length int32, padChar *rt.Char) string {
+	if length < 0 {
+		panic(fmt.Sprintf("Desired length %d is less than zero.", length))
+	}
+	pad := rt.Char(' ')
+	if padChar != nil {
+		pad = *padChar
+	}
+	n := length - String_Length(this)
+	if n <= 0 {
+		return this
+	}
+	return string(utf16.Decode(slices.Repeat([]uint16{uint16(pad)}, int(n)))) + this
+}
+
+func String_ToIntOrNull(this string) *int32 {
+	if n, ok := whole(this, 32); ok {
+		v := int32(n)
+		return &v
+	}
+	return nil
+}
+
+func String_ToLongOrNull(this string) *int64 {
+	if n, ok := whole(this, 64); ok {
+		return &n
+	}
+	return nil
+}
+
+// whole reads a whole number as Kotlin's toIntOrNull does: an
+// optional + or - and then decimal digits alone, any of Unicode's,
+// within bits. Blank, a sign alone and one out of range are not one.
+func whole(s string, bits int) (int64, bool) {
+	var ascii []byte
+	for i, u := range units(s) {
+		if d := digit(u); d >= 0 {
+			ascii = append(ascii, byte('0'+d))
+		} else if i == 0 && (u == '+' || u == '-') {
+			ascii = append(ascii, byte(u))
+		} else {
+			return 0, false
+		}
+	}
+	n, err := strconv.ParseInt(string(ascii), 10, bits)
+	return n, err == nil
+}
+
+// digit is a UTF-16 unit's value as a decimal digit, or -1: Unicode's
+// decimal digits come in runs of ten from a zero.
+func digit(u uint16) int {
+	for _, r := range unicode.Nd.R16 {
+		if r.Lo <= u && u <= r.Hi {
+			return int(u-r.Lo) % 10
+		}
+	}
+	return -1
+}
+
 func String_Map[R any](this string, transform func(rt.Char) R) List[R] {
 	out := List[R]{}
 	for _, u := range units(this) {
@@ -405,12 +481,9 @@ func String_Map[R any](this string, transform func(rt.Char) R) List[R] {
 	return out
 }
 
-// Unicode's decimal digits come in runs of ten from a zero.
 func Char_DigitToInt(this rt.Char) int32 {
-	for _, r := range unicode.Nd.R16 {
-		if r.Lo <= uint16(this) && uint16(this) <= r.Hi {
-			return int32(uint16(this)-r.Lo) % 10
-		}
+	if d := digit(uint16(this)); d >= 0 {
+		return int32(d)
 	}
 	panic("Char " + this.String() + " is not a decimal digit")
 }

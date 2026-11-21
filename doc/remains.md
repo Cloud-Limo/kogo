@@ -97,13 +97,15 @@ Agreed subject to this review:
 
 ## To check before relying on it
 
-- **Whether cusoon2's Kotlin sends a Stripe call twice today.** Its
-  `effect-runner.md` says one is never retried. The JDK under it
-  sends an unsuccessful `POST` on a kept connection again unless
-  `sun.net.http.retryPost` is off, and cusoon2 does not set it
-  (`doc/work.md`, "What Go would decide, Kogo states"). The JDK's
-  exact conditions were not traced; that sentence of cusoon2's is
-  Greg's to keep or change.
+- **Whether cusoon2's Kotlin sends a Stripe call twice today.**
+  Settled 21 Nov 2026 by the explorations of DEV-1046 to DEV-1049: it
+  can, in two ways, each under one `Idempotency-Key`. The JDK sends
+  again at once, once, when reading the answer's head fails other
+  than by a timeout, on a new connection as on a kept one. The runner
+  sends again after a process death between `act` and `record`. The
+  lead's call with it (21 Nov 2026): `performOnce`, when built, sends
+  once more on any connection, as the JDK does; that issue corrects
+  `doc/work.md`'s "kept connection".
 - **The Go already written against the rule on Go's defaults**: the
   handler, the prelude, and `kogo.mail` when it is built. And against
   the rule that it is handed its clock (`doc/work.md`, "How it is
@@ -113,9 +115,13 @@ Agreed subject to this review:
   application's own extensions"): the roadmap plans a small writer
   of cusoon2's own, about 380 lines of Go and font data
   (`doc/roadmap.md`, "2. The rest of cusoon2"), over a wrapped Go
-  library such as `fpdf`. Still unchecked: whether PDFBox kerns
-  when it measures a string, and the Kotlin's 32-bit floats against
-  Kogo's `Double` in the layout.
+  library such as `fpdf`. Checked on 21 Nov 2026 (DEV-1046 to
+  DEV-1049): PDFBox 2.0.37 does not kern when it measures:
+  `getStringWidth("AV")` is A plus V, and `showText` writes a plain
+  `Tj`. And `Double` is enough against the Kotlin's 32-bit floats: on
+  3,000 random line items, 183,681 marks, none differed in text or
+  count and none was more than 0.00077 pt apart, against a tolerance
+  of 0.01 pt.
 - **Reading Postgres's limit on a session idle in a transaction** when
   the server starts, as cusoon2's role is set.
 - **What the printed table and the gate's check miss.** A cascade, a

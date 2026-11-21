@@ -458,7 +458,8 @@ func TestPortCalls(t *testing.T) {
 }
 
 // split, padStart, toIntOrNull and toLongOrNull at their corners, each
-// as Kotlin 2.4 gives it.
+// as Kotlin 2.4 gives it but for split("😀", ""): Kotlin's gives two
+// lone surrogates, where a Kogo String never holds one (spec 3).
 func TestSplitPadParseCorners(t *testing.T) {
 	split := func(s, d string) string {
 		return rt.ToString(String_Split(s, d)) + rt.ToString(int32(len(String_Split(s, d))))

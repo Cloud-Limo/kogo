@@ -358,8 +358,9 @@ func TestFailures(t *testing.T) {
 		{600, `{}`, `Either.Left(Unknown(why=the service answered 600))`},
 		{200, `[1]`, `Either.Left(Unreadable(why=the answer is not a JSON object))`},
 		{200, ``, `Either.Right({})`},
+		{200, `{"status": "ZERO_RESULTS"}`, `Either.Right({"status": "ZERO_RESULTS"})`},
 	} {
-		h, log := serve(t, Service{Query: map[string]string{"key": "secret"}}, answer(c.status, c.body))
+		h, log := serve(t, Service{Query: map[string]string{"key": "secret"}, Headers: map[string]string{"Authorization": "secret"}}, answer(c.status, c.body))
 		asked, performed := both(h)
 		want(t, "ask", asked, c.want)
 		want(t, "perform", performed, c.want)
@@ -376,7 +377,7 @@ func TestFailures(t *testing.T) {
 			t.Errorf("%d: the body is logged %v, want %v:\n%s", c.status, !refused, refused, log)
 		}
 		if strings.Contains(log.String(), "secret") {
-			t.Errorf("the handle's query is logged:\n%s", log)
+			t.Errorf("the handle's query or headers are logged:\n%s", log)
 		}
 	}
 	// A long refusal is logged to 4 KiB, and says so.

@@ -937,8 +937,8 @@ There are no mutable collections, sequences or arrays. Build a list with
 **Strings.** `length`, `isEmpty`, `isBlank`, `isNotBlank`,
 `isNullOrBlank`, `ifEmpty`, `ifBlank`, `trim`, `trim(char)`, `trimEnd`,
 `lowercase`, `uppercase`, `startsWith`, `endsWith`, `contains`,
-`substring`, `substringAfter`, `take`, `replace`, `split(delimiter)`
-(one `String`), `padStart`, `toIntOrNull`, `toLongOrNull`,
+`substring`, `substringAfter`, `take`, `replace`, `split(delimiter)`,
+`padStart`, `toIntOrNull`, `toLongOrNull`,
 `equals(other, ignoreCase = true)`, `filter`, `filterNot`, `map` (over
 `Char`), and on `Char`: `isWhitespace`, `isDigit`, `digitToInt`.
 `Regex(pattern)` with `matches`, `containsMatchIn`, `find` and
@@ -959,6 +959,8 @@ all listed here:
   `"-a--c-"`. The text is read as Kotlin reads it: `$1` and `${name}`
   are groups, and a backslash takes the next character as it is.
 - `trim(char)` takes one `Char`, where Kotlin's takes any number.
+- `split(delimiter)` takes one `String`, where Kotlin's also takes
+  several, a `Char`, `ignoreCase` and `limit`.
 - A bug's message is Kotlin's but for these two. Kotlin words an index
   outside a list by the list's class, so `emptyList<Int>()[0]` is
   `Empty list doesn't contain element at index 0.` there and `Index 0

@@ -6,7 +6,7 @@ is, so each is Greg's to answer yes or no.
 
 Read at: Kogo `origin/main` 34c4a47; cusoon2 `origin/renew` 4906409ba
 (88 Kotlin files, 25 packages; the port, 24 `.kg` files in 8 packages)
-and `kogo/port/model/google.kg` on PR 1576's branch. Every Kogo claim
+and `kogo/port/model/google.kg` at PR 1576's merge commit `ef0c378cd`. Every Kogo claim
 was run with `kogo check` on a scratch package of a few lines, and
 every Kotlin claim with kotlinc 2.4.0. DEV-1067 (PR 127) edits spec 5,
 12, 13 and 14 beside this: the two meet only in section 14's table,
@@ -32,10 +32,10 @@ where both add rows.
 | 12 | Packages do not import each other | 2, 14 | `cycles.go` | yes |
 | 13 | `private` is the file, `internal` the package; an import of what the file may not name is `not-visible` | 2 | `visible`, `see` | yes |
 | 14 | A binding with a receiver is in scope everywhere and never imported; a program's extension is imported by its name | 13, 2 | `members`, `member-import` | yes; an unimported one is "a P has no function show", with no import named |
-| 15 | **A program file may say `package kogo` or `package kogo.time`: its names are then in scope in every file** | 1 and 13 imply not | nothing | **no** |
+| 15 | **A program file may say `package kogo`, and its names are then in scope in every file. It may say `package kogo.time`, and its names are then imported as `import kogo.time.mine`, as if they were the prelude's** | 1 and 13 imply not | nothing | **no** |
 | 16 | A local hides anything outside; an inner block's local hides an outer one and a type parameter hides a type, without a word, as in Kotlin | 5.2, the first only | `scope` | partly |
 | 17 | **Two declarations whose Go names meet (`foo` and `Foo`, both types) pass `kogo check` and are refused by `kogo emit`, `go-name`** | unstated | emitter | **no**: check is to be the only gate |
-| 18 | **A typealias names its type only where a type is written: `PRow(1)`, `KindRow.A` and `is ORow.Ok` are errors, though Kotlin takes all three** | 3.5, "transparent, as in Kotlin" | `qualifier`, `call` | **no** |
+| 18 | **A typealias names its type only where a type is written: `PRow(1)`, `KindRow.A` and `is ORow.Ok` are errors. Kotlin takes the first two and refuses the third** | 3.5, "transparent, as in Kotlin" | `qualifier`, `call` | **no** |
 | 19 | An import of the file's own package, a repeated one and an unused one are accepted | unstated | nothing | harmless |
 
 The issue's list said a plain interface holds no types. That is the
@@ -52,20 +52,21 @@ Commands are in the appendix, by letter.
 | Rule | What the Kotlin has | Count | In Kogo | Fits |
 | --- | --- | --- | --- | --- |
 | 1, 4 | `import ... as` (B) | 26: 19 jOOQ rows, 2 Stripe's types, 2 `time.BookingStatus`, 1 nested `StripeModel.Config`, 2 funs | 13 only read better, the name being free in the file: the port writes the plain name. 13 are forced: 10 because the file's own package declares the name, 1 by a type nested in the file, 2 funs by a property or local of the name | **10 do not** |
-| 4, 6 | Table rows whose name is also an application type's (G) | 17 of the 40 imported: `Booker`, `Booking`, `Charge`, `Journey`, `Place`, `PlaceType`... | The port's `cusoon.schema` gives a row its table's name ("a stand-in for what `kogo schema` will write"), and a wire type keeps the frontend's (`kogo/types.sh` compares them word for word). Neither is free to rename | **no**, wherever a file maps the row to the wire type: 9 of the 10 above, in 6 files of `rpc.storefront` |
+| 4, 6 | Table rows whose name is also an application type's (G) | 17 of the 40 imported: `Booker`, `Booking`, `Charge`, `Journey`, `Place`, `PlaceType`... | The port's `cusoon.schema` gives a row its table's name ("a stand-in for what `kogo schema` will write"), and a wire type keeps the frontend's (`kogo/types.sh` compares them word for word). Neither is free to rename | **no** for naming both in one file, wherever a file maps the row to the wire type: 9 of the 10 above, in 6 files of `rpc.storefront`. There is a way round: such a file reads its query straight into the wire type, or into a class of the query's own name (10.3), and never names the row |
 | 6 | An import that hides the package's own type | 1: `rpc/storefront/call.kt` reads `Booker` as the row, beside `lists.kt`'s `Booker` | compiles, the same way | yes, silently |
 | 4 | One name imported twice without `as` | 0 | | yes |
 | 1 | Wildcard import (C) | 1, using 7 of the package's 42 names | 7 imports | yes |
+| 3 | Imports of a nested name (O) | 2: `model.StripeModel.Config as StripeConfig`, already among B's 26, and `CusoonAppState.deployment`, an object's member | each fits once its outer moves to the top level, as rows 10 and H say | yes |
 | 4 | Type names declared in two packages (E) | 9 (the issue's 11 was a rougher grep) | Only `BookingStatus` meets its namesake in a file, counted above | yes |
 | 5 | Qualified names in code (D) | 2 lines, both `java.util.UUID` | `Uuid` | yes |
 | 10 | Nested types (F) | 34, and 6 companions: 15 variants of a sealed type, 4 in an interface (`GoogleMaps.Place`), 15 in a class. Written `Outer.Inner` on 40 lines | A variant stays. The rest go to the top level; the port took `GoogleMapsPlace`, `Place` being the row | yes |
 | 10 | Top-level objects (H) | 15, with 140 members: 10 hold operations, 3 are pricing regimes, 2 hold state and constants | an `api` list (`OpsApi` is ported so), a `data object`, parameters and vals | yes |
-| 12 | Packages on an import cycle (K) | 19 of 25 on one; 459 names and 629 import lines inside it | at least 52 of the 459 must move for the packages to be layers. The port's 8 packages have none so far: rows went to a package of their own under `model`, state arrives by parameter, `discountedCents` moved to `pricing` | yes, by moving |
+| 12 | Packages on an import cycle (K) | 19 of 25 on one; 459 imports of a name and 629 import lines inside it | 52 imports of a name point up under the best order of the 19: not a count of declarations to move, since a name two packages import counts twice and a moved name can drag what it uses with it. The port's 8 packages have none so far: rows went to a package of their own under `model`, state arrives by parameter, `discountedCents` moved to `pricing` | yes, by moving |
 | 8, 9 | `private` top-level names (I, J) | 85 funs, 33 vals, 10 types; none twice in a package, in the port neither | | yes |
 | 6, 7 | Names the prelude has (M) | no type; the fun `randomString`; 2 extensions on other receivers, `Area.contains` and `PDPageContentStream.list` | the prelude's; overloads | yes |
 | 17 | Names of a package apart only by the first letter's case (L) | 28 pairs, each a type beside a fun or a val, which the emitter spells apart | | yes |
 
-The port so far (N; PR 1576's branch, 27 files): no type name in two
+The port so far (N; PR 1576's merge commit `ef0c378cd`, 27 files): no type name in two
 packages, 4 nested types, all variants, and 3 imports of a fun beside
 the package's own fun of that name, which are overloads (rule 7):
 `cusoon.authentication.passkeys` in `rpc/ops/passkeys.kg` and
@@ -75,7 +76,15 @@ So one thing does not fit, and it is the issue's own question. It is
 not `GoogleMaps.Place`, which a joined name answers. It is a row and a
 wire type of one name in one file: 9 times in `rpc.storefront`, which
 is not ported yet. The tenth is `time.BookingStatus` beside the wire
-type of that name.
+type of that name. Today's rules give no way to name both in one file,
+but there is a way round. The 9 are mapping functions, such as
+`lists.kt`'s `bookingRow(call, booking: BookingPojo)`, `invoices.kt`'s
+`sendInvoiceJob(row: SendInvoiceJobPojo)` and `places.kt`'s
+`rpcArea(a: AreaRow)`. Spec 10.3 fills any data class by column name,
+so the file can read its query straight into the wire type, by the
+prefix form, or into a class of the query's own name, and never name
+the row. What that costs is a class that repeats a table's columns, or
+giving up `select b as booker` whole-row reads.
 
 ## 3. Proposals
 
@@ -83,7 +92,8 @@ Sizes are code / tests / doc lines. "Live" says whether cusoon2 or its
 port meets the hole today.
 
 **1. `import ... as`, for two declarations of one name in one file.**
-Live: 10 files-and-names, section 2. Recommended.
+Live: 10 files-and-names, section 2, each of which has the way round
+section 2 gives. Recommended.
 
 Spec 2, in place of "no `import ... as`":
 
@@ -96,7 +106,7 @@ Spec 2, in place of "no `import ... as`":
 
 | | `import ... as` | Qualified name | Today's rule, "rename one" |
 | --- | --- | --- | --- |
-| The author writes | the Kotlin's own line, once a file: 10 lines | `cusoon.schema.Booker` at each use: 17 uses | a suffix on every row type or wire type, for good |
+| The author writes | the Kotlin's own line, once a file: 10 lines | `cusoon.schema.Booker` at each use: 17 uses | a suffix on every row type or wire type, for good; or, not naming the row, a query read straight into the wire type or into a class of its own that repeats the table's columns, and no `select b as booker` whole-row read |
 | A reader | meets a name no declaration has; the file's imports answer. One declaration may have two names in two files, as `Area` is `AreaRow` and `AreaPojo` in cusoon2 | sees the package at the use; but the imports no longer list all a file takes, and `a.b` may be a package or a value | reads one name everywhere |
 | Go from `kogo emit` | no change: it writes every other package's name as `p1.Booker` from the declaration the checker found, and reads no import | no change | no change |
 | TypeScript from `kogo ts` | no change: the declared name. Two wire types of one name in a list stay an error (15.4) | no change | the wire names change, and the frontend with them, unless the rows take the suffix |
@@ -166,7 +176,8 @@ Recommended.
 
 Spec 2: "A program's package is not `kogo` or under it." Guards
 against a program making its own names ambient in every file, which is
-what imports exist to prevent. Size 4 / 2 / 2.
+what imports exist to prevent, and against a program's names under a
+`kogo.` package that read as the prelude's at each import. Size 4 / 2 / 2.
 
 **7. Accept four holes, each stated in a sentence, with no code.**
 None is live; each needs a declaration nobody has written. One audit
@@ -175,13 +186,20 @@ issue holds them until one bites.
 - Rule 6 against the prelude, spec 2: "A package's own type or val is
   meant before one of package `kogo` or a built-in type, as in Kotlin."
   Refusing instead is 5 / 2, and then each name added to the prelude
-  can break a program.
+  can break a program. Funs already break that way today: a program's
+  `fun listOf(x: Int): Int` makes its own `listOf(1)` an
+  `ambiguous-call` against the prelude's, and a program's
+  `fun String.trim(): String` makes every `s.trim()` in it ambiguous.
+  Both are valid Kotlin, where the program's own fun wins.
 - Rule 17, spec 2: "Two names of a package that differ only in the
   case of the first letter may be one name in Go; `kogo emit` refuses
   them." It belongs in `kogo check` by the only-gate decision: 15 / 4
   when wanted.
 - Rule 18, spec 3.5: "An alias stands where a type is written; a value
   is built, and a constant or a variant named, by the type's own name."
+  Kotlin refuses a variant through an alias too, but takes the first
+  two, so spec 14 gains the row "a constructor or a constant through a
+  typealias, `PRow(1)` | the type's own name".
 - Rules 16 and 19, spec 6: "A local hides a name declared outside it,
   an outer block's local and a type's name included, as in Kotlin."
   Nothing on the imports of rule 19.
@@ -197,7 +215,8 @@ change, so one issue once 1 and 3 are ruled. Size 25 / 10 / 0.
 - Two types of one name: "this is a String where a String is wanted"
   becomes each with its package (rule 6).
 - A constructor through an alias: "PRow is not in scope: add import
-  q.a.PRow", though it is imported (rule 18).
+  q.a.PRow", though it is imported (rule 18). It fires inside package
+  `q.a` itself too, where no import is possible.
 
 **No proposal on import cycles.** Rule 12 is stated, enforced and met
 by the port. What it costs the migration is in section 2.
@@ -210,6 +229,7 @@ by the port. What it costs the migration is in section 2.
 | an import of a name the file's own package declares | `import ... as`, or rename one | 2 |
 | `a.b.Name` written in code | import it and write `Name` | 3 |
 | `import a.b.Outer.Inner` | `import a.b.Outer`, and write `Outer.Inner` | 3 |
+| a constructor or a constant through a typealias, `PRow(1)` | the type's own name | 7 |
 | two `private val`s of one name in two files of a package | rename one | 4 |
 | a type nested in an interface as a namespace, `GoogleMaps.Place` | a top-level type, `GoogleMapsPlace` | 5 |
 
@@ -246,7 +266,8 @@ T='^(@\w+(\([^)]*\))? )?((public|private|internal|data|sealed|enum|value|abstrac
 - J, none: `git grep -E '^private ((const|data|sealed|enum|value|abstract|open|suspend|inline) )*(class|interface|object|typealias|val|fun) ' $R -- $K | sed -E 's#^[^:]+:(.*)/([^/]+)\.kt:private ((const|data|sealed|enum|value|abstract|open|suspend|inline) )*(class|interface|object|typealias|val|fun) (<[^>]*> )?([A-Za-z0-9_<>?, ]+\.)?(\w+).*#\1 \5 \8 \2#' | sort -u | cut -d' ' -f1-3 | uniq -d`
 - K, the cycle: `git grep -E '^(package|import) ' $R -- $K | python3 cycle.py`,
   which prints "25 packages; 19 on one cycle; 459 names and 629 import
-  lines inside it; 52 names point up at best". jOOQ's generated
+  lines inside it; 52 names point up at best", where a name is a pair
+  of an importing package and an imported name". jOOQ's generated
   packages are left out. `cycle.py` is below.
 - L, 28: E's `git grep` and `sed`, with `\1 \3` for `\3 \1`, through
   `sort -u` into `t`; then
@@ -257,10 +278,12 @@ T='^(@\w+(\([^)]*\))? )?((public|private|internal|data|sealed|enum|value|abstrac
   `grep -hoE '^(external |sealed |data |enum )*(class|object|interface) \w+' prelude/kogo.kg prelude/either.kg check/core.kg | awk '{print $NF}' | sort -u > pre`,
   the nine built-in types of spec 3 added; `comm -12 pre types`. The fun
   and the two extensions: `git grep -nE '^fun (Area\.contains|PDPageContentStream\.list|randomString)\(' $R -- $K`
-- N, with `P` PR 1576's branch: `git ls-tree -r --name-only $P kogo/port | grep -c '\.kg$'`;
+- N, with `P=ef0c378cd`, PR 1576's merge commit on `renew`: `git ls-tree -r --name-only $P kogo/port | grep -c '\.kg$'`;
   `git grep -hoE '^((private|internal) )?(data class|sealed interface|enum class|interface|typealias|data object) \w+' $P -- kogo/port | awk '{print $NF}' | sort | uniq -d`;
   `git grep -hE '^\s+(data |sealed |enum )*(class|object|interface) \w+' $P -- kogo/port | wc -l`;
   `git grep -nE '^import cusoon\.(authentication\.passkeys|model\.setDriverShare)$' $P -- kogo/port/rpc/ops`
+
+- O, 2: `git grep -hE '^import net\.gtod\.cusoon\.' $R -- $K | grep -v '\.jooq\.' | grep -E '\.[A-Z]\w*\.\w+( as \w+)?$'`
 
 `cycle.py`:
 

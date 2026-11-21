@@ -39,7 +39,7 @@ Each entry: what was decided, why, and what would reopen it.
   receiver is not nullable either, so the rule holds for every extension and a reader
   need not know which prelude names a plain `.` on a nullable value still reaches. The
   prelude's two, `List<T>?.orEmpty()` and `String?.isNullOrBlank()`, are gone: write
-  `x ?: emptyList()`, with `emptyList<T>()` where nothing else settles `T` (DEV-1069), and
+  `x ?: emptyList()`, whose `T` the left of `?:` settles (DEV-1069), and
   `x == null || x.isBlank()`, which narrows `x` where `isNullOrBlank` did not. Not taken: keeping the two as a convenience of the prelude;
   cusoon2's port called them at three places, each as clear in the longer form.
 - **The columns under `exists` and `execute` are not typed** (15 Nov 2026). Both discard
@@ -3858,6 +3858,8 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   2026): the form the DEV-1035 session fell into, taken as it stands
   and wrapped as `doc/lead.md` is. Not taken: rewording it on the way
   in. Reopen when it has been used twice more, as it says.
+  *Superseded 22 Nov 2026 by "The guide is revised with Greg at the
+  end of a sitting that chafed" (DEV-1075) below.*
 - **"Guide DEV-NNN" is said in the repository the design is about**
   (the lead, 21 Nov 2026), as the draft and the Workflow line have it:
   a guide checks the design against that repository's code and commits
@@ -4168,6 +4170,54 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   ordinary form. It is a `String`, Kogo having no `CharSequence`. Not built: `prefix`,
   `postfix`, `limit` and `truncated` (one use in cusoon2's backend). Reopen when a port
   needs one.
+
+## `emptyList`'s type from the left of `?:` (DEV-1069), 21 Nov 2026
+
+- **A call with no lambda argument on the right of `?:` takes the left's type, made
+  non-null, as the type its result must have, when nothing outside the `?:` gives one**
+  (spec 5.1, rule 3; the lead approved it, 22 Nov 2026). Kotlin settles `T` in
+  `xs ?: emptyList()` from `xs` with the same meaning. With no lambda, rule 3 fills
+  only the type parameters the receiver and the arguments left open, which were
+  `type-arguments` errors before, so this grows the subset and changes no program that
+  checked before. Not taken: keeping `emptyList<T>()` where nothing else settles `T`,
+  which DEV-1067 made the form a reader writes for `orEmpty`.
+- **A call with a lambda argument there keeps what it did before** (Greg's ruling on
+  the review, 22 Nov 2026): its lambdas settle it, and `?:` takes the common type of its
+  two sides. Rule 3 comes before rule 4, so the left's type would override the lambda:
+  `a ?: make { b }` for `a: S.A?`, `b: S.B` checked as an `S` and would become a
+  `type-mismatch` at `b`. Not taken: handing the left's type to these calls too, which
+  would accept `xs ?: make { emptyList() }` but refuse that program, which checked
+  before. Reopen when a port needs the first.
+- **Only a call takes it**, written directly on the right: a literal there still has
+  its own type, so `n ?: 0` for `n: Long?` stays `no-common-type` with its fix `0L`, as
+  before. Not taken: handing the left's type to any right side, which would make that
+  `0` a Long here and nowhere else a literal stands without a wanted type. Nor a left
+  that is `null` or `Nothing`, which settles nothing.
+- **`if`/`else` and `when` branches do not settle one another**: `if (c) xs else
+  emptyList()` with no wanted type is still `type-arguments`, though Kotlin accepts it.
+  The issue scoped `?:` alone. Reopen when a port writes one.
+
+## The guide settles each piece (DEV-1075), 22 Nov 2026
+
+- **A guide's sitting settles each piece of a design as it is shown** (Greg, 22 Nov 2026,
+  at the end of DEV-1068's sitting): a piece ends in one proposal, his "next" is
+  agreement to it, and the end is the tally and only what is left: what was postponed,
+  two rulings that pull against each other, and anything the document asks that no
+  piece showed, which catches a question once the choices pass is gone. The first form
+  built the whole design and then took its choices one a message; in DEV-1064 and
+  DEV-1068 he had judged each piece as it landed, and the second pass asked again what
+  was settled. Not taken: the two passes kept for a design whose pieces lean on each
+  other. Postponing a piece that cannot be judged yet, and reopening a ruling a later
+  piece disturbs, stand in for them. Reopen if a sitting on such a design commits him
+  before he has seen the whole.
+- **A piece carries what he asked for in DEV-1068**: what Kotlin does, from a run, the
+  slip or "I cannot build one", the size, and what was not taken in a clause. A test he
+  gives in the sitting is held against every later piece. Not taken: leaving these to
+  his questions, which asked for Kotlin's rule four times; holding a test only to the
+  piece it was said on.
+- **The guide is revised with Greg at the end of a sitting that chafed**, in place of
+  "when it has been used twice more", which this revision met. Not taken: a count of
+  uses, which would hold a fix back or force one that nobody wants.
 
 ## `import ... as`, and an import that hides the package's own (DEV-1076), 21 Nov 2026
 

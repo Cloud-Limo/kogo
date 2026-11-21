@@ -558,7 +558,14 @@ func (c *checker) binary(e *syntax.Binary, want Type) Type {
 		if want == nil {
 			xt = c.expr(e.X, nil)
 			c.straight = e.Y
-			yt = c.expr(e.Y, nil)
+			// A call on the right with no lambda argument takes the
+			// left's type as the type its result must have (spec.md 5.1).
+			var hint Type
+			if call, ok := e.Y.(*syntax.Call); ok && !slices.ContainsFunc(call.Args, isLambda) &&
+				xt != unknown && !is(nonNull(xt), tNothing) {
+				hint = nonNull(xt)
+			}
+			yt = c.expr(e.Y, hint)
 		} else {
 			if xt = c.expr(e.X, nullable(want)); !fits(nonNull(xt), want) {
 				c.mismatch(e.X, nonNull(xt), want)
@@ -1077,4 +1084,10 @@ func holdsFunc(t Type, bytes *TypeDecl, seen map[*TypeDecl]bool) string {
 		}
 	}
 	return ""
+}
+
+// isLambda reports whether a is a lambda argument.
+func isLambda(a *syntax.Arg) bool {
+	_, ok := a.Value.(*syntax.Lambda)
+	return ok
 }

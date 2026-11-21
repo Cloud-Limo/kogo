@@ -560,6 +560,10 @@ func TestCalls(t *testing.T) {
 		"fun f(): List<Int?> = listOf(1, null)",
 		"fun f(): List<Long> = emptyList()\nfun g(): List<Long> = listOf<Long>(1, 2)\nfun h(xs: List<Long>?): List<Long> = xs ?: emptyList()",
 		"fun f(): Int = emptyList<Int>().size + listOf(1).map { it }.first()",
+		// The left of ?: settles a call's on its right.
+		"fun f(xs: List<Long>?): Int {\n    val ys = xs ?: emptyList()\n    return ys.size + (xs ?: emptyList()).size\n}",
+		// but not one with a lambda argument, whose lambda settles it.
+		"sealed interface S {\n    data class A(val v: Long) : S\n    data class B(val v: Long) : S\n}\nfun <R> make(block: () -> R): R = block()\nfun f(a: S.A?, b: S.B): S {\n    val s = a ?: make { b }\n    return s\n}",
 		"fun <T> twice(use: (T) -> Int, make: () -> T): Int = use(make())\nfun f(): Int = twice({ x: String -> x.length }, { \"\" })",
 		"fun <T> firstOr(items: List<T>, fallback: T): T = if (items.size > 0) items.first() else fallback\nfun f(xs: List<Long>): Long = firstOr(xs, 0L) + firstOr(emptyList<Long>(), 0L)",
 		"sealed interface S<out T> {\n    data class A<T>(val v: T) : S<T>\n    data object B : S<Nothing>\n}\nfun f(): List<S<Int>> = listOf(S.A(1), S.B)",

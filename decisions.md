@@ -4093,9 +4093,24 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
 - **"Longer" is against the Kotlin's form, in lines**: a write-around is weighed when it
   takes more lines than what the Kotlin wrote in its place, as `eight()`'s ten did for the
   one call to `toUrlValue`. Not taken: a measure in characters, which would weigh
-  `requireNotNull` for `!!`, the swap Greg's scope leaves out. Reopen if a one-line write-around hides a library's rule.
+  `requireNotNull` for `!!`, the swap Greg's scope leaves out. Reopen if a one-line
+  write-around hides a library's rule.
 - **The rule is its own paragraph after "Add what the spec lists"**, not sentences inside it,
   since it applies to both kinds of name that paragraph sorts and reads as a step of its own.
 - **It names no write-around but of a name**: matching what a Java client sends on the wire
   (the FusionAuth request defaults in cusoon2's `idp.kg`) is not a missing name and stays
-  outside it. The handoff of DEV-1065 asks the lead whether the rule should reach those.
+  outside it. The handoff of DEV-1065 asked the lead whether the rule should reach those;
+  the lead's ruling of 22 Nov 2026 asks it again when the next such client is ported
+  (noted on DEV-1048).
+- **The port's Decided accepts a difference only the comparison sees** (22 Nov 2026, Greg;
+  `doc/design.md`, "Ports"; `doc/porting.md`). A difference weighed under "Weigh a
+  write-around" that nobody but the comparison sees is accepted by the port's Decided, and
+  the Code review checks the claim of who sees it. This reopens DEV-884's entry for that
+  case alone: every other accepted or owed difference stays Greg's. Not taken: Greg
+  accepting each such difference from the handoff, which puts a ruling before him for
+  every write-around. Reopen if a difference so accepted turns out to be seen.
+- **Spec section 14's `String.format` row adds "or `plain`, or a prelude function"** (22
+  Nov 2026, the lead's ruling on DEV-1065): read alone, "string templates, `padStart`" was
+  an order to rebuild a format by hand, as `eight()` did. Not taken: leaving the row as it
+  was, as the issue's Scope said, and filing it apart. Reopen if a port reads the row as
+  licence to skip a prelude function the spec lists.

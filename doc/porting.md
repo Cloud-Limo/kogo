@@ -49,8 +49,10 @@ the Kotlin does, because Kogo cannot yet do it. The handoff names the
 gap and leaves it to him. Record what is left out, the issue that will
 close it and the cases it covers, which the comparison names and
 forgives until that issue closes. A port passes at zero differences
-beyond those accepted and owed, and a module does not replace its Kotlin
-without such a run, nor with a difference owed.
+beyond those accepted and owed, accepted by Greg or, for one only the
+comparison sees, by the port's Decided under "Weigh a write-around";
+a module does not replace its Kotlin without such a run, nor with a
+difference owed.
 
 For each newly ported area, plant one bug in the port (a cent off, a
 dropped `where`, a swapped share), see the comparison exit 1 and name
@@ -77,7 +79,8 @@ the short form were written: a customer, an op, a stored row, or the
 answer of an outside service. If nobody but the comparison, it writes
 the short form, leaves that difference out of the comparison on its
 case, and puts it under Decided with the form not taken; rule 6 of
-`AGENTS.md` lets Decided loosen the comparison so. If somebody, the
+`AGENTS.md` lets Decided loosen the comparison so, and the Code review
+checks the claim of who sees it. If somebody, the
 handoff names the prelude function that would do it, of either kind
 above: the prelude may grow to keep a port short. Until it is built
 the port writes the shortest thing that keeps what is seen, under

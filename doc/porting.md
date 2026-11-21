@@ -7,6 +7,13 @@ happens to a difference.
 **Transliterate by default.** Keep the Kotlin's names, order and
 structure wherever Kogo has the construct, so the two read side by side.
 
+**Follow a design where one gives the form.** Where a design gives the
+port a form `kogo/run.sh` cannot see (the list's rows, a gate, a
+step's signature, where a mark sits: cusoon2's `doc/plans/gates.md`),
+the port follows the design and the Kotlin is not reshaped first
+(`doc/roadmap.md`, "How it moves"). The file that departs says so in
+one line naming the design. The side-by-side run is unchanged.
+
 **Mark each departure outside SQL.** Where Kogo lacks the construct
 (`spec.md` section 14, or a name section 12 does not list), the port
 says why in a one-line comment, as `// generateSequence becomes a while:

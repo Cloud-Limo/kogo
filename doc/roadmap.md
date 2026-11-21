@@ -4,11 +4,11 @@ Agreed with Greg on 19 Nov 2026, from three research runs: DEV-928 (what
 Kogo lacks, ops site first), DEV-929 and DEV-938 (the test form) and
 DEV-930 (moving piece by piece). Every size is an estimate in code /
 test lines, from counting the Kotlin a piece replaces or from the
-designs' own guesses; nothing was built to measure it. Linear holds
-each piece's state, so no table here has a column for it: what is
-built is in the code and `spec.md`. This file holds the order and the
-reasons, and is rewritten when either moves. Last rewritten to the
-evening of 19 Nov 2026 (DEV-979).
+designs' own guesses; nothing was built to measure it. The ops
+site's table marks each piece built, with its PR, or not; Linear holds
+the state of what is not. This file holds the order and the reasons,
+and is rewritten when either moves. Last rewritten 21 Nov 2026
+(DEV-1041).
 
 ## The goal
 
@@ -30,6 +30,17 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   the runner first.
 - **Behaviour changes are made in the Kotlin first**, under its tests,
   and the port then matches them exactly.
+- **Where a port leaves the Kotlin** (Greg, 21 Nov 2026): the test is
+  whether `kogo/run.sh` can see the change. Where it can (an answer, a
+  row, what Postgres is asked or holds), the Kotlin goes first, as
+  above: binding the person, the policies, the commands' role and the
+  column grants are of this kind. Where it cannot (the form: the
+  list's rows, a gate, `call.kg`, a step's signature, where a mark
+  sits), the port is written from the design, cusoon2's
+  `doc/plans/gates.md`, and the Kotlin is not reshaped first. So
+  row-level security's slice 4 changes the statement a gate runs in
+  the Kotlin first, and the marks in the port alone; the Kotlin's
+  marks stay until it is deleted.
 - **The port is kept in step with Kogo the day Kogo changes**, so that
   `kogo/run.sh` keeps comparing against `main`: the list in its new
   form (cusoon2 PR 1529), with a named check (PR 1533) that became the
@@ -67,10 +78,11 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   five kinds in `spec.md` 15.1's table (PR 94), which says where it
   may ask outside and where it may change it. The driver's job pages
   still show the stored address (`place.address`, kept fresh by the
-  daemon; cusoon2 PR 1523); a place with none is to be filled when
-  read (cusoon2 DEV-972). The booker's Google operations became
+  daemon; cusoon2 PR 1523); a place with none is filled when read
+  (cusoon2 DEV-972, PR 1536). The booker's Google operations became
   actions between transactions (cusoon2 PR 1531); under the rule,
-  three of them fold back into one transaction (cusoon2 DEV-975).
+  three of them folded back into one transaction (cusoon2 DEV-975,
+  PR 1537).
 - **`driverJobs` becomes one call per operator** (c): an
   `operatorJobs` operation under `driverJob`'s gate. Not taken: a view
   across tenants; a proof holding a list of operators. The runner's
@@ -93,25 +105,40 @@ Every prelude name is imported from a `kogo.` package (DEV-939, DEV-954).
 
 ### 1. The ops site from Go (about 2,000 / 1,900 Kogo, 1,500 / 800 port)
 
-| # | Repo | Piece | Size (estimate) |
-| --- | --- | --- | --- |
-| 1 | cusoon2 | Kotlin first: the first call makes the session; gates bind the storefront; Origin drops `null` | 60 / 60 |
-| 1b | cusoon2 | Kotlin first: job pages show the stored address; `operatorJobs` replaces `driverJobs` | ~80 / 80 |
-| 2 | Kogo | The lists in their agreed forms (`gatedBy`, `ungated`, `checkedBy`/`unchecked`; `after`, built here, out since DEV-1039) | 250 / 250 |
-| 3 | Kogo | Serve a gated row: check, gate, work | 150 / 150 |
-| 4 | Kogo | The Origin and CSRF check (`doc/origin.md`) | 120 / 150 |
-| 5 | Kogo | `SerializableTx` beside `Tx` | 70 / 70 |
-| 6a | Kogo | A proof's rules in the checker (DEV-976) | 170 / 150, 6a and 6b |
-| 6b | Kogo | A gate only reads (DEV-977) | (in 6a's) |
-| 7 | Kogo | `action fun`, `lookup` and `action` bindings | 100 / 100 |
-| 8 | Kogo | `Reply` and `Cookie` | 50 / 50 |
-| 9 | Kogo | `kogo.http` (DEV-978) | 360 / 250 |
-| 10 | Kogo | Compare and shift an `Instant` | 30 / 30 |
-| 11 | Kogo | `main`'s prelude: `rpc.Call`, `_op`, settings | 150 / 150 |
-| 12 | Kogo | `ByteArray` and `kogo.mail` | 130 / 120 |
-| 13–18 | cusoon2 | Port the logins and logout (with a FusionAuth client), the passkeys, the five ported operations as gated rows, the jobs with `settle`, `jobOffer`/`giveJob`, `operatorJobs` | ~1,600 / 850 |
-| 19 | cusoon2 | The ops site's Go `main`; settings move | 150 / 80 |
-| 20 | cusoon2 | Serve the ops site from Go | |
+Built is a merged PR, Kogo's unless it says cusoon2; "no" names the
+issue where there is one.
+
+| # | Repo | Piece | Size (estimate) | Built |
+| --- | --- | --- | --- | --- |
+| 1 | cusoon2 | Kotlin first: the first call makes the session; gates bind the storefront; Origin drops `null` | 60 / 60 | cusoon2 PR 1505, 1524 |
+| 1b | cusoon2 | Kotlin first: job pages show the stored address; `operatorJobs` replaces `driverJobs` | ~80 / 80 | cusoon2 PR 1523 |
+| 2 | Kogo | The lists in their agreed forms (`gatedBy`, `ungated`, `checkedBy`/`unchecked`) | 250 / 250 | PR 88; `after` out, PR 117 |
+| 3 | Kogo | Serve a gated row: check, gate, work | 150 / 150 | PR 91 |
+| 4 | Kogo | The Origin and CSRF check (`doc/origin.md`) | 120 / 150 | PR 92 |
+| 5 | Kogo | `SerializableTx` beside `Tx` | 70 / 70 | PR 93, 102 |
+| 6a | Kogo | The gate design: a gate's answer holds its transaction, the proof's rules (PR 98) out, two refusals (DEV-1040) | -60 / -20 | no, DEV-1040 |
+| 6b | Kogo | A gate only reads (DEV-977) | (in 6a's) | PR 96 |
+| 7 | Kogo | `action fun` and the `action` binding (`lookup` out, PR 100) | 100 / 100 | PR 90 |
+| 8 | Kogo | `Reply` and `Cookie` | 50 / 50 | PR 89 |
+| 9 | Kogo | `kogo.http` (DEV-978) | 360 / 250 | PR 97 |
+| 10 | Kogo | Compare and shift an `Instant` | 30 / 30 | PR 79 |
+| 11 | Kogo | `main`'s prelude: `rpc.Call`, `_op`, settings | 150 / 150 | PR 101, 106 |
+| 12 | Kogo | `ByteArray` and `kogo.mail` | 130 / 120 | PR 103 |
+| 13a | cusoon2 | Ported as `ungated` rows: the business page's five, me and logout, four logins with a FusionAuth client, the four passkey operations | (in 13i's) | cusoon2 PR 1494, 1544, 1548, 1550 |
+| 13b | cusoon2 | Kotlin first: bind the person (DEV-1025) | 15 SQL / 20 / 20, 15 port | no, cusoon2 PR 1564 in review |
+| 13c | cusoon2 | Kotlin first: row-level security's slice 2, the policies on `supply_agreement`, `invite` and `debt_entry` | 112 SQL / 10 / 140 | no, not filed |
+| 13d | cusoon2 | Kotlin first: slice 3, `business` and `admin_grant`, `create_business`, the commands' role, `person`'s column grants | 60 SQL / 0 / 60, 10 port | no, not filed |
+| 13e | cusoon2 | The ops port's entry and the business page's five to the gate design (DEV-1030) | ~80 added, 75 removed, port | no, DEV-1030 |
+| 13f | cusoon2 | Slice 4: the gate asks the database; its statement Kotlin first, the marks in the port alone | -25 / 0, -10 port | no, not filed |
+| 13g | cusoon2 | The passkey rows as a gate that answers facts (`gates.md` section 7) | | no, not filed |
+| 13h | cusoon2 | Kotlin first: a place with no stored address filled when read (DEV-972) | | cusoon2 PR 1536 |
+| 13i | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13i's: ~1,600 / 850) | no |
+| 19 | cusoon2 | The ops site's Go `main`; settings move | 150 / 80 | no |
+| 20 | cusoon2 | Serve the ops site from Go | | no |
+
+Beside 13b to 13i, as tests in the Kotlin: the probes of each second id
+and admin-only field, the storefront's (DEV-1031, cusoon2 PR 1563 in
+review) and then the ops site's (DEV-1038, 0 / 40).
 
 Beside it, before the first list goes live (DEV-930, about 290 / 220):
 the release carries Go; units, health and CI; routing and the port
@@ -129,7 +156,7 @@ concurrency test.
 | The daemon's 16 queues | 1,400 / 600 |
 | Stripe and Google (legacy endpoints) through `kogo.http` | 850 / 400 |
 | A paged list (not designed) | |
-| The booker's 70 operations, in DEV-893's slices: in Kotlin RPC so far the booking page (cusoon2 PR 1514), the wizard (PR 1517), the invoice page (PR 1528), places and journeys (PR 1531) | 4,500 / 2,000 |
+| The booker's 70 operations: all in Kotlin RPC since GraphQL left cusoon2 (DEV-893's first step, cusoon2 PR 1557); its second step, the port, is sliced when this row is reached | 4,500 / 2,000 |
 | Translating cusoon2's tests into the test form, area by area | |
 
 ### 3. Operator money
@@ -143,10 +170,6 @@ longest lead time and can go out early.
 
 ## Open
 
-- A place with no stored address, filled when read (cusoon2 DEV-972),
-  in the Kotlin, before the jobs' port (rows 13–18).
-- The three Google operations folded back into one transaction
-  (cusoon2 DEV-975), before the booker's places slice is ported.
 - From the test form's build (DEV-940): what three refusals buried in
   application code and two expected panics become.
 - `doc/remains.md`'s review of `find` and `fair`, with the runner.

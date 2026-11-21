@@ -842,7 +842,9 @@ Agreed with Greg on 17 Nov 2026; respelt `action fun` on 18 Nov 2026.
 Six of cusoon2's seven write nothing of ours after the gate: the
 three passkey operations, on both sites, change the identity service
 and are done, and starting a registration answers with what the
-service said. So a gated operation may have no work in a transaction.
+service said. The seventh acts outside and then writes, and is
+`ungated` on a `Db` since 21 Nov 2026 (DEV-1035, `decisions.md`).
+So a gated operation may have no work in a transaction.
 Its row is an ordinary one: the operation being an `action fun` is
 what says it runs with none, as a `Db` does for an ungated one (spec
 15.3), and the list only labels the gates:
@@ -870,7 +872,7 @@ and no other. What it needs of the request is a fact of the proof:
 the Kotlin names a new passkey from the User-Agent (`deviceName`).
 
 Nothing gated in cusoon2 needs a `Db`: by a scan of its mutations
-every gated one is one transaction but these seven.
+every gated one is one transaction but these six.
 
 A third kind of call, `repeatable` (an action that is safe to make
 twice, allowed in a transaction), was weighed for the operations that

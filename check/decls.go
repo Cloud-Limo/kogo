@@ -433,7 +433,7 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 			g := &Var{Kind: Global, Name: d.Name, Decl: d, vis: v}
 			c.info.Vars[d] = []*Var{g}
 			// Two private vals of two files do not meet (spec.md 2).
-			if u := c.pkg.vals[d.Name]; u != nil && v.visibility == "private" && u.visibility == "private" && u.file != c.file {
+			if u := c.pkg.vals[d.Name]; u != nil && v.visibility == "private" && u.visibility == "private" && u.file != c.file && c.pkg.privs[privKey{c.file, d.Name}] == nil {
 				c.pkg.privs[privKey{c.file, d.Name}] = g
 			} else if !taken(d.Name) {
 				c.pkg.vals[d.Name] = g

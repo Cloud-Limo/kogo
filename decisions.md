@@ -4264,7 +4264,9 @@ and 7.
   or a typealias nested in a plain interface, a typealias nested in any type, and a type
   in a sealed interface that does not implement it, are refused. The parser already
   refuses a type in a data class's body. Not taken: types nested in a plain interface
-  as a namespace.
+  as a namespace. One code, `nested-type`, gives all three refusals (not taken: a code
+  of its own for "not a variant"; DEV-1078 words them). A refused nested type is still
+  declared, so a use of it gives no follow-on error (not taken: dropping it).
 - **A program's package is not `kogo` or under it (`kogo-package`)**: a program's
   `package kogo` put its names in every file, and `package kogo.time` had its names
   imported as the prelude's. **A package's own type or val is meant before one of
@@ -4277,4 +4279,4 @@ and 7.
   name declared outside it. The emitter's `go-name` refusal stays outside `kogo check`,
   **a named deviation from "`kogo check` is the only gate" (15 Nov 2026)**: Kotlin
   accepts the two names, and moving the refusal into the checker (15 / 4) waits for the
-  audit issue the design names, until a file meets one. Reopen when a port meets either.
+  audit issue DEV-1079, until a file meets one. Reopen when a port meets either.

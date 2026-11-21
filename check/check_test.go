@@ -251,6 +251,7 @@ func TestNames(t *testing.T) {
 		{"private val n: Int = 1\n---\npackage t\n‸val n: Int = 2", "duplicate", "already declares n"},
 		{"val n: Int = 1\n---\npackage t\nprivate ‸val n: Int = 2", "duplicate", "already declares n"},
 		{"private val n: Int = 1\nprivate ‸val n: Int = 2", "duplicate", "already declares n"},
+		{"private val n: Int = 1\n---\npackage t\nprivate val n: Int = 2\nprivate ‸val n: Int = 3", "duplicate", "already declares n"},
 		// A name is written bare, an import names a top-level name, and
 		// an extension is imported by its own.
 		{"package a\nfun f(): Int = ‸b.g()\n---\npackage b\nfun g(): Int = 1", "unknown-name", "nothing named b"},

@@ -259,17 +259,20 @@ him, as `doc/clerk.md` says, and you do not wait for it.
   issue's project's: a run clones the repository of the issue's Linear
   project, Kogo for Kogo and cusoon2 for any other. Words after the
   phrase change the model, effort or cap, as `fable high` for a heavy
-  design. First post a `Lead:` comment saying the issue's steps run
-  locally, and where; the clerk starts each later step so. A stack's
-  clone is one issue's from Pickup to merge: with both held, `lin
-  local` refuses, and the issue waits in Todo. For a cusoon2 step
-  whose folder's `AGENTS.md` lacks the `Workflow, shared` markers, the
-  `Lead:` comment opens with "Read the Workflow in `git show
-  origin/renew:AGENTS.md` first: it overrides this branch's." Delete
+  design. `lin local` posts a `Start:` on the issue with the phrase
+  under it, and the clerk starts each later step the same way, in
+  that `<where>`. A stack's clone is one issue's from Pickup to merge:
+  with both held, `lin local` refuses, and the issue waits in Todo.
+  For a cusoon2 step whose folder's `AGENTS.md` lacks the `Workflow,
+  shared` markers, the phrase goes on with "Read the Workflow in `git
+  show origin/renew:AGENTS.md` first: it overrides this branch's." Delete
   this line when no open cusoon2 branch predates DEV-917.
 - **Zed** when Greg wants to watch or steer, or when the work is a
   conversation. Give Greg the phrase: "Pickup DEV-NNN", "Code review
-  DEV-NNN" or "Fix DEV-NNN", and the clone or worktree.
+  DEV-NNN" or "Fix DEV-NNN", and the clone or worktree. A step said
+  in Zed posts no `Start:`, so the clerk starts the steps after a Zed
+  Pickup as `doc/clerk.md` says for an issue with none; to keep a
+  later step Greg's, label the issue `lead` and tell him.
 
 A speculative run (cusoon2's `doc/plans/async-agent-runs.md`) takes
 `lin launch --no-label`; at the end of the day you label up to three,

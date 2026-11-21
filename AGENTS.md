@@ -172,9 +172,12 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
 - **Local runs.** A step that needs this VM, a stack or the other
   repository runs here as a headless session: the lead or the clerk
   starts it with `lin local DEV-NNN <where> "<phrase>"`, which returns
-  at once. It works in `~/Dev/<where>`, made first when that is a
-  missing issue worktree, with an async run's model and effort, a $25
-  cap and no time limit, and ends with its step's comment as any
+  at once, once it has posted `Start: <step> · local · <where> ·
+  <model> <effort> $<cap>` on the issue with the phrase under it: the
+  clerk starts each later step the way the newest `Start:` ran. It
+  works in `~/Dev/<where>`, made first when that is a missing issue
+  worktree, with an async run's model and effort, a $25 cap and no
+  time limit, and ends with its step's comment as any
   session does; one that ends without it is handed to the lead, as a
   clerk that fails is. It refuses a `<where>` another issue holds: by
   its newest `Taken` while that issue is In Progress or In Review, by
@@ -183,9 +186,9 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   `lin local --list` shows each one running, with its minutes and its
   log.
 - A comment with no PR to hold it stays on the issue in full: a
-  launch comment, a `Lead:` comment, an answer of Greg's given before
-  a PR exists. A `Clerk:` comment does too, PR or none: the lead reads
-  the issue.
+  launch comment, a `Start:`, a `Lead:` comment, an answer of Greg's
+  given before a PR exists. A `Clerk:` comment does too, PR or none:
+  the lead reads the issue.
 - Never rebase or force-push a pushed branch: reviews hold its shas.
 - A PR description is three parts and nothing else: one or two
   sentences of what it does, verb first, carrying "Fixes DEV-NNN"; one

@@ -130,16 +130,16 @@ issue where there is one.
 | 11 | Kogo | `main`'s prelude: `rpc.Call`, `_op`, settings | 150 / 150 | PR 101, 106 |
 | 12 | Kogo | `ByteArray` and `kogo.mail` | 130 / 120 | PR 103 |
 | 13a | cusoon2 | Ported as `ungated` rows: the business page's five, me and logout, four logins with a FusionAuth client, the four passkey operations | (in 13l's) | cusoon2 PR 1494, 1544, 1548, 1550 |
-| 13b | cusoon2 | Kotlin first: bind the person (DEV-1025) | 15 SQL / 20 / 20, 15 port | no, cusoon2 PR 1564 in review |
-| 13c | cusoon2 | Kotlin first: row-level security's slice 2, the policies on `supply_agreement`, `invite` and `debt_entry` | 112 SQL / 10 / 140 | no, DEV-1042 |
-| 13d | cusoon2 | Kotlin first: slice 3, `business` and `admin_grant`, `create_business`, the commands' role, `person`'s column grants | 60 SQL / 0 / 60, 10 port | no, DEV-1043 |
-| 13e | cusoon2 | The ops port's entry and the business page's five to the gate design (DEV-1030) | ~80 added, 75 removed, port | no, DEV-1030 |
-| 13f | cusoon2 | Slice 4: the gate asks the database; its statement Kotlin first, the marks in the port alone | -25 / 0, -10 port | no, DEV-1044 |
-| 13g | cusoon2 | The passkey rows as a gate that answers facts (`gates.md` section 7), in the ops port's entry | (in 13e's) | no, DEV-1030 |
+| 13b | cusoon2 | Kotlin first: bind the person (DEV-1025) | 15 SQL / 20 / 20, 15 port | cusoon2 PR 1564 |
+| 13c | cusoon2 | Kotlin first: row-level security's slice 2, the policies on `supply_agreement`, `invite` and `debt_entry` | 112 SQL / 10 / 140 | cusoon2 PR 1567 |
+| 13d | cusoon2 | Kotlin first: slice 3, `business` and `admin_grant`, `create_business`, the commands' role, `person`'s column grants | 60 SQL / 0 / 60, 10 port | cusoon2 PR 1569 |
+| 13e | cusoon2 | The ops port's entry and the business page's five to the gate design (DEV-1030) | ~80 added, 75 removed, port | cusoon2 PR 1566 |
+| 13f | cusoon2 | Slice 4: the gate asks the database; its statement Kotlin first, the marks in the port alone | -25 / 0, -10 port | cusoon2 PR 1571 |
+| 13g | cusoon2 | The passkey rows as a gate that answers facts (`gates.md` section 7), in the ops port's entry | (in 13e's) | cusoon2 PR 1566 |
 | 13h | cusoon2 | Kotlin first: a place with no stored address filled when read (DEV-972) | | cusoon2 PR 1536 |
 | 13i | Kogo | `Json.strings`; `split`, `padStart`, `toIntOrNull`, `toLongOrNull`; a log line for every failed call | 45 / 65 | PR 120 |
-| 13j | cusoon2 | A Google stand-in for the comparison and the port's tests | ~160 / 40 | no |
-| 13k | cusoon2 | The port of Place Details, the time zone and `compositePlace` | ~230 / 120 | no |
+| 13j | cusoon2 | A Google stand-in for the comparison and the port's tests | ~160 / 40 | cusoon2 PR 1572 |
+| 13k | cusoon2 | The port of Place Details, the time zone and `compositePlace` | ~230 / 120 | cusoon2 PR 1576, 1580 |
 | 13l | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13l's: ~1,600 / 850) | no |
 | 19 | cusoon2 | The ops site's Go `main`; settings move | 150 / 80 | no |
 | 20 | cusoon2 | Serve the ops site from Go | | no |

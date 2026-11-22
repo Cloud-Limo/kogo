@@ -4322,3 +4322,21 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
   spelling and meaning but for those corners, which states what section 12 already does
   for `lowercase`, `replace` and now `Regex`. Not taken: leaving the sentence to be read
   as limited by section 12.
+
+## An unread default, and an interface's `string()` (DEV-1085), 22 Nov 2026
+
+- **A defaulted parameter's local is read once (`_ = y_`)**, as a local `val`'s is, so a
+  fun that never reads it builds. Not taken: leaving the local out when nothing reads it.
+- **`kogo check` refuses an interface's `fun string()` or `fun String()` with no
+  parameter (`go-name`)**: either became Go's `String` method, so a template would write
+  what it returns instead of its data class's text, `custom` where Kotlin writes
+  `Tex(a=3)`. Not taken: having `rt`'s walk tell an emitted data class from a prelude
+  type that writes its own text, more code for a name no program has. `kogo check`
+  refuses these two names, and `kogo emit` the other three `go-name` cases until
+  DEV-1079 moves them.
+- **The refusal is the checker's, not the emitter's (Greg's ruling, 22 Nov 2026)**,
+  overriding the lead's correction that had first put it beside the emitter's three:
+  those compare the Go names the emitter computes, and this one needs only an
+  interface's fun, its name and its parameters, which the checker sees itself. Not
+  taken: the emitter, beside the other three, until DEV-1079 moves them all, which
+  would add a refusal outside the only gate and save nothing.

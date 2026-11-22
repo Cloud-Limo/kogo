@@ -169,127 +169,84 @@ nothing is left. Hand on again only for a Question still unanswered.
 
 ## Merging
 
-First make or move the worktree as the paragraphs below say, and
-there `git fetch origin` and `git merge-base --is-ancestor
-origin/<base> HEAD`, the base being `main` for Kogo and `renew` for
-cusoon2: checks on a head the base has since passed say nothing of
-the merge, and `--match-head-commit` holds the head alone. When it
-fails for a Kogo PR, merge the base there yourself, `git merge
-origin/main -m "Merge main into dev-NNN"`, never a rebase: a clean
-merge of the base changes nothing the Review read, so it is yours
-though you write no code. `git push` it, then run the checks below on
-the merged tree and merge on its head. Just before `gh pr merge`, fetch
-and test `--is-ancestor` again: if `main` moved, do the same once more;
-if it moves a third time, hand on. When the merge conflicts,
-`git merge --abort`, merge nothing, launch a Fix whose brief asks only
-that it merge the base, test and push. For a cusoon2 PR, merge
-nothing and post no `Checked:`: launch that Fix. But when a cusoon2
-PR's own diff (`git diff --name-only origin/renew...HEAD`) touches
-`kogo/` or a file `renew`'s `kogo/pins` names
-(`git show origin/renew:kogo/pins`), that Fix runs `kogo/run.sh`,
-which no run can: start it as a local run, `lin local DEV-NNN <where>
-"Fix DEV-NNN: merge renew, run kogo/run.sh, move the pin"`.
-What `renew` alone gained does not count: the merge leaves the port,
-the pins and each pinned file `renew`'s, which its checks passed.
-Nor does that Fix run it when every path the merge brings (`git diff
---no-renames --name-only HEAD...origin/renew`) begins `doc/`, `infra/`,
-`frontend/` or `site/`: launch it as for any other PR. A file anywhere
-else asks for the run.
+Read the Handoff, the Review, its Rulings and the Fixed on the PR, and
+the fix commits against them: `git fetch origin`, then `git log -p <the
+Review's sha>..origin/<branch>`, in `~/Dev/kogo` for a Kogo PR and with
+`git -C ~/Dev/cusoon2-tasks` for a cusoon2 one. Hand on unless both
+hold: the fix commits make every Fix the Review and its Rulings left
+standing, and change no `spec.md` but as a Fix or a Ruling said; the
+Fixed has nothing under Open that a later Ruling has not answered.
 
-In the issue's worktree, fast-forwarded (made from `origin/<branch>`
-when missing, as in Code review): read any fix commits against the
-Review and its Rulings, then run `mise run testdb`, `mise exec -- go
-test ./...` and `mise run leaks` (after `mise install`), which ends
-`no leaks found` twice: Kogo is public, so a secret on `main` is
-published. Unless the PR changes only `.md` files, run two more checks:
+Then `lin merge-check DEV-NNN`, and nothing between it and what its
+first line asks. It takes the PR and the branch from the newest Handoff,
+its first PR; when the Handoff names two, a line after all the others
+names the other: check that one only from the `Ready to merge:` row,
+with the PR after `DEV-NNN`, as for the Kogo PR a `Checked:` named
+waiting. For a Kogo PR it makes or moves
+`~/Dev/kogo-dev-NNN`, merges `main` into a PR that fell behind and
+pushes it (a clean merge of the base changes nothing the Review read, so
+it is yours though you write no code), runs the tests, `leaks` and,
+unless the PR changes only `.md` files, the two comparisons with Kotlin.
+For a cusoon2 PR it makes or moves `~/Dev/cusoon2-dev-NNN`, detached at
+the pushed head, and runs that checkout's `kogo/run.sh` when the PR
+touches `kogo/` or a file `kogo/pins` names. It takes a minute or so,
+and more when it must run a comparison on `main` too. Its first line is
+one of three:
 
-- `mise run kotlin`, in the worktree after `mise install` there. It
-  compares every built-in with Kotlin's, takes about ten seconds and
-  ends `N cases of M names, 0 differ`.
-- `KOGO=~/Dev/kogo-dev-NNN ~/Dev/cusoon2-tasks/kogo/run.sh`, from any
-  directory, after `git -C ~/Dev/cusoon2-tasks pull --ff-only`. It
-  compares the ports with their Kotlin, needs cusoon2's Gradle build,
-  `jq` and, for its cases on the database, `sudo -n -u postgres`, and
-  takes a few minutes. Read its last three lines, `N cases`, `T tables
-  holding rows, R rows` and `0 differ`: `0 differ` alone reads the same
-  when no case ran.
+- `pass <sha>`. Hand on when `<sha>` is neither the head whose fix
+  commits you read nor, when the line under it says it `merged
+  origin/main`, that merge onto it: the branch moved after you read it.
+  Else the line under `when the fix commits and Open pass too:` is what
+  to do. For a Kogo PR that is `gh pr merge <PR url> --merge
+  --match-head-commit <sha>`: run it as it stands, a command of its own
+  with no `cd`, `&&` or pipe, since the rule that allows it matches that
+  form alone. It moves the issue to Done. Then post `Merged: <sha>` with
+  the lines between the first and the `when` line, and the sizes against
+  a Budget outgrown, on the PR alone with `gh pr comment`: it is a note,
+  and Done says the same on the issue. When the merge is refused because
+  the head moved, hand on. For a cusoon2 PR, which is Greg's to merge,
+  that line is `Checked: <PR url> at <sha>`: post it with `lin step
+  DEV-NNN < checked.md`, the sizes under it when the Budget was
+  outgrown, and the Kogo PR with its head sha when one waits on this
+  merge, and exit: it is whole on the issue and takes no label. Do not
+  wait for Cloud CI, which runs `mise run check-all` and the tests: `lin
+  clerk` watches that sha's run, tells Greg in his inbox on green, and
+  posts a `Failed:` with `lead` on red.
+- `fix: <why>`. The base moved and the command could not merge it: a
+  conflict, or any cusoon2 PR. Merge nothing and post no `Checked:`.
+  Start the Fix it names, whose brief asks only that it merge the
+  base, test and push: a run, or the `lin local` line under it when
+  the Fix must run `kogo/run.sh`, which no run can.
+- `fail: <what>`. Hand on with that line and the lines under it: a
+  check's last lines, and for a comparison what `main` says of the
+  same check. When `main` fails the same way, the PR is not the cause.
+  Run nothing again to get past it.
 
-If either stops before its last line, differs, or the comparison
-counts no cases, run it once on `main` (in `~/Dev/kogo`, or with
-`KOGO=~/Dev/kogo`), and say in the handing on whether `main` fails the
-same way: if it does, the PR is not the cause.
-
-Merge when all of this holds: the fix commits make every Fix the
-Review and its Rulings left standing, and change no `spec.md` but as
-a Fix or a Ruling said; the Fixed has nothing under Open that a later
-Ruling has not answered; the tests pass and `leaks` found nothing;
-both checks end `0 differ` with a case count above zero, or were
-skipped. Then `gh pr merge <PR url> --merge --match-head-commit
-<sha>`, the sha being the head the checks ran on: a run's wrapper may
-push what was left in its tree after the `Fixed:` is posted, and you
-merge only what you tested. It is the full sha, 40 characters, from
-`git rev-parse HEAD` in the worktree once the checks have run: `gh`
-refuses the short one a step's comment carries. Run it as a command
-of its own, with no `cd`, `&&` or pipe, since the rule that allows it
-matches that form alone. It moves the issue to Done. Post `Merged:
-<sha>`, the built-ins check's last line and the comparison's `N
-cases` with `0 differ` (or "checks skipped"), and the sizes against a
-Budget outgrown, on the PR alone with `gh pr comment`: it is a note,
-and Done says the same on the issue.
-Otherwise hand on, with what failed or differed, as when the merge is
-refused because the head moved.
-
-A cusoon2 PR is Greg's to merge. On the same comments, in a worktree
-at its pushed head, `~/Dev/cusoon2-dev-NNN`: made when missing with
-`git -C ~/Dev/cusoon2-b fetch origin` and `git -C ~/Dev/cusoon2-b
-worktree add --detach ~/Dev/cusoon2-dev-NNN origin/<branch>`, which
-works whichever clone has the branch checked out; otherwise moved to
-it, with `git pull --ff-only` on a branch or `git fetch origin` and
-`git checkout --detach origin/<branch>` when detached. There, read
-any fix commits against the Review and its Rulings. Where the PR
-changes Kotlin that a Kogo port was taken from, also run that
-checkout's own `kogo/run.sh`, which compares its Kotlin, with
-`KOGO=~/Dev/kogo`, and read its last three lines as above. If all pass
-and nothing is Open, post `Checked: <PR url> at <sha>` with `lin step
-DEV-NNN < checked.md`, the sha full, 40 characters, from `git rev-parse
-HEAD` there, with the sizes under it when the Budget was outgrown, and
-exit: it is whole on the issue and takes no label. When a Kogo PR
-waits on this merge, name it under the line with its head sha.
-Otherwise hand on with what failed. Do not wait for Cloud CI, which
-runs `mise run check-all` and the tests: `lin clerk` watches that
-sha's run, tells Greg in his inbox on green, and posts a `Failed:`
-with `lead` on red.
-
-Say the order on that line when it matters. A port's PR, as above,
-that goes behind `renew` costs a local Fix round. So list the others
-open, `gh pr list --base renew` there, with `gh pr diff N --name-only`
-for each, and count only those with a `Review:` on the PR (`gh pr view
-N --json comments`). When exactly one of the two is a port and the
-other changes a file outside the four directories above, the other's
-line ends ` · merge after PR N`, N the port's.
+Say the order on a `Checked:` line when it matters. A port's PR, one
+whose `fix:` would be a local run, that goes behind `renew` costs a
+local Fix round. So list the others open, `gh pr list --base renew`
+in `~/Dev/cusoon2-dev-NNN`, with `gh pr diff N --name-only` for each,
+and count only those with a `Review:` on the PR (`gh pr view N --json
+comments`). When
+exactly one of the two is a port and the other changes a file outside
+`doc/`, `infra/`, `frontend/` and `site/`, the other's line ends ` ·
+merge after PR N`, N the port's.
 
 ## After a merge
 
-Remove the issue's worktree: check `git status` there is clean, then
-`git worktree remove`, `git branch -d` and `git push origin --delete
-<branch>`, each when what it removes is still there, so the step can
-be said twice; and `git -C ~/Dev/kogo pull --ff-only`. For cusoon2, the
-worktree hangs off `~/Dev/cusoon2` or `~/Dev/cusoon2-b`; skip `git
-push origin --delete`, since GitHub deletes a merged branch there, as
-well as `git branch -d` for a detached worktree; and leave a clone as
-it is. A worktree that is not clean stays: hand on, naming it.
+`lin merge-check DEV-NNN --tidy`, and again with the other PR after
+`DEV-NNN` when a line names one. It asks GitHub whether the PR is
+merged, then removes the issue's worktree and its branch, pulls
+`~/Dev/kogo` and takes `lead` off the issue; it can be said twice. On
+`fail:`, which a worktree not clean is, hand on with its lines. On a
+`hand on:` line, hand on with what follows it: the merged PR changed the
+poller, which runs the old file until Greg restarts it, and a clerk that
+restarted it would stop itself.
 
-Then `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list backlog`:
-move to Todo each issue whose `Parked:`, or older `Lead:` line,
-waits on this merge, with
-`lin comment DEV-MMM --state Todo < /dev/null`, which posts nothing.
-The lead starts it from the board. Then take `lead` off this issue if
-it is on: `lin label DEV-NNN lead --remove`.
-
-When the merged PR, or the issue's cusoon2 PR merged before it,
-changed cusoon2's `mise-tasks/linear-clerk`, hand on with `Clerk:
-Greg's: systemctl --user restart lin-clerk`: the poller runs the old
-file until then, and a clerk that restarted it would stop itself.
+Then `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list backlog`: move
+to Todo each issue whose `Parked:`, or older `Lead:` line, waits on this
+merge, with `lin comment DEV-MMM --state Todo < /dev/null`, which posts
+nothing. The lead starts it from the board.
 
 ## Handing on
 

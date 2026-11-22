@@ -4391,3 +4391,16 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
   function past a local that cannot be called, and Kogo refuses the call,
   `not-callable`. Spec 6 states it as a limit of the subset; Kogo's behaviour is
   unchanged.
+
+## The clerk's merge checks are one command (DEV-1108), 23 Nov 2026
+
+- **`doc/clerk.md`'s Merging and After a merge call `lin merge-check DEV-NNN`, and
+  `--tidy`, and spell out none of its checks** (Greg, 23 Nov 2026: DEV-1090's way A;
+  the command is cusoon2's DEV-1107). The prose keeps what is a model's: reading the
+  fix commits against the Review, the Open, the order on a `Checked:` line, and the
+  Backlog's `Parked:` issues. The command fetches once more after its checks, and the
+  clerk merges within seconds of its `pass`, so the second fetch DEV-1013 put just
+  before `gh pr merge` goes; `--match-head-commit` still holds the head. Not taken:
+  way B, the poller running the checks and putting their result in the clerk's prompt.
+  A Handoff that names two PRs gives the one to check after `DEV-NNN`, as the command
+  takes it. Reopen if a clerk merges on a `pass` the base had passed by.

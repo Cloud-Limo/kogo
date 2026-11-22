@@ -180,8 +180,9 @@ Fixed has nothing under Open that a later Ruling has not answered.
 Then `lin merge-check DEV-NNN`, and nothing between it and what its
 first line asks. It takes the PR and the branch from the newest Handoff,
 its first PR; when the Handoff names two, a line after all the others
-names the other, and you give the PR to check after `DEV-NNN`, as for
-the Kogo PR a `Checked:` named waiting. For a Kogo PR it makes or moves
+names the other: check that one only from the `Ready to merge:` row,
+with the PR after `DEV-NNN`, as for the Kogo PR a `Checked:` named
+waiting. For a Kogo PR it makes or moves
 `~/Dev/kogo-dev-NNN`, merges `main` into a PR that fell behind and
 pushes it (a clean merge of the base changes nothing the Review read, so
 it is yours though you write no code), runs the tests, `leaks` and,
@@ -192,8 +193,11 @@ touches `kogo/` or a file `kogo/pins` names. It takes a minute or so,
 and more when it must run a comparison on `main` too. Its first line is
 one of three:
 
-- `pass <sha>`. The line under `when the fix commits and Open pass too:`
-  is what to do. For a Kogo PR that is `gh pr merge <PR url> --merge
+- `pass <sha>`. Hand on when `<sha>` is neither the head whose fix
+  commits you read nor, when the line under it says it `merged
+  origin/main`, that merge onto it: the branch moved after you read it.
+  Else the line under `when the fix commits and Open pass too:` is what
+  to do. For a Kogo PR that is `gh pr merge <PR url> --merge
   --match-head-commit <sha>`: run it as it stands, a command of its own
   with no `cd`, `&&` or pipe, since the rule that allows it matches that
   form alone. It moves the issue to Done. Then post `Merged: <sha>` with
@@ -221,8 +225,9 @@ one of three:
 Say the order on a `Checked:` line when it matters. A port's PR, one
 whose `fix:` would be a local run, that goes behind `renew` costs a
 local Fix round. So list the others open, `gh pr list --base renew`
-there, with `gh pr diff N --name-only` for each, and count only those
-with a `Review:` on the PR (`gh pr view N --json comments`). When
+in `~/Dev/cusoon2-dev-NNN`, with `gh pr diff N --name-only` for each,
+and count only those with a `Review:` on the PR (`gh pr view N --json
+comments`). When
 exactly one of the two is a port and the other changes a file outside
 `doc/`, `infra/`, `frontend/` and `site/`, the other's line ends ` ·
 merge after PR N`, N the port's.
@@ -237,7 +242,6 @@ merged, then removes the issue's worktree and its branch, pulls
 `hand on:` line, hand on with what follows it: the merged PR changed the
 poller, which runs the old file until Greg restarts it, and a clerk that
 restarted it would stop itself.
-
 
 Then `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list backlog`: move
 to Todo each issue whose `Parked:`, or older `Lead:` line, waits on this

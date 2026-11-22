@@ -503,6 +503,8 @@ func TestTypes(t *testing.T) {
 		{"val n: Long = ‸-9223372036854775808", "number-range", "even after a minus"},
 		{"interface I {\n    ‸fun <T> card(key: T): Int\n}", "interface-fun", "make card a top-level fun that takes the value"},
 		{"interface I {\n    fun card(‸key: Int = 0): Int\n}", "interface-fun", "state key at each call, or add a top-level fun that does"},
+		{"interface Texty {\n    ‸fun string(): String\n}", "go-name", "fun string() with no parameter becomes Go's String method"},
+		{"interface I {\n    ‸fun String(): String\n}", "go-name", "fun String() with no parameter becomes Go's String method"},
 	})
 }
 

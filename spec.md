@@ -45,7 +45,10 @@ import kogo.time.Instant
   `private val`s in two files do not meet, as two `private fun`s do not
   (5.2). Funs share names (5.2), and a fun may be named for a type or a
   val. Two names of a package that differ only in the case of the first
-  letter may be one name in Go; `kogo emit` refuses them.
+  letter may be one name in Go; `kogo emit` refuses them. `kogo check`
+  refuses an interface's `fun string()` or `fun String()` with no
+  parameter, which would be Go's `String` method, so a template would
+  write what it returns instead of its data class's text.
 - A name is written as it is declared or imported, never with its
   package: `cusoon.model.Booking` in code is an error. An import names a
   top-level name and brings every declaration of it; a nested type comes
@@ -776,7 +779,9 @@ hours. What Postgres holds and the Kogo type does not is a panic when
 it is read (section 8): `infinity` in a `timestamptz` or a `date`,
 `24:00` in a `time`, and an `interval` with months, which has no fixed
 length. A `Duration` too long for an `interval`'s microseconds is a
-panic when it is sent. A `Decimal` holds `NaN` and `Infinity` as well
+panic when it is sent, and so is an `Instant` or a `LocalDate` past
+Postgres's range: -4713-11-24 to +294276-12-31 for a `timestamptz`,
+to +5874897-12-31 for a `date`. A `Decimal` holds `NaN` and `Infinity` as well
 as numbers, and a zero keeps its scale: `0.00`. An empty `List` is sent as an
 empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
 `bytea`.

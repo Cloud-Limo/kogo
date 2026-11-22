@@ -778,6 +778,9 @@ func (c *checker) class(td *TypeDecl) {
 				if m.TypeParams != nil {
 					c.errorf(m, "interface-fun", "an interface's fun takes no type parameters (spec.md 3.4): make %s a top-level fun that takes the value", m.Name)
 				}
+				if (m.Name == "string" || m.Name == "String") && len(m.Params) == 0 {
+					c.errorf(m, "go-name", "an interface's fun %s() with no parameter becomes Go's String method, which writes a value's text: rename it", m.Name)
+				}
 				for _, p := range m.Params {
 					if p.Default != nil {
 						c.errorf(p, "interface-fun", "an interface's fun has no default values (spec.md 3.4): state %s at each call, or add a top-level fun that does", p.Name)

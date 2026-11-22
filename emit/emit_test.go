@@ -1056,7 +1056,6 @@ func TestRefused(t *testing.T) {
 		{"enum class Kind { entries, b }", "1:19: go-name", "are both Kind_entries in Go"},
 		{"data class D(val a: Int, val A: Int)", "1:26: go-name", "two members of D are both A in Go"},
 		{"interface I {\n    val name: String\n}\ndata class D(override val name: String, val getName: String) : I", "4:14: go-name", "two members of D are both GetName in Go"},
-		{"interface Texty {\n    fun string(): String\n}", "2:5: go-name", "becomes Go's String method"},
 	} {
 		_, files, errs := emit(t, "x", "package t\n"+c[0])
 		got := ""

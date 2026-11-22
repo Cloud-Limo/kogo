@@ -139,9 +139,6 @@ func (e *emitter) class(d *syntax.ClassDecl) {
 			for _, p := range m.Params {
 				ps = append(ps, p.Type)
 			}
-			if m.Name == "string" && len(ps) == 0 {
-				e.refuse(m.Decl, "go-name", "an interface's fun string() with no parameter becomes Go's String method, which writes a value's text: rename it")
-			}
 			e.w("%s(%s) %s", claim(m.Decl, export(m.Name)), e.typs(ps), e.typ(m.Result))
 		}
 		e.shut("}")

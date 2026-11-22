@@ -71,6 +71,10 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			break
 		}
 		recv, safe = fun.X, fun.Safe
+		if c.packaged(fun) {
+			c.loose(e.Args, nil)
+			return unknown
+		}
 		if rt = c.expr(recv, nil); rt == unknown {
 			c.loose(e.Args, nil)
 			return unknown
@@ -180,10 +184,30 @@ func (c *checker) noFunc(at syntax.Node, name string, rt Type, member bool) Type
 			}
 		}
 	}
-	d, _ := c.findType(name)
+	d, a := c.findType(name)
+	for _, k := range slices.Sorted(maps.Keys(c.pkgs)) { // an alias not imported
+		if pa := c.pkgs[k].aliases[name]; d == nil && a == nil && pa != nil && c.visible(pa.vis) {
+			a = pa
+		}
+	}
 	switch {
 	case member && notKogo[name][0] == "":
+		var homes []string
+		for _, p := range c.pkgs {
+			if slices.ContainsFunc(p.funcs[name], func(f *Func) bool { _, ok := c.receives(f, rt, true); return ok && c.visible(f.vis) }) {
+				homes = append(homes, p.name+"."+name)
+			}
+		}
+		if slices.Sort(homes); homes != nil {
+			return c.errorf(at, "unknown-name", "a %s has no function %s: add import %s", rt, name, strings.Join(homes, " or import "))
+		}
 		return c.errorf(at, "unknown-name", "a %s has no function %s", rt, name)
+	case a != nil && !member:
+		t := c.aliased(a).String()
+		if n := named(c.aliased(a)); n != nil {
+			t = n.Name
+		}
+		return c.errorf(at, "unknown-name", "%s is a typealias, which builds nothing: write %s, the type's own name", name, t)
 	case member || d == nil:
 		return c.missing(at, name)
 	case d.Ctor != nil:

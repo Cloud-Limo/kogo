@@ -258,9 +258,14 @@ func TestNames(t *testing.T) {
 		{"private val n: Int = 1\n---\npackage t\nprivate val n: Int = 2\nprivate ‸val n: Int = 3", "duplicate", "already declares n"},
 		// A name is written bare, an import names a top-level name, and
 		// an extension is imported by its own.
-		{"package a\nfun f(): Int = ‸b.g()\n---\npackage b\nfun g(): Int = 1", "unknown-name", "nothing named b"},
-		{"package a\nimport ‸b.Shape.Dot\n---\npackage b\nsealed interface Shape {\n    data object Dot : Shape\n}", "unknown-import", "no package b.Shape"},
-		{"package a\nfun f(): Int = 2.‸twice()\n---\npackage b\nfun Int.twice(): Int = this * 2", "unknown-name", "has no function twice"},
+		{"package a\nfun f(): Int = ‸b.g()\n---\npackage b\nfun g(): Int = 1", "unknown-name", "a package is not written in code: import b.g and write g"},
+		{"package a\nfun f(): Int = ‸b.O.Ok(1).n\n---\npackage b\nsealed interface O {\n    data class Ok(val n: Int) : O\n}", "unknown-name", "import b.O and write O.Ok"},
+		{"package a\nimport ‸b.Shape.Dot\n---\npackage b\nsealed interface Shape {\n    data object Dot : Shape\n}", "unknown-import", "no package b.Shape: import b.Shape and write Shape.Dot"},
+		{"package a\nfun f(): Int = 2.‸twice()\n---\npackage b\nfun Int.twice(): Int = this * 2", "unknown-name", "a Int has no function twice: add import b.twice"},
+		{"package a\nfun f(): Int = 2.‸twice()\n---\npackage b\nfun String.twice(): String = this\n---\npackage c\nfun Int.twice(): Int = this * 2", "unknown-name", "a Int has no function twice: add import c.twice"},
+		{"package a\nimport b.PRow\nfun f(): PRow = ‸PRow(1)\n---\npackage b\ndata class Row(val n: Int)\ntypealias PRow = Row", "unknown-name", "PRow is a typealias, which builds nothing: write Row, the type's own name"},
+		{"package a\nfun f(): Int = ‸PRow(1).n\n---\npackage b\ndata class Row(val n: Int)\ntypealias PRow = Row", "unknown-name", "PRow is a typealias, which builds nothing: write Row"},
+		{"package a\nfun f(x: ‸b.P): Int = 1\n---\npackage b\ndata class P(val n: Int)", "unknown-name", "a package is not written in code: import b.P and write P"},
 		{"package a\nimport b.g\nimport ‸c.g\n---\npackage b\nfun g(): Int = 1\n---\npackage c\nfun g(): Int = 2", "duplicate", "g is already imported from package b"},
 		// Section 6: the scope functions that do not exist.
 		{"fun f(x: Int): Int = x.‸apply { 1 }", "kotlin-scope-function", "name the value and call it"},
@@ -301,6 +306,7 @@ func TestImportAs(t *testing.T) {
 		{"package a\nimport b.Area as g\nimport ‸b.g" + rows, "duplicate", "g is already imported from package b"},
 		{"package a\nimport b.g\nimport ‸b.Area as g" + rows, "duplicate", "g is already imported from package b"},
 		{"package a\nimport b.Area as R\nfun f(): R = ‸Area(1, \"x\")" + rows, "unknown-name", "Area is not in scope"},
+		{"package a\nimport b.Area as R\ndata class Area(val label: String)\nfun f(r: R?): Area? = ‸r" + rows, "type-mismatch", "this is a b.Area? where a a.Area? is wanted"},
 	})
 }
 

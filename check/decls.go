@@ -226,6 +226,35 @@ func (c *checker) missing(at syntax.Node, name string) Type {
 	return c.errorf(at, "unknown-name", "nothing named %s is declared here, in package %s or in the prelude", name, c.pkg.name)
 }
 
+// packaged reports a name written with its package, b.g or b.O.Ok,
+// in code: see prefixed.
+func (c *checker) packaged(e *syntax.Select) bool {
+	name, x := e.Name, e.X
+	for s, ok := x.(*syntax.Select); ok; s, ok = x.(*syntax.Select) {
+		name, x = s.Name+"."+name, s.X
+	}
+	id, ok := x.(*syntax.Ident)
+	return ok && c.prefixed(id, id.Name+"."+name)
+}
+
+// prefixed reports a dotted name, in code or as a type, whose head
+// names nothing in scope and whose front is a package: Kogo writes it
+// bare, imported.
+func (c *checker) prefixed(at syntax.Node, name string) bool {
+	head, _, _ := strings.Cut(name, ".")
+	if c.scope.lookup(head) != nil || slices.ContainsFunc(c.homes(head), func(p *pkg) bool { return p.named(head) != nil }) {
+		return false
+	}
+	for i := strings.LastIndexByte(name, '.'); i > 0; i = strings.LastIndexByte(name[:i], '.') {
+		if c.pkgs[name[:i]] != nil {
+			next, _, _ := strings.Cut(name[i+1:], ".")
+			c.errorf(at, "unknown-name", "a package is not written in code: import %s.%s and write %s", name[:i], next, name[i+1:])
+			return true
+		}
+	}
+	return false
+}
+
 // visible reports whether the file at hand may name a declaration.
 func (c *checker) visible(v vis) bool {
 	if v.file != nil && v.file.IsTest() && !c.file.IsTest() {
@@ -269,11 +298,14 @@ func (c *checker) importAll(f *syntax.File) {
 			continue
 		}
 		from, name, local := c.pkgs[imp.Name[:i]], imp.Name[i+1:], imp.Local()
+		j := max(strings.LastIndexByte(imp.Name[:i], '.'), 0) // before a nested type's outer one
 		switch {
 		case from != nil && testOnly[from.name] && !f.IsTest():
 			c.errorf(imp, "test-import", "package %s is for test files, those named _test.kg: move what uses %s into one (spec.md 16)", from.name, name)
 		case from == nil && c.kotlinFix(imp.Name[:i], name) != "":
 			c.errorf(imp, "unknown-import", "there is no package %s in Kogo: %s", imp.Name[:i], c.kotlinFix(imp.Name[:i], name))
+		case from == nil && c.pkgs[imp.Name[:j]] != nil:
+			c.errorf(imp, "unknown-import", "there is no package %s: import %s and write %s", imp.Name[:i], imp.Name[:i], imp.Name[j+1:])
 		case from == nil:
 			c.errorf(imp, "unknown-import", "there is no package %s", imp.Name[:i])
 		case from.named(name) == nil && slices.ContainsFunc(c.members[name], func(f *Func) bool { return f.Pkg == from.name }):
@@ -978,6 +1010,8 @@ func (c *checker) named(at syntax.Node, name string) (Type, []*TypeParam) {
 	} else if d != nil {
 		c.see(at, name, d.vis)
 		return self(d), d.Params
+	} else if c.prefixed(at, name) {
+		return unknown, nil
 	}
 	return c.missing(at, name), nil
 }

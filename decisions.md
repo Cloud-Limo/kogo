@@ -4296,6 +4296,15 @@ and 7.
   **a named deviation from "`kogo check` is the only gate" (15 Nov 2026)**: Kotlin
   accepts the two names, and moving the refusal into the checker (15 / 4) waits for the
   audit issue DEV-1079, until a file meets one. Reopen when a port meets either.
+- **Five messages on names** (design section 8, DEV-1078): a type mismatch names each
+  type's package only where the two types themselves print alike, a `?` looked
+  through, not where they differ further in, as `List<Area>` against another
+  `List<Area>`. Not taken: printing a type with its packages all through (about 15
+  lines more). Reopen when a port meets it. An extension not imported is named from
+  each package's visible fun of its name that the receiver's type can call, as the call
+  would match it once imported (Review, 22 Nov 2026), so the import it names works.
+  Not taken: any fun of the name with a receiver, which named imports that only led to
+  a second error.
 - **An `Instant` or a `LocalDate` past Postgres's range is an error when it is sent**
   (DEV-1087, spec 10.4), at Postgres's own ends, -4713-11-24 to +294276-12-31 for a
   `timestamptz` and to +5874897-12-31 for a `date`, written as Kogo prints a year, not

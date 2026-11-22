@@ -58,7 +58,11 @@ first line of each, which is all the board shows. An issue goes Todo,
 In Progress, In Review, Done, and the first line of its newest event
 says what happens next. An event is a comment that begins with a word
 of cusoon2's `doc/plans/pipeline-events.md`, section 5, and a colon;
-any other is a note, which no reader takes for a step. Each step
+any other is a note, which no reader takes for a step. A session
+posts an event with `lin step DEV-NNN < comment.md`, which refuses a
+first line that does not fit its word's form, posts the whole where
+the word says and its first line on the issue, and does what goes
+with the word; a note goes with `lin comment`. Each step
 below can run in Zed, as an async run or as a local run, in any mix.
 So whatever a later step needs is on the issue, the PR or the pushed
 branch, never only in a session or a worktree.
@@ -87,9 +91,9 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   becomes `Handoff:`, `Review:`, `Ruling:` or `Fixed:`, from a run or
   a session alike, or its PR merges, so no session reports a step
   back. It starts the Code review and the Fix, checks and tidies.
-  What it cannot settle it hands to the lead: a `Clerk:` comment and
-  the label `lead`, which wait for Greg's next "Lead". It leaves an
-  issue labelled `lead` alone.
+  What it cannot settle it hands to the lead: a `Clerk:` comment,
+  which `lin step` posts with the label `lead`; both wait for Greg's
+  next "Lead". It leaves an issue labelled `lead` alone.
 - **Guide.** "Guide DEV-NNN", said in the repository the design is
   about, starts a session that takes Greg through a design to his
   rulings: read Kogo's `doc/guide.md` and follow it. It ends with one
@@ -121,12 +125,11 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
 - **Handoff.** Commit, push with `git push -u origin HEAD` and open
   a PR into the repository's main line with `gh pr create --base
   <main or renew>`. Write one comment: the first line `Handoff: <PR
-  url> · <branch> · <where>`, then Landed / Verified / Decided / Next
-  step / Gotcha. Post it on the PR
-  with `gh pr comment` and its first line alone on the issue with
-  `head -1 handoff.md | lin comment DEV-NNN --state "In Review"`,
-  print it, and stop. A PR that outgrows its Budget, or adds what the
-  Scope did not name, says so in the handoff.
+  url> · <branch>`, then Landed / Verified / Decided / Next step /
+  Gotcha. Post it with `lin step DEV-NNN < handoff.md`, which puts it
+  on the PR, its first line on the issue, and moves the issue to In
+  Review; print it, and stop. A PR that outgrows its Budget, or adds
+  what the Scope did not name, says so in the handoff.
 - **Code review.** "Code review DEV-NNN": `lin show DEV-NNN` and take
   the PR and branch from the newest Handoff; its text is on the PR.
   Work as Where a step works says, on the branch fast-forwarded with
@@ -137,9 +140,8 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   fix, N question`, then a numbered list. Each item is a **Fix** (what
   is wrong, the change, its size as code / tests), a **Won't fix** (the
   finding and why it stays) or a **Question** (a choice that is Greg's
-  or the lead's: the options and which you lean to). Post it on the
-  PR, and its first line alone on the issue with `head -1 review.md |
-  lin comment DEV-NNN`, print it, and stop.
+  or the lead's: the options and which you lean to). Post it with
+  `lin step DEV-NNN < review.md`, print it, and stop.
 - **Fix.** "Fix DEV-NNN": in the same place, fast-forwarded or made as
   in Code review when missing, make every Fix of the newest Review,
   read on the PR, as further commits. A `Ruling:` comment after it, on
@@ -148,9 +150,8 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   moved. Push. Write one comment: the first line `Fixed: <PR url> at
   <sha>`, then what was done for each numbered item, and under
   **Open** any Question without a Ruling and any choice the fixes
-  raised. Post it on the PR, and its first line alone on the issue
-  with `head -1 fixed.md | lin comment DEV-NNN` (no `--state`: it
-  stays In Review), print it, and stop. Do not merge: see Who merges.
+  raised. Post it with `lin step DEV-NNN < fixed.md` (it stays In
+  Review), print it, and stop. Do not merge: see Who merges.
 - **Who merges.** Kogo: the clerk, and no other session. After Code
   review and Fix it reads the fixes and runs the checks `doc/clerk.md`
   names. It merges when every one passes and nothing is Open, and
@@ -182,7 +183,7 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   clerk that fails is. It refuses a `<where>` another issue holds: by
   its newest `Taken` while that issue is In Progress or In Review, by
   its session running there before that Taken is posted, or by the
-  lead's `Held, <where>` for a walkthrough until `Released, <where>`.
+  lead's `Held: <where>` for a walkthrough until `Released: <where>`.
   `lin local --list` shows each one running, with its minutes and its
   log.
 - A comment with no PR to hold it stays on the issue in full: a

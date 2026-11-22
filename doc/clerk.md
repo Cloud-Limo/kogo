@@ -28,15 +28,15 @@ It runs one clerk at a time, since two merges would share `kogo_test`.
 It leaves alone an issue labelled `lead` or `agent`, but for a merge,
 and takes it up from its newest event when the label goes. For a
 clerk that fails, the cap included, it labels the issue `lead` under
-a comment of its own, not in the form of Handing on: `Clerk: the clerk
-for DEV-NNN exited N: <its last line>`, then the command and its last
-lines. Anyone may say "Clerk DEV-NNN" by hand.
+a comment of its own: `Failed: the clerk for DEV-NNN exited N · <its
+last line>`, then the command and its last lines. Anyone may say
+"Clerk DEV-NNN" by hand.
 
 You start runs, async or local, check, merge and tidy. You write no
 code and make no commit but the merge of `main` into a Kogo PR that
 Merging gives, you run no Pickup, Code review or Fix yourself, and you
 make no choice a step left open: that goes to the lead. Write every
-file a command reads (`clerk.md`, `brief.md`, the `Merged:` text)
+file a command reads (`clerk.md`, `brief.md`, the `Merged:` note)
 under `/tmp`, in a directory of its own from `mktemp -d`, and never in
 a checkout: one left in the issue's worktree makes it not clean, so
 After a merge leaves it and hands on, and `~/Dev/kogo` is never
@@ -57,10 +57,11 @@ line, `Async agent · DEV-NNN · ...`, and a blank one: its first line
 is the one under those. The row is chosen by the issue's newest
 event, which `lin show --newest` prints first: a comment that begins
 with a word of cusoon2's `doc/plans/pipeline-events.md`, section 5,
-and a colon, a launch directive, or today's `Taken,`, `Held,`,
-`Released,` and `Launched agent-` lines. Any other comment, a `Lead:`
-one included, is a note, and a note after the event changes the row only
-for Backlog. Take the first row that fits:
+and a colon, a launch directive, a `Launched agent-` line, or a
+`Taken,`, `Held,` or `Released,` line as they were written before
+DEV-1073. Any other comment, a `Lead:` one included, is a note, and a
+note after the event changes the row only for Backlog's older lines.
+Take the first row that fits:
 
 | State | Newest event | Next |
 | --- | --- | --- |
@@ -74,10 +75,12 @@ for Backlog. Take the first row that fits:
 | any | launch comment, `[agent]` | the run's: exit |
 | Todo | launch comment, no label | a speculative run, the lead's to label: exit |
 | In Progress | `Taken` | the session's: exit |
-| Backlog | any, with a `Lead:` note of what brings it back | After a merge moves it, when that is a merge; else the lead's |
+| Backlog | `Parked:`, or an older `Lead:` line of what brings it back | After a merge moves it, when that is a merge; else the lead's |
 | any | `Start:` | the step's, running: exit |
-| any | `Held,`, `Released,` or `Walkthrough:` | Greg's walkthrough, the lead's: exit |
-| any | `Clerk:` | the lead's or Greg's, as the comment says: exit |
+| any | `Held:`, `Released:` or `Walkthrough:` | Greg's walkthrough, the lead's: exit |
+| In Review | `Checked:` | `lin clerk` watches its Cloud CI: exit |
+| any | `Ready to merge:` | Greg's merge: exit |
+| any | `Clerk:` or `Failed:` | the lead's: exit |
 
 ## Launching a run
 
@@ -158,7 +161,7 @@ Read the Handoff and the Review on the PR, and `gh pr diff <PR url>
 
 Otherwise launch a Fix when the Review has one to make, and go to
 Merging when it has none. A Budget outgrown's sizes go in your
-`Merged:` or `merge` comment.
+`Merged:` or `Checked:` comment.
 
 A `Ruling:` answers what the `Clerk:` comment before it raised: raise
 none of it again. Launch a Fix, each Ruling quoted in full, when the
@@ -181,7 +184,7 @@ and test `--is-ancestor` again: if `main` moved, do the same once more;
 if it moves a third time, hand on. When the merge conflicts,
 `git merge --abort`, merge nothing, launch a Fix whose brief asks only
 that it merge the base, test and push. For a cusoon2 PR, merge
-nothing and write no `merge` line: launch that Fix. But when a cusoon2
+nothing and post no `Checked:`: launch that Fix. But when a cusoon2
 PR's own diff (`git diff --name-only origin/renew...HEAD`) touches
 `kogo/` or a file `renew`'s `kogo/pins` names
 (`git show origin/renew:kogo/pins`), that Fix runs `kogo/run.sh`,
@@ -232,7 +235,8 @@ of its own, with no `cd`, `&&` or pipe, since the rule that allows it
 matches that form alone. It moves the issue to Done. Post `Merged:
 <sha>`, the built-ins check's last line and the comparison's `N
 cases` with `0 differ` (or "checks skipped"), and the sizes against a
-Budget outgrown, in full on the PR and its first line on the issue.
+Budget outgrown, on the PR alone with `gh pr comment`: it is a note,
+and Done says the same on the issue.
 Otherwise hand on, with what failed or differed, as when the merge is
 refused because the head moved.
 
@@ -247,21 +251,21 @@ any fix commits against the Review and its Rulings. Where the PR
 changes Kotlin that a Kogo port was taken from, also run that
 checkout's own `kogo/run.sh`, which compares its Kotlin, with
 `KOGO=~/Dev/kogo`, and read its last three lines as above. If all pass
-and nothing is Open, hand on with `Clerk: Greg's: merge <PR url> at
-<sha> once Cloud CI passes`, the sha full, from `git rev-parse HEAD`
-there, with the sizes under it when the Budget was outgrown, posted on
-the PR too, where he merges. Otherwise hand on with what failed. Do
-not wait for Cloud CI, which runs `mise run check-all` and the tests:
-`lin clerk` watches that sha's run and tells Greg.
+and nothing is Open, post `Checked: <PR url> at <sha>` with `lin step
+DEV-NNN < checked.md`, the sha full, 40 characters, from `git rev-parse
+HEAD` there, with the sizes under it when the Budget was outgrown, and
+exit: it is whole on the issue and takes no label. Otherwise hand on
+with what failed. Do not wait for Cloud CI, which runs `mise run
+check-all` and the tests: `lin clerk` watches that sha's run, tells
+Greg in his inbox on green, and posts a `Failed:` with `lead` on red.
 
 Say the order on that line when it matters. A port's PR, as above,
 that goes behind `renew` costs a local Fix round. So list the others
 open, `gh pr list --base renew` there, with `gh pr diff N --name-only`
 for each, and count only those with a `Review:` on the PR (`gh pr view
 N --json comments`). When exactly one of the two is a port and the
-other changes a file outside the four directories above, the port's
-line ends `once Cloud CI passes: merge before PR N` and the other's
-`once Cloud CI passes: merge after PR N`.
+other changes a file outside the four directories above, the other's
+line ends ` · merge after PR N`, N the port's.
 
 ## After a merge
 
@@ -275,10 +279,11 @@ well as `git branch -d` for a detached worktree; and leave a clone as
 it is. A worktree that is not clean stays: hand on, naming it.
 
 Then `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list backlog`:
-move to Todo each issue whose `Lead:` line waits on this merge, with
-`echo "Clerk: Todo: DEV-NNN merged" | lin comment DEV-MMM --state
-Todo`. The lead starts it from the board. Then take `lead` off this
-issue if it is on: `lin label DEV-NNN lead --remove`.
+move to Todo each issue whose `Parked:`, or older `Lead:` line,
+waits on this merge, with
+`lin comment DEV-MMM --state Todo < /dev/null`, which posts nothing.
+The lead starts it from the board. Then take `lead` off this issue if
+it is on: `lin label DEV-NNN lead --remove`.
 
 When the merged PR changed cusoon2's `mise-tasks/linear-clerk`, hand
 on with `Clerk: Greg's: systemctl --user restart lin-clerk`: the
@@ -287,11 +292,11 @@ would stop itself.
 
 ## Handing on
 
-Post one `Clerk:` comment in full on the issue, `lin comment DEV-NNN <
-clerk.md`, where the lead reads it instead of the PR; then `lin label
-DEV-NNN lead`, and exit. It takes the place of the step: launch
-nothing and merge nothing on that event. It waits for Greg's next
-"Lead".
+Post one `Clerk:` comment with `lin step DEV-NNN < clerk.md`, which
+puts it in full on the issue, where the lead reads it instead of the
+PR, and the label `lead` on; then exit. It takes the place of the
+step: launch nothing and merge nothing on that event. It waits for
+Greg's next "Lead".
 
 The first line is `Clerk: <what waits, in a line>`, or `Clerk: Greg's:
 <the move>` for a move that is no choice, which needs no more. Under

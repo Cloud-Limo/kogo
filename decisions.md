@@ -4297,9 +4297,8 @@ and 7.
   accepts the two names, and moving the refusal into the checker (15 / 4) waits for the
   audit issue DEV-1079, until a file meets one. Reopen when a port meets either.
 - **A `when` that must cover every case panics on a value none of its branches names**
-  (Greg, 22 Nov 2026; spec 8), with `when: no branch for <type> <value>`, in every form:
-  as a `val` or an assignment it gave the type's zero, as a statement it ran no branch,
-  and as a result `unreachable`. Such a value is a row's enum label the program lacks.
+  (Greg, 22 Nov 2026; spec 8), with `when: no branch for <type> <value>`, in every form.
+  Such a value is a row's enum label the program lacks.
   Not taken: checking each enum column against its constants as the row is read (about
   15 / 10), which fails sooner but also fails a request that only passes the value on
   or compares it with `==`, both of which answer truly today.

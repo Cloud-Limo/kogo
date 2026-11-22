@@ -54,9 +54,10 @@ with them. `$LINEAR_API_KEY` is already in the shell.
 <!-- Workflow, shared: begin -->
 Linear holds the state of every piece of work and GitHub holds its
 code. The PR holds each step's comment in full, and the issue the
-first line of each, which is all the board shows. An issue goes Todo,
-In Progress, In Review, Done, and the first line of its newest event
-says what happens next. An event is a comment that begins with a word
+first line of each, which is all the board shows, with the PR
+comment's address under it. An issue goes Todo, In Progress, In
+Review, Done, and the first line of its newest event says what
+happens next. An event is a comment that begins with a word
 of cusoon2's `doc/plans/pipeline-events.md`, section 5, and a colon;
 any other is a note, which no reader takes for a step. A session
 posts an event with `lin step DEV-NNN < comment.md`, which refuses a
@@ -171,11 +172,12 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   it with `agent-step < answer.md`: it refuses a first line that does
   not fit its word, as `lin step` does, and posts on the PR the line
   names with the run's marker line last. The wrapper posts on the
-  issue the first line when the PR has that text, and `answer.md`
-  whole when not: what an interrupted run leaves behind. Its own
-  comment begins `Answer:` for a run that is no step, `Failed:` for
-  one that ended with no answer. A review or fix run leaves its tree
-  clean: whatever is left is pushed to the PR's branch. No run merges.
+  issue the first line and that comment's address when the PR has
+  that text, and `answer.md` whole when not: what an interrupted run
+  leaves behind. Its own comment begins `Answer:` for a run that is no
+  step, `Failed:` for one that ended with no answer. A review or fix
+  run leaves its tree clean: whatever is left is pushed to the PR's
+  branch. No run merges.
 - **Local runs.** A step that needs this VM, a stack or the other
   repository runs here as a headless session: the lead or the clerk
   starts it with `lin local DEV-NNN <where> "<phrase>"`, which returns

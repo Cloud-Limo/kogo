@@ -168,11 +168,16 @@ func (c *checker) noFunc(at syntax.Node, name string, rt Type, member bool) Type
 		}
 	}
 	d, a := c.findType(name)
+	for _, k := range slices.Sorted(maps.Keys(c.pkgs)) { // an alias not imported
+		if pa := c.pkgs[k].aliases[name]; d == nil && a == nil && pa != nil && c.visible(pa.vis) {
+			a = pa
+		}
+	}
 	switch {
 	case member && notKogo[name][0] == "":
 		var homes []string
 		for _, p := range c.pkgs {
-			if slices.ContainsFunc(p.funcs[name], func(f *Func) bool { return f.Receiver != nil && c.visible(f.vis) }) {
+			if slices.ContainsFunc(p.funcs[name], func(f *Func) bool { _, ok := c.receives(f, rt, true); return ok && c.visible(f.vis) }) {
 				homes = append(homes, p.name+"."+name)
 			}
 		}

@@ -214,7 +214,7 @@ func (c *checker) mismatch(at syntax.Node, got, want Type) {
 		fix = ": write .to" + want.String() + "()"
 	}
 	g, w := got.String(), want.String()
-	if gd, wd := named(got), named(want); g == w && gd != wd && gd != nil && wd != nil {
+	if gd, wd := named(nonNull(got)), named(nonNull(want)); g == w && gd != wd && gd != nil && wd != nil {
 		g, w = gd.Pkg+"."+g, wd.Pkg+"."+w // two types of one name
 	}
 	c.errorf(at, "type-mismatch", "this is a %s where a %s is wanted%s", g, w, fix)

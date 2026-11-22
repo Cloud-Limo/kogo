@@ -227,20 +227,28 @@ func (c *checker) missing(at syntax.Node, name string) Type {
 }
 
 // packaged reports a name written with its package, b.g or b.O.Ok,
-// whose head names nothing in scope: Kogo writes it bare, imported.
+// in code: see prefixed.
 func (c *checker) packaged(e *syntax.Select) bool {
-	parts, x := []string{e.Name}, e.X
+	name, x := e.Name, e.X
 	for s, ok := x.(*syntax.Select); ok; s, ok = x.(*syntax.Select) {
-		parts, x = append([]string{s.Name}, parts...), s.X
+		name, x = s.Name+"."+name, s.X
 	}
 	id, ok := x.(*syntax.Ident)
-	if !ok || c.scope.lookup(id.Name) != nil || slices.ContainsFunc(c.homes(id.Name), func(p *pkg) bool { return p.named(id.Name) != nil }) {
+	return ok && c.prefixed(id, id.Name+"."+name)
+}
+
+// prefixed reports a dotted name, in code or as a type, whose head
+// names nothing in scope and whose front is a package: Kogo writes it
+// bare, imported.
+func (c *checker) prefixed(at syntax.Node, name string) bool {
+	head, _, _ := strings.Cut(name, ".")
+	if c.scope.lookup(head) != nil || slices.ContainsFunc(c.homes(head), func(p *pkg) bool { return p.named(head) != nil }) {
 		return false
 	}
-	parts = append([]string{id.Name}, parts...)
-	for i := len(parts) - 1; i > 0; i-- {
-		if c.pkgs[strings.Join(parts[:i], ".")] != nil {
-			c.errorf(id, "unknown-name", "a package is not written in code: import %s and write %s", strings.Join(parts[:i+1], "."), strings.Join(parts[i:], "."))
+	for i := strings.LastIndexByte(name, '.'); i > 0; i = strings.LastIndexByte(name[:i], '.') {
+		if c.pkgs[name[:i]] != nil {
+			next, _, _ := strings.Cut(name[i+1:], ".")
+			c.errorf(at, "unknown-name", "a package is not written in code: import %s.%s and write %s", name[:i], next, name[i+1:])
 			return true
 		}
 	}
@@ -1002,6 +1010,8 @@ func (c *checker) named(at syntax.Node, name string) (Type, []*TypeParam) {
 	} else if d != nil {
 		c.see(at, name, d.vis)
 		return self(d), d.Params
+	} else if c.prefixed(at, name) {
+		return unknown, nil
 	}
 	return c.missing(at, name), nil
 }

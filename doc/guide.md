@@ -32,18 +32,17 @@ reads as a design he was not shown. Then build the proposed design
 for him from nothing, and let him settle each piece as it lands.
 
 - One small piece of code a message, in the order a request or a file
-  meets them, cut no shorter than shows where each value in it comes
-  from the first time it appears. Each piece is one proposal: yours,
-  and where it differs from the document's lean, say so in a clause.
+  meets them, long enough to show where each value in it first comes
+  from. Each piece is one proposal: yours, and where it differs from
+  the document's lean, say so in a clause.
 - With each piece: what can no longer go wrong, what holds that, how
   far it reaches, and what it does not hold, as plainly. Say which
   part is new and which the code already has, and its size as code /
   tests.
 - **Build the slip.** Write the most likely accident that the piece
   alone would catch, and follow it to what happens: a rollback, a 500,
-  a leak. Follow it as one row, shown before and after each statement,
-  not in labelled bullets. If you cannot build one, say so, since that
-  is the answer.
+  a leak. Show one row before and after each statement, not labelled
+  bullets. If you cannot build one, say so, since that is the answer.
 - Where the piece is about the language, say what Kotlin does there,
   from a run, and whether the piece is Kotlin's rule or stricter.
 - What was not taken gets a clause, and no more until he asks. A
@@ -125,7 +124,6 @@ left, say so.
   nothing from it.
 - You post no Ruling, launch no run and merge nothing: those are the
   lead's, the clerk's and Greg's. You commit the short document to the
-  PR's branch on his word, and nothing else. If that PR merged during
-  the sitting, there is no branch: on his word, open a PR of its own
-  for the document, from `main`.
+  PR's branch on his word, and nothing else; if that PR merged during
+  the sitting, to a PR of its own.
 - Leave nothing only in the session or a worktree.

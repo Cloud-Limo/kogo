@@ -6,6 +6,7 @@ package kogo
 external class List<out T>
 external class Pair<out A, out B>
 external class Set<out T>
+external class Map<K, out V>
 external class Regex
 external class Uuid
 external class Decimal
@@ -20,6 +21,7 @@ external fun <T> listOfNotNull(vararg elements: T?): List<T>
 external fun <T> emptyList(): List<T>
 external val <T> List<T>.size: Int
 external fun <T> List<T>.get(index: Int): T
+external fun <T> List<T>.isEmpty(): Boolean
 external fun <T> List<T>.isNotEmpty(): Boolean
 external fun <T> List<T>.contains(element: T): Boolean
 external fun <T> List<T>.none(predicate: (T) -> Boolean): Boolean
@@ -44,9 +46,17 @@ external fun List<Long>.sum(): Long
 external fun <T> List<T>.sumOf(selector: (T) -> Int): Int
 external fun <T> List<T>.sumOf(selector: (T) -> Long): Long
 external fun <T> List<T>.plus(elements: List<T>): List<T>
+external fun <T, R> List<T>.mapNotNull(transform: (T) -> R?): List<R>
+external fun <T, R> List<T>.sortedBy(selector: (T) -> R): List<T>
+external fun <T, K> List<T>.distinctBy(selector: (T) -> K): List<T>
+external fun <T> List<T>.reversed(): List<T>
+external fun <T, K> List<T>.groupBy(keySelector: (T) -> K): Map<K, List<T>>
 
 external fun <T> setOf(vararg elements: T): Set<T>
 external fun <T> Set<T>.contains(element: T): Boolean
+external fun <T, R> Set<T>.mapNotNull(transform: (T) -> R?): List<R>
+
+external fun <K, V> Map<K, V>.get(key: K): V?
 
 external val String.length: Int
 external fun String.plus(other: String): String
@@ -82,8 +92,10 @@ external fun Regex.matches(input: String): Boolean
 
 external fun Int.toLong(): Long
 external fun Long.toDouble(): Double
+external fun Long.toInt(): Int
 external fun Long.coerceAtLeast(minimumValue: Long): Long
 external fun Long.coerceAtMost(maximumValue: Long): Long
+external fun abs(n: Long): Long
 external fun Double.toLong(): Long
 external fun Double.toInt(): Int
 external fun Decimal.toDouble(): Double

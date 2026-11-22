@@ -363,7 +363,7 @@ func (c *checker) kotlinFix(from, name string) string {
 		return fmt.Sprintf("import %s.%s instead", kogo, name)
 	case from == "java.util" && name == "UUID" && has("kogo", "Uuid"):
 		return "Uuid needs no import: remove this one and write Uuid"
-	case (from == "arrow.core" || strings.HasPrefix(from, "arrow.core.")) && has("kogo", name):
+	case (from == "kotlin.math" || from == "arrow.core" || strings.HasPrefix(from, "arrow.core.")) && has("kogo", name):
 		return name + " needs no import: remove this one"
 	}
 	return ""

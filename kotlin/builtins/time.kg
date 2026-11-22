@@ -23,6 +23,8 @@ fun time(f: String, s: String, t: String, x: Long, y: Long, n: Int, m: Int): Str
     "zoneOf" -> "${ZoneId.of(s)} ${ZoneId.of(t)}"
     "atZoneEra" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m)))} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate()}"
     "atStartOfDay" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().atStartOfDay(ZoneId.of(zone(n * 10 + m)))} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().atStartOfDay(ZoneId.of(zone(n * 10 + m))).toInstant()}"
+    "dateParts" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().year} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().monthValue} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().dayOfMonth} ${Instant.ofEpochSecond(x % 100000000000L, 0L).atZone(ZoneId.of("UTC")).toLocalDate().year}"
+    "hourMinute" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).hour} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).minute} ${Instant.ofEpochSecond(changeAt(m) + x % 7200L, 0L).atZone(ZoneId.of(changeZone(m))).hour}"
     "fraction" -> "${Instant.ofEpochSecond(x % 100000000000L, n.toLong() % 1000L * 1000000L)} ${Instant.ofEpochSecond(x % 100000000000L, n.toLong() % 1000L * 1000L + 1000000L)}"
     "startOfChangedDay" -> "${Instant.ofEpochSecond(changeAt(m), 0L).atZone(ZoneId.of(changeZone(m))).toLocalDate().atStartOfDay(ZoneId.of(changeZone(m)))}"
     "ofDays" -> "${Duration.ofDays(n.toLong())} ${Duration.ofDays(n.toLong()).seconds}"

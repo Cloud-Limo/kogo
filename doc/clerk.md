@@ -132,11 +132,8 @@ Pickup said in a session, launch a run, but start a local
 one in the newest `Taken`'s `<where>` when the PR is in the other
 repository than the issue's project's. A `Lead:` comment does not
 choose: the lead holds an issue whose next step is Greg's with the
-label `lead`. One exception: an issue with no `Start:` whose `Lead:`
-comment says every step runs locally is started locally, in the
-`<where>` that comment names; DEV-1081 is the only one, and this
-sentence goes when it merges. The Fix that runs `kogo/run.sh` (Merging) is a local run
-however the steps before it ran.
+label `lead`. The Fix that runs `kogo/run.sh` (Merging) is a local
+run however the steps before it ran.
 
 ## Starting a local run
 

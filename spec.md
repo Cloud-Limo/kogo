@@ -779,7 +779,9 @@ hours. What Postgres holds and the Kogo type does not is a panic when
 it is read (section 8): `infinity` in a `timestamptz` or a `date`,
 `24:00` in a `time`, and an `interval` with months, which has no fixed
 length. A `Duration` too long for an `interval`'s microseconds is a
-panic when it is sent. A `Decimal` holds `NaN` and `Infinity` as well
+panic when it is sent, and so is an `Instant` or a `LocalDate` past
+Postgres's range: -4713-11-24 to +294276-12-31 for a `timestamptz`,
+to +5874897-12-31 for a `date`. A `Decimal` holds `NaN` and `Infinity` as well
 as numbers, and a zero keeps its scale: `0.00`. An empty `List` is sent as an
 empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
 `bytea`.

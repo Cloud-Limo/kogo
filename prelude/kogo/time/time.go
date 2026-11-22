@@ -126,7 +126,9 @@ func (d Duration) String() string {
 // null is, which the caller panics with, and so is a time of 24:00,
 // which Postgres holds and a LocalTime does not. An interval's day is
 // 24 hours, and a Duration is sent as microseconds alone: one too long
-// for an int64 of them is an error too.
+// for an int64 of them is an error too. So is an Instant or a
+// LocalDate past what Postgres holds, which the driver's microseconds
+// or days would wrap round to another time.
 
 func (i *Instant) ScanTimestamptz(v pgtype.Timestamptz) error {
 	if !v.Valid || v.InfinityModifier != pgtype.Finite {
@@ -136,7 +138,15 @@ func (i *Instant) ScanTimestamptz(v pgtype.Timestamptz) error {
 	return nil
 }
 
+// Postgres's range of a timestamptz, in seconds since 1970, and of a
+// date, in days: from 4714-11-24 BC to the first it does not hold, in
+// 294277 and 5874898.
+const pgMinSecond, pgEndSecond, pgMinDay, pgEndDay = -210866803200, 9224318016000, -2440588, 2145042906
+
 func (i Instant) TimestamptzValue() (pgtype.Timestamptz, error) {
+	if i.Seconds < pgMinSecond || i.Seconds >= pgEndSecond {
+		return pgtype.Timestamptz{}, fmt.Errorf("%s is outside a timestamptz's range, 4713 BC to 294276", i)
+	}
 	return pgtype.Timestamptz{Time: i.utc(), Valid: true}, nil
 }
 
@@ -150,7 +160,11 @@ func (d *LocalDate) ScanDate(v pgtype.Date) error {
 }
 
 func (d LocalDate) DateValue() (pgtype.Date, error) {
-	return pgtype.Date{Time: gotime.Date(int(d.Year), gotime.Month(d.Month), int(d.Day), 0, 0, 0, 0, gotime.UTC), Valid: true}, nil
+	t := gotime.Date(int(d.Year), gotime.Month(d.Month), int(d.Day), 0, 0, 0, 0, gotime.UTC)
+	if day := t.Unix() / 86400; day < pgMinDay || day >= pgEndDay {
+		return pgtype.Date{}, fmt.Errorf("%s is outside a date's range, 4713 BC to 5874897", d)
+	}
+	return pgtype.Date{Time: t, Valid: true}, nil
 }
 
 func (t *LocalTime) ScanTime(v pgtype.Time) error {

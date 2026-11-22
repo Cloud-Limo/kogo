@@ -1813,7 +1813,7 @@ Each entry: what was decided, why, and what would reopen it.
 - Value classes are out: cusoon2 has none, and binding distinct id types to SQL columns needs
   a design (foreign keys could supply it).
 - No `apply`/`run`/`with`, no labelled returns, no `object`.
-- `Regex` is RE2: no lookaround or backreferences.
+- `Regex` is RE2: no lookaround or backreferences. (Widened by DEV-1083: the pattern is Go's.)
 
 ## Taken building the SQL pass (DEV-818), not yet discussed
 
@@ -4261,3 +4261,105 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   went through goes in the handoff. The audit counted 0.59 comment lines a code line in
   the ports against 0.44 in their Kotlin. Not taken: a ratio to meet, which a reviewer
   would count rather than read.
+
+## The rules on a package's names (DEV-1077), 21 Nov 2026
+
+Greg's rulings on DEV-1068, `doc/plans/packages-and-names-design.md` sections 1, 2, 5, 6
+and 7.
+
+- **A package has one table of names for its types, typealiases, markers and top-level
+  `val`s, `private` ones included, as in Kotlin; but two `private val`s in two files do
+  not meet**, as two `private fun`s do not. A `private val` beside one that is not
+  private stays `duplicate`, as in Kotlin. The checker keeps the first `val` of a name
+  in the package's table and each file's private one beside it, and a file means its
+  own first. Not taken: one table that also holds two `private val`s of two files.
+- **A name is written bare, and an import names a top-level name and brings what it
+  declares and the types nested in it** (spec 2). The checker held this already; the
+  spec gains the words and the tests hold them. Not taken: a package written in code.
+- **Only a sealed interface holds types, and only its variants (`nested-type`)**: a type
+  or a typealias nested in a plain interface, a typealias nested in any type, and a type
+  in a sealed interface that does not implement it, are refused. The parser already
+  refuses a type in a data class's body. Not taken: types nested in a plain interface
+  as a namespace. One code, `nested-type`, gives all three refusals (not taken: a code
+  of its own for "not a variant"; DEV-1078 words them). A refused nested type is still
+  declared, so a use of it gives no follow-on error (not taken: dropping it).
+- **A program's package is not `kogo` or under it (`kogo-package`)**: a program's
+  `package kogo` put its names in every file, and `package kogo.time` had its names
+  imported as the prelude's. **A package's own type or val is meant before one of
+  package `kogo` or a built-in type**, as the checker already does. Not taken:
+  refusing a program's own declaration of a name the prelude or the built-in types
+  have.
+- **Stated, with no code** (design section 7): `kogo emit` refuses two names that
+  differ only in the case of the first letter; an alias stands where a type is written,
+  and a value, a constant or a variant is named by the type's own name; a local hides a
+  name declared outside it. The emitter's `go-name` refusal stays outside `kogo check`,
+  **a named deviation from "`kogo check` is the only gate" (15 Nov 2026)**: Kotlin
+  accepts the two names, and moving the refusal into the checker (15 / 4) waits for the
+  audit issue DEV-1079, until a file meets one. Reopen when a port meets either.
+- **Five messages on names** (design section 8, DEV-1078): a type mismatch names each
+  type's package only where the two types themselves print alike, a `?` looked
+  through, not where they differ further in, as `List<Area>` against another
+  `List<Area>`. Not taken: printing a type with its packages all through (about 15
+  lines more). Reopen when a port meets it. An extension not imported is named from
+  each package's visible fun of its name that the receiver's type can call, as the call
+  would match it once imported (Review, 22 Nov 2026), so the import it names works.
+  Not taken: any fun of the name with a receiver, which named imports that only led to
+  a second error.
+- **An `Instant` or a `LocalDate` past Postgres's range is an error when it is sent**
+  (DEV-1087, spec 10.4), at Postgres's own ends, -4713-11-24 to +294276-12-31 for a
+  `timestamptz` and to +5874897-12-31 for a `date`, written as Kogo prints a year, not
+  only where the driver's int64 of microseconds or int32 of days would wrap: one range
+  a reader can look up, and the driver's wrap cancels out inside it. An `Instant` is
+  checked on its seconds, as the driver cuts its nanoseconds down to the microsecond.
+  Not taken: checking only the wrap, and leaving the rest of the refusal to Postgres's
+  `out of range`.
+- **A `when` that must cover every case panics on a value none of its branches names**
+  (Greg, 22 Nov 2026; spec 8), with `when: no branch for <type> <value>`, in every form.
+  Such a value is a row's enum label the program lacks.
+  Not taken: checking each enum column against its constants as the row is read (about
+  15 / 10), which fails sooner but also fails a request that only passes the value on
+  or compares it with `==`, both of which answer truly today.
+
+## A Regex's pattern is Go's (DEV-1083), 22 Nov 2026
+
+Greg's ruling, 22 Nov 2026: a regex is a language of its own.
+
+- **A `Regex`'s pattern is read as Go's `regexp` reads it, and nothing of Kotlin's is
+  promised for it**; the name and its functions stay Kotlin's, the stated exception to
+  principle 3. Spec 12 lists the differences known, each with an example, and says the
+  list is not a promise that it is all; converting a pattern is the port's work
+  (`doc/porting.md`). Probes through `mise run kotlin` found seven patterns both engines
+  read that differ. Not taken: translating a pattern to Java's meaning in the prelude;
+  refusing at check the forms both engines read and mean differently.
+- **`kogo check` refuses a string literal Go cannot compile as a pattern
+  (`regex-pattern`)**, compiled by Go's `regexp`, as the prelude does when the program
+  runs, with Go's reason. A pattern built by a template or held in a variable is not
+  read, and panics when the `Regex` is made, as before, with the prelude's text
+  unchanged. Compiling the nine patterns cusoon2's ports hold takes about 46
+  microseconds. Not taken: leaving every pattern to the panic.
+- **`kotlin/builtins` and `kotlin/cases` keep their cases and gain no `kept` entry for a
+  pattern**, since nothing is promised to agree; the prelude's table test holds Kogo's
+  column of spec 12's table.
+- **Spec 1's sentence on the `kogo.` packages' names takes "but for the corners section
+  12 lists"** (lead, 22 Nov 2026): the names keep Kotlin's, `java.time`'s and Arrow's
+  spelling and meaning but for those corners, which states what section 12 already does
+  for `lowercase`, `replace` and now `Regex`. Not taken: leaving the sentence to be read
+  as limited by section 12.
+
+## An unread default, and an interface's `string()` (DEV-1085), 22 Nov 2026
+
+- **A defaulted parameter's local is read once (`_ = y_`)**, as a local `val`'s is, so a
+  fun that never reads it builds. Not taken: leaving the local out when nothing reads it.
+- **`kogo check` refuses an interface's `fun string()` or `fun String()` with no
+  parameter (`go-name`)**: either became Go's `String` method, so a template would write
+  what it returns instead of its data class's text, `custom` where Kotlin writes
+  `Tex(a=3)`. Not taken: having `rt`'s walk tell an emitted data class from a prelude
+  type that writes its own text, more code for a name no program has. `kogo check`
+  refuses these two names, and `kogo emit` the other three `go-name` cases until
+  DEV-1079 moves them.
+- **The refusal is the checker's, not the emitter's (Greg's ruling, 22 Nov 2026)**,
+  overriding the lead's correction that had first put it beside the emitter's three:
+  those compare the Go names the emitter computes, and this one needs only an
+  interface's fun, its name and its parameters, which the checker sees itself. Not
+  taken: the emitter, beside the other three, until DEV-1079 moves them all, which
+  would add a refusal outside the only gate and save nothing.

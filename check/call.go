@@ -71,6 +71,10 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			break
 		}
 		recv, safe = fun.X, fun.Safe
+		if c.packaged(fun) {
+			c.loose(e.Args, nil)
+			return unknown
+		}
 		if rt = c.expr(recv, nil); rt == unknown {
 			c.loose(e.Args, nil)
 			return unknown
@@ -116,6 +120,7 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 		c.info.Uses[e.Fun] = call.Func
 		c.fails(e, call)
 		c.zoneOffset(e, call.Func)
+		c.regexPattern(e, call.Func)
 		if id, ok := e.Fun.(*syntax.Ident); ok && call.Func.Receiver != nil && c.raised(call.Func.Receiver) == nil {
 			c.narrowedThis(id)
 		}
@@ -140,6 +145,22 @@ func (c *checker) zoneOffset(e *syntax.Call, f *Func) {
 	}
 }
 
+// regexPattern refuses the prelude's Regex on a string literal that
+// Go's regexp, which reads the pattern when the program runs, cannot
+// compile (spec.md 12); a pattern built by a template is not read.
+func (c *checker) regexPattern(e *syntax.Call, f *Func) {
+	if f.Pkg != "kogo" || f.Owner != nil || f.Receiver != nil || f.Name != "Regex" || len(e.Args) != 1 {
+		return
+	}
+	if s, ok := e.Args[0].Value.(*syntax.StringLit); ok && len(s.Parts) == 1 {
+		if l, ok := s.Parts[0].(*syntax.Literal); ok {
+			if _, err := regexp.Compile(l.Value); err != nil {
+				c.errorf(s, "regex-pattern", "Go cannot read this pattern: %s. A Regex's pattern is Go's, not Kotlin's: write it in Go's syntax (spec 12)", strings.TrimPrefix(err.Error(), "error parsing regexp: "))
+			}
+		}
+	}
+}
+
 // offsetID is java.time's rule for an ID that ZoneId.of reads as an
 // offset: Z, a sign, or UTC, GMT or UT and then a sign.
 var offsetID = regexp.MustCompile(`^(Z$|[+-]|(UTC|GMT|UT)[+-])`)
@@ -150,7 +171,7 @@ func (c *checker) holds(rt Type, written bool, name string) bool {
 	if n, ok := rt.(*Named); ok && slices.ContainsFunc(n.Decl.Props, func(v *Var) bool { return v.Name == name }) {
 		return true
 	}
-	return !written && slices.ContainsFunc(c.homes(name), func(p *pkg) bool { return p.vals[name] != nil })
+	return !written && slices.ContainsFunc(c.homes(name), func(p *pkg) bool { return c.val(p, name) != nil })
 }
 
 // noFunc reports a call of a name that no function in scope has.
@@ -163,10 +184,30 @@ func (c *checker) noFunc(at syntax.Node, name string, rt Type, member bool) Type
 			}
 		}
 	}
-	d, _ := c.findType(name)
+	d, a := c.findType(name)
+	for _, k := range slices.Sorted(maps.Keys(c.pkgs)) { // an alias not imported
+		if pa := c.pkgs[k].aliases[name]; d == nil && a == nil && pa != nil && c.visible(pa.vis) {
+			a = pa
+		}
+	}
 	switch {
 	case member && notKogo[name][0] == "":
+		var homes []string
+		for _, p := range c.pkgs {
+			if slices.ContainsFunc(p.funcs[name], func(f *Func) bool { _, ok := c.receives(f, rt, true); return ok && c.visible(f.vis) }) {
+				homes = append(homes, p.name+"."+name)
+			}
+		}
+		if slices.Sort(homes); homes != nil {
+			return c.errorf(at, "unknown-name", "a %s has no function %s: add import %s", rt, name, strings.Join(homes, " or import "))
+		}
 		return c.errorf(at, "unknown-name", "a %s has no function %s", rt, name)
+	case a != nil && !member:
+		t := c.aliased(a).String()
+		if n := named(c.aliased(a)); n != nil {
+			t = n.Name
+		}
+		return c.errorf(at, "unknown-name", "%s is a typealias, which builds nothing: write %s, the type's own name", name, t)
 	case member || d == nil:
 		return c.missing(at, name)
 	case d.Ctor != nil:

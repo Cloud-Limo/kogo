@@ -56,6 +56,12 @@ the port follows the design and the Kotlin is not reshaped first
 (`doc/roadmap.md`, "How it moves"). The file that departs says so in
 one line naming the design. The side-by-side run is unchanged.
 
+**Read each pattern as Go's.** A `Regex`'s pattern is Go's (`spec.md`
+section 12), so the port reads each one against that section's list and
+writes it in a form Go reads as the Kotlin meant: where a vertical tab
+can come, Kotlin's `\s` is `[\s\v]`. The Code review reads each pattern
+so.
+
 **Mark each departure outside SQL.** Where Kogo lacks the construct
 (`spec.md` section 14, or a name section 12 does not list), the port
 says why in a one-line comment, as `// generateSequence becomes a while:

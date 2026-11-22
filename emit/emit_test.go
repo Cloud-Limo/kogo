@@ -383,6 +383,7 @@ func TestLanguage(t *testing.T) {
 	expect(t, [][2]string{
 		{"t.Fares()", "Fare(base=100, tip=0, note=none) Fare(base=100, tip=5, note=none) 105 true"},
 		{"t.Greetings()", "Hello, AnnH Hello, Bob! Yo, CyY"},
+		{"t.U1(3, nil)", "a3"},
 		{"t.Band(0) + t.Band(2) + t.Band(9) + t.Band(10)", "zerofewsomemany"},
 		{"t.Sign(-5)", "-1"},
 		{"t.Sign(0)", "0"},
@@ -425,6 +426,9 @@ fun fares(): String {
 
 fun greet(name: String, greeting: String = "Hello", mark: String = greeting.substring(0, 1)): String =
     "$greeting, $name$mark"
+
+// A default that its fun never reads builds.
+fun u1(x: Int, y: Int = 0): String = "a$x"
 
 fun greetings(): String = greet("Ann") + " " + greet("Bob", mark = "!") + " " + greet(greeting = "Yo", name = "Cy")
 
@@ -1313,3 +1317,50 @@ func main() {
 	fmt.Println(rpc.Call(calls, r, t.Note_op, in))
 }
 `
+
+// A when that must cover every case panics on a value none of its
+// branches names (spec.md 8), as a row's enum may hold a label the
+// program lacks, in each form it is written in; a statement when over
+// an Int, which need not cover every case, runs on.
+func TestWhenNoBranch(t *testing.T) {
+	const want = "panics: when: no branch for InviteType Partner"
+	p := `t.InviteType("Partner")`
+	expect(t, [][2]string{
+		{"t.Share(" + p + ")", want},
+		{"t.Assigned(" + p + ")", want},
+		{"t.Stated(" + p + ")", want},
+		{"t.Result(" + p + ")", want},
+		{"t.Wrapped(" + p + ")", want},
+		{"t.Counted(3)", "0"},
+	}, `package t
+
+enum class InviteType { InHouse, Outside }
+
+fun share(type: InviteType): Int {
+    val share = when (type) { InviteType.InHouse -> 1; InviteType.Outside -> 2 }
+    return share
+}
+
+fun assigned(type: InviteType): Int {
+    var share = 0
+    share = when (type) { InviteType.InHouse -> 1; InviteType.Outside -> 2 }
+    return share
+}
+
+fun stated(type: InviteType): Int {
+    var said = 0
+    when (type) { InviteType.InHouse -> said = 1; InviteType.Outside -> said = 2 }
+    return said
+}
+
+fun result(type: InviteType): Int = when (type) { InviteType.InHouse -> 1; InviteType.Outside -> 2 }
+
+fun wrapped(type: InviteType): String = "is ${when (type) { InviteType.InHouse -> 1; InviteType.Outside -> 2 }}"
+
+fun counted(n: Int): Int {
+    var said = 0
+    when (n) { 1 -> said = 1; 2 -> said = 2 }
+    return said
+}
+`)
+}

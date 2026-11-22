@@ -210,6 +210,12 @@ func TestNames(t *testing.T) {
 		"package a\nfun f(): Int = g()\ninternal fun g(): Int = 1\n---\npackage a\nprivate fun h(): Int = 2\nfun k(): Int = g() + h()\n---\npackage a\nprivate fun h(): Int = 3\nfun m(): Int = h()",
 		"package a\nimport kogo.time.ZoneId\nfun f(s: String): List<ZoneId> = listOf(ZoneId.of(\"Zulu\"), ZoneId.of(\"UTC\"), ZoneId.of(s), ZoneId.of(\"$s+1\"))\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}",
 		"package a\nimport kogo.time.Stamp\nfun f(s: Stamp, xs: List<Int>): Int = s.seconds() + xs.size\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int",
+		"package a\nfun f(s: String): List<Regex> = listOf(Regex(\"(?=$s)\"), Regex(s), Regex(\"[a-z]+\"))\n---\npackage kogo\nexternal class Regex\nexternal fun Regex(pattern: String): Regex",
+		// One table of names (spec.md 2): a file's private val is its own,
+		// and the package's own val or type is meant before the prelude's.
+		"private val limit: Int = 50\nfun f(): Int = limit\n---\npackage t\nprivate val limit: String = \"\"\nfun g(): String = limit",
+		"data class Either(val n: Int)\nfun f(): Either = Either(1)\nval limit: Int = 50\n---\npackage kogo\nval limit: String = \"\"\n---\npackage t\nfun h(): Int = limit",
+		"package a\nimport b.twice\nfun f(): Int = 2.twice()\n---\npackage b\nfun Int.twice(): Int = this * 2",
 		"package a\nimport b.Shape\nfun f(s: Shape): Int = when (s) {\n    is Shape.Dot -> 0\n    is Shape.Line -> s.length\n}\nfun g(): Shape = Shape.Line(2)\n---\npackage b\nsealed interface Shape {\n    data object Dot : Shape\n    data class Line(val length: Int) : Shape\n}",
 	)
 	refused(t, [][3]string{
@@ -228,6 +234,9 @@ func TestNames(t *testing.T) {
 		// Section 12: an offset ID written as a literal is outside the subset.
 		{"package a\nimport kogo.time.ZoneId\nfun f(): ZoneId = ZoneId.of(‸\"+05:30\")\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}", "zone-offset", "ZoneId.of takes a region name, such as Australia/Melbourne; offsets are not supported (spec 12)"},
 		{"package a\nimport kogo.time.ZoneId\nfun f(): ZoneId = ZoneId.of(‸\"Z\")\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}", "zone-offset", "offsets are not supported"},
+		// A literal pattern is compiled by Go's regexp at check (spec.md 12).
+		{"package a\nfun f(): Regex = Regex(‸\"a(?=b)\")\n---\npackage kogo\nexternal class Regex\nexternal fun Regex(pattern: String): Regex", "regex-pattern", "Go cannot read this pattern: invalid or unsupported Perl syntax: `(?=`. A Regex's pattern is Go's, not Kotlin's: write it in Go's syntax (spec 12)"},
+		{"package a\nfun f(): Regex = Regex(‸\"\"\"(a)\\1\"\"\")\n---\npackage kogo\nexternal class Regex\nexternal fun Regex(pattern: String): Regex", "regex-pattern", "invalid escape sequence: `\\1`"},
 		{"package a\nimport ‸kogo.time.seconds\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int", "member-import", "seconds is a member, in scope wherever a value of its receiver's type is: remove this import"},
 		// Section 13: only the prelude declares bindings, and an
 		// external object holds funs.
@@ -242,6 +251,21 @@ func TestNames(t *testing.T) {
 		{"package a\nimport c.P\nimport c.make\nfun f(): P = make().‸copy(n = 2)\n---\npackage c\ndata class P internal constructor(val n: Int)\nfun make(): P = P(1)", "not-visible", "P's constructor is internal to package c"},
 		{"data class P(val n: Int)\n‸typealias P = Int", "duplicate", "package t already declares P: rename one"},
 		{"val n: Int = 1\n---\npackage t\n‸val n: Int = 2", "duplicate", "already declares n"},
+		{"data class Area(val n: Int)\n---\npackage t\n‸private data class Area(val code: String)", "duplicate", "already declares Area"},
+		{"private val n: Int = 1\n---\npackage t\n‸val n: Int = 2", "duplicate", "already declares n"},
+		{"val n: Int = 1\n---\npackage t\nprivate ‸val n: Int = 2", "duplicate", "already declares n"},
+		{"private val n: Int = 1\nprivate ‸val n: Int = 2", "duplicate", "already declares n"},
+		{"private val n: Int = 1\n---\npackage t\nprivate val n: Int = 2\nprivate ‸val n: Int = 3", "duplicate", "already declares n"},
+		// A name is written bare, an import names a top-level name, and
+		// an extension is imported by its own.
+		{"package a\nfun f(): Int = ‸b.g()\n---\npackage b\nfun g(): Int = 1", "unknown-name", "a package is not written in code: import b.g and write g"},
+		{"package a\nfun f(): Int = ‸b.O.Ok(1).n\n---\npackage b\nsealed interface O {\n    data class Ok(val n: Int) : O\n}", "unknown-name", "import b.O and write O.Ok"},
+		{"package a\nimport ‸b.Shape.Dot\n---\npackage b\nsealed interface Shape {\n    data object Dot : Shape\n}", "unknown-import", "no package b.Shape: import b.Shape and write Shape.Dot"},
+		{"package a\nfun f(): Int = 2.‸twice()\n---\npackage b\nfun Int.twice(): Int = this * 2", "unknown-name", "a Int has no function twice: add import b.twice"},
+		{"package a\nfun f(): Int = 2.‸twice()\n---\npackage b\nfun String.twice(): String = this\n---\npackage c\nfun Int.twice(): Int = this * 2", "unknown-name", "a Int has no function twice: add import c.twice"},
+		{"package a\nimport b.PRow\nfun f(): PRow = ‸PRow(1)\n---\npackage b\ndata class Row(val n: Int)\ntypealias PRow = Row", "unknown-name", "PRow is a typealias, which builds nothing: write Row, the type's own name"},
+		{"package a\nfun f(): Int = ‸PRow(1).n\n---\npackage b\ndata class Row(val n: Int)\ntypealias PRow = Row", "unknown-name", "PRow is a typealias, which builds nothing: write Row"},
+		{"package a\nfun f(x: ‸b.P): Int = 1\n---\npackage b\ndata class P(val n: Int)", "unknown-name", "a package is not written in code: import b.P and write P"},
 		{"package a\nimport b.g\nimport ‸c.g\n---\npackage b\nfun g(): Int = 1\n---\npackage c\nfun g(): Int = 2", "duplicate", "g is already imported from package b"},
 		// Section 6: the scope functions that do not exist.
 		{"fun f(x: Int): Int = x.‸apply { 1 }", "kotlin-scope-function", "name the value and call it"},
@@ -282,17 +306,30 @@ func TestImportAs(t *testing.T) {
 		{"package a\nimport b.Area as g\nimport ‸b.g" + rows, "duplicate", "g is already imported from package b"},
 		{"package a\nimport b.g\nimport ‸b.Area as g" + rows, "duplicate", "g is already imported from package b"},
 		{"package a\nimport b.Area as R\nfun f(): R = ‸Area(1, \"x\")" + rows, "unknown-name", "Area is not in scope"},
+		{"package a\nimport b.Area as R\ndata class Area(val label: String)\nfun f(r: R?): Area? = ‸r" + rows, "type-mismatch", "this is a b.Area? where a a.Area? is wanted"},
 	})
 }
 
-// A program's file is not the prelude's for claiming its package.
+// A program's file is not the prelude's for claiming its package, and
+// a program's package is not kogo or under it (spec.md 2).
 func TestBindingsOnlyInPrelude(t *testing.T) {
-	f, err := syntax.Parse("p.kg", []byte("package kogo\nexternal class Box\n"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, errs := Check(nil, []*syntax.File{f}, nil); len(errs) != 1 || errs[0].Code != "external" {
-		t.Errorf("got %v, want one external error", errs)
+	for src, want := range map[string][]string{
+		"package kogo\nexternal class Box\n":  {"kogo-package", "external"},
+		"package kogo.time\nval n: Int = 1\n": {"kogo-package"},
+		"package shop.kogo\nval n: Int = 1\n": nil,
+	} {
+		f, err := syntax.Parse("p.kg", []byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, errs := Check(nil, []*syntax.File{f}, nil)
+		var got []string
+		for _, e := range errs {
+			got = append(got, e.Code)
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s\n got %v, want %v", src, errs, want)
+		}
 	}
 }
 
@@ -424,6 +461,10 @@ func TestTypes(t *testing.T) {
 		"interface I {\n    fun card(key: Int): Int\n}\nfun <T> card(i: I, key: T, n: Int = 0): T = key",
 	)
 	refused(t, [][3]string{
+		// Section 3.2: only a sealed interface holds types, its variants.
+		{"interface GoogleMaps {\n    ‸data class Place(val id: String)\n}", "nested-type", "declare Place at the top level"},
+		{"sealed interface O {\n    data class Ok(val id: Int) : O\n    ‸data class Note(val text: String)\n}", "nested-type", "O.Note is not a variant of O"},
+		{"interface I {\n    ‸typealias N = Int\n}", "nested-type", "a typealias is declared at the top level"},
 		{"fun f(n: Int): Long = ‸n", "type-mismatch", "this is a Int where a Long is wanted: write .toLong()"},
 		{"fun f(n: Long): Int = ‸n", "type-mismatch", "write .toInt()"},
 		{"fun f(): Double = ‸1", "type-mismatch", "this is a Int where a Double is wanted: write .toDouble()"},
@@ -469,6 +510,8 @@ func TestTypes(t *testing.T) {
 		{"val n: Long = ‸-9223372036854775808", "number-range", "even after a minus"},
 		{"interface I {\n    ‸fun <T> card(key: T): Int\n}", "interface-fun", "make card a top-level fun that takes the value"},
 		{"interface I {\n    fun card(‸key: Int = 0): Int\n}", "interface-fun", "state key at each call, or add a top-level fun that does"},
+		{"interface Texty {\n    ‸fun string(): String\n}", "go-name", "fun string() with no parameter becomes Go's String method"},
+		{"interface I {\n    ‸fun String(): String\n}", "go-name", "fun String() with no parameter becomes Go's String method"},
 	})
 }
 

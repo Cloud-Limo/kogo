@@ -13,9 +13,9 @@ Source files end in `.kg`.
 Where a construct is valid in both Kotlin and Kogo it means the same thing.
 A Kogo file need not compile as Kotlin. A Kogo file imports only from
 its own application and from `kogo.` packages, whose names keep
-Kotlin's, `java.time`'s and Arrow's spelling and meaning:
-`kogo.time.Instant` is `java.time.Instant`, `kogo.test.assertEquals`
-is `kotlin.test.assertEquals`. Kogo has four kinds of
+Kotlin's, `java.time`'s and Arrow's spelling and meaning, but for the
+corners section 12 lists: `kogo.time.Instant` is `java.time.Instant`,
+`kogo.test.assertEquals` is `kotlin.test.assertEquals`. Kogo has four kinds of
 deliberate deviation from Kotlin, its own forms, and kotlinc refuses
 each (`mise run kotlin` holds this). The one exception is a binding
 file of bare `external fun`s, which kotlinc takes for JNI functions;
@@ -39,6 +39,21 @@ import kogo.time.Instant
   A package is the files that share a package line, wherever they lie. An
   import names one declaration of another package; a name of the file's
   own package needs none.
+- In a package, a type, a typealias, a marker and a top-level `val` each
+  take a name no other of them has, in any file, as in Kotlin: `private`
+  limits who may name a declaration, not where its name is taken. Two
+  `private val`s in two files do not meet, as two `private fun`s do not
+  (5.2). Funs share names (5.2), and a fun may be named for a type or a
+  val. Two names of a package that differ only in the case of the first
+  letter may be one name in Go; `kogo emit` refuses them. `kogo check`
+  refuses an interface's `fun string()` or `fun String()` with no
+  parameter, which would be Go's `String` method, so a template would
+  write what it returns instead of its data class's text.
+- A name is written as it is declared or imported, never with its
+  package: `cusoon.model.Booking` in code is an error. An import names a
+  top-level name and brings every declaration of it; a nested type comes
+  with its outer one, `import shop.Outcome` and then `Outcome.Ok`. An
+  extension is imported by its own name.
 - `import cusoon.schema.Area as AreaRow` gives the declaration another
   name in this file, as in Kotlin: the file writes `AreaRow`, also for its
   constructor, constants and variants. Any import may take one, a `kogo.`
@@ -61,7 +76,9 @@ import kogo.time.Instant
 - Comments: `//`, `/* */` and `/** */`. KDoc is kept as a comment.
 - The declarations of package `kogo` (section 12, and the functions of
   sections 8 and 9) are in scope in every file. The prelude's other
-  packages, as `kogo.time`, are imported by name.
+  packages, as `kogo.time`, are imported by name. A program's package is
+  not `kogo` or under it. A package's own type or val is meant before one
+  of package `kogo` or a built-in type, as in Kotlin.
 - A file named `_test.kg` is a test file (section 16). It is in its
   package as any file is, but only a test file may name what one
   declares, or import from `kogo.test`.
@@ -174,7 +191,8 @@ sealed interface Outcome<out T> {
 ```
 
 The variants are data classes or `data object`s nested in the body or
-declared in the same file. A nested one is named in full everywhere,
+declared in the same file. Only a sealed interface holds types, and each
+implements it. A nested one is named in full everywhere,
 `Outcome.Ok`, also inside the body, where Kotlin allows `Ok`. `out` on a
 type parameter of a sealed interface
 is the only variance annotation in the language, a binding's external
@@ -212,14 +230,17 @@ though Kotlin allows both: make it a top-level fun that takes the value,
 or state the argument at each call. Only
 data classes and `data object`s implement interfaces. A `data object` has no
 constructor to implement a `val` in, so it implements only interfaces
-that declare `fun`s alone. There are no other
+that declare `fun`s alone. An interface holds no types: declare each at
+the top level. There are no other
 classes, no inheritance, no `object`, no `companion object`, no anonymous
 `object :` expressions. Use a lambda where Kotlin would use an anonymous
 object.
 
 ### 3.5 Typealias
 
-`typealias Cents = Long` is transparent, as in Kotlin.
+`typealias Cents = Long`: an alias stands where a type is written; a
+value is built, and a constant or a variant named, by the type's own
+name.
 
 ## 4. Absence
 
@@ -369,6 +390,8 @@ interface `fun` before an extension of the same name.
 - `val` everywhere. `var` only for locals inside a function body.
   Top-level `val` and `const val` hold constants; there is no top-level
   `var` and no other global state.
+- A local hides a name declared outside it, an outer block's local and a
+  type's name included, as in Kotlin.
 - A top-level `val`'s value may not refer to the `val` itself, or to a
   `val` declared below it in its file, directly or through the `val`s
   and functions it refers to. A reference counts wherever it is
@@ -543,6 +566,10 @@ units, panics with `Requested character count <n> is less than zero.`
 `Range [<start>, <end>) out of bounds for length <length>`, where
 `substring(start)` ends at the string's length
 (`"abc".substring(5, 3)`: `Range [5, 3) out of bounds for length 3`).
+A `when` that must cover every case (section 6) and has no `else`
+panics, as Kotlin's throws, on a value none of its branches names, with
+`when: no branch for <type> <value>` (`when: no branch for InviteType
+Partner`), whether it is a value or a statement.
 The server catches it at the request boundary, rolls the transaction back,
 logs it and answers 500 (section 15).
 
@@ -743,6 +770,11 @@ or `_`, then letters, digits and `_`, neither a hard keyword such as
 space or a hyphen, has no Kogo type, whatever it fills: rename the label
 in Postgres, or cast the column to text and read it as a `String`.
 
+An enum is read as the label the column holds, unchecked: a label the
+program's enum lacks, one a migration added while an older program
+runs, is passed on and compared with `==` as any other, and a `when`
+over it panics (section 8).
+
 A parameter's Kogo type must map to the type Postgres infers for it. When
 Postgres cannot infer one, cast it: `$active::boolean`. A parameter or a
 result column of a type that is not in the table is a compile error: cast
@@ -756,7 +788,9 @@ hours. What Postgres holds and the Kogo type does not is a panic when
 it is read (section 8): `infinity` in a `timestamptz` or a `date`,
 `24:00` in a `time`, and an `interval` with months, which has no fixed
 length. A `Duration` too long for an `interval`'s microseconds is a
-panic when it is sent. A `Decimal` holds `NaN` and `Infinity` as well
+panic when it is sent, and so is an `Instant` or a `LocalDate` past
+Postgres's range: -4713-11-24 to +294276-12-31 for a `timestamptz`,
+to +5874897-12-31 for a `date`. A `Decimal` holds `NaN` and `Infinity` as well
 as numbers, and a zero keeps its scale: `0.00`. An empty `List` is sent as an
 empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
 `bytea`.
@@ -958,15 +992,30 @@ There are no mutable collections, sequences or arrays. Build a list with
 `equals(other, ignoreCase = true)`, `filter`, `filterNot`, `map` (over
 `Char`), and on `Char`: `isWhitespace`, `isDigit`, `digitToInt`.
 `Regex(pattern)` with `matches`, `containsMatchIn`, `find` and
-`String.replace(regex, text)`; the pattern syntax is RE2 (no
-lookaround, no backreferences). Case conversion never reads a
-locale.
+`String.replace(regex, text)`; the pattern is read as Go's `regexp`
+reads it (RE2), and nothing of Kotlin's is promised for it. Case
+conversion never reads a locale.
 
 **Where the prelude differs from Kotlin.** A name that Kotlin has means
 what Kotlin's means in ordinary use. The corners where it does not are
-all listed here:
+all listed here, but for a `Regex`'s pattern, whose list is what we know
+and not a promise that it is all:
 
-- `Regex` takes RE2 patterns: no lookaround and no backreferences.
+- A `Regex`'s pattern is Go's, not Kotlin's. One Go cannot read
+  (lookaround, a backreference, a possessive repeat) is refused at
+  `kogo check` with `regex-pattern` when it is a string literal with no
+  template in it, and otherwise panics when the `Regex` is made. One
+  both read may mean something else in each:
+
+  | Pattern | Input | Kotlin | Kogo |
+  | -- | -- | -- | -- |
+  | `a.c` matches | `a\rc` | false | true: `.` stops only at `\n`; Kotlin's also at `\r`, U+0085, U+2028, U+2029 |
+  | `\s` matches | U+000B | true | false |
+  | `(?i)k` matches | U+212A | false | true: Go folds case by Unicode, Kotlin by ASCII |
+  | `[[:alpha:]]` matches | `z` | false | true: a POSIX class in Go, a nested class in Kotlin |
+  | `[a-c&&[b]]` matches | `a]` | false | true: Kotlin's `&&` intersects; Go reads the characters |
+  | `(?U)\w` matches | `é` | true | false: Kotlin's Unicode classes; Go's ungreedy flag |
+  | replace `$` with `!` | `ab\n` | `ab!\n!` | `ab\n!`: Kotlin's `$` also stands before a final line break |
 - A `String` never holds half of a surrogate pair (section 3).
 - `lowercase()` does not read the letters either side: a final `Σ`
   becomes `σ` where Kotlin's is `ς`.
@@ -1347,6 +1396,10 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `==` on a value that holds a function, as `rule == rule` | compare the other properties |
 | two funs of one name imported from two packages | `import ... as` on one |
 | an import of a name the file's own package declares | `import ... as`, or rename one |
+| `a.b.Name` written in code | import it and write `Name` |
+| `import a.b.Outer.Inner` | `import a.b.Outer`, and write `Outer.Inner` |
+| a constructor or a constant through a typealias, `PRow(1)` | the type's own name |
+| a type nested in an interface as a namespace, `GoogleMaps.Place` | a top-level type, `GoogleMapsPlace` |
 
 ## 15. Operations
 

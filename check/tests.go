@@ -49,7 +49,7 @@ func (c *checker) testLists(program []*syntax.File) {
 			want := &Named{test, []Type{l.Env}}
 			for _, id := range d.Vals {
 				v := own[id.Name]
-				switch g := c.pkg.vals[id.Name]; {
+				switch g := c.val(c.pkg, id.Name); {
 				case v == nil || g == nil || g.Decl != v:
 					c.errorf(id, "test", "%s is no top-level val of this file: a tests list names the tests of its own file, each as val %s = test(\"what it shows\") { tx, env -> ... } (spec.md 16.1)", id.Name, id.Name)
 				case c.tested[v] != nil:

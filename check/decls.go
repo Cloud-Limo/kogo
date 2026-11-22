@@ -38,6 +38,9 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 	for i, f := range files {
 		order[f.Name] = i
 		c.enter(f, c.pkgOf(f.Package.Name))
+		if name := f.Package.Name; i >= len(prelude) && (name == "kogo" || strings.HasPrefix(name, "kogo.")) {
+			c.errorf(f.Package, "kogo-package", "package %s is the prelude's, and a program's package is not kogo or under it (spec.md 2): rename it", name)
+		}
 		for _, d := range f.Decls {
 			if i >= len(prelude) && external(d) {
 				c.errorf(d, "external", "only the prelude declares bindings (spec.md 13): give this a body in Kogo")
@@ -115,6 +118,21 @@ type pkg struct {
 	aliases map[string]*alias
 	funcs   map[string][]*Func // funs and extension vals
 	vals    map[string]*Var
+	privs   map[privKey]*Var // each file's private vals (spec.md 2)
+}
+
+type privKey struct {
+	file *syntax.File
+	name string
+}
+
+// val gives the top-level val called name that the file at hand
+// means in p: its own private one first.
+func (c *checker) val(p *pkg, name string) *Var {
+	if v := p.privs[privKey{c.file, name}]; v != nil {
+		return v
+	}
+	return p.vals[name]
 }
 
 type alias struct {
@@ -127,7 +145,7 @@ type alias struct {
 
 func (c *checker) pkgOf(name string) *pkg {
 	if c.pkgs[name] == nil {
-		c.pkgs[name] = &pkg{name, map[string]*TypeDecl{}, map[string]*TypeDecl{}, map[string]*alias{}, map[string][]*Func{}, map[string]*Var{}}
+		c.pkgs[name] = &pkg{name, map[string]*TypeDecl{}, map[string]*TypeDecl{}, map[string]*alias{}, map[string][]*Func{}, map[string]*Var{}, map[privKey]*Var{}}
 	}
 	return c.pkgs[name]
 }
@@ -208,6 +226,35 @@ func (c *checker) missing(at syntax.Node, name string) Type {
 	return c.errorf(at, "unknown-name", "nothing named %s is declared here, in package %s or in the prelude", name, c.pkg.name)
 }
 
+// packaged reports a name written with its package, b.g or b.O.Ok,
+// in code: see prefixed.
+func (c *checker) packaged(e *syntax.Select) bool {
+	name, x := e.Name, e.X
+	for s, ok := x.(*syntax.Select); ok; s, ok = x.(*syntax.Select) {
+		name, x = s.Name+"."+name, s.X
+	}
+	id, ok := x.(*syntax.Ident)
+	return ok && c.prefixed(id, id.Name+"."+name)
+}
+
+// prefixed reports a dotted name, in code or as a type, whose head
+// names nothing in scope and whose front is a package: Kogo writes it
+// bare, imported.
+func (c *checker) prefixed(at syntax.Node, name string) bool {
+	head, _, _ := strings.Cut(name, ".")
+	if c.scope.lookup(head) != nil || slices.ContainsFunc(c.homes(head), func(p *pkg) bool { return p.named(head) != nil }) {
+		return false
+	}
+	for i := strings.LastIndexByte(name, '.'); i > 0; i = strings.LastIndexByte(name[:i], '.') {
+		if c.pkgs[name[:i]] != nil {
+			next, _, _ := strings.Cut(name[i+1:], ".")
+			c.errorf(at, "unknown-name", "a package is not written in code: import %s.%s and write %s", name[:i], next, name[i+1:])
+			return true
+		}
+	}
+	return false
+}
+
 // visible reports whether the file at hand may name a declaration.
 func (c *checker) visible(v vis) bool {
 	if v.file != nil && v.file.IsTest() && !c.file.IsTest() {
@@ -251,11 +298,14 @@ func (c *checker) importAll(f *syntax.File) {
 			continue
 		}
 		from, name, local := c.pkgs[imp.Name[:i]], imp.Name[i+1:], imp.Local()
+		j := max(strings.LastIndexByte(imp.Name[:i], '.'), 0) // before a nested type's outer one
 		switch {
 		case from != nil && testOnly[from.name] && !f.IsTest():
 			c.errorf(imp, "test-import", "package %s is for test files, those named _test.kg: move what uses %s into one (spec.md 16)", from.name, name)
 		case from == nil && c.kotlinFix(imp.Name[:i], name) != "":
 			c.errorf(imp, "unknown-import", "there is no package %s in Kogo: %s", imp.Name[:i], c.kotlinFix(imp.Name[:i], name))
+		case from == nil && c.pkgs[imp.Name[:j]] != nil:
+			c.errorf(imp, "unknown-import", "there is no package %s: import %s and write %s", imp.Name[:i], imp.Name[:i], imp.Name[j+1:])
 		case from == nil:
 			c.errorf(imp, "unknown-import", "there is no package %s", imp.Name[:i])
 		case from.named(name) == nil && slices.ContainsFunc(c.members[name], func(f *Func) bool { return f.Pkg == from.name }):
@@ -285,7 +335,7 @@ func (c *checker) importAll(f *syntax.File) {
 // renamed gives what an import with as brings: what from declares as
 // name, and the types nested in it, under the name local.
 func renamed(from *pkg, name, local string) *pkg {
-	return &pkg{from.name, rename(from.types, name, local), rename(from.objects, name, local), rename(from.aliases, name, local), rename(from.funcs, name, local), rename(from.vals, name, local)}
+	return &pkg{from.name, rename(from.types, name, local), rename(from.objects, name, local), rename(from.aliases, name, local), rename(from.funcs, name, local), rename(from.vals, name, local), nil}
 }
 
 func rename[V any](from map[string]V, name, local string) map[string]V {
@@ -374,8 +424,14 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 			c.pkg.types[td.Name] = td
 		}
 		for _, m := range d.Body {
-			if nested, ok := m.(*syntax.ClassDecl); ok {
-				c.declare(nested, td.Name+".")
+			switch m := m.(type) {
+			case *syntax.ClassDecl:
+				if d.Kind != "sealed interface" {
+					c.errorf(m, "nested-type", "only a sealed interface holds types, its variants (spec.md 3.2): declare %s at the top level", m.Name)
+				}
+				c.declare(m, td.Name+".")
+			case *syntax.TypeAlias:
+				c.errorf(m, "nested-type", "a typealias is declared at the top level: move %s out of %s", m.Name, d.Name)
 			}
 		}
 		c.later(&c.sigs, func() { c.class(td) })
@@ -408,8 +464,14 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 		default:
 			g := &Var{Kind: Global, Name: d.Name, Decl: d, vis: v}
 			c.info.Vars[d] = []*Var{g}
-			if !taken(d.Name) {
+			// Two private vals of two files do not meet (spec.md 2).
+			if u := c.pkg.vals[d.Name]; u != nil && v.visibility == "private" && u.visibility == "private" && u.file != c.file && c.pkg.privs[privKey{c.file, d.Name}] == nil {
+				c.pkg.privs[privKey{c.file, d.Name}] = g
+			} else if !taken(d.Name) {
 				c.pkg.vals[d.Name] = g
+				if v.visibility == "private" {
+					c.pkg.privs[privKey{c.file, d.Name}] = g
+				}
 			}
 			c.later(&c.sigs, func() {
 				g.markers = c.marks(d.Mods)
@@ -696,6 +758,11 @@ func (c *checker) class(td *TypeDecl) {
 			}
 		}
 	}
+	if i := strings.LastIndexByte(td.Name, '.'); i >= 0 {
+		if o := c.pkg.types[td.Name[:i]]; o != nil && o.Kind == "sealed interface" && !slices.ContainsFunc(td.Supers, func(s *Named) bool { return s.Decl == o }) {
+			c.errorf(d, "nested-type", "%s is not a variant of %s, and only its variants are nested in it (spec.md 3.2): add : %s, or declare %s at the top level", td.Name, o.Name, o.Name, d.Name)
+		}
+	}
 	for _, p := range d.Params {
 		v := &Var{Kind: Property, Name: p.Name, Type: c.typ(p.Type), Owner: td, Decl: p}
 		v.markers = c.marks(syntax.Modifiers{Annotations: p.Marks})
@@ -742,6 +809,9 @@ func (c *checker) class(td *TypeDecl) {
 				f.Kind = Method
 				if m.TypeParams != nil {
 					c.errorf(m, "interface-fun", "an interface's fun takes no type parameters (spec.md 3.4): make %s a top-level fun that takes the value", m.Name)
+				}
+				if (m.Name == "string" || m.Name == "String") && len(m.Params) == 0 {
+					c.errorf(m, "go-name", "an interface's fun %s() with no parameter becomes Go's String method, which writes a value's text: rename it", m.Name)
 				}
 				for _, p := range m.Params {
 					if p.Default != nil {
@@ -940,6 +1010,8 @@ func (c *checker) named(at syntax.Node, name string) (Type, []*TypeParam) {
 	} else if d != nil {
 		c.see(at, name, d.vis)
 		return self(d), d.Params
+	} else if c.prefixed(at, name) {
+		return unknown, nil
 	}
 	return c.missing(at, name), nil
 }

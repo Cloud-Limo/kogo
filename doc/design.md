@@ -26,7 +26,9 @@ constraints) is worth typing.
      compile as Kotlin. Where Kogo wants another behaviour it takes
      another name: Kotlin's own, where Kotlin has one
      (`Uuid.parseOrNull`). The rare corners listed in spec 12, which
-     `mise run kotlin` holds, stay allowed.
+     `mise run kotlin` holds, stay allowed. `Regex` is the stated
+     exception, to this and to the subset below: the name and its
+     functions are Kotlin's, the pattern language is Go's (spec 12).
    - Kogo is a subset of Kotlin and `java.time`, never a difference.
      Where Kogo stops short of a name's inputs, it refuses: at `kogo
      check` where it can, else a panic naming the limit. It never gives

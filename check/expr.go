@@ -213,7 +213,11 @@ func (c *checker) mismatch(at syntax.Node, got, want Type) {
 	case number(got) && number(want):
 		fix = ": write .to" + want.String() + "()"
 	}
-	c.errorf(at, "type-mismatch", "this is a %s where a %s is wanted%s", got, want, fix)
+	g, w := got.String(), want.String()
+	if gd, wd := named(nonNull(got)), named(nonNull(want)); g == w && gd != wd && gd != nil && wd != nil {
+		g, w = gd.Pkg+"."+g, wd.Pkg+"."+w // two types of one name
+	}
+	c.errorf(at, "type-mismatch", "this is a %s where a %s is wanted%s", g, w, fix)
 }
 
 func (c *checker) expr1(e syntax.Expr, want Type) Type {
@@ -359,7 +363,7 @@ func (c *checker) ident(e *syntax.Ident) Type {
 		}
 	}
 	for _, p := range c.homes(e.Name) {
-		if v := p.vals[e.Name]; v != nil {
+		if v := c.val(p, e.Name); v != nil {
 			c.see(e, e.Name, v.vis)
 			c.demand(e, e.Name, v.vis)
 			c.info.Uses[e] = v
@@ -514,6 +518,9 @@ func (c *checker) sel(e *syntax.Select) Type {
 			return c.errorf(e, "unknown-name", "%s has no constant %s: its constants are %s", q, e.Name, strings.Join(names, ", "))
 		}
 		return c.errorf(e, "unknown-name", "%s has nothing named %s that is a value", q, e.Name)
+	}
+	if c.packaged(e) {
+		return unknown
 	}
 	rt := c.expr(e.X, nil)
 	if rt == unknown {

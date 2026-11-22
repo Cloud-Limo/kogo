@@ -158,18 +158,24 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   otherwise hands the PR to the lead. Greg does not review Kogo's PRs
   on GitHub: review is the Code review step.
 - **Async runs.** The lead or the clerk starts one with `lin launch
-  DEV-NNN < brief.md`, which posts the launch comment and then adds
-  the `agent` label; Greg may add or remove the label too. A run has
+  DEV-NNN < brief.md`, the brief's first line `Start: <step> · async ·
+  <directive>`: it posts the `Start:` with the brief under it, then
+  adds the `agent` label; Greg may add or remove the label too. The
+  launcher takes the issue's newest async `Start:` as the brief, so a
+  note posted after it changes nothing. A run has
   no Linear access and its clone is its worktree. It clones the
   repository of its issue's project: Kogo for Kogo, cusoon2 for any
   other. Work that lands in another repository than its issue's
   project's runs as a local run.
-  Post the step's comment on the PR yourself, under the marker line the
-  run's prompt gives, and write the same, in full, as the run's
-  `answer.md`. The wrapper posts on the issue the first line when the
-  PR has that text, and `answer.md` whole when not: what an interrupted
-  run leaves behind. A review or fix run leaves its tree clean: whatever
-  is left is pushed to the PR's branch. No run merges.
+  Write the step's comment, in full, as the run's `answer.md`, and post
+  it with `agent-step < answer.md`: it refuses a first line that does
+  not fit its word, as `lin step` does, and posts on the PR the line
+  names with the run's marker line last. The wrapper posts on the
+  issue the first line when the PR has that text, and `answer.md`
+  whole when not: what an interrupted run leaves behind. Its own
+  comment begins `Answer:` for a run that is no step, `Failed:` for
+  one that ended with no answer. A review or fix run leaves its tree
+  clean: whatever is left is pushed to the PR's branch. No run merges.
 - **Local runs.** A step that needs this VM, a stack or the other
   repository runs here as a headless session: the lead or the clerk
   starts it with `lin local DEV-NNN <where> "<phrase>"`, which returns
@@ -187,7 +193,7 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   `lin local --list` shows each one running, with its minutes and its
   log.
 - A comment with no PR to hold it stays on the issue in full: a
-  launch comment, a `Start:`, a `Lead:` comment, an answer of Greg's
+  `Start:`, a `Lead:` comment, an answer of Greg's
   given before a PR exists. A `Clerk:` comment does too, PR or none:
   the lead reads the issue.
 - Never rebase or force-push a pushed branch: reviews hold its shas.

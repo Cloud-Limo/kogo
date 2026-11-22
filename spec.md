@@ -212,8 +212,11 @@ extension: `fun <T> Box<T>.put(value: T): Box<T>`.
 enum class InviteType { InHouse, Outside }
 ```
 
-Constants only: no constructor, no body. `.name` gives the constant's name
-and `InviteType.entries` the list of constants.
+Constants only: no constructor, no body. `.name` gives the constant's
+name, `InviteType.entries` the list of constants and
+`InviteType.valueOf(name)` the constant of that name; another name
+panics, as Kotlin's throws, with Kotlin's message, `No enum constant
+shop.InviteType.Other`.
 
 ### 3.4 Interfaces
 
@@ -391,7 +394,10 @@ interface `fun` before an extension of the same name.
   Top-level `val` and `const val` hold constants; there is no top-level
   `var` and no other global state.
 - A local hides a name declared outside it, an outer block's local and a
-  type's name included, as in Kotlin.
+  type's name included, as in Kotlin. It hides a function of its name
+  too, where Kotlin calls the function past a local that cannot be
+  called: with a local `job` that holds an `Int`, `job()` is
+  `not-callable`. Name the local otherwise.
 - A top-level `val`'s value may not refer to the `val` itself, or to a
   `val` declared below it in its file, directly or through the `val`s
   and functions it refers to. A reference counts wherever it is
@@ -975,14 +981,16 @@ no import;
 `mapNotNull`, `flatMap`, `filter`, `filterNot`, `filterNotNull`, `any`,
 `all`, `none`, `count`, `sum`, `sumOf`, `maxOrNull`, `minOrNull`,
 `sortedBy`, `sortedByDescending`, `sorted`, `reversed`, `distinct`,
-`take`, `drop`, `zip`, `plus` (`+`), `groupBy`, `associateBy`,
-`associate`, `toSet`, `toList`, `joinToString`, `forEach`,
-`keys`, `values`, `listOfNotNull`. A `Map` and a `Set` iterate in
-insertion order and compare keys as `==` does, by value, so any type may
-be a key.
+`distinctBy`, `take`, `drop`, `zip`, `plus` (`+`), `groupBy`,
+`associateBy`, `associate`, `toSet`, `toList`, `joinToString`,
+`forEach`, `keys`, `values`, `listOfNotNull`. A `Map` and a `Set`
+iterate in insertion order and compare keys as `==` does, by value, so
+any type may be a key.
 
 There are no mutable collections, sequences or arrays. Build a list with
 `map`/`filter`/`+`, or accumulate into a local `var` of an immutable list.
+
+**Enums.** `valueOf(name)`, as section 3.3 says.
 
 **Strings.** `length`, `isEmpty`, `isBlank`, `isNotBlank`, `ifEmpty`,
 `ifBlank`, `trim`, `trim(char)`, `trimEnd`,
@@ -1023,6 +1031,10 @@ and not a promise that it is all:
   ends: `"abc".replace(Regex("b*"), "-")` is `"-a-c-"` where Kotlin's is
   `"-a--c-"`. The text is read as Kotlin reads it: `$1` and `${name}`
   are groups, and a backslash takes the next character as it is.
+- `sortedBy` orders by an `Int`, a `Long`, a `Double`, a `String`, a
+  `Char` or a `Boolean`, or one of these that may be null, as Kotlin
+  does. A key of any other type, an enum or a time among them, is
+  refused at `kogo check` with `sort-key`.
 - `trim(char)` takes one `Char`, where Kotlin's takes any number.
 - `split(delimiter)` takes one `String`, where Kotlin's also takes
   several, a `Char`, `ignoreCase` and `limit`.

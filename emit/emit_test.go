@@ -943,6 +943,43 @@ fun start(second: Long): String {
 `)
 }
 
+// An enum's valueOf gives its constant, and panics for another name
+// with Kotlin's message, which names the enum with its package.
+func TestValueOf(t *testing.T) {
+	expect(t, [][2]string{
+		{`t.Pick("green")`, "green true"},
+		{`t.Pick("Green")`, "panics: No enum constant t.Light.Green"},
+	}, `package t
+
+enum class Light { red, green }
+
+fun pick(name: String): String = "${Light.valueOf(name)} ${Light.valueOf(name) == Light.green}"
+`)
+}
+
+// groupBy gives a Map, which keeps its keys in the order first given,
+// is read by map[k], writes itself as Kotlin's does, compares its
+// entries in any order and widens as a List does.
+func TestGroupBy(t *testing.T) {
+	expect(t, [][2]string{
+		{`t.Groups([]int64{3, 1, 4, 1, 5})`, "{1=[3, 1, 1, 5], 0=[4]} [4] null true"},
+		{`t.Groups(nil)`, "{} null null true"},
+		{`t.Wide([]int64{2, 7})`, "{0=[2], 1=[7]} [7]"},
+	}, `package t
+
+fun groups(xs: List<Long>): String {
+    val byParity = xs.groupBy { it % 2L }
+    val evensFirst = xs.filter { it % 2L == 0L } + xs.filter { it % 2L != 0L }
+    return "$byParity ${byParity[0L]} ${byParity[2L]} ${byParity == evensFirst.groupBy { it % 2L }}"
+}
+
+fun wide(xs: List<Long>): String {
+    val m: Map<Long, List<Long?>> = xs.groupBy { it % 2L }
+    return "$m ${m[1L]}"
+}
+`)
+}
+
 // The second firstOrNull and contains sit beside the first.
 func TestOverloads(t *testing.T) {
 	expect(t, [][2]string{

@@ -642,3 +642,43 @@ func testPool(t *testing.T) (context.Context, *pgxpool.Pool) {
 	t.Cleanup(pool.Close)
 	return ctx, pool
 }
+
+// What the Kotlin check (kotlin/README.md) does not reach: Long's
+// least value, a String key ordered by UTF-16 units as Kotlin's, a
+// key Kotlin cannot compare, a list left as it was, and a map
+// compared by its values as well as its keys.
+func TestListCorners(t *testing.T) {
+	if Abs(math.MinInt64) != math.MinInt64 || Abs(-3) != 3 || Long_ToInt(1<<32+5) != 5 {
+		t.Error("abs or toInt is not Kotlin's")
+	}
+	// U+FFFD is one unit above a surrogate, and before an emoji in UTF-8.
+	xs := ListOf("😀", "�", "a")
+	if got := rt.ToString(List_SortedBy(xs, func(s string) string { return s })); got != "[a, 😀, �]" {
+		t.Errorf("sortedBy orders strings as %s", got)
+	}
+	if rt.ToString(xs) != "[😀, �, a]" || List_Reversed(List[int32]{}) == nil || List_SortedBy(List[int32]{}, func(x int32) int32 { return x }) == nil {
+		t.Error("reversed or sortedBy changed its list or gave nil")
+	}
+	if got := rt.ToString(List_DistinctBy(ListOf[int32](1, 2, 3, 4), func(x int32) Pair[bool, *int32] { return Pair[bool, *int32]{x > 2, nil} })); got != "[1, 3]" {
+		t.Errorf("distinctBy gives %s", got)
+	}
+	if got := Set_MapNotNull(SetOf[int32](1, 2, 3), func(x int32) *int32 {
+		if x == 2 {
+			return nil
+		}
+		return rt.Ptr(x * 2)
+	}); !slices.Equal(got, []int32{2, 6}) {
+		t.Errorf("a set's mapNotNull gives %v", got)
+	}
+	a := List_GroupBy(ListOf[int32](1, 2), func(x int32) bool { return x > 1 })
+	b := List_GroupBy(ListOf[int32](1, 3), func(x int32) bool { return x > 1 })
+	if rt.Equal(a, b) || !rt.Equal(a, List_GroupBy(ListOf[int32](2, 1), func(x int32) bool { return x > 1 })) {
+		t.Error("two maps compare by their keys alone, or by their order")
+	}
+	defer func() {
+		if p := recover(); p == nil || !strings.HasPrefix(p.(string), "sortedBy orders by an Int") {
+			t.Errorf("sortedBy by a list panics with %v", p)
+		}
+	}()
+	List_SortedBy(ListOf[int32](1, 2), func(x int32) List[int32] { return ListOf(x) })
+}

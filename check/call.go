@@ -63,6 +63,11 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 				return unknown
 			} else if o := c.findObject(q); o != nil {
 				cands = slices.DeleteFunc(slices.Clone(o.Methods), func(f *Func) bool { return f.Name != name })
+			} else if d, _ := c.findType(q); d != nil && d.Kind == "enum class" && name == "valueOf" {
+				if d.valueOf == nil {
+					d.valueOf = &Func{Kind: ValueOf, Name: name, Params: []*Var{{Kind: Param, Name: "value", Type: tString}}, Result: self(d), Owner: d, vis: d.vis}
+				}
+				cands = []*Func{d.valueOf}
 			}
 			if len(cands) == 0 {
 				c.loose(e.Args, nil)
@@ -121,6 +126,7 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 		c.fails(e, call)
 		c.zoneOffset(e, call.Func)
 		c.regexPattern(e, call.Func)
+		c.sortKey(e, call)
 		if id, ok := e.Fun.(*syntax.Ident); ok && call.Func.Receiver != nil && c.raised(call.Func.Receiver) == nil {
 			c.narrowedThis(id)
 		}
@@ -159,6 +165,21 @@ func (c *checker) regexPattern(e *syntax.Call, f *Func) {
 			}
 		}
 	}
+}
+
+// sortKey refuses the prelude's sortedBy on a key whose type Kogo
+// does not order (spec.md 12), where Kotlin orders any Comparable and
+// refuses the rest at compile time.
+func (c *checker) sortKey(e *syntax.Call, call *Call) {
+	f := call.Func
+	if f.Pkg != "kogo" || f.Receiver == nil || f.Name != "sortedBy" || len(call.TypeArgs) != 2 || len(e.Args) != 1 {
+		return
+	}
+	k := nonNull(call.TypeArgs[1])
+	if k == unknown || is(k, tInt) || is(k, tLong) || is(k, tDouble) || is(k, tString) || is(k, tChar) || is(k, tBoolean) {
+		return
+	}
+	c.errorf(e.Args[0].Value, "sort-key", "this key is a %s, and sortedBy orders only by an Int, a Long, a Double, a String, a Char or a Boolean, or one of these that may be null: give it one of these, such as a field of the %s (spec 12)", k, k)
 }
 
 // offsetID is java.time's rule for an ID that ZoneId.of reads as an

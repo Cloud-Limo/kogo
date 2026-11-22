@@ -20,6 +20,7 @@ fun constructs(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, 
     "whenConst" -> "${band(n)} ${band(m)} ${band(n * 3)} ${band(m * 3 - 1)} ${bandLong(x)} ${bandLong(y)}"
     "whenString" -> "${word(s)} ${word(t)} ${word(s.take(1))}"
     "whenEnum" -> "${light(lightOf(n))} ${light(lightOf(m))}"
+    "valueOf" -> "${Light.valueOf(listOf("red", "amber", "green", "Red", "")[(n % 5 + 5) % 5])} ${Light.valueOf(lightOf(m)?.name ?: "green")}"
     "whenBoolean" -> "${flag(n > m)} ${flag(s == "")}"
     "whenIs" -> "${shape(shapeOf(n))} ${shape(shapeOf(m))}"
     "whenNullable" -> "${nullable(n.takeIf { it % 3 != 0 })} ${nullable(m.takeIf { it > 0 })}"

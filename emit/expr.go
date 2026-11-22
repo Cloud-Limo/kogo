@@ -523,6 +523,10 @@ func (e *emitter) call(at syntax.Node, c *check.Call, recv *operand, rt check.Ty
 		}
 	case check.ToString:
 		build = func(codes []string) string { return e.rt() + ".ToString(" + codes[0] + ")" }
+	case check.ValueOf:
+		build = func(codes []string) string {
+			return fmt.Sprintf("%s(%s, %s, %q)", e.qualify("kogo", "EnumValueOf"), e.entries(f.Owner), codes[0], f.Owner.Pkg+"."+f.Owner.Name)
+		}
 	case check.Method:
 		build = func(codes []string) string {
 			return codes[0] + "." + export(f.Name) + "(" + strings.Join(codes[1:], ", ") + ")"

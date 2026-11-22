@@ -4296,3 +4296,9 @@ and 7.
   **a named deviation from "`kogo check` is the only gate" (15 Nov 2026)**: Kotlin
   accepts the two names, and moving the refusal into the checker (15 / 4) waits for the
   audit issue DEV-1079, until a file meets one. Reopen when a port meets either.
+- **Five messages on names** (design section 8, DEV-1078): a type mismatch names each
+  type's package only where the two types themselves print alike, not where they differ
+  further in, as `List<Area>` against another `List<Area>`; an extension not imported is
+  named from any package's fun of its name with a receiver, without testing the
+  receiver's type. Not taken: printing a type with its packages all through (about 15
+  lines more), and matching the receiver. Reopen when a port meets either.

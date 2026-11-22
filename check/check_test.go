@@ -448,7 +448,7 @@ func TestTypes(t *testing.T) {
 		"fun f(c: Char, s: String, b: Boolean, u: Unit): String = \"$c $s $b ${f(c, s, !b, Unit)}\" + \"\"\"raw\"\"\"",
 		"typealias Pairs<T> = List<Pair<T, T>>\nfun f(ps: Pairs<Int>): Pair<Int, Int> = ps.first()",
 		"data class P(val a: Int, val b: String = \"\")\nfun f(p: P): P = p.copy(b = p.toString())\nfun g(p: P): Int {\n    val (a, b) = p\n    return a + b.length\n}\nfun h(): Boolean = P(1) == P(b = \"x\", a = 2)",
-		"enum class E { a, b }\nfun f(e: E): String = e.name + E.a.name\nfun g(): List<E> = E.entries",
+		"enum class E { a, b }\nfun f(e: E): String = e.name + E.a.name\nfun g(): List<E> = E.entries\nfun h(s: String): E = E.valueOf(name = s)",
 		"interface I<K> {\n    val label: String\n    fun card(key: K): Int\n}\ndata class D(override val label: String, val n: Int) : I<Int> {\n    override fun card(key: Int): Int = key + n + label.length\n}\ninterface J {\n    fun size(): Int\n}\ndata object O : J {\n    override fun size(): Int = 0\n}\nfun f(i: I<Int>, d: D, j: J): Int = i.card(1) + d.card(2) + i.label.length + j.size() + O.size()",
 		// An out type parameter is given back: in a val, a result, a list, a lambda's parameter.
 		"sealed interface B<out T> {\n    val all: List<T>\n    fun each(f: (T) -> Unit): B<T>\n}",
@@ -488,6 +488,8 @@ func TestTypes(t *testing.T) {
 		{"enum class E { a, b }\nfun f(): E = E.‸c", "unknown-name", "E has no constant c: its constants are a, b"},
 		{"enum class E { a }\nfun f(): E = ‸E", "not-a-value", "E is a type, not a value"},
 		{"enum class E { a }\nfun f(): E = ‸E()", "not-callable", "only a data class is made by calling its name"},
+		{"enum class E { a }\nfun f(): E = E.valueOf(‸1)", "type-mismatch", "this is a Int where a String is wanted"},
+		{"enum class E { a }\nfun f(): E = E.‸values().first()", "unknown-name", "E has no function values"},
 		{"interface I { val label: String }\n‸data class D(val n: Int) : I", "override", "D implements I: give its constructor override val label: String"},
 		{"interface I { val label: String }\n‸data object O : I", "override", "a data object has no constructor to give val label: make O a data class, or label a fun in I"},
 		{"sealed interface B<out T> {\n    fun put(‸value: T): B<T>\n}", "variance", "T is out in B, so a B gives a T back and takes none (spec.md 3.2): remove out, or make put an extension of B<T>"},
@@ -667,6 +669,8 @@ func TestCalls(t *testing.T) {
 		{"fun Int.double(): Int = this * 2\nfun f(): Int = ‸double()", "arguments", "double is called on a value: it is fun Int.double(): Int"},
 		{"fun f(s: String?): Int = s.‸compareTo(\"\")", "nullable", "this String? may be null: write ?.compareTo, or test it for null first"},
 		{"fun f(n: Int): Int = ‸n(1)", "not-callable", "this is a Int, which is not a function"},
+		// Kotlin calls the function job past the local; Kogo's local hides it (spec.md 6).
+		{"fun job(): Int = 1\nfun f(): Int {\n    val job = 2\n    return ‸job() + job\n}", "not-callable", "this is a Int, which is not a function"},
 		{"fun f(g: (Int) -> Int): Int = ‸g(1, 2)", "arguments", "is called with its 1 arguments in order"},
 		{"data class D(val step: () -> Long)\nfun d(n: Long): D = D { n }\nfun f(): Long = d(‸\"s\").step()", "type-mismatch", "this is a String where a Long is wanted"},
 		{"fun f(xs: List<Int>): List<Int> = xs.map ‸{ a, b -> a }", "lambda-parameters", "this lambda names 2 parameters where 1 are passed to it"},

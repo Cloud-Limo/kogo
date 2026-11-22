@@ -12,11 +12,13 @@
 package kogo
 
 import (
+	"cmp"
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
 	"slices"
@@ -240,6 +242,106 @@ func List_Plus[T any](this, elements List[T]) List[T] {
 	return append(append(make(List[T], 0, len(this)+len(elements)), this...), elements...)
 }
 
+// EnumValueOf is an enum's valueOf: its constant of that name, or a
+// panic with Kotlin's message. enum is the enum's name with its
+// package's.
+func EnumValueOf[E ~string](entries []E, name, enum string) E {
+	for _, x := range entries {
+		if string(x) == name {
+			return x
+		}
+	}
+	panic("No enum constant " + enum + "." + name)
+}
+
+func List_IsEmpty[T any](this List[T]) bool { return len(this) == 0 }
+
+func List_MapNotNull[T, R any](this List[T], transform func(T) *R) List[R] {
+	return ListOfNotNull(List_widen(this, transform)...)
+}
+
+// List_SortedBy is stable, and orders keys as Kotlin's compareValues
+// does (compare).
+func List_SortedBy[T, R any](this List[T], selector func(T) R) List[T] {
+	out := slices.Clone(this)
+	slices.SortStableFunc(out, func(a, b T) int {
+		return compare(reflect.ValueOf(selector(a)), reflect.ValueOf(selector(b)))
+	})
+	return List_Plus(out, nil)
+}
+
+// compare orders two keys of one type: null first, then by Kotlin's
+// compareTo, for a number, a String (by UTF-16 units), a Char or a
+// Boolean. Any other key is outside Kogo's subset (spec.md 12).
+func compare(a, b reflect.Value) int {
+	if a.Kind() == reflect.Pointer {
+		if a.IsNil() || b.IsNil() {
+			return cmp.Compare(boolInt(!a.IsNil()), boolInt(!b.IsNil()))
+		}
+		return compare(a.Elem(), b.Elem())
+	}
+	switch a.Type() {
+	case reflect.TypeFor[int32](), reflect.TypeFor[int64]():
+		return cmp.Compare(a.Int(), b.Int())
+	case reflect.TypeFor[rt.Char]():
+		return cmp.Compare(a.Uint(), b.Uint())
+	case reflect.TypeFor[bool]():
+		return cmp.Compare(boolInt(a.Bool()), boolInt(b.Bool()))
+	case reflect.TypeFor[string]():
+		return slices.Compare(units(a.String()), units(b.String()))
+	case reflect.TypeFor[float64](): // NaN last and -0.0 before 0.0, as Java's
+		x, y := a.Float(), b.Float()
+		if x != x || y != y {
+			return cmp.Compare(boolInt(x != x), boolInt(y != y))
+		}
+		return cmp.Or(cmp.Compare(x, y), cmp.Compare(boolInt(math.Signbit(y)), boolInt(math.Signbit(x))))
+	}
+	panic("sortedBy orders by an Int, a Long, a Double, a String, a Char or a Boolean, or one of these that may be null (spec 12)")
+}
+
+func boolInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// List_DistinctBy keeps the first element of each key, comparing keys
+// as == does.
+func List_DistinctBy[T, K any](this List[T], selector func(T) K) List[T] {
+	var seen ordered[K]
+	out := List[T]{}
+	for _, x := range this {
+		if k := selector(x); seen.index(k) < 0 {
+			seen.add(k)
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+func List_Reversed[T any](this List[T]) List[T] {
+	out := List_Plus(this, nil)
+	slices.Reverse(out)
+	return out
+}
+
+// List_GroupBy keeps the keys in the order first given, and each
+// key's elements in the list's order.
+func List_GroupBy[T, K any](this List[T], keySelector func(T) K) Map[K, List[T]] {
+	var m Map[K, List[T]]
+	for _, x := range this {
+		k := keySelector(x)
+		if i := m.index(k); i >= 0 {
+			m.values[i] = append(m.values[i], x)
+		} else {
+			m.add(k)
+			m.values = append(m.values, List[T]{x})
+		}
+	}
+	return m
+}
+
 // ordered holds each key once, in the order first given, comparing
 // keys as == does (decisions.md). Set is built on it, and Map is to be
 // built on it, with a value beside each key. A lookup walks the keys.
@@ -279,6 +381,44 @@ func SetOf[T any](elements ...T) Set[T] {
 }
 
 func Set_Contains[T any](this Set[T], element T) bool { return this.index(element) >= 0 }
+
+func Set_MapNotNull[T, R any](this Set[T], transform func(T) *R) List[R] {
+	return List_MapNotNull(this.keys, transform)
+}
+
+// A Map holds a value beside each key. Its Keys for == are its
+// entries, so that two maps are equal when they hold the same entries
+// in any order, as in Kotlin.
+type Map[K, V any] struct {
+	rt.Unordered
+	ordered[K]
+	values []V
+}
+
+func (m Map[K, V]) entries() List[Pair[K, V]] {
+	return List_MapIndexed(m.keys, func(i int32, k K) Pair[K, V] { return Pair[K, V]{k, m.values[i]} })
+}
+
+func (m Map[K, V]) Keys() reflect.Value { return reflect.ValueOf(m.entries()) }
+
+// String is Kotlin's text of a map: {a=1, b=2}.
+func (m Map[K, V]) String() string {
+	return "{" + ListT_JoinToString_String_TToString(m.entries(), nil, func(p Pair[K, V]) string {
+		return rt.ToString(p.First) + "=" + rt.ToString(p.Second)
+	}) + "}"
+}
+
+func Map_widen[K, A, B any](m Map[K, A], f func(A) B) Map[K, B] {
+	return Map[K, B]{ordered: m.ordered, values: List_widen(m.values, f)}
+}
+
+// Map_Get is map[k]: the key's value, or null where it has none.
+func Map_Get[K, V any](this Map[K, V], key K) *V {
+	if i := this.index(key); i >= 0 {
+		return rt.Ptr(this.values[i])
+	}
+	return nil
+}
 
 // A String is a Go string counted as Kotlin counts it, in UTF-16
 // units (spec.md section 3). An operation that would leave half of a
@@ -574,6 +714,15 @@ func expand(b *strings.Builder, re *regexp.Regexp, replacement, s string, m []in
 
 func Int_ToLong(this int32) int64      { return int64(this) }
 func Long_ToDouble(this int64) float64 { return float64(this) }
+func Long_ToInt(this int64) int32      { return int32(this) } // the low 32 bits, as Kotlin's
+
+// Abs of Long's least value is that value, as Kotlin's is.
+func Abs(n int64) int64 {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
 
 // A number's toString is its text in a template, by the same call.
 func Int_ToString(this int32) string       { return rt.ToString(this) }

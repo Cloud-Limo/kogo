@@ -4363,3 +4363,29 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
   interface's fun, its name and its parameters, which the checker sees itself. Not
   taken: the emitter, beside the other three, until DEV-1079 moves them all, which
   would add a refusal outside the only gate and save nothing.
+
+## The job operations' prelude names (DEV-1094), 22 Nov 2026
+
+- **An enum's `valueOf` is the checker's, as `copy` is, not a binding**: no binding can
+  name every enum, so `E.valueOf(name)` resolves to a function the checker makes for `E`,
+  and the emitter calls the prelude's `EnumValueOf` with `E`'s entries. Spec 3.3 names it
+  beside `.name` and `entries`, and section 12 points there. Not taken: naming it in
+  section 12 alone, which holds bindings.
+- **`sortedBy` takes any key type, as `prelude.diff` declares it, and orders at run
+  time** an `Int`, a `Long`, a `Double`, a `String` (by UTF-16 units), a `Char` or a
+  `Boolean`, or a nullable one, null first, as Kotlin's `compareValues`. Any other key
+  panics: Kogo has no bound to say `Comparable`. Not taken: an overload for each key
+  type, as `sumOf` has, about 10 declarations with their Go; or a check that refuses
+  another key, about 15 lines. Reopen when a port sorts by an enum or a time.
+- **A `Map` compares its entries in any order, and writes itself `{k=v}`**, as Kotlin's,
+  on the same `ordered` keys as a `Set`. `for` over a `Map` stays unemitted: no port
+  needs it yet.
+- **`abs` needs no import**, as section 12 lists it with the numbers, where Kotlin's
+  needs `import kotlin.math.abs`, which `kogo check` refuses: a port drops the import.
+  So `kotlin/builtins` has no case for it, kotlinc needing the import; prelude/kogo's
+  test holds it. Not taken: a `kogo.math` package with an import, a name of Kogo's own
+  for one of Kotlin's.
+- **A local hides a function of its name** (lead, 22 Nov 2026): Kotlin calls the
+  function past a local that cannot be called, and Kogo refuses the call,
+  `not-callable`. Spec 6 states it as a limit of the subset; Kogo's behaviour is
+  unchanged.

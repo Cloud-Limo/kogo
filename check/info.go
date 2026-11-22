@@ -106,7 +106,7 @@ type Var struct {
 	Type    Type
 	Mutable bool        // a var
 	Owner   *TypeDecl   // of a Property or an Entry
-	Decl    syntax.Node // nil for an enum's name and entries, and for this
+	Decl    syntax.Node // nil for an enum's name, entries and valueOf's name, and for this
 	vis
 }
 
@@ -119,6 +119,7 @@ const (
 	Constructor                 // of a data class
 	Copy                        // a data class's copy
 	ToString                    // a data class's toString
+	ValueOf                     // an enum's valueOf
 )
 
 // A Func is anything that is called. A Method, an override, a Copy
@@ -133,8 +134,8 @@ type Func struct {
 	Result     Type
 	External   bool        // a binding: Go provides it
 	Action     bool        // an action fun: it changes something outside (spec.md 7.1)
-	Owner      *TypeDecl   // of a Method, a Constructor, a Copy, a ToString, an override and an object's fun
-	Decl       syntax.Node // a *syntax.FunDecl, a *syntax.ValDecl or a *syntax.ClassDecl; nil for Copy and ToString
+	Owner      *TypeDecl   // of a Method, a Constructor, a Copy, a ToString, a ValueOf, an override and an object's fun
+	Decl       syntax.Node // a *syntax.FunDecl, a *syntax.ValDecl or a *syntax.ClassDecl; nil for Copy, ToString and ValueOf
 	vis
 	owners int // how many of TypeParams are the owner's
 }
@@ -153,6 +154,7 @@ type TypeDecl struct {
 	Decl     *syntax.ClassDecl
 	vis
 	copy, toString *Func // made when first called
+	valueOf        *Func // made when first called
 }
 
 // vis is where a declaration lives, who may name it, and the markers

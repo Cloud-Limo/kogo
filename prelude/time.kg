@@ -36,3 +36,9 @@ external fun Instant.isBefore(otherInstant: Instant): Boolean
 external fun Instant.isAfter(otherInstant: Instant): Boolean
 external fun Instant.plus(amountToAdd: Duration): Instant
 external fun Instant.minus(amountToSubtract: Duration): Instant
+
+external val LocalDate.year: Int
+external val LocalDate.monthValue: Int
+external val LocalDate.dayOfMonth: Int
+external val ZonedDateTime.hour: Int
+external val ZonedDateTime.minute: Int

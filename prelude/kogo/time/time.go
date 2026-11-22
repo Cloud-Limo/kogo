@@ -417,3 +417,12 @@ func Instant_Minus(this Instant, d Duration) Instant {
 	}
 	return this.plus(0, -int64(d.Nanos))
 }
+
+func LocalDate_Year(this LocalDate) int32       { return this.Year }
+func LocalDate_MonthValue(this LocalDate) int32 { return this.Month }
+func LocalDate_DayOfMonth(this LocalDate) int32 { return this.Day }
+
+// ZonedDateTime_Hour and ZonedDateTime_Minute read the time in the
+// zone, at the offset in force at the instant.
+func ZonedDateTime_Hour(this ZonedDateTime) int32   { return int32(this.local().Hour()) }
+func ZonedDateTime_Minute(this ZonedDateTime) int32 { return int32(this.local().Minute()) }

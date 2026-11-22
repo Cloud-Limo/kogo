@@ -63,6 +63,11 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 				return unknown
 			} else if o := c.findObject(q); o != nil {
 				cands = slices.DeleteFunc(slices.Clone(o.Methods), func(f *Func) bool { return f.Name != name })
+			} else if d, _ := c.findType(q); d != nil && d.Kind == "enum class" && name == "valueOf" {
+				if d.valueOf == nil {
+					d.valueOf = &Func{Kind: ValueOf, Name: name, Params: []*Var{{Kind: Param, Name: "name", Type: tString}}, Result: self(d), Owner: d, vis: d.vis}
+				}
+				cands = []*Func{d.valueOf}
 			}
 			if len(cands) == 0 {
 				c.loose(e.Args, nil)

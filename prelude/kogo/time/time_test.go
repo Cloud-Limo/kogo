@@ -171,8 +171,8 @@ func TestPostgres(t *testing.T) {
 	}
 }
 
-// Postgres holds a timestamptz from 4714-11-24 BC to 294276, and a
-// date to 5874897: the last value at each end is stored as itself,
+// Postgres holds a timestamptz from -4713-11-24 to +294276-12-31, and
+// a date to +5874897-12-31: the last value at each end is stored as itself,
 // and the first past it is an error with nothing stored, never a
 // time the driver's microseconds or days wrapped round to.
 func TestPostgresRange(t *testing.T) {
@@ -189,6 +189,7 @@ func TestPostgresRange(t *testing.T) {
 		Instant{-210866803201, 999_999_999}: false, Instant{9224318016000, 0}: false,
 		Instant{1700000000000000, 0}: false, Instant{minSecond, 0}: false,
 		LocalDate{-4713, 11, 23}: false, LocalDate{5874898, 1, 1}: false, LocalDate{11994002, 9, 10}: false,
+		LocalDate{-10000000, 1, 1}: false,
 	} {
 		sql, back := "insert into at (i) values ($1) returning i", any(new(Instant))
 		if _, ok := v.(LocalDate); ok {

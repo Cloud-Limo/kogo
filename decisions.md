@@ -4297,8 +4297,8 @@ and 7.
   accepts the two names, and moving the refusal into the checker (15 / 4) waits for the
   audit issue DEV-1079, until a file meets one. Reopen when a port meets either.
 - **An `Instant` or a `LocalDate` past Postgres's range is an error when it is sent**
-  (DEV-1087, spec 10.4), at Postgres's own ends, 4714-11-24 BC to 294276-12-31 for a
-  `timestamptz` and to 5874897-12-31 for a `date`, not only where the driver's int64 of
+  (DEV-1087, spec 10.4), at Postgres's own ends, -4713-11-24 to +294276-12-31 for a
+  `timestamptz` and to +5874897-12-31 for a `date`, written as Kogo prints a year, not only where the driver's int64 of
   microseconds or int32 of days would wrap: one range a reader can look up, and the
   driver's wrap cancels out inside it. An `Instant` is checked on its seconds, as the
   driver cuts its nanoseconds down to the microsecond. Not taken: checking only the

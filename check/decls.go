@@ -226,6 +226,27 @@ func (c *checker) missing(at syntax.Node, name string) Type {
 	return c.errorf(at, "unknown-name", "nothing named %s is declared here, in package %s or in the prelude", name, c.pkg.name)
 }
 
+// packaged reports a name written with its package, b.g or b.O.Ok,
+// whose head names nothing in scope: Kogo writes it bare, imported.
+func (c *checker) packaged(e *syntax.Select) bool {
+	parts, x := []string{e.Name}, e.X
+	for s, ok := x.(*syntax.Select); ok; s, ok = x.(*syntax.Select) {
+		parts, x = append([]string{s.Name}, parts...), s.X
+	}
+	id, ok := x.(*syntax.Ident)
+	if !ok || c.scope.lookup(id.Name) != nil || slices.ContainsFunc(c.homes(id.Name), func(p *pkg) bool { return p.named(id.Name) != nil }) {
+		return false
+	}
+	parts = append([]string{id.Name}, parts...)
+	for i := len(parts) - 1; i > 0; i-- {
+		if c.pkgs[strings.Join(parts[:i], ".")] != nil {
+			c.errorf(id, "unknown-name", "a package is not written in code: import %s and write %s", strings.Join(parts[:i+1], "."), strings.Join(parts[i:], "."))
+			return true
+		}
+	}
+	return false
+}
+
 // visible reports whether the file at hand may name a declaration.
 func (c *checker) visible(v vis) bool {
 	if v.file != nil && v.file.IsTest() && !c.file.IsTest() {
@@ -269,11 +290,14 @@ func (c *checker) importAll(f *syntax.File) {
 			continue
 		}
 		from, name, local := c.pkgs[imp.Name[:i]], imp.Name[i+1:], imp.Local()
+		j := max(strings.LastIndexByte(imp.Name[:i], '.'), 0) // before a nested type's outer one
 		switch {
 		case from != nil && testOnly[from.name] && !f.IsTest():
 			c.errorf(imp, "test-import", "package %s is for test files, those named _test.kg: move what uses %s into one (spec.md 16)", from.name, name)
 		case from == nil && c.kotlinFix(imp.Name[:i], name) != "":
 			c.errorf(imp, "unknown-import", "there is no package %s in Kogo: %s", imp.Name[:i], c.kotlinFix(imp.Name[:i], name))
+		case from == nil && c.pkgs[imp.Name[:j]] != nil:
+			c.errorf(imp, "unknown-import", "there is no package %s: import %s and write %s", imp.Name[:i], imp.Name[:i], imp.Name[j+1:])
 		case from == nil:
 			c.errorf(imp, "unknown-import", "there is no package %s", imp.Name[:i])
 		case from.named(name) == nil && slices.ContainsFunc(c.members[name], func(f *Func) bool { return f.Pkg == from.name }):

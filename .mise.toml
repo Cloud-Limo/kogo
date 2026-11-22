@@ -2,5 +2,5 @@
 [tools]
 gitleaks = "8.30.1"
 go = "1.27.4"
-java = "temurin-21.0.12+101.0.LTS"
+java = "temurin-21.0.12.1+1.0.LTS"
 kotlin = { version = "2.4.21", asset_pattern = "kotlin-compiler-*.zip", bin_path = "kotlinc/bin" }

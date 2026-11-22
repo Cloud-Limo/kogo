@@ -256,7 +256,7 @@ him, as `doc/clerk.md` says, and you do not wait for it.
   DEV-1020, a rule on statements would have read 4 of the port's 17.
 - **Local**, `lin local DEV-NNN <where> "Pickup DEV-NNN"`, when the
   work needs this VM (a stack, a read of `cusoon_b`, the stage-1
-  ports, `kogo/run.sh`) or lands in a repository other than its
+  ports) or lands in a repository other than its
   issue's project's: a run clones the repository of the issue's Linear
   project, Kogo for Kogo and cusoon2 for any other. Words after the
   phrase change the model, effort or cap, as `fable high` for a heavy

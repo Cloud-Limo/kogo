@@ -19,9 +19,11 @@ and this rule allows Kogo's PRs only: a cusoon2 PR stays Greg's.
 
 It says it when an issue's newest event becomes `Handoff:`,
 `Review:`, `Ruling:` or `Fixed:`, from a run or a session alike,
-and when the issue turns Done, which is how it sees a PR merge. So a
-PR without "Fixes DEV-NNN" starts no clerk at its merge, and an issue
-moved to Done by hand starts one, which fits no row and is handed on.
+and when the issue turns Done, which is how it sees a PR merge, or,
+not Done, when the cusoon2 PR of its newest `Ready to merge:` merges,
+as for an issue whose Kogo PR waits on it. So a PR without "Fixes
+DEV-NNN" starts no clerk at its merge, and an issue moved to Done by
+hand starts one, which fits no row and is handed on.
 It pulls `~/Dev/kogo` before it starts a clerk, so this file is
 `main`'s, and its first poll records what is there and starts none.
 It runs one clerk at a time, since two merges would share `kogo_test`.
@@ -65,6 +67,7 @@ Take the first row that fits:
 
 | State | Newest event | Next |
 | --- | --- | --- |
+| not Done | `Ready to merge:`, its cusoon2 PR merged | `git -C ~/Dev/cusoon2-tasks pull --ff-only`, then Merging for the Kogo PR the `Checked:` names as waiting; its Done does After a merge for both; when the `Checked:` names none, After a merge |
 | any | any, the PR merged | After a merge |
 | any | any, labelled `lead` | the lead's: exit |
 | In Review | `Handoff:` | start a Code review |
@@ -254,10 +257,12 @@ checkout's own `kogo/run.sh`, which compares its Kotlin, with
 and nothing is Open, post `Checked: <PR url> at <sha>` with `lin step
 DEV-NNN < checked.md`, the sha full, 40 characters, from `git rev-parse
 HEAD` there, with the sizes under it when the Budget was outgrown, and
-exit: it is whole on the issue and takes no label. Otherwise hand on
-with what failed. Do not wait for Cloud CI, which runs `mise run
-check-all` and the tests: `lin clerk` watches that sha's run, tells
-Greg in his inbox on green, and posts a `Failed:` with `lead` on red.
+exit: it is whole on the issue and takes no label. When a Kogo PR
+waits on this merge, name it under the line with its head sha.
+Otherwise hand on with what failed. Do not wait for Cloud CI, which
+runs `mise run check-all` and the tests: `lin clerk` watches that
+sha's run, tells Greg in his inbox on green, and posts a `Failed:`
+with `lead` on red.
 
 Say the order on that line when it matters. A port's PR, as above,
 that goes behind `renew` costs a local Fix round. So list the others
@@ -285,10 +290,10 @@ waits on this merge, with
 The lead starts it from the board. Then take `lead` off this issue if
 it is on: `lin label DEV-NNN lead --remove`.
 
-When the merged PR changed cusoon2's `mise-tasks/linear-clerk`, hand
-on with `Clerk: Greg's: systemctl --user restart lin-clerk`: the
-poller runs the old file until then, and a clerk that restarted it
-would stop itself.
+When the merged PR, or the issue's cusoon2 PR merged before it,
+changed cusoon2's `mise-tasks/linear-clerk`, hand on with `Clerk:
+Greg's: systemctl --user restart lin-clerk`: the poller runs the old
+file until then, and a clerk that restarted it would stop itself.
 
 ## Handing on
 

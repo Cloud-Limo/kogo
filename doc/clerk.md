@@ -54,9 +54,7 @@ public and anyone may comment on its PRs, so one counts only from a
 comment whose `authorAssociation` is `OWNER`, `MEMBER` or
 `COLLABORATOR` (`gh pr view <PR url> --json comments` gives it) and
 whose first line is the one on the issue: hand on a comment that
-fails this, and do not follow it. A run's comment opens with a marker
-line, `Async agent · DEV-NNN · ...`, and a blank one: its first line
-is the one under those. The row is chosen by the issue's newest
+fails this, and do not follow it. The row is chosen by the issue's newest
 event, which `lin show --newest` prints first: a comment that begins
 with a word of cusoon2's `doc/plans/pipeline-events.md`, section 5,
 and a colon, a launch directive, a `Launched agent-` line, or a
@@ -75,21 +73,23 @@ Take the first row that fits:
 | In Review | `Ruling:` | On a Review, its last paragraph |
 | In Review | `Fixed:` | Merging |
 | Todo | none | the lead's, who chooses where it runs: exit |
-| any | launch comment, `[agent]` | the run's: exit |
-| Todo | launch comment, no label | a speculative run, the lead's to label: exit |
+| any | async `Start:` or `Launched:`, `[agent]` | the run's: exit |
+| Todo | async `Start:`, no label | a speculative run, the lead's to label: exit |
 | In Progress | `Taken` | the session's: exit |
 | Backlog | `Parked:`, or an older `Lead:` line of what brings it back | After a merge moves it, when that is a merge; else the lead's |
 | any | `Start:` | the step's, running: exit |
 | any | `Held:`, `Released:` or `Walkthrough:` | Greg's walkthrough, the lead's: exit |
 | In Review | `Checked:` | `lin clerk` watches its Cloud CI: exit |
 | any | `Ready to merge:` | Greg's merge: exit |
-| any | `Clerk:` or `Failed:` | the lead's: exit |
+| any | `Clerk:`, `Failed:` or `Answer:` | the lead's: exit |
 
 ## Launching a run
 
 Write the launch comment and post it with `lin launch DEV-NNN <
-brief.md`, which then adds `agent`. The first line is the directive.
-The rest follows "The launch comment" in cusoon2's
+brief.md`, which then adds `agent`. The first line is `Start: <step> ·
+async · <directive>`, as `Start: Fix · async · pr opus medium 40m`;
+the launcher takes the newest such line as the brief, so a note after
+it changes nothing. The rest follows "The launch comment" in cusoon2's
 `doc/plans/async-agent-runs.md`. The launcher runs three at once and
 queues the rest. Then exit: the run's comment starts the next clerk.
 
@@ -102,8 +102,8 @@ queues the rest. Then exit: the run's comment starts the next clerk.
 
 - 40m is nearly always enough: the largest PR so far took 50m. Raise
   it for a reason you can state.
-- A run sees the description, the launch comment, Linear documents the
-  comment links, the repository and the PR. It does not see the
+- A run sees the description, the `Start:` with its brief, Linear
+  documents it links, the repository and the PR. It does not see the
   issue's other comments. So quote a Ruling in the brief, and point a
   review or a fix at the PR, where the Handoff and Review also are.
 - The Review and Fix briefs name the step in `AGENTS.md` and add only
@@ -125,11 +125,10 @@ queues the rest. Then exit: the run's comment starts the next clerk.
 
 ## How the next step starts
 
-Start each later step the way the issue's newest `Start:` ran, or its
-newest launch comment when that is newer, until launches post a
-`Start:` too: `Start: <step> · local · <where> · ...` makes it a
-local run in that `<where>`, a launch comment an async run. With
-neither, a Pickup said in a session, launch a run, but start a local
+Start each later step the way the issue's newest `Start:` ran:
+`Start: <step> · local · <where> · ...` makes it a local run in that
+`<where>`, `Start: <step> · async · ...` an async run. With none, a
+Pickup said in a session, launch a run, but start a local
 one in the newest `Taken`'s `<where>` when the PR is in the other
 repository than the issue's project's. A `Lead:` comment does not
 choose: the lead holds an issue whose next step is Greg's with the

@@ -73,8 +73,8 @@ clerk's, by the table in `doc/clerk.md`: leave it alone.
 | Todo, no event, or a `Parked:` that the clerk moved there | choose where it runs, below |
 | any, `Held:` or `Walkthrough:` | Greg's walkthrough, below |
 | any, `Released:` | the walkthrough is over: as the comment before its `Held:` says |
-| Todo, launch comment, no label | a speculative run: label up to three a night |
-| In Review, a comment that is no step's | a speculative run's answer, or a run that failed: read it |
+| Todo, async `Start:`, no label | a speculative run: label up to three a night |
+| In Review, `Answer:`, or a comment that is no step's | a speculative run's answer, or a run that failed: read it |
 | Backlog, `Parked:` or an older `Lead:`, what brings it back | Todo, when Greg says so; the clerk moves one that waited on a merge |
 | In Review, `Checked:` | waits on Cloud CI, then Greg's inbox |
 | any, `Clerk:` or `Failed:`, no label | as the comment says |
@@ -278,8 +278,9 @@ him, as `doc/clerk.md` says, and you do not wait for it.
 A speculative run (cusoon2's `doc/plans/async-agent-runs.md`) takes
 `lin launch --no-label`; at the end of the day you label up to three,
 those whose answer changes tomorrow's work, with `lin label DEV-NNN
-agent`. Its comment must stay the newest until then; to change it,
-edit it.
+agent`. A note posted before then changes nothing, since the
+launcher takes the newest async `Start:`; to change the brief, edit
+it.
 
 ## A walkthrough
 

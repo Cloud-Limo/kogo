@@ -2,6 +2,7 @@ package emit
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/Cloud-Limo/kogo/check"
@@ -291,6 +292,26 @@ func (e *emitter) when(x *syntax.When, d dest) {
 		e.block(b.Body, d)
 		back()
 	}
+	if name := covers(st); name != "" && !slices.ContainsFunc(x.Branches, func(b *syntax.Branch) bool { return b.Conds == nil }) {
+		e.w("default:")
+		e.w("panic(%q + %s.ToString(%s))", "when: no branch for "+name+" ", e.rt(), subject)
+	}
 	e.shut("}")
 	e.shut("}")
+}
+
+// covers gives the name of the type a when's subject is of when the
+// when must cover every case of it, as the checker has shown it does:
+// an enum, a sealed interface or a Boolean, or one of them nullable.
+// A value none of the branches names, such as a label a row holds
+// that the enum lacks, then panics (spec.md 8).
+func covers(t check.Type) string {
+	if n, ok := t.(*check.Nullable); ok {
+		t = n.Elem
+	}
+	n, ok := t.(*check.Named)
+	if !ok || !(n.Decl.Kind == "enum class" || n.Decl.Kind == "sealed interface" || builtin(n, "Boolean")) {
+		return ""
+	}
+	return n.String()
 }

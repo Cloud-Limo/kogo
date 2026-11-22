@@ -4304,6 +4304,12 @@ and 7.
   checked on its seconds, as the driver cuts its nanoseconds down to the microsecond.
   Not taken: checking only the wrap, and leaving the rest of the refusal to Postgres's
   `out of range`.
+- **A `when` that must cover every case panics on a value none of its branches names**
+  (Greg, 22 Nov 2026; spec 8), with `when: no branch for <type> <value>`, in every form.
+  Such a value is a row's enum label the program lacks.
+  Not taken: checking each enum column against its constants as the row is read (about
+  15 / 10), which fails sooner but also fails a request that only passes the value on
+  or compares it with `==`, both of which answer truly today.
 
 ## An unread default, and an interface's `string()` (DEV-1085), 22 Nov 2026
 

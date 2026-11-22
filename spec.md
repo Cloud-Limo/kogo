@@ -566,6 +566,10 @@ units, panics with `Requested character count <n> is less than zero.`
 `Range [<start>, <end>) out of bounds for length <length>`, where
 `substring(start)` ends at the string's length
 (`"abc".substring(5, 3)`: `Range [5, 3) out of bounds for length 3`).
+A `when` that must cover every case (section 6) and has no `else`
+panics, as Kotlin's throws, on a value none of its branches names, with
+`when: no branch for <type> <value>` (`when: no branch for InviteType
+Partner`), whether it is a value or a statement.
 The server catches it at the request boundary, rolls the transaction back,
 logs it and answers 500 (section 15).
 
@@ -766,6 +770,11 @@ or `_`, then letters, digits and `_`, neither a hard keyword such as
 space or a hyphen, has no Kogo type, whatever it fills: rename the label
 in Postgres, or cast the column to text and read it as a `String`.
 
+An enum is read as the label the column holds, unchecked: a label the
+program's enum lacks, one a migration added while an older program
+runs, is passed on and compared with `==` as any other, and a `when`
+over it panics (section 8).
+
 A parameter's Kogo type must map to the type Postgres infers for it. When
 Postgres cannot infer one, cast it: `$active::boolean`. A parameter or a
 result column of a type that is not in the table is a compile error: cast
@@ -779,7 +788,9 @@ hours. What Postgres holds and the Kogo type does not is a panic when
 it is read (section 8): `infinity` in a `timestamptz` or a `date`,
 `24:00` in a `time`, and an `interval` with months, which has no fixed
 length. A `Duration` too long for an `interval`'s microseconds is a
-panic when it is sent. A `Decimal` holds `NaN` and `Infinity` as well
+panic when it is sent, and so is an `Instant` or a `LocalDate` past
+Postgres's range: -4713-11-24 to +294276-12-31 for a `timestamptz`,
+to +5874897-12-31 for a `date`. A `Decimal` holds `NaN` and `Infinity` as well
 as numbers, and a zero keeps its scale: `0.00`. An empty `List` is sent as an
 empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
 `bytea`.

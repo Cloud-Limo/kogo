@@ -1,9 +1,14 @@
 package time
 
 import (
+	"cmp"
+	"context"
 	"math"
+	"os"
+	"reflect"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/Cloud-Limo/kogo/rt"
@@ -163,5 +168,40 @@ func TestPostgres(t *testing.T) {
 		if _, err := d.IntervalValue(); err != nil {
 			t.Errorf("the longest Duration Postgres holds is not sent: %v", err)
 		}
+	}
+}
+
+// Postgres holds a timestamptz from -4713-11-24 to +294276-12-31, and
+// a date to +5874897-12-31: the last value at each end is stored as itself,
+// and the first past it is an error with nothing stored, never a
+// time the driver's microseconds or days wrapped round to.
+func TestPostgresRange(t *testing.T) {
+	ctx, url := context.Background(), cmp.Or(os.Getenv("KOGO_TEST_DATABASE_URL"), "postgres://kogo:kogo@127.0.0.1/kogo_test")
+	conn, err := pgx.Connect(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(ctx)
+	conn.Exec(ctx, "create temp table at (i timestamptz, d date)")
+	for v, held := range map[any]bool{
+		Instant{-210866803200, 0}: true, Instant{9224318015999, 999_999_000}: true,
+		LocalDate{-4713, 11, 24}: true, LocalDate{5874897, 12, 31}: true,
+		Instant{-210866803201, 999_999_999}: false, Instant{9224318016000, 0}: false,
+		Instant{1700000000000000, 0}: false, Instant{minSecond, 0}: false,
+		LocalDate{-4713, 11, 23}: false, LocalDate{5874898, 1, 1}: false, LocalDate{11994002, 9, 10}: false,
+		LocalDate{-10000000, 1, 1}: false,
+	} {
+		sql, back := "insert into at (i) values ($1) returning i", any(new(Instant))
+		if _, ok := v.(LocalDate); ok {
+			sql, back = "insert into at (d) values ($1) returning d", new(LocalDate)
+		}
+		err := conn.QueryRow(ctx, sql, v).Scan(back)
+		if stored := reflect.ValueOf(back).Elem().Interface(); held != (err == nil) || held && stored != v {
+			t.Errorf("%v is stored as %v (%v)", v, stored, err)
+		}
+	}
+	var n int
+	if conn.QueryRow(ctx, "select count(*) from at").Scan(&n); n != 4 {
+		t.Errorf("%d values are stored, want the 4 Postgres holds", n)
 	}
 }

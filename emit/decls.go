@@ -61,6 +61,7 @@ func (e *emitter) params(d *syntax.FunDecl, f *check.Func) (params string, defau
 			if arg, ok := late[i]; ok {
 				name := e.local(v, v.Name)
 				e.w("var %s %s", name, e.typ(v.Type))
+				e.w("_ = %s", name)
 				e.open("if %s != nil {", arg)
 				e.w("%s = *%s", name, arg)
 				e.turn("} else {")

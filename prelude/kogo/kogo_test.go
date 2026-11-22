@@ -376,6 +376,29 @@ func TestEither(t *testing.T) {
 	}
 }
 
+// A Regex's pattern is Go's: Kogo's column of spec.md 12's table of
+// patterns both engines read and Kotlin reads otherwise.
+func TestRegexIsGos(t *testing.T) {
+	for _, c := range []struct {
+		pattern, input string
+		want           bool
+	}{
+		{"a.c", "a\rc", true},
+		{`\s`, "\v", false},
+		{"(?i)k", "\u212A", true},
+		{"[[:alpha:]]", "z", true},
+		{"[a-c&&[b]]", "a]", true},
+		{`(?U)\w`, "é", false},
+	} {
+		if got := Regex_Matches(Regex_String(c.pattern), c.input); got != c.want {
+			t.Errorf("Regex(%q).matches(%q) is %v, want %v", c.pattern, c.input, got, c.want)
+		}
+	}
+	if got := String_Replace("ab\n", Regex_String("$"), "!"); got != "ab\n!" {
+		t.Errorf("replace of $ is %q, want %q", got, "ab\n!")
+	}
+}
+
 // What the stage-1 ports call, each giving what Kotlin 2.4 gives.
 func TestPortCalls(t *testing.T) {
 	re := func(p string) Regex { return Regex_String(p) }

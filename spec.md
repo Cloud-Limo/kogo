@@ -13,9 +13,9 @@ Source files end in `.kg`.
 Where a construct is valid in both Kotlin and Kogo it means the same thing.
 A Kogo file need not compile as Kotlin. A Kogo file imports only from
 its own application and from `kogo.` packages, whose names keep
-Kotlin's, `java.time`'s and Arrow's spelling and meaning:
-`kogo.time.Instant` is `java.time.Instant`, `kogo.test.assertEquals`
-is `kotlin.test.assertEquals`. Kogo has four kinds of
+Kotlin's, `java.time`'s and Arrow's spelling and meaning, but for the
+corners section 12 lists: `kogo.time.Instant` is `java.time.Instant`,
+`kogo.test.assertEquals` is `kotlin.test.assertEquals`. Kogo has four kinds of
 deliberate deviation from Kotlin, its own forms, and kotlinc refuses
 each (`mise run kotlin` holds this). The one exception is a binding
 file of bare `external fun`s, which kotlinc takes for JNI functions;
@@ -992,15 +992,30 @@ There are no mutable collections, sequences or arrays. Build a list with
 `equals(other, ignoreCase = true)`, `filter`, `filterNot`, `map` (over
 `Char`), and on `Char`: `isWhitespace`, `isDigit`, `digitToInt`.
 `Regex(pattern)` with `matches`, `containsMatchIn`, `find` and
-`String.replace(regex, text)`; the pattern syntax is RE2 (no
-lookaround, no backreferences). Case conversion never reads a
-locale.
+`String.replace(regex, text)`; the pattern is read as Go's `regexp`
+reads it (RE2), and nothing of Kotlin's is promised for it. Case
+conversion never reads a locale.
 
 **Where the prelude differs from Kotlin.** A name that Kotlin has means
 what Kotlin's means in ordinary use. The corners where it does not are
-all listed here:
+all listed here, but for a `Regex`'s pattern, whose list is what we know
+and not a promise that it is all:
 
-- `Regex` takes RE2 patterns: no lookaround and no backreferences.
+- A `Regex`'s pattern is Go's, not Kotlin's. One Go cannot read
+  (lookaround, a backreference, a possessive repeat) is refused at
+  `kogo check` with `regex-pattern` when it is a string literal with no
+  template in it, and otherwise panics when the `Regex` is made. One
+  both read may mean something else in each:
+
+  | Pattern | Input | Kotlin | Kogo |
+  | -- | -- | -- | -- |
+  | `a.c` matches | `a\rc` | false | true: `.` stops only at `\n`; Kotlin's also at `\r`, U+0085, U+2028, U+2029 |
+  | `\s` matches | U+000B | true | false |
+  | `(?i)k` matches | U+212A | false | true: Go folds case by Unicode, Kotlin by ASCII |
+  | `[[:alpha:]]` matches | `z` | false | true: a POSIX class in Go, a nested class in Kotlin |
+  | `[a-c&&[b]]` matches | `a]` | false | true: Kotlin's `&&` intersects; Go reads the characters |
+  | `(?U)\w` matches | `é` | true | false: Kotlin's Unicode classes; Go's ungreedy flag |
+  | replace `$` with `!` | `ab\n` | `ab!\n!` | `ab\n!`: Kotlin's `$` also stands before a final line break |
 - A `String` never holds half of a surrogate pair (section 3).
 - `lowercase()` does not read the letters either side: a final `Σ`
   becomes `σ` where Kotlin's is `ς`.

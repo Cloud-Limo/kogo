@@ -210,6 +210,7 @@ func TestNames(t *testing.T) {
 		"package a\nfun f(): Int = g()\ninternal fun g(): Int = 1\n---\npackage a\nprivate fun h(): Int = 2\nfun k(): Int = g() + h()\n---\npackage a\nprivate fun h(): Int = 3\nfun m(): Int = h()",
 		"package a\nimport kogo.time.ZoneId\nfun f(s: String): List<ZoneId> = listOf(ZoneId.of(\"Zulu\"), ZoneId.of(\"UTC\"), ZoneId.of(s), ZoneId.of(\"$s+1\"))\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}",
 		"package a\nimport kogo.time.Stamp\nfun f(s: Stamp, xs: List<Int>): Int = s.seconds() + xs.size\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int",
+		"package a\nfun f(s: String): List<Regex> = listOf(Regex(\"(?=$s)\"), Regex(s), Regex(\"[a-z]+\"))\n---\npackage kogo\nexternal class Regex\nexternal fun Regex(pattern: String): Regex",
 		// One table of names (spec.md 2): a file's private val is its own,
 		// and the package's own val or type is meant before the prelude's.
 		"private val limit: Int = 50\nfun f(): Int = limit\n---\npackage t\nprivate val limit: String = \"\"\nfun g(): String = limit",
@@ -233,6 +234,9 @@ func TestNames(t *testing.T) {
 		// Section 12: an offset ID written as a literal is outside the subset.
 		{"package a\nimport kogo.time.ZoneId\nfun f(): ZoneId = ZoneId.of(‸\"+05:30\")\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}", "zone-offset", "ZoneId.of takes a region name, such as Australia/Melbourne; offsets are not supported (spec 12)"},
 		{"package a\nimport kogo.time.ZoneId\nfun f(): ZoneId = ZoneId.of(‸\"Z\")\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}", "zone-offset", "offsets are not supported"},
+		// A literal pattern is compiled by Go's regexp at check (spec.md 12).
+		{"package a\nfun f(): Regex = Regex(‸\"a(?=b)\")\n---\npackage kogo\nexternal class Regex\nexternal fun Regex(pattern: String): Regex", "regex-pattern", "Go cannot read this pattern: invalid or unsupported Perl syntax: `(?=`. A Regex's pattern is Go's, not Kotlin's: write it in Go's syntax (spec 12)"},
+		{"package a\nfun f(): Regex = Regex(‸\"\"\"(a)\\1\"\"\")\n---\npackage kogo\nexternal class Regex\nexternal fun Regex(pattern: String): Regex", "regex-pattern", "invalid escape sequence: `\\1`"},
 		{"package a\nimport ‸kogo.time.seconds\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int", "member-import", "seconds is a member, in scope wherever a value of its receiver's type is: remove this import"},
 		// Section 13: only the prelude declares bindings, and an
 		// external object holds funs.

@@ -383,6 +383,7 @@ func TestLanguage(t *testing.T) {
 	expect(t, [][2]string{
 		{"t.Fares()", "Fare(base=100, tip=0, note=none) Fare(base=100, tip=5, note=none) 105 true"},
 		{"t.Greetings()", "Hello, AnnH Hello, Bob! Yo, CyY"},
+		{"t.U1(3, nil)", "a3"},
 		{"t.Band(0) + t.Band(2) + t.Band(9) + t.Band(10)", "zerofewsomemany"},
 		{"t.Sign(-5)", "-1"},
 		{"t.Sign(0)", "0"},
@@ -425,6 +426,9 @@ fun fares(): String {
 
 fun greet(name: String, greeting: String = "Hello", mark: String = greeting.substring(0, 1)): String =
     "$greeting, $name$mark"
+
+// A default that its fun never reads builds.
+fun u1(x: Int, y: Int = 0): String = "a$x"
 
 fun greetings(): String = greet("Ann") + " " + greet("Bob", mark = "!") + " " + greet(greeting = "Yo", name = "Cy")
 

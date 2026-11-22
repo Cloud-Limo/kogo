@@ -4317,3 +4317,8 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
 - **`kotlin/builtins` and `kotlin/cases` keep their cases and gain no `kept` entry for a
   pattern**, since nothing is promised to agree; the prelude's table test holds Kogo's
   column of spec 12's table.
+- **Spec 1's sentence on the `kogo.` packages' names takes "but for the corners section
+  12 lists"** (lead, 22 Nov 2026): the names keep Kotlin's, `java.time`'s and Arrow's
+  spelling and meaning but for those corners, which states what section 12 already does
+  for `lowercase`, `replace` and now `Regex`. Not taken: leaving the sentence to be read
+  as limited by section 12.

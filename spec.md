@@ -13,9 +13,9 @@ Source files end in `.kg`.
 Where a construct is valid in both Kotlin and Kogo it means the same thing.
 A Kogo file need not compile as Kotlin. A Kogo file imports only from
 its own application and from `kogo.` packages, whose names keep
-Kotlin's, `java.time`'s and Arrow's spelling and meaning:
-`kogo.time.Instant` is `java.time.Instant`, `kogo.test.assertEquals`
-is `kotlin.test.assertEquals`. Kogo has four kinds of
+Kotlin's, `java.time`'s and Arrow's spelling and meaning, but for the
+corners section 12 lists: `kogo.time.Instant` is `java.time.Instant`,
+`kogo.test.assertEquals` is `kotlin.test.assertEquals`. Kogo has four kinds of
 deliberate deviation from Kotlin, its own forms, and kotlinc refuses
 each (`mise run kotlin` holds this). The one exception is a binding
 file of bare `external fun`s, which kotlinc takes for JNI functions;
@@ -989,9 +989,9 @@ and not a promise that it is all:
 
 - A `Regex`'s pattern is Go's, not Kotlin's. One Go cannot read
   (lookaround, a backreference, a possessive repeat) is refused at
-  `kogo check` with `regex-pattern` when it is one string literal, and
-  otherwise panics when the `Regex` is made. One both read may mean
-  something else in each:
+  `kogo check` with `regex-pattern` when it is a string literal with no
+  template in it, and otherwise panics when the `Regex` is made. One
+  both read may mean something else in each:
 
   | Pattern | Input | Kotlin | Kogo |
   | -- | -- | -- | -- |

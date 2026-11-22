@@ -116,6 +116,7 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 		c.info.Uses[e.Fun] = call.Func
 		c.fails(e, call)
 		c.zoneOffset(e, call.Func)
+		c.regexPattern(e, call.Func)
 		if id, ok := e.Fun.(*syntax.Ident); ok && call.Func.Receiver != nil && c.raised(call.Func.Receiver) == nil {
 			c.narrowedThis(id)
 		}
@@ -136,6 +137,22 @@ func (c *checker) zoneOffset(e *syntax.Call, f *Func) {
 	if s, ok := e.Args[0].Value.(*syntax.StringLit); ok && len(s.Parts) == 1 {
 		if l, ok := s.Parts[0].(*syntax.Literal); ok && offsetID.MatchString(l.Value) {
 			c.errorf(s, "zone-offset", "ZoneId.of takes a region name, such as Australia/Melbourne; offsets are not supported (spec 12)")
+		}
+	}
+}
+
+// regexPattern refuses the prelude's Regex on a string literal that
+// Go's regexp, which reads the pattern when the program runs, cannot
+// compile (spec.md 12); a pattern built by a template is not read.
+func (c *checker) regexPattern(e *syntax.Call, f *Func) {
+	if f.Pkg != "kogo" || f.Owner != nil || f.Receiver != nil || f.Name != "Regex" || len(e.Args) != 1 {
+		return
+	}
+	if s, ok := e.Args[0].Value.(*syntax.StringLit); ok && len(s.Parts) == 1 {
+		if l, ok := s.Parts[0].(*syntax.Literal); ok {
+			if _, err := regexp.Compile(l.Value); err != nil {
+				c.errorf(s, "regex-pattern", "Go cannot read this pattern: %s. A Regex's pattern is Go's, not Kotlin's: write it in Go's syntax (spec 12)", strings.TrimPrefix(err.Error(), "error parsing regexp: "))
+			}
 		}
 	}
 }

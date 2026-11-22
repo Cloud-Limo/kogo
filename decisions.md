@@ -1813,7 +1813,7 @@ Each entry: what was decided, why, and what would reopen it.
 - Value classes are out: cusoon2 has none, and binding distinct id types to SQL columns needs
   a design (foreign keys could supply it).
 - No `apply`/`run`/`with`, no labelled returns, no `object`.
-- `Regex` is RE2: no lookaround or backreferences.
+- `Regex` is RE2: no lookaround or backreferences. (Widened by DEV-1083: the pattern is Go's.)
 
 ## Taken building the SQL pass (DEV-818), not yet discussed
 
@@ -4296,3 +4296,24 @@ and 7.
   **a named deviation from "`kogo check` is the only gate" (15 Nov 2026)**: Kotlin
   accepts the two names, and moving the refusal into the checker (15 / 4) waits for the
   audit issue DEV-1079, until a file meets one. Reopen when a port meets either.
+
+## A Regex's pattern is Go's (DEV-1083), 22 Nov 2026
+
+Greg's ruling, 22 Nov 2026: a regex is a language of its own.
+
+- **A `Regex`'s pattern is read as Go's `regexp` reads it, and nothing of Kotlin's is
+  promised for it**; the name and its functions stay Kotlin's, the stated exception to
+  principle 3. Spec 12 lists the differences known, each with an example, and says the
+  list is not a promise that it is all; converting a pattern is the port's work
+  (`doc/porting.md`). Probes through `mise run kotlin` found seven patterns both engines
+  read that differ. Not taken: translating a pattern to Java's meaning in the prelude;
+  refusing at check the forms both engines read and mean differently.
+- **`kogo check` refuses a string literal Go cannot compile as a pattern
+  (`regex-pattern`)**, compiled by Go's `regexp`, as the prelude does when the program
+  runs, with Go's reason. A pattern built by a template or held in a variable is not
+  read, and panics when the `Regex` is made, as before, with the prelude's text
+  unchanged. Compiling the nine patterns cusoon2's ports hold takes about 46
+  microseconds. Not taken: leaving every pattern to the panic.
+- **`kotlin/builtins` and `kotlin/cases` keep their cases and gain no `kept` entry for a
+  pattern**, since nothing is promised to agree; the prelude's table test holds Kogo's
+  column of spec 12's table.

@@ -221,9 +221,10 @@ one of three:
   check's last lines, and for a comparison what `main` says of the
   same check. When `main` fails the same way, the PR is not the cause.
   Run nothing again to get past it.
-  One that names a comment of Greg's newer than any `PRA:` is a
-  question on a Kogo PR that no PR session has answered: hand on, and
-  the lead has him post a `PRQ:` (AGENTS.md: PR questions).
+  One that names a comment of Greg's newer than any `PRQ:` of his,
+  or a `PRQ:` with no `PRA:` yet, is a question on a Kogo PR that no
+  PR session has answered: hand on, and the lead has him post a
+  `PRQ:`, or waits for the `PRA:` (AGENTS.md: PR questions).
 
 Say the order on a `Checked:` line when it matters. A port's PR, one
 whose `fix:` would be a local run, that goes behind `renew` costs a

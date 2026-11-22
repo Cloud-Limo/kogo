@@ -167,14 +167,17 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   Handoff, and answers each comment: one with `"thread": true` in its
   thread, `gh api repos/Cloud-Limo/<repo>/pulls/<n>/comments/<id>/replies
   -f body=<answer>`, any other with `gh pr comment <PR url>`, the
-  answer under a quote of it. Where the answer is "this should
-  change", it says what would change and its size: the change is the
-  lead's Ruling. It changes no code, posts no step's comment, starts
-  nothing and waits on no step. When it ends, the poller posts `PRA:
-  <PR url> · N answered` on the issue as the application, a note that
+  answer under a quote of it. Each reply begins `PRA:`: one without
+  it is read as Greg's at his next `PRQ:`. Where the answer is "this
+  should change", it says what would change and its size: the change
+  is the lead's Ruling. It changes no code, posts no step's comment,
+  starts nothing and waits on no step. When it ends, the poller posts
+  `PRA: <PR url> · N answered` on the issue as the application, with
+  Linear's review-view address of the PR under it, a note that
   reaches Greg's inbox; one that fails gets a `Failed:` with `lead`.
-  `lin merge-check` refuses a Kogo PR with a comment of his newer than
-  its newest `PRA:`. A comment with no `PRQ:` after it is not read.
+  `lin merge-check` refuses a Kogo PR with a comment of his newer
+  than his newest `PRQ:`, or that `PRQ:` with no `PRA:` after it. A
+  comment with no `PRQ:` after it is not read.
 - **Async runs.** The lead or the clerk starts one with `lin launch
   DEV-NNN < brief.md`, the brief's first line `Start: <step> · async ·
   <directive>`: it posts the `Start:` with the brief under it, then

@@ -106,7 +106,7 @@ type Var struct {
 	Type    Type
 	Mutable bool        // a var
 	Owner   *TypeDecl   // of a Property or an Entry
-	Decl    syntax.Node // nil for an enum's name, entries and valueOf's name, and for this
+	Decl    syntax.Node // nil for an enum's name, entries and valueOf's value, and for this
 	vis
 }
 

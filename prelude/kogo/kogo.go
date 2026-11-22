@@ -263,11 +263,11 @@ func List_MapNotNull[T, R any](this List[T], transform func(T) *R) List[R] {
 // List_SortedBy is stable, and orders keys as Kotlin's compareValues
 // does (compare).
 func List_SortedBy[T, R any](this List[T], selector func(T) R) List[T] {
-	out := slices.Clone(this)
+	out := List_Plus(this, nil)
 	slices.SortStableFunc(out, func(a, b T) int {
 		return compare(reflect.ValueOf(selector(a)), reflect.ValueOf(selector(b)))
 	})
-	return List_Plus(out, nil)
+	return out
 }
 
 // compare orders two keys of one type: null first, then by Kotlin's

@@ -4371,12 +4371,14 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
   and the emitter calls the prelude's `EnumValueOf` with `E`'s entries. Spec 3.3 names it
   beside `.name` and `entries`, and section 12 points there. Not taken: naming it in
   section 12 alone, which holds bindings.
-- **`sortedBy` takes any key type, as `prelude.diff` declares it, and orders at run
-  time** an `Int`, a `Long`, a `Double`, a `String` (by UTF-16 units), a `Char` or a
-  `Boolean`, or a nullable one, null first, as Kotlin's `compareValues`. Any other key
-  panics: Kogo has no bound to say `Comparable`. Not taken: an overload for each key
-  type, as `sumOf` has, about 10 declarations with their Go; or a check that refuses
-  another key, about 15 lines. Reopen when a port sorts by an enum or a time.
+- **`sortedBy` is declared once, as `prelude.diff` declares it, and orders** an `Int`,
+  a `Long`, a `Double`, a `String` (by UTF-16 units), a `Char` or a `Boolean`, or a
+  nullable one, null first, as Kotlin's `compareValues`. `kogo check` refuses any other
+  key, `sort-key` (lead, 22 Nov 2026): Kotlin refuses a key that is not `Comparable`
+  when it compiles, so the subset's limit sits in Kotlin's own place, not in a panic
+  first seen in production. The run-time panic stays behind the check. Not taken: an
+  overload for each key type, as `sumOf` has, about 10 declarations with their Go; or
+  the panic alone. Reopen when a port sorts by an enum or a time.
 - **A `Map` compares its entries in any order, and writes itself `{k=v}`**, as Kotlin's,
   on the same `ordered` keys as a `Set`. `for` over a `Map` stays unemitted: no port
   needs it yet.

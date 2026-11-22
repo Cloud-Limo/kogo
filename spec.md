@@ -1033,8 +1033,8 @@ and not a promise that it is all:
   are groups, and a backslash takes the next character as it is.
 - `sortedBy` orders by an `Int`, a `Long`, a `Double`, a `String`, a
   `Char` or a `Boolean`, or one of these that may be null, as Kotlin
-  does. Any other key panics, where Kotlin orders by any `Comparable`,
-  an enum or a time among them, and refuses the rest at compile time.
+  does. A key of any other type, an enum or a time among them, is
+  refused at `kogo check` with `sort-key`.
 - `trim(char)` takes one `Char`, where Kotlin's takes any number.
 - `split(delimiter)` takes one `String`, where Kotlin's also takes
   several, a `Char`, `ignoreCase` and `limit`.

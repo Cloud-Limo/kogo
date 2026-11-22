@@ -215,6 +215,7 @@ func TestNames(t *testing.T) {
 		// and the package's own val or type is meant before the prelude's.
 		"private val limit: Int = 50\nfun f(): Int = limit\n---\npackage t\nprivate val limit: String = \"\"\nfun g(): String = limit",
 		"data class Either(val n: Int)\nfun f(): Either = Either(1)\nval limit: Int = 50\n---\npackage kogo\nval limit: String = \"\"\n---\npackage t\nfun h(): Int = limit",
+		"typealias Money = Long\ndata class P(val n: Int?, val s: String, val m: Money)\nfun f(xs: List<P>): List<P> = xs.sortedBy { it.n }.sortedBy { it.s }.sortedBy { it.m }.sortedBy { it.m < 0 }\n---\npackage kogo\nexternal fun <T, R> List<T>.sortedBy(selector: (T) -> R): List<T>",
 		"package a\nimport b.twice\nfun f(): Int = 2.twice()\n---\npackage b\nfun Int.twice(): Int = this * 2",
 		"package a\nimport b.Shape\nfun f(s: Shape): Int = when (s) {\n    is Shape.Dot -> 0\n    is Shape.Line -> s.length\n}\nfun g(): Shape = Shape.Line(2)\n---\npackage b\nsealed interface Shape {\n    data object Dot : Shape\n    data class Line(val length: Int) : Shape\n}",
 	)
@@ -231,12 +232,17 @@ func TestNames(t *testing.T) {
 		{"package a\nimport ‸java.util.UUID", "unknown-import", "Uuid needs no import: remove this one and write Uuid"},
 		{"package a\nimport ‸arrow.core.Either", "unknown-import", "Either needs no import: remove this one"},
 		{"package a\nimport ‸arrow.core.raise.ensure", "unknown-import", "ensure needs no import: remove this one"},
+		{"package a\nimport ‸kotlin.math.abs\n---\npackage kogo\nexternal fun abs(n: Long): Long", "unknown-import", "abs needs no import: remove this one"},
 		// Section 12: an offset ID written as a literal is outside the subset.
 		{"package a\nimport kogo.time.ZoneId\nfun f(): ZoneId = ZoneId.of(‸\"+05:30\")\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}", "zone-offset", "ZoneId.of takes a region name, such as Australia/Melbourne; offsets are not supported (spec 12)"},
 		{"package a\nimport kogo.time.ZoneId\nfun f(): ZoneId = ZoneId.of(‸\"Z\")\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}", "zone-offset", "offsets are not supported"},
 		// A literal pattern is compiled by Go's regexp at check (spec.md 12).
 		{"package a\nfun f(): Regex = Regex(‸\"a(?=b)\")\n---\npackage kogo\nexternal class Regex\nexternal fun Regex(pattern: String): Regex", "regex-pattern", "Go cannot read this pattern: invalid or unsupported Perl syntax: `(?=`. A Regex's pattern is Go's, not Kotlin's: write it in Go's syntax (spec 12)"},
 		{"package a\nfun f(): Regex = Regex(‸\"\"\"(a)\\1\"\"\")\n---\npackage kogo\nexternal class Regex\nexternal fun Regex(pattern: String): Regex", "regex-pattern", "invalid escape sequence: `\\1`"},
+		// Section 12: sortedBy orders by a key of these types alone.
+		{"data class P(val n: Int)\nfun f(xs: List<P>): List<P> = xs.sortedBy ‸{ it }\n---\npackage kogo\nexternal fun <T, R> List<T>.sortedBy(selector: (T) -> R): List<T>", "sort-key", "this key is a P, and sortedBy orders only by an Int, a Long, a Double, a String, a Char or a Boolean, or one of these that may be null: give it one of these, such as a field of the P (spec 12)"},
+		{"enum class E { a }\nfun f(xs: List<Int>): List<Int> = xs.sortedBy(selector = ‸{ E.a })\n---\npackage kogo\nexternal fun <T, R> List<T>.sortedBy(selector: (T) -> R): List<T>", "sort-key", "this key is a E"},
+		{"fun f(xs: List<List<Int>>): List<List<Int>> = xs.sortedBy ‸{ it }\n---\npackage kogo\nexternal fun <T, R> List<T>.sortedBy(selector: (T) -> R): List<T>", "sort-key", "this key is a List<Int>"},
 		{"package a\nimport ‸kogo.time.seconds\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int", "member-import", "seconds is a member, in scope wherever a value of its receiver's type is: remove this import"},
 		// Section 13: only the prelude declares bindings, and an
 		// external object holds funs.
@@ -448,7 +454,7 @@ func TestTypes(t *testing.T) {
 		"fun f(c: Char, s: String, b: Boolean, u: Unit): String = \"$c $s $b ${f(c, s, !b, Unit)}\" + \"\"\"raw\"\"\"",
 		"typealias Pairs<T> = List<Pair<T, T>>\nfun f(ps: Pairs<Int>): Pair<Int, Int> = ps.first()",
 		"data class P(val a: Int, val b: String = \"\")\nfun f(p: P): P = p.copy(b = p.toString())\nfun g(p: P): Int {\n    val (a, b) = p\n    return a + b.length\n}\nfun h(): Boolean = P(1) == P(b = \"x\", a = 2)",
-		"enum class E { a, b }\nfun f(e: E): String = e.name + E.a.name\nfun g(): List<E> = E.entries\nfun h(s: String): E = E.valueOf(name = s)",
+		"enum class E { a, b }\nfun f(e: E): String = e.name + E.a.name\nfun g(): List<E> = E.entries\nfun h(s: String): E = E.valueOf(value = s)",
 		"interface I<K> {\n    val label: String\n    fun card(key: K): Int\n}\ndata class D(override val label: String, val n: Int) : I<Int> {\n    override fun card(key: Int): Int = key + n + label.length\n}\ninterface J {\n    fun size(): Int\n}\ndata object O : J {\n    override fun size(): Int = 0\n}\nfun f(i: I<Int>, d: D, j: J): Int = i.card(1) + d.card(2) + i.label.length + j.size() + O.size()",
 		// An out type parameter is given back: in a val, a result, a list, a lambda's parameter.
 		"sealed interface B<out T> {\n    val all: List<T>\n    fun each(f: (T) -> Unit): B<T>\n}",

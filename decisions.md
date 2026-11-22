@@ -388,9 +388,9 @@ Each entry: what was decided, why, and what would reopen it.
   it interacts with inference. Here exactly one candidate may fit, and two that fit are an
   error that says to rename one. The exception is the one Kotlin itself has for `sumOf`:
   candidates that differ only in what a lambda returns are chosen by reading the lambda.
-  The same answer serves ordering: the prelude declares `sortedBy` once per key type, since
-  Kogo cannot say "any ordered type". Reopen if those lists become a burden; the other way
-  is an "ordered" bound that only bindings may use.
+  Ordering went the other way: `sortedBy` is declared once, with `kogo check` limiting its
+  key (lead, 22 Nov 2026; see the `sortedBy` entry of that date). Reopen if the overloads
+  that remain become a burden.
 - **An operator on anything but a number is a binding** (15 Nov 2026; spec 6): `a + b` is
   the prelude's `plus`, `a < b` its `compareTo`, `x in c` its `contains`, `c[i]` its `get`,
   `a to b` its `to`. Only an `external fun` counts, so application code still defines no

@@ -247,7 +247,10 @@ him, as `doc/clerk.md` says, and you do not wait for it.
   wrote: its context is warm and a run is slower to start. Give Greg
   the phrase for that session.
 - **Async** is the default otherwise: the issue stands alone and a
-  launch comment can say the rest.
+  launch comment can say the rest. `lin launch` exports each other
+  issue the brief or the description names into a document linked
+  as `Reads:`, made only when one is named; the issue's own comments
+  are not sent (`doc/clerk.md`, Launching a run).
 - **On paper first**, as `pr fable high`, when a piece changes the
   form of a port that later pieces will copy, while its answers and
   rows stay the same: `kogo/run.sh` cannot tell one form from

@@ -103,9 +103,13 @@ queues the rest. Then exit: the run's comment starts the next clerk.
 - 40m is nearly always enough: the largest PR so far took 50m. Raise
   it for a reason you can state.
 - A run sees the description, the `Start:` with its brief, Linear
-  documents it links, the repository and the PR. It does not see the
-  issue's other comments. So point a review or a fix at the PR, where
-  the Handoff, the Review and its Rulings are whole, and quote none.
+  documents it links, the repository and the PR. When the brief or the
+  description names another issue, `lin launch` exports each one named,
+  its description and every comment, into one Linear document and
+  links it as the brief's last line, `Reads:`: name an issue and export
+  nothing by hand. The issue's own comments but the `Start:` are not
+  sent. So point a review or a fix at the PR, where the Handoff, the
+  Review and its Rulings are whole, and quote none.
 - The Review and Fix briefs name the step in `AGENTS.md` and add only
   what is particular to this PR. A port's Review brief names
   `doc/porting.md`'s "Keep the Kotlin's shape".

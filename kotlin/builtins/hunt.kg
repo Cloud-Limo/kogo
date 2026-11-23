@@ -71,11 +71,15 @@ fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int
     "hDecls" -> decls(xs, s, n, x)
     "hWords" -> words(s, n, x)
     "hExtensions" -> extensions(xs, s, n, x)
+    "hThis" -> "${shapeOf(n).area()} ${shapeOf(m).describe()} ${Tag(s).greeting()} ${asNamed(Tag(t)).greeting()} ${xs.map { Money(it, s) }.total()} ${xs.spread()} ${s.initials()} ${lightOf(n)?.next()} ${Light.red.next().next().short} ${Wrap(x).unwrap()} ${Wrap(x).plusOne()} ${Wrap(s).unwrap()} ${Money(x, s).scaled(n)} ${Money(x, s).scaled(n).worthMore(Money(y, t))}"
+    "hSortRaise" -> "${sortRaise(xs + ys)} ${sortRaise(xs + ys + xs + ys + xs + ys + xs + ys + xs + ys + xs)}"
+    "hLambdaCalls" -> lambdaCalls(xs, ys, s, n)
     "hCharJoin" -> s.map { if (it == ' ') '_' else it }.joinToString("") { "$it" } // kept: spec 3, half of a pair is U+FFFD
-    // The three below differ (DEV-1143): mise run kotlin prints each and exits 1.
+    // The four below differ (DEV-1143): mise run kotlin prints each and exits 1.
     "hInOrder" -> inOrder(n)
     "hGenericNull" -> genericNull(xs, x.takeIf { it > y })
     "hFunctionText" -> "${Rule(s, { it > 0L })}"
+    "hSortCalls" -> sortCalls(xs + ys)
     else -> null
 }
 
@@ -1049,4 +1053,77 @@ fun extensions(xs: List<Long>, s: String, n: Int, x: Long): String {
     val größe = n
     val _under = größe + 1
     return "${two.second()} ${two.head} ${x.pipe { it + 1L }.pipe(::double)} ${s.pipe { it.trim() }.shout} ${x.half().half()} ${n.isBig()} ${(-x).half()} ${-x.half()} ${s.wrapIn()} ${s.wrapIn("<")} ${s.wrapIn(close = ">")} ${applied(x)} ${applied(x) { it * 3L }} ${applied(f = { -it }, x = x)} ${pairUp(n, s)} ${pairUp(s, x, swap = true)} $empty $none ${empty + two.take(1)} ${listOf<Long>() == empty} ${setOf<Long>()} ${empty.sum()} $größe ${größe} $_under ${none.joinToString("-")} ${two.map { it.half() }.filter { it.toInt().isBig() }}"
+}
+
+fun Shape.area(): Int = when (this) {
+    is Shape.Dot -> n
+    is Shape.Line -> length * 2
+    Shape.Empty -> 0
+}
+
+fun Shape.describe(): String = if (this is Shape.Dot && n > 1) "big dot $n" else if (this is Shape.Line) "line $length" else "$this"
+
+fun Named.greeting(): String = "hi $name, ${title()}"
+
+fun List<Money>.total(): Long = if (isEmpty()) 0L else sumOf { it.cents } + size + first().cents
+
+fun List<Long>.spread(): String = if (isNotEmpty()) "${first()}..${last()} of $size ${map { it + 1L }.take(2)} ${this[0]} ${contains(1L)}" else "none"
+
+fun String.initials(): String = if (isNotEmpty()) "${startsWith("a")} ${trim().length} $length ${contains(' ')}" else "-"
+
+fun Light.next(): Light = when (this) {
+    Light.red -> Light.amber
+    Light.amber -> Light.green
+    Light.green -> Light.red
+}
+
+val Light.short: String
+    get() = name.take(1)
+
+fun <T> Wrap<T>.unwrap(): T = value
+
+fun Wrap<Long>.plusOne(): Long = value + 1L
+
+fun Money.scaled(by: Int): Money = copy(cents = cents * by)
+
+fun Money.worthMore(other: Money): Boolean = cents > other.cents || code == other.code && this != other
+
+fun lambdaCalls(xs: List<Long>, ys: List<Long>, s: String, n: Int): String {
+    var log = ""
+    fun seen(tag: String, v: Long): Long {
+        log += "$tag$v "
+        return v
+    }
+    val a = xs.none { seen("n", it) > n.toLong() }
+    val b = xs.firstOrNull { seen("f", it) > n.toLong() }
+    val c = xs.filter { seen("i", it) % 2L == 0L }
+    val e = xs.distinctBy { seen("d", it) % 3L }
+    val g = xs.groupBy { seen("g", it) % 2L }
+    val h = xs.mapNotNull { seen("m", it).takeIf { v -> v > 0L } }
+    val i = xs.joinToString("+") { "${seen("j", it)}" }
+    val j = xs.sumOf { seen("s", it) }
+    val k = xs.zip(ys).map { (p, q) -> seen("z", p) + q }
+    val l = xs.toSet().mapNotNull { seen("t", it).takeIf { v -> v != 1L } }
+    val o = s.ifEmpty { "${seen("e", 0L)}" }.ifBlank { "${seen("b", 1L)}" }
+    val p = s.filterNot { seen("c", 2L) == 3L }.length
+    val q = xs.mapIndexed { at, v -> seen("x$at:", v) }
+    val r = xs.take(2).map { v -> ys.take(2).filter { seen("y$v:", it) > v }.size }
+    return "$a $b $c $e $g $h $i $j $k $l $o $p $q $r $log"
+}
+
+// Differs: which keys sortedBy asks for, how often and in what order.
+fun sortCalls(xs: List<Long>): String {
+    var log = ""
+    val sorted = xs.sortedBy {
+        log += "$it "
+        it % 3L
+    }
+    return "$sorted $log"
+}
+
+fun sortRaise(xs: List<Long>): Either<String, Int> = either {
+    xs.mapIndexed { at, v -> at to v }.sortedBy { (at, v) ->
+        ensure(v >= 0L) { "negative $v at $at" }
+        v % 3L
+    }.size
 }

@@ -5,8 +5,10 @@ package rpc
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -302,8 +304,8 @@ type Handler[Env any] struct {
 // A server is what a Handler and Calls share: a list, its check if
 // it has one, and what its operations run with.
 type server[Env any] struct {
-	// Limit is how long the reruns of a Tx operation go on before
-	// the answer is 503.
+	// Limit is how long a request may take, from its start to its
+	// answer: past it, what it waits on ends and the answer is 503.
 	Limit time.Duration
 	check func(kogo.Tx, Env, Request) kogo.Either[string, rt.Unit]
 	ops   map[string]Operation[Env]
@@ -333,9 +335,10 @@ func newServer[Env any](check func(kogo.Tx, Env, Request) kogo.Either[string, rt
 }
 
 // ServeHTTP gives each request an id, before any rerun, and logs one
-// line for it with its outcome and time, one for each rerun with its
-// cause and one for a panic with its message and trace. It logs no
-// input, answer or refusal.
+// line for it with its outcome, its reruns and its time, one more
+// for a database that is down or cut off, with the driver's error,
+// and one for a panic, with its message and trace. It logs no input,
+// answer or refusal.
 func (h *Handler[Env]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimPrefix(r.URL.Path, "/")
 	res := h.run(r, name, func(op Operation[Env]) (any, result) {
@@ -371,6 +374,11 @@ func (h *Handler[Env]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// statusLeft is the status of a request whose client left before it
+// was answered, which nobody reads: nginx's, so that its log and the
+// served line agree.
+const statusLeft = 499
+
 // A result is how one call ended: at 200 an answer, or a refusal
 // whose words are text; at any other status, text is what a browser
 // is answered.
@@ -383,26 +391,47 @@ type result struct {
 
 // run is what a browser's call and Call share: the id, the log's
 // lines, the list's check, the limit and the reruns. input gives the
-// operation's input, or how the call ends without one.
+// operation's input, or how the call ends without one. One deadline,
+// Limit from the start, is on the context of everything inside: the
+// wait for a connection, each statement, the pause before a rerun.
 func (h *server[Env]) run(r *http.Request, name string, input func(Operation[Env]) (any, result)) (res result) {
 	start := time.Now()
 	id := kogo.NewId().String()
 	log := h.log.With("request", id, "operation", name)
+	reruns := 0
 	defer func() {
 		outcome := fmt.Sprint(res.status)
 		if res.status == http.StatusOK {
 			outcome = map[bool]string{false: "ok", true: "refused"}[res.refused]
 		}
-		log.Info("served", "outcome", outcome, "duration", time.Since(start))
+		log.Info("served", "outcome", outcome, "reruns", reruns, "duration", time.Since(start))
 	}()
+	ctx, cancel := context.WithTimeout(r.Context(), h.Limit)
+	defer cancel()
+	r = r.WithContext(ctx)
 	ranOut := false
 	defer func() {
 		p := recover()
-		if header, ok := p.(notText); ok {
+		err, _ := p.(error)
+		var pg *pgconn.PgError
+		code := ""
+		if errors.As(err, &pg) {
+			code = pg.Code
+		}
+		ended := errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || code == "57014"
+		switch header, ok := p.(notText); {
+		case p == nil:
+		case ok:
 			res = result{status: http.StatusBadRequest, text: name + ": " + header.String()}
-		} else if p != nil && ranOut {
+		case (ranOut || ended) && ctx.Err() == context.Canceled:
+			res = result{status: statusLeft}
+		case (ranOut || ended) && ctx.Err() != nil:
 			res = result{status: http.StatusServiceUnavailable, text: "request " + id}
-		} else if p != nil {
+		case code == "57014" || code == "57P01" || strings.HasPrefix(code, "08") || errors.Is(err, pgconn.ErrConnClosed) ||
+			errors.As(err, new(*pgconn.ConnectError)) || errors.As(err, new(net.Error)) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF):
+			log.Error("database", "error", err.Error())
+			res = result{status: http.StatusServiceUnavailable, text: "request " + id}
+		default:
 			log.Error("panic", "message", fmt.Sprint(p), "trace", string(debug.Stack()))
 			res = result{status: http.StatusInternalServerError, text: "request " + id}
 		}
@@ -410,7 +439,7 @@ func (h *server[Env]) run(r *http.Request, name string, input func(Operation[Env
 	// The list's check runs first, once, in a read-only transaction
 	// of its own: its refusal is a 403 with its words. An unchecked
 	// list has none, and only Call reaches it.
-	db := kogo.NewDb(r.Context(), h.pool)
+	db := kogo.NewDb(ctx, h.pool)
 	if h.check != nil {
 		checked := kogo.ReadOnlyTx(db, func(tx kogo.Tx) kogo.Either[string, rt.Unit] { return h.check(tx, h.env, Request{r}) })
 		if refusal, refused := checked.(kogo.Either_Left[string]); refused {
@@ -425,9 +454,9 @@ func (h *server[Env]) run(r *http.Request, name string, input func(Operation[Env
 	if stop.status != 0 {
 		return stop
 	}
-	again := func(conflict *pgconn.PgError) bool {
-		if ranOut = time.Since(start) >= h.Limit; !ranOut {
-			log.Info("rerun", "cause", map[string]string{"40001": "serialization failure", "40P01": "deadlock"}[conflict.Code])
+	again := func(*pgconn.PgError) bool {
+		if ranOut = ctx.Err() != nil; !ranOut {
+			reruns++
 		}
 		return !ranOut
 	}
@@ -474,8 +503,9 @@ func (r Refused) Error() string { return string(r) }
 // its enums can be wrong, which Call checks as the strict reader
 // does. Its error is a Refused, or the status and text a browser
 // would be answered: 400 for an enum or a header that is not UTF-8,
-// 404 for an operation not of the list, 500 with the request's id for
-// a panic, 503 past the limit.
+// 404 for an operation not of the list, 499 where r's client left,
+// 500 with the request's id for a panic, 503 with it past the limit
+// or where the database is down.
 func Call[Env, I, A any](c *Calls[Env], r *http.Request, op Op[Env, I, A], input I) (A, error) {
 	res := c.run(r, op.name, func(Operation[Env]) (any, result) {
 		if err := c.read.valid(reflect.ValueOf(&input).Elem(), "input"); err != nil {

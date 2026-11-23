@@ -863,8 +863,9 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
   commits when the block finishes, and rolls back on a failure or a
   panic. It is not rerun: a deadlock in it is a panic.
 - `db.tx(serializable = true) { ... }` runs at SERIALIZABLE and reruns the
-  block from the start on a serialization failure or deadlock, so the
-  block must have no effect outside the transaction.
+  block from the start on a serialization failure or deadlock, after a
+  short random pause, so the block must have no effect outside the
+  transaction.
 - The transaction ends with the block, so the block answers nothing
   that holds one (`tx-escapes`, 15.7): not the `Tx`, and not a value
   with one in a property. It answers the facts the lines after it
@@ -1737,7 +1738,19 @@ application chooses.
 | no operation of that name | 404 | |
 | a method other than `POST` | 405 | |
 | a panic (section 8) | 500 | the request's id |
-| the reruns of a `Tx` operation did not end in time | 503 | the request's id |
+| the request did not end within its limit | 503 | the request's id |
+| the database cannot be reached, or ended the connection | 503 | the request's id |
+| the client left before the answer | 499, which nobody reads | |
+
+- A request has one limit, from its start to its answer: 90 seconds
+  unless `main` sets another. Whatever the request waits on when it
+  passes ends there: a connection of the pool, a statement, a lock,
+  the pause before a rerun. Its connection goes back to the pool.
+- A rerun (15.3, 10.7) comes after a short random pause, so that two
+  requests that conflicted do not meet again in step.
+- A client that leaves ends its request as the limit would, and is
+  no bug: neither it nor a database that is down is answered or
+  logged as a panic.
 
 ### 15.6 TypeScript
 

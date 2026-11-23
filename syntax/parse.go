@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -218,6 +219,10 @@ func (p *parser) file() {
 			f.APIs = append(f.APIs, p.api())
 		} else if p.at("tests") && p.peek(1).kind == tIdent {
 			f.Tests = append(f.Tests, p.tests())
+		} else if (p.at("job") || p.at("effect")) && p.peek(1).kind == tIdent {
+			f.Queues = append(f.Queues, p.queue())
+		} else if p.at("work") && p.peek(1).kind == tIdent {
+			f.Works = append(f.Works, p.work())
 		} else {
 			f.Decls = append(f.Decls, p.decl(false))
 		}
@@ -274,6 +279,63 @@ func (p *parser) row() *Row {
 		p.fail(p.tok.pos, "syntax", "a row is %s gatedBy <gate>, or %s ungated, and nothing more: remove %s, or end the row with a comma or a new line (spec.md 15.1)", op, op, describe(p.tok))
 	}
 	return r
+}
+
+// queue reads a job or an effect: job name { parts }, or effect name
+// on table { parts }, each part a word and what it names, one a line
+// (doc/work.md, "The list of work"). The checker holds the words and
+// their order.
+func (p *parser) queue() *Queue {
+	q := &Queue{Pos: p.tok.pos, Effect: p.at("effect")}
+	p.next()
+	if _, q.Name = p.ident(); q.Effect {
+		if !p.got("on") {
+			p.fail(p.tok.pos, "syntax", "an effect names its table: effect %s on <table> { ... }", q.Name)
+		}
+		q.Table = p.path()
+	}
+	p.want("{")
+	for !p.at("}") {
+		pos, word := p.ident()
+		part := &Part{Pos: pos, Word: word}
+		if p.tok.nl || p.at("}") {
+			p.fail(p.tok.pos, "syntax", "%s names nothing: a part is a word and what it names, on one line, as %s <name>", word, word)
+		}
+		if word != "attempts" {
+			pos, name := p.ident()
+			part.Name = &Ident{pos, name}
+		} else if part.Unlimited = p.got("unlimited"); !part.Unlimited {
+			n, err := strconv.Atoi(p.tok.text)
+			if p.tok.kind != tNumber || err != nil || n < 1 {
+				p.fail(p.tok.pos, "syntax", "attempts is the most calls of act for a row: a whole number of 1 or more, or unlimited, found %s", describe(p.tok))
+			}
+			part.Attempts = n
+			p.next()
+		}
+		if !p.tok.nl && !p.at("}") {
+			p.fail(p.tok.pos, "syntax", "a job's and an effect's parts stand one a line, with no commas: move %s to a line of its own", describe(p.tok))
+		}
+		q.Parts = append(q.Parts, part)
+	}
+	p.want("}")
+	return q
+}
+
+// work reads a work list, work name alertedBy alert { queues }: its
+// queues are a list's entries.
+func (p *parser) work() *Work {
+	w := &Work{Pos: p.tok.pos}
+	p.next()
+	if _, w.Name = p.ident(); p.got("alertedBy") {
+		pos, name := p.ident()
+		w.Alert = &Ident{pos, name}
+	}
+	p.want("{")
+	p.entries("}", func() {
+		pos, name := p.ident()
+		w.Queues = append(w.Queues, &Ident{pos, name})
+	})
+	return w
 }
 
 // sameLine requires the token to stand on the line of the row of op.

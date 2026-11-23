@@ -95,6 +95,12 @@ func emitAll(info *check.Info, prelude, program []*syntax.File, root, outDir str
 				for _, d := range f.Tests {
 					e.tests(d)
 				}
+				for _, d := range f.Queues {
+					e.queue(d)
+				}
+				for _, d := range f.Works {
+					e.workList(d)
+				}
 			}
 		})
 		name := pkg[strings.LastIndexByte(pkg, '.')+1:]

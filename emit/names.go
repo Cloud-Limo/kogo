@@ -197,6 +197,12 @@ func (e *emitter) name(files []*syntax.File) {
 		for _, d := range f.Tests {
 			add(d, d, "", export(d.Name), export(d.Name)+"_tests")
 		}
+		for _, d := range f.Queues {
+			add(d, d, "", export(d.Name), export(d.Name)+map[bool]string{true: "_effect", false: "_job"}[d.Effect])
+		}
+		for _, d := range f.Works {
+			add(d, d, "", export(d.Name), export(d.Name)+"_work")
+		}
 	}
 	for _, pkg := range pkgs {
 		shared := map[string]int{}

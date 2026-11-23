@@ -1,0 +1,133 @@
+// A worker (doc/work.md, "Workers"): a sketch (DEV-1141), not in
+// spec.md. A job is database work in one transaction, which causes an
+// outside write only by inserting a row. An effect is one outside
+// write for one row of its table, in three steps: prepare in a
+// transaction, act with none open, record in a second. A work list
+// names the queues a worker serves and the fun that tells someone a
+// row failed for good. The runner calls each fun; nothing here calls
+// the runner.
+package example.parcels
+
+import kogo.http.Action
+import kogo.http.Http
+import kogo.http.HttpFailure
+import kogo.http.action
+import kogo.http.field
+import kogo.io.Console
+import kogo.time.Clock
+import kogo.work.Act
+import kogo.work.Alert
+import kogo.work.EffectKey
+import kogo.work.Failure
+
+data class DepotEnv(val courier: Http, val clock: Clock, val console: Console)
+
+// The list: a worker's queues in any order, each served on its own.
+work depot alertedBy tellTheDesk {
+    queueParcel
+    bookCourier
+}
+
+// The job. next claims one owed row, or none; run does it in that
+// transaction; failed marks a row whose run panicked, in a transaction
+// of its own, so that next stops finding it.
+job queueParcel {
+    next    nextNewParcel
+    run     queueDispatch
+    failed  parcelFailed
+}
+
+data class NewParcel(val id: Uuid, val address: String)
+
+fun nextNewParcel(tx: Tx, env: DepotEnv): NewParcel? =
+    tx.queryOne<NewParcel>(sql"""
+        select id, address from parcel where status = 'new'
+        order by id limit 1 for update skip locked
+    """)
+
+// The row it inserts is the effect's, under the parcel's own id: due
+// now, by the handed clock.
+fun queueDispatch(tx: Tx, env: DepotEnv, parcel: NewParcel) {
+    tx.execute(sql"update parcel set status = 'queued' where id = ${parcel.id}")
+    check(parcel.address != "nowhere") { "no depot serves nowhere" }
+    tx.execute(sql"""
+        insert into parcel_dispatch (id, next_attempt_at, parcel_id)
+        values (${parcel.id}, ${env.clock.now()}, ${parcel.id})
+    """)
+}
+
+fun parcelFailed(tx: Tx, env: DepotEnv, parcel: NewParcel, why: String) {
+    tx.execute(sql"update parcel set status = 'failed' where id = ${parcel.id}")
+}
+
+// The effect. Its table holds the runner's columns, and the runner
+// claims a row of it, reads it as the data class the steps take and
+// makes its key. attempts is how many calls of act a row may have.
+effect bookCourier on parcel_dispatch {
+    soonest   express_since
+    attempts  3
+    prepare   prepareBooking
+    act       book
+    record    recordBooking
+    failed    bookingFailed
+    recovery  bookingRecovery
+}
+
+data class Dispatch(val id: Uuid, val parcelId: Uuid)
+
+data class Label(val address: String, val grams: Int)
+
+fun prepareBooking(tx: Tx, env: DepotEnv, row: Dispatch): Either<String, Label> = either {
+    val label = tx.querySingle<Label>(sql"select address, grams from parcel where id = ${row.parcelId} for share")
+    ensure(label.address != "") { "The parcel has no address." }
+    label
+}
+
+val BOOKINGS: Action = action("POST", "/v1/bookings")
+
+// The one place a worker acts: no Tx and no Db reach it. What a failed
+// call means for the row is said here, case by case.
+action fun book(env: DepotEnv, key: EffectKey, label: Label): Act<String> {
+    val sent = env.courier.withHeader("Idempotency-Key", key.text)
+        .perform(BOOKINGS, listOf(field("address", label.address), field("grams", label.grams.toLong())))
+    return sent.fold(
+        { failure ->
+            when (failure) {
+                is HttpFailure.NotSent -> Act.NotMade(failure.why)
+                is HttpFailure.Unknown -> Act.Unknown(failure.why)
+                is HttpFailure.Unreadable -> Act.Unknown("the courier booked it, and ${failure.why}")
+                is HttpFailure.Refused -> Act.Refused("The courier does not deliver there.")
+            }
+        },
+        { answer ->
+            val tracking = answer.string("tracking")
+            if (tracking == null) Act.Unknown("the courier's answer has no tracking") else Act.Done(tracking)
+        })
+}
+
+fun recordBooking(tx: Tx, env: DepotEnv, row: Dispatch, tracking: String): Either<String, Unit> = either {
+    val status = tx.querySingle<String>(sql"select status from parcel where id = ${row.parcelId} for update")
+    ensure(status == "queued") { "Parcel ${row.parcelId} was withdrawn while the courier was booked." }
+    tx.execute(sql"update parcel_dispatch set tracking = $tracking where id = ${row.id}")
+    tx.execute(sql"update parcel set status = 'booked' where id = ${row.parcelId}")
+}
+
+fun bookingFailed(tx: Tx, env: DepotEnv, row: Dispatch, why: Failure) {
+    val message = when (why) {
+        is Failure.Refused -> why.why
+        is Failure.NotMade, is Failure.Exhausted, is Failure.Unrecorded -> "We could not book a courier."
+    }
+    tx.execute(sql"update parcel_dispatch set failed_message = $message where id = ${row.id}")
+}
+
+fun bookingRecovery(tx: Tx, env: DepotEnv, row: Dispatch, why: Failure): String? =
+    when (why) {
+        is Failure.Unrecorded -> "The courier holds a booking we did not record: cancel it with them. Do not run the reset statement below."
+        is Failure.Refused, is Failure.NotMade, is Failure.Exhausted -> null
+    }
+
+// The alert: the application's own, after the commit that failed the
+// row. Here it is a line on the console.
+action fun tellTheDesk(env: DepotEnv, alert: Alert): Either<String, Unit> = either {
+    env.console.println("ALERT ${alert.queue} ${alert.row}: ${alert.cause}. ${alert.recovery ?: "No words."}")
+}

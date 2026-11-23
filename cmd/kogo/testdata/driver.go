@@ -24,6 +24,7 @@ import (
 	"ROOT/example/markers"
 	"ROOT/example/ops"
 	"ROOT/example/origin"
+	"ROOT/example/parcels"
 	"ROOT/example/reply"
 	"github.com/Cloud-Limo/kogo/internal/testdb"
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
@@ -32,7 +33,9 @@ import (
 	kmail "github.com/Cloud-Limo/kogo/prelude/kogo/mail"
 	"github.com/Cloud-Limo/kogo/prelude/kogo/rpc"
 	ktime "github.com/Cloud-Limo/kogo/prelude/kogo/time"
+	"github.com/Cloud-Limo/kogo/prelude/kogo/work"
 	"github.com/Cloud-Limo/kogo/rt"
+	"github.com/jackc/pgx/v5"
 )
 
 // The rows that examples 10 to 19, 21, 22, 24, 27 and 28 read.
@@ -384,4 +387,58 @@ func main() {
 		}
 	}
 	show("no letter", in(db, func(tx kogo.Tx) *kogo.ByteArray { return letters.Queued(tx, kogo.NewId()) }))
+
+	// 32: a worker's two queues, stepped a pass at a time through the
+	// runner, against a courier that is a local server: it books the
+	// first parcel, answers 503 once for the second, and refuses the
+	// third. The fourth is one the job's run panics on.
+	busy := true
+	courier := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := goio.ReadAll(r.Body)
+		fmt.Printf("the courier is sent: %s [%s] %s\n", r.URL.Path, r.Header.Get("Idempotency-Key"), body)
+		switch {
+		case bytes.Contains(body, []byte("2 Low Rd")) && busy:
+			busy = false
+			w.WriteHeader(http.StatusServiceUnavailable)
+		case bytes.Contains(body, []byte("the moon")):
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			fmt.Fprint(w, `{"reason": "too far"}`)
+		default:
+			fmt.Fprintf(w, `{"tracking": "T-%d"}`, len(body))
+		}
+	}))
+	defer courier.Close()
+	if _, err := pool.Exec(ctx, `insert into parcel (id, depot, address, grams) values
+		('00000000-0000-0000-0000-0000000000a1', 'north', '1 High St', 500),
+		('00000000-0000-0000-0000-0000000000a2', 'north', '2 Low Rd', 900),
+		('00000000-0000-0000-0000-0000000000a3', 'north', 'the moon', 100),
+		('00000000-0000-0000-0000-0000000000a4', 'north', 'nowhere', 100)`); err != nil {
+		panic(err)
+	}
+	theCourier, err := khttp.New(khttp.Service{Address: courier.URL, Encoding: khttp.JSON, MaxAnswer: 1 << 10, Timeout: 5 * time.Second, Log: slog.New(slog.DiscardHandler)})
+	if err != nil {
+		panic(err)
+	}
+	nine := ktime.Instant{Seconds: 1795424400} // 2026-11-23T09:00:00Z
+	runner := &work.Runner[parcels.DepotEnv]{Pool: pool, Clock: ktime.FixedClock(nine), List: parcels.Depot, Log: slog.New(slog.DiscardHandler),
+		Env: parcels.DepotEnv{Courier: theCourier, Clock: ktime.FixedClock(nine), Console: io.NewConsole(os.Stdin, os.Stdout)}}
+	for range 5 {
+		show("queueParcel", runner.Pass(ctx, "queueParcel"))
+	}
+	dispatches := func(when string) {
+		rows, _ := pool.Query(ctx, `select concat_ws(' ', right(p.id::text, 2), p.status, 'attempts ' || attempts, case when failed then 'failed' end,
+			case when done_at is not null then 'done' end, 'next ' || to_char(next_attempt_at at time zone 'UTC', 'HH24:MI'), tracking, failed_message,
+			'(' || last_error || ')') from parcel p left join parcel_dispatch d on d.parcel_id = p.id order by p.id`)
+		lines, _ := pgx.CollectRows(rows, pgx.RowTo[string])
+		fmt.Printf("%s:\n  %s\n", when, strings.Join(lines, "\n  "))
+	}
+	dispatches("after the job")
+	for range 4 {
+		show("bookCourier at 09:00", runner.Pass(ctx, "bookCourier"))
+	}
+	dispatches("at 09:00")
+	runner.Clock = ktime.FixedClock(ktime.Instant{Seconds: nine.Seconds + 60})
+	show("bookCourier at 09:01", runner.Pass(ctx, "bookCourier"))
+	show("bookCourier at 09:01", runner.Pass(ctx, "bookCourier"))
+	dispatches("at 09:01")
 }

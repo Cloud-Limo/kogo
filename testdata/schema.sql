@@ -142,3 +142,30 @@ create function rename_all() returns void language sql as $$ update person set n
 -- A cast the schema defines, whose function can return null.
 create function amount_of(text) returns amount language sql as $$ select null::amount $$;
 create cast (text as amount) with function amount_of(text);
+
+-- A worker's queues (examples/32_work.kg; doc/work.md, "Workers"). A
+-- parcel waits to be handed to a courier: a job queues its dispatch,
+-- and an effect, whose table holds the runner's columns before its
+-- own, books the courier.
+create table parcel (
+    id uuid primary key,
+    depot text not null,
+    address text not null,
+    grams integer not null,
+    status text not null default 'new'
+);
+
+create table parcel_dispatch (
+    id uuid primary key,
+    attempts integer not null default 0,
+    next_attempt_at timestamptz not null,
+    claimed_at timestamptz,
+    last_error text,
+    failed boolean not null default false,
+    done_at timestamptz,
+    not_after timestamptz,
+    parcel_id uuid not null references parcel,
+    express_since timestamptz,
+    tracking text,
+    failed_message text
+);

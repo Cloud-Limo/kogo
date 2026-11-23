@@ -29,7 +29,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 		info: &Info{
 			Types: map[syntax.Node]Type{}, Uses: map[syntax.Node]Object{}, Calls: map[syntax.Node]*Call{},
 			Narrowed: map[*syntax.Ident]Type{}, Vars: map[syntax.Node][]*Var{}, Funcs: map[syntax.Node]*Func{},
-			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{}, SQL: map[*syntax.SQL]*Query{}, APIs: map[*syntax.API]*API{}, Tests: map[*syntax.Tests]*TestList{}, Core: core,
+			Classes: map[*syntax.ClassDecl]*TypeDecl{}, Fails: map[syntax.Node]Type{}, SQL: map[*syntax.SQL]*Query{}, APIs: map[*syntax.API]*API{}, Queues: map[*syntax.Queue]*Queue{}, Works: map[*syntax.Work]*WorkList{}, Tests: map[*syntax.Tests]*TestList{}, Core: core,
 		},
 		pkgs: map[string]*pkg{}, members: map[string][]*Func{}, imports: map[*syntax.File]map[string]*pkg{},
 		core: core, signer: sigs, optIns: map[*syntax.File]map[*TypeDecl]bool{}, reads: map[Object][]Object{}, stmts: map[Object][]reached{}, acting: map[*syntax.Lambda]string{},
@@ -60,6 +60,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 	}
 	c.overloads()
 	c.apis(program)
+	c.works(program)
 	for i := 0; i < len(c.bodies); i++ {
 		c.bodies[i]()
 	}

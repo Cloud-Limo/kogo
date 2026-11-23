@@ -63,6 +63,11 @@ type Info struct {
 	SQL map[*syntax.SQL]*Query
 	// APIs holds each api list (spec.md 15) with its operations.
 	APIs map[*syntax.API]*API
+	// Queues holds each job and effect, and Works each work list
+	// (doc/work.md; a sketch, DEV-1141). A queue that was refused is
+	// nil.
+	Queues map[*syntax.Queue]*Queue
+	Works  map[*syntax.Work]*WorkList
 	// Tests holds each tests list (spec.md 16) with its tests.
 	Tests map[*syntax.Tests]*TestList
 	// Core is the checker's own file, check/core.kg, as these tables

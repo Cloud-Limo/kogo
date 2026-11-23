@@ -65,8 +65,8 @@ func examples(t *testing.T, patterns ...string) map[string]string {
 func TestExamples(t *testing.T) {
 	testDB(t)
 	files := examples(t, "*.kg")
-	if len(files) != 32 {
-		t.Fatalf("%d examples, want 32", len(files))
+	if len(files) != 33 {
+		t.Fatalf("%d examples, want 33", len(files))
 	}
 	if code, out := kogo(t, files); code != 0 || out != "" {
 		t.Errorf("exit %d, want 0\n%s", code, out)
@@ -76,8 +76,9 @@ func TestExamples(t *testing.T) {
 // The Go that kogo emit writes for the examples is built with
 // testdata/driver.go and run, 10 to 19, 21 and 22 against the test
 // database, 22, 24, 25, 27 and 28 served over HTTP, 29 calling a local
-// server, 30 keeping a message's bytes: each result was worked out by hand
-// from the Kogo and the rows the driver begins with.
+// server, 30 keeping a message's bytes, 32 served by the runner a pass at
+// a time: each result was worked out by hand from the Kogo and the rows
+// the driver begins with.
 func TestEmittedGoRuns(t *testing.T) {
 	testDB(t)
 	// Inside the module, which holds the rt and the prelude it imports.
@@ -264,6 +265,37 @@ read back as eml wrote it: true
   Content-Type: text/plain
   Content-Disposition: attachment; filename="receipt-7.txt"
 no letter: null
+queueParcel: [done]
+queueParcel: [done]
+queueParcel: [done]
+ALERT queueParcel NewParcel(id=00000000-0000-0000-0000-0000000000a4, address=nowhere): no depot serves nowhere. No words.
+queueParcel: [failed]
+queueParcel: [idle]
+after the job:
+  a1 queued attempts 0 next 09:00
+  a2 queued attempts 0 next 09:00
+  a3 queued attempts 0 next 09:00
+  a4 failed
+the courier is sent: /v1/bookings [parcel_dispatch-00000000-0000-0000-0000-0000000000a1] {"address":"1 High St","grams":500}
+bookCourier at 09:00: [done]
+the courier is sent: /v1/bookings [parcel_dispatch-00000000-0000-0000-0000-0000000000a2] {"address":"2 Low Rd","grams":900}
+bookCourier at 09:00: [retry]
+the courier is sent: /v1/bookings [parcel_dispatch-00000000-0000-0000-0000-0000000000a3] {"address":"the moon","grams":100}
+bookCourier at 09:00: [refused]
+bookCourier at 09:00: [idle]
+at 09:00:
+  a1 booked attempts 0 done next 09:00 T-35
+  a2 queued attempts 1 next 09:01 (the service answered 503)
+  a3 queued attempts 1 failed next 09:00 The courier does not deliver there. (The courier does not deliver there.)
+  a4 failed
+the courier is sent: /v1/bookings [parcel_dispatch-00000000-0000-0000-0000-0000000000a2] {"address":"2 Low Rd","grams":900}
+bookCourier at 09:01: [done]
+bookCourier at 09:01: [idle]
+at 09:01:
+  a1 booked attempts 0 done next 09:00 T-35
+  a2 booked attempts 0 done next 09:01 T-34
+  a3 queued attempts 1 failed next 09:00 The courier does not deliver there. (The courier does not deliver there.)
+  a4 failed
 `
 	if err != nil || string(out) != want {
 		t.Errorf("%v\n got:\n%s\nwant:\n%s", err, out, want)

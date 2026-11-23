@@ -1,0 +1,30 @@
+// What the runner hands a worker's funs and what they answer
+// (doc/work.md, "Workers"): a sketch (DEV-1141), not in spec.md.
+package kogo.work
+
+// The key of one effect's row, <table>-<id>. Only the runner makes
+// one, and it is the same at every call of act for the row.
+external class EffectKey
+
+external val EffectKey.text: String
+
+// What an effect's act came to.
+sealed interface Act<out R> {
+    data class Done<R>(val result: R) : Act<R>          // the write was made
+    data class Refused(val why: String) : Act<Nothing>  // the service's no, for the customer: nobody is alerted
+    data class NotMade(val why: String) : Act<Nothing>  // it was not made, and will not be tried again
+    data class Unknown(val why: String) : Act<Nothing>  // it may have been made: offer the row again
+}
+
+// Why an effect's row failed for good.
+sealed interface Failure {
+    data class Refused(val why: String) : Failure
+    data class NotMade(val why: String) : Failure
+    data class Exhausted(val why: String) : Failure     // act answered Unknown at its last attempt
+    data class Unrecorded(val why: String) : Failure    // the write was made, and record gave a Left or panicked
+}
+
+// What the runner knows of a row that failed for good, for the
+// application's alert. table, id and reset are an effect's.
+data class Alert(val queue: String, val table: String?, val id: String?, val row: String,
+                 val cause: String, val recovery: String?, val reset: String?)

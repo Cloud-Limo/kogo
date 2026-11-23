@@ -74,6 +74,15 @@ func TestCheckExamples(t *testing.T) {
 		"28_session.kg:33:42 (it: Uuid) -> ",
 		"30_mail.kg:22:16 (id: Uuid, eml(mail): ByteArray) -> ",
 		"30_mail.kg:25:28 (id: Uuid) -> eml: ByteArray",
+		"32_work.kg:43:28 () -> id: Uuid, address: String",
+		"32_work.kg:51:16 (parcel.id: Uuid) -> ",
+		"32_work.kg:53:16 (parcel.id: Uuid, env.clock.now(): Instant, parcel.id: Uuid) -> ",
+		"32_work.kg:60:16 (parcel.id: Uuid) -> ",
+		"32_work.kg:81:39 (row.parcelId: Uuid) -> address: String, grams: Int",
+		"32_work.kg:109:41 (row.parcelId: Uuid) -> status: String",
+		"32_work.kg:111:16 (tracking: String, row.id: Uuid) -> ",
+		"32_work.kg:112:16 (row.parcelId: Uuid) -> ",
+		"32_work.kg:120:16 (message: String, row.id: Uuid) -> ",
 	}
 	lines, code := kogoSQL(t, "check", "../../examples")
 	if code != 0 || len(lines) != len(want) {

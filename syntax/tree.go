@@ -46,6 +46,8 @@ type File struct {
 	Imports []*Import
 	Decls   []Decl
 	APIs    []*API   // the api lists
+	Queues  []*Queue // the job and effect forms (doc/work.md; a sketch, DEV-1141)
+	Works   []*Work  // the work lists
 	Tests   []*Tests // the tests lists
 	SQL     []*SQL   // every sql literal of the file, in source order
 	Lines   int      // the line the source ends on
@@ -82,6 +84,35 @@ type API struct {
 type Row struct {
 	Op   *Ident
 	Gate *Ident // nil in an ungated row
+}
+
+// A Queue is a job or an effect: job name { parts }, or effect name on
+// table { parts }, its parts one a line (doc/work.md, "The list of
+// work").
+type Queue struct {
+	Pos
+	Effect bool
+	Name   string
+	Table  *Ident // an effect's; nil for a job
+	Parts  []*Part
+}
+
+// A Part is one line of a job or an effect: a word and the fun or the
+// column it names, or for attempts a number, or unlimited.
+type Part struct {
+	Pos
+	Word      string
+	Name      *Ident // nil for attempts
+	Attempts  int    // of attempts; 0 for unlimited
+	Unlimited bool
+}
+
+// A Work is a work list, work name alertedBy alert { queues }.
+type Work struct {
+	Pos
+	Name   string
+	Alert  *Ident // nil where the head names none
+	Queues []*Ident
 }
 
 // A Tests is a tests list, tests name<Env> { a, b }: the top-level

@@ -67,8 +67,8 @@ func write(b *strings.Builder, v reflect.Value) {
 // line a declaration, then one an api or a tests list.
 func TestExamples(t *testing.T) {
 	files, _ := filepath.Glob("../examples/*.kg")
-	if len(files) != 32 {
-		t.Fatalf("%d examples, want 32", len(files))
+	if len(files) != 33 {
+		t.Fatalf("%d examples, want 33", len(files))
 	}
 	var got strings.Builder
 	for _, file := range files {
@@ -89,6 +89,12 @@ func TestExamples(t *testing.T) {
 		}
 		for _, l := range f.Tests {
 			got.WriteString(show(l) + "\n")
+		}
+		for _, q := range f.Queues {
+			got.WriteString(show(q) + "\n")
+		}
+		for _, w := range f.Works {
+			got.WriteString(show(w) + "\n")
 		}
 	}
 	if *update {

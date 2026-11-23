@@ -106,6 +106,11 @@ queues the rest. Then exit: the run's comment starts the next clerk.
   documents it links, the repository and the PR. It does not see the
   issue's other comments. So point a review or a fix at the PR, where
   the Handoff, the Review and its Rulings are whole, and quote none.
+  `lin launch` exports each other issue the brief or the description
+  names, its description and every comment, into one Linear document
+  and links it as the brief's last line, `Reads:`; so name an issue
+  and export nothing by hand. It makes a document only when another
+  issue is named, and the issue's own comments are still not sent.
 - The Review and Fix briefs name the step in `AGENTS.md` and add only
   what is particular to this PR. A port's Review brief names
   `doc/porting.md`'s "Keep the Kotlin's shape".

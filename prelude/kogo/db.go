@@ -5,9 +5,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -59,19 +61,28 @@ func Db_Tx_Boolean_TxToA[A any](this Db, serializable *bool, block func(Tx) A) A
 // where not, as stated and not left to the database's default. block
 // is run again from the start for as long as Postgres ends it with a
 // serialization failure or a deadlock and again, told which, says to
-// go on. Where again says not to, Postgres's error is a panic.
+// go on, after a random pause, up to 5 ms after the first conflict
+// and 5 ms more after each, to 50, so that the two that conflicted
+// do not meet again in step; db's context ends the pause. Where again
+// says not to, Postgres's error is a panic.
 func InTx[A any](db Db, serializable bool, again func(conflict *pgconn.PgError) bool, block func(Tx) A) A {
 	level := pgx.ReadCommitted
 	if serializable {
 		level = pgx.Serializable
 	}
-	for {
+	for n := 1; ; n++ {
 		a, conflict := attempt(db, pgx.TxOptions{IsoLevel: level}, block)
 		if conflict == nil {
 			return a
 		}
 		if !again(conflict) {
 			panic(conflict)
+		}
+		pause := time.NewTimer(rand.N(time.Duration(min(n, 10)) * 5 * time.Millisecond))
+		select {
+		case <-pause.C:
+		case <-db.ctx.Done():
+			pause.Stop()
 		}
 	}
 }

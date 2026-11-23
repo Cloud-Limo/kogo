@@ -4499,3 +4499,42 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
   - Not taken: `find` and `fair` as designed on 17 Nov; `find` held to an id, a tenant and
     one time, with a test pinning each view's columns.
   - Reopen with tenants in the dozens or more, when the idle cost or that wait is felt.
+
+## A request ends at its limit (DEV-1136), 23 Nov 2026
+
+The agent's, on DEV-1133's stress run; the issue gave the three mends and left these.
+
+- **The deadline is on the request's own context, which `run` hands on**: `Limit` from the
+  start, on the `Db` and on the `Request` an operation is given, so a check, a gate and
+  anything later that reads the request's context share it. Not taken: a deadline on the
+  `Db` alone. An outbound call (`khttp`) still has its own `Timeout` and not this one
+  (spec 13: "the handle carries the deadline" is not built). Reopen when that is.
+- **A client that left is served as 499 and logged by the served line alone**, outcome
+  `499`: nginx's status for it, so its log and ours agree. Not taken: a word of its own as
+  the outcome (`left`), or a line of its own beside the served line. Call gives it as a
+  `Failed` of 499.
+- **The three kinds are told apart by the panic's value and the context.** A context error
+  or Postgres's `57014` while the request's context is done is the client's leaving where
+  the context was cancelled, and the limit where its deadline passed (503, no line beyond
+  the served one, as a rerun past the limit was). Otherwise `57014`, class `57P`, class `08`,
+  `pgconn.ConnectError`, `pgconn.ErrConnClosed`, a `net.Error` or an EOF is a database
+  that is down: 503 with the request's id, and one ERROR line, `database`, with the
+  driver's error and no trace. Anything else is the panic it is. Not taken: a WARN for the
+  database (it is an operator's to act on); a trace for it (it names no Kogo line worth
+  reading). Class `57P` is the whole of it, not `57P01` alone: `57P02` is the crash
+  restart every session sees after one backend crashes, and `57P04` a dropped database
+  (the Review, Fix 1).
+- **`Call`'s error is a `Failed{Status, Text}`, not a plain error** (the lead's Ruling on
+  the Review's Question 8): its `Error()` is the same `"503 request …"`, and a route
+  answers its `Status`, so a database that is down behind a route reaches nginx as the
+  503 it is and not a 500. Not taken: leaving the status in the error's text alone, which
+  a route could only parse.
+- **A rerun pauses for a random time up to 5 ms after the first conflict and 5 ms more
+  after each, to 50 ms**, in `InTx`, so in `db.tx(serializable = true)` too, and the
+  request's context ends the pause. Not taken: a fixed pause (two that conflicted stay in
+  step); an exponential one (a request waits more than the conflict costs).
+- **The served line counts reruns, `reruns`, always present; the cause of each is no
+  longer logged.** Postgres logs each serialization failure and deadlock with its detail.
+  Not taken: a count for each cause. Reopen if Postgres's log is not kept beside ours.
+- **A pool's wait for a connection still has no limit of its own** (Q12 stands): the
+  request's deadline ends it.

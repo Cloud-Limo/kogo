@@ -304,9 +304,11 @@ one walk over the emitted types, as `==` is, by the names the structs
 already carry: no reader or writer is emitted for each type. Go's
 reflection does not list an enum's constants, so the table carries each
 that its inputs reach. Reruns are those of `db.tx(serializable = true)`,
-here with a limit, since a person is waiting: 90 seconds unless `main`
-says otherwise, and past it the answer is 503, so that a 500 always
-means a bug.
+here with a limit, since a person is waiting: one deadline on the whole
+request, 90 seconds unless `main` says otherwise, that ends whatever it
+waits on, a connection, a statement or a rerun, and past it the answer
+is 503. A database that is down is a 503 too, and a client that left a
+499 nobody reads, so that a 500 always means a bug.
 
 **The application's `main`** is Go that it writes once: read the
 configuration, open the pool, build the environment's handles, mount
@@ -333,10 +335,12 @@ a new setting needs no Go (`decisions.md`, 18 Nov 2026).
 **Logging.** One id for each HTTP request, given before any rerun and
 written on every line about it: an id for each attempt makes a rerun
 look like a second request. For every request: the operation, the
-outcome (ok, refused, or the status), the time taken, and each rerun
+outcome (ok, refused, or the status), the time taken, and how many
+reruns it took, on the one line: Postgres's own log has each conflict
 with its cause, since a serialization failure and a deadlock call for
-different investigations. For a panic: its message and a trace that
-names the Kogo file and line. Never an input, an answer or a refusal's
+different investigations. For a database that is down, one line with
+the driver's error and no trace. For a panic: its message and a trace
+that names the Kogo file and line. Never an input, an answer or a refusal's
 words: they carry login codes and personal data. The lines go to a
 logger that `main` passes.
 

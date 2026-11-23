@@ -19,8 +19,9 @@ names no check, the chain with a
 step's type such as `DeliveryFailure_needsRcpt`, and
 `rpc.ReadSettings`. Two lines below are ahead of them: `rpc.NewCalls`
 and `rpc.NewHandler` take no clock yet (Q8). `rpc.Call`'s error is an
-`rpc.Refused` for a refusal, and otherwise the status and text a
-browser would get. Changed on 23 Nov 2026, each marked with the date:
+`rpc.Refused` for a refusal, and otherwise an `rpc.Failed` with the
+status and text a browser would get, whose `Status` a route answers
+(DEV-1136). Changed on 23 Nov 2026, each marked with the date:
 Go listens on `deployment.goPort`, a key of its own, and the settings
 move is its own PR, DEV-1124. Built since (DEV-1125, cusoon2 PR
 1611): the slice the ops list needs, marked where it departs from the
@@ -307,7 +308,7 @@ func logout(calls *rpc.Calls[app.Env]) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reply, err := rpc.Call(calls, r, routes.Logout_op, rt.Unit{})
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(status(err))
 			return
 		}
 		rpc.SetCookies(w, reply.Cookies)
@@ -349,9 +350,18 @@ func webhook(calls *rpc.Calls[app.Env], secret *string, log *slog.Logger) http.H
 		reason, _ := field("message")
 		in := routes.DeliveryFailure_().MessageId(id).Rcpt(rcpt).Event(event).Kind(kind).Reason(reason)
 		if _, err := rpc.Call(calls, r, routes.RecordDeliveryFailure_op, in); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(status(err))
 		}
 	}
+}
+
+// status is the answer to a failed Call: its Status, a 503 where the
+// database is down, and 500 for a refusal, which neither route expects.
+func status(err error) int {
+	if f, ok := err.(rpc.Failed); ok {
+		return f.Status
+	}
+	return http.StatusInternalServerError
 }
 
 func or(s, otherwise string) string {
@@ -402,10 +412,10 @@ days after a deploy). **Never** means no test sees it.
 | [5] the runner | 1 | nothing: a queue is Kogo's | `ctx`, the signal's, reaching a row's transaction or `act` | at a deploy: SIGTERM cancels a Stripe call in flight. `work.Run` stops claiming rows when `ctx` is done and finishes each row on a context of its own, as the Kotlin's `Drain` does (`GracefulShutdown.kt:31`) |
 | [6] commands, `check-config` | 10 | nothing: a command is Kogo's | `check-config` opening the pool | start: the deploy's check needs the database |
 
-About 315 lines in the file, 230 of them code, not imports, blanks or
+About 320 lines in the file, 235 of them code, not imports, blanks or
 comments; before the answers of 18 Nov it was 310 and 240. Written
-once: about 135 (`run`, `load`'s frame, the pool, `web`'s frame, the
-address, the drain, `or`). The other 95 grow, and with less than they
+once: about 140 (`run`, `load`'s frame, the pool, `web`'s frame, the
+address, the drain, `status`, `or`). The other 95 grow, and with less than they
 did: a service adds 2 lines, a step and its keys; a key of Go's adds 1
 or 2; a list a third of a line; a route 10 to 35 and a line of `web`.
 A setting, a queue or a command adds nothing: on paper before, a

@@ -15,7 +15,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Cloud-Limo/kogo/internal/testdb"
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
@@ -199,7 +201,25 @@ var table = Table[env]{Check: ours, Operations: []Operation[env]{
 	Outside("serializableOutside", true, level, levelWork),
 	Gated("strays", true, strays, bound), Outside("straysOutside", true, strays, act),
 	Gated("straysPlain", false, strays, bound),
+	Tx("waits", false, waits), Tx("cut", false, cut), Tx("crashed", false, crashed),
 }}
+
+// waits locks the row "locked", which a test holds from a connection
+// of its own, and so waits until that ends or the request does.
+func waits(tx kogo.Tx, _ env, _ Request, _ rt.Unit) kogo.Either[string, bool] {
+	return kogo.Either_Right[bool]{Value: kogo.Tx_Exists(tx, "select 1 from person where name = 'locked' for update")}
+}
+
+// crashed fails as every session does while Postgres restarts after
+// a backend of its own crashed.
+func crashed(kogo.Tx, env, Request, rt.Unit) kogo.Either[string, bool] {
+	panic(&pgconn.PgError{Code: "57P02"})
+}
+
+// cut ends its own connection, as Postgres ends one when it stops.
+func cut(tx kogo.Tx, _ env, _ Request, _ rt.Unit) kogo.Either[string, bool] {
+	return kogo.Either_Right[bool]{Value: kogo.Tx_Exists(tx, "select pg_terminate_backend(pg_backend_pid())")}
+}
 
 func TestHandler(t *testing.T) {
 	url := os.Getenv("KOGO_TEST_DATABASE_URL")
@@ -360,18 +380,22 @@ func TestHandler(t *testing.T) {
 		t.Errorf("two gated requests in conflict answer %v after %d attempts and %d runs of the gate", answers, n, h.env.gates.Load())
 	}
 
-	// The log: a line for each request, with its id; reruns and a
-	// panic under the request's id; no input, answer or refusal.
-	ids, reruns, readOnly := map[any]string{}, map[any]string{}, map[string]bool{}
+	// The log: a line for each request, with its id and its count of
+	// reruns, and no line for a rerun; a panic under the request's id;
+	// no input, answer or refusal.
+	ids, reruns, readOnly := map[any]string{}, map[string]float64{}, map[string]bool{}
 	for _, l := range lines() {
 		switch l["msg"] {
 		case "served":
-			if _, ok := l["duration"]; !ok {
-				t.Errorf("a served line has no duration: %v", l)
+			_, timed := l["duration"]
+			n, counted := l["reruns"].(float64)
+			if !timed || !counted {
+				t.Errorf("a served line has no duration or reruns: %v", l)
 			}
 			ids[l["request"]] = l["operation"].(string) + " " + l["outcome"].(string)
+			reruns[ids[l["request"]]] += n
 		case "rerun":
-			reruns[l["request"]] = l["cause"].(string)
+			t.Errorf("a rerun has a line of its own: %v", l)
 		case "panic":
 			// The check that writes panics with Postgres's refusal,
 			// and so does a gate that strays.
@@ -389,13 +413,8 @@ func TestHandler(t *testing.T) {
 	if len(ids) != 45 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
-	causes := map[string]bool{}
-	for id, cause := range reruns {
-		causes[ids[id]+" "+cause] = true
-	}
-	if !causes["race ok serialization failure"] || !causes["deadlocked 503 deadlock"] ||
-		!causes["deadlockedPlain 503 deadlock"] {
-		t.Errorf("reruns are logged as %v", reruns)
+	if reruns["race ok"] < 1 || reruns["heldRace ok"] < 1 || reruns["deadlocked 503"] < 1 || reruns["deadlockedPlain 503"] < 1 || reruns["add ok"] != 0 {
+		t.Errorf("reruns are counted as %v", reruns)
 	}
 }
 
@@ -440,7 +459,7 @@ func TestCall(t *testing.T) {
 	cross, wild := Mood("Cross"), Mood("Wild")
 	who, err := Call(calls, r, NewOp[env, rt.Unit, Who]("who"), rt.Unit{})
 	reply, replyErr := Call(calls, r, NewOp[env, Person, Reply[string]]("signIn"), Person{Name: "called-in"})
-	calls.Limit = 0
+	calls.Limit = 100 * time.Millisecond
 	for i, c := range [][2]string{
 		{show(Call(calls, r, addOp, Person{Name: "called"})), "secret answer"},
 		{show(Call(calls, r, addOp, Person{Name: "refused call"})), "refused: secret refusal"},
@@ -469,6 +488,11 @@ func TestCall(t *testing.T) {
 		if m["msg"] == "served" && m["request"] != "" {
 			served = append(served, fmt.Sprint(m["operation"], " ", m["outcome"]))
 		}
+	}
+	// A failure is a Failed, whose Status a route answers.
+	_, err = Call(calls, r, NewOp[env, rt.Unit, int32]("deadlocked"), rt.Unit{})
+	if f, _ := err.(Failed); f.Status != 503 {
+		t.Errorf("deadlocked fails with %#v, want a Failed of 503", err)
 	}
 	if got, want := strings.Join(served, ","), "who ok,signIn ok,add ok,add refused,add 500,nothing 404,feel ok,feel 400,deadlocked 503"; got != want {
 		t.Errorf("served %s, want %s", got, want)
@@ -542,5 +566,107 @@ func TestLimits(t *testing.T) {
 	}
 	if got, want := strings.Join(served, ","), "served add ok,served add 413,served add ok,served add 413,served add 413,served add 400,served add ok,served who 400,served who ok"; got != want || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log is %s, want %s, with no value:\n%s", got, want, log.String())
+	}
+}
+
+// A request ends at its Limit, whatever it waits on: a row lock, or a
+// connection of a pool that every one of them holds. Each answers 503
+// and gives its connection back. A request whose client leaves is
+// served as 499, a database that ends the connection or cannot be
+// reached is a 503 and one line, and neither is logged as a panic.
+func TestDeadline(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://kogo:kogo@127.0.0.1/kogo_test")
+	ctx := context.Background()
+	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
+	defer drop()
+	var log bytes.Buffer
+	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}, &sync.Map{}}, slog.New(slog.NewJSONHandler(&log, nil)))
+	h.Limit = 500 * time.Millisecond
+	post := func(rctx context.Context, name string) (int, time.Duration) {
+		start, w := time.Now(), httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequestWithContext(rctx, "POST", "/"+name, nil))
+		return w.Code, time.Since(start)
+	}
+	// The row is locked by a connection outside the pool, until the
+	// test ends or for 3 seconds, after which a request that has not
+	// ended answers. A request waits on it; then the test holds every
+	// connection of the pool itself, for 2.
+	pool.Exec(ctx, "insert into person (id, name, email) values ($1, 'locked', 'locked')", kogo.NewId())
+	holder, err := pgx.ConnectConfig(ctx, pool.Config().ConnConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer holder.Close(ctx)
+	lock, _ := holder.Begin(ctx)
+	lock.Exec(ctx, "select 1 from person where name = 'locked' for update")
+	unlock := sync.OnceFunc(func() { lock.Rollback(ctx) })
+	time.AfterFunc(3*time.Second, unlock)
+	defer unlock()
+	// The client leaves while its request waits on the row.
+	left, leave := context.WithCancel(ctx)
+	time.AfterFunc(100*time.Millisecond, leave)
+	if status, _ := post(left, "waits"); status != 499 {
+		t.Errorf("a request whose client left answers %d, want 499", status)
+	}
+	// A connection a request ended is closed, and the pool counts it
+	// given back once it is.
+	held := func() (busy int32) {
+		for end := time.Now().Add(time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+			if busy = pool.Stat().AcquiredConns(); busy == 0 {
+				break
+			}
+		}
+		return
+	}
+	if status, _ := post(ctx, "waits"); status != 503 {
+		t.Errorf("a request waiting on a row lock answers %d, want 503", status)
+	}
+	if busy := held(); busy != 0 {
+		t.Errorf("%d connections are still held a second after every request ended", busy)
+	}
+	var taken []*pgxpool.Conn
+	for range pool.Config().MaxConns {
+		c, _ := pool.Acquire(ctx)
+		taken = append(taken, c)
+	}
+	give := sync.OnceFunc(func() {
+		for _, c := range taken {
+			c.Release()
+		}
+	})
+	time.AfterFunc(2*time.Second, give)
+	if status, took := post(ctx, "who"); status != 503 || took > time.Second {
+		t.Errorf("a request waiting on a full pool answers %d after %v, want 503 at %v", status, took, h.Limit)
+	}
+	give()
+	// The database ends the connection, or there is none to reach.
+	if status, _ := post(ctx, "cut"); status != 503 {
+		t.Errorf("a connection the database ended answers %d, want 503", status)
+	}
+	if status, _ := post(ctx, "crashed"); status != 503 {
+		t.Errorf("a database restarting after a crash answers %d, want 503", status)
+	}
+	down, _ := pgxpool.New(ctx, "postgres://kogo:kogo@127.0.0.1:1/kogo_test")
+	defer down.Close()
+	h.pool = down
+	if status, _ := post(ctx, "who"); status != 503 {
+		t.Errorf("a database that cannot be reached answers %d, want 503", status)
+	}
+	if busy := held(); busy != 0 {
+		t.Errorf("%d connections are still held a second after every request ended", busy)
+	}
+	var got []string
+	for _, l := range strings.Split(strings.TrimSpace(log.String()), "\n") {
+		var m map[string]any
+		json.Unmarshal([]byte(l), &m)
+		if m["level"] != "INFO" {
+			_, traced := m["trace"]
+			got = append(got, fmt.Sprint(m["level"], " ", m["msg"], " ", m["operation"], " ", traced))
+		} else if m["outcome"] != "503" {
+			got = append(got, fmt.Sprint(m["msg"], " ", m["operation"], " ", m["outcome"]))
+		}
+	}
+	if got, want := strings.Join(got, ","), "served waits 499,ERROR database cut false,ERROR database crashed false,ERROR database who false"; got != want {
+		t.Errorf("the log is %s, want %s:\n%s", got, want, log.String())
 	}
 }

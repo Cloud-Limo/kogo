@@ -11,7 +11,8 @@ import (
 )
 
 // DEV-1144, a sketch: each test states what the pass should answer
-// and fails today. The runs behind them are in the issue's report.
+// and fails today. The runs behind them are in the issue's report,
+// under each finding's number.
 
 // stressed gives a Checker over a schema of the test's own, made
 // from statements in the test database and dropped after.
@@ -69,11 +70,11 @@ func wantCode(t *testing.T, c *Checker, literal, code string) {
 	}
 }
 
-// A: a name written twice is one parameter, so the one Postgres sees
-// outside a quoted string hides the one inside it, whose text is then
-// sent as $1: 'costs $1', an interval of '$1 days', which Postgres
-// reads as one day, a pattern that looks for the text $1, and a
-// jsonpath that looks for a variable named 1.
+// Finding 1: a name written twice is one parameter, so the one
+// Postgres sees outside a quoted string hides the one inside it,
+// whose text is then sent as $1: 'costs $1', an interval of '$1
+// days', which Postgres reads as one day, a pattern that looks for
+// the text $1, and a jsonpath that looks for a variable named 1.
 func TestStressNameInsideAString(t *testing.T) {
 	c := stressed(t, `create table t (id integer primary key, name text not null, at timestamptz not null, j jsonb not null);`)
 	wantCode(t, c, `select 'costs $x' as label from t where id = $x`, "sql-parameter-syntax")
@@ -83,9 +84,9 @@ func TestStressNameInsideAString(t *testing.T) {
 		"sql-parameter-syntax")
 }
 
-// I: Postgres 18 sets attnotnull for a NOT NULL constraint that is
-// NO INHERIT, and a child's rows, which the parent's scan gives, may
-// hold a null. Only `from only` keeps the column non-null.
+// Finding 9: Postgres 18 sets attnotnull for a NOT NULL constraint
+// that is NO INHERIT, and a child's rows, which the parent's scan
+// gives, may hold a null. Only `from only` keeps the column non-null.
 func TestStressNotNullNoInherit(t *testing.T) {
 	c := stressed(t, `
 		create table par (id integer primary key, v text, constraint par_v_nn not null v no inherit);
@@ -94,8 +95,9 @@ func TestStressNotNullNoInherit(t *testing.T) {
 	wantSignature(t, c, `select p as row from par p`, "() -> row: par(id: Int, v: String?)")
 }
 
-// J: the tree Postgres logs is the statement before its rules are
-// applied, and a rule replaces returning's list with its own.
+// Finding 10: the tree Postgres logs is the statement before its
+// rules are applied, and a rule replaces returning's list with its
+// own.
 func TestStressRuleRewritesReturning(t *testing.T) {
 	c := stressed(t, `
 		create table r (id integer primary key, v text not null);
@@ -104,10 +106,11 @@ func TestStressRuleRewritesReturning(t *testing.T) {
 	wantSignature(t, c, `insert into r values (1, 'x') returning v`, "() -> v: String?")
 }
 
-// K: spec 10.1 has any $ but $name, ${expr} and $1 as SQL text, and
-// Postgres accepts each of these as written. The other way to settle
-// it keeps the refusals, as A wants one more, and has each message
-// say how a $ is written as text: 'in ' || chr(36) || 'AUD' passes.
+// Finding 11: spec 10.1 has any $ but $name, ${expr} and $1 as SQL
+// text, and Postgres accepts each of these as written. The other way
+// to settle it keeps the refusals, as finding 1 wants one more, and
+// has each message say how a $ is written as text: 'in ' || chr(36)
+// || 'AUD' passes.
 func TestStressDollarText(t *testing.T) {
 	c := stressed(t, `create table t (id integer primary key, amount numeric not null);`)
 	wantSignature(t, c, `select $q$hello$q$ as "s!"`, "() -> s: String")
@@ -116,9 +119,10 @@ func TestStressDollarText(t *testing.T) {
 	wantSignature(t, c, `select 'in $AUD' as "s!"`, "() -> s: String")
 }
 
-// L: Postgres types $x from `id = $x`, then finds `$x is null` untyped
-// and says so with SQLSTATE 42P08, not 42P18, so the message lacks
-// "write a cast after it" for the mistake 10.6's idiom invites.
+// Finding 12: Postgres types $x from `id = $x`, then finds `$x is
+// null` untyped and says so with SQLSTATE 42P08, not 42P18, so the
+// message lacks "write a cast after it" for the mistake 10.6's idiom
+// invites.
 func TestStressOptionalFilterWithoutCast(t *testing.T) {
 	c := stressed(t, `create table t (id integer primary key, name text not null);`)
 	wantCode(t, c, `select name from t where ($x is null or id = $x)`, "sql-untyped-parameter")

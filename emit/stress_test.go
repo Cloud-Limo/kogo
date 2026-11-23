@@ -12,7 +12,7 @@ import (
 
 // DEV-1144, a sketch: each test runs emitted Go against a schema of
 // its own and states what it should give; each fails today. The runs
-// behind them are in the issue's report.
+// behind them are in the issue's report, under each finding's number.
 
 // What the driver of a stress test declares: db, over a pool of one
 // connection, so that a statement prepared before the schema moves is
@@ -89,13 +89,13 @@ func stress(t *testing.T, statements string, cases [][2]string, source string) {
 	}
 }
 
-// E: the check matches columns to properties by name, and the reader
-// scans by position and never reads the names Postgres sends. A
-// column dropped and added again is last, so select * and a whole
-// row read each value into the other's property; a column dropped
-// for good shifts a whole row's fields along. Reading by name gives
-// the first two wants; a panic that names the column is the other
-// way to settle it.
+// Finding 2: the check matches columns to properties by name, and
+// the reader scans by position and never reads the names Postgres
+// sends. A column dropped and added again is last, so select * and a
+// whole row read each value into the other's property; a column
+// dropped for good shifts a whole row's fields along. Reading by
+// name gives the first two wants; a panic that names the column is
+// the other way to settle it.
 func TestStressSchemaMovedUnderPositions(t *testing.T) {
 	stress(t, `
 create table acct (id integer primary key, owner text not null, payee text not null);
@@ -123,9 +123,9 @@ fun whole2(db: Db): Held2 = db.tx { tx -> tx.querySingle<Held2>(sql"select acct2
 `)
 }
 
-// F: a literal that ends the transaction passes check, and what
-// follows it in db.tx runs outside any transaction: a panic rolls
-// nothing back (spec.md 10.7). Where check refuses the literals
+// Finding 3: a literal that ends the transaction passes check, and
+// what follows it in db.tx runs outside any transaction: a panic
+// rolls nothing back (spec.md 10.7). Where check refuses the literals
 // instead, this test moves to check's.
 func TestStressCommitInsideTx(t *testing.T) {
 	stress(t, `create table p (id integer primary key, name text not null);`, [][2]string{
@@ -154,11 +154,12 @@ fun names(db: Db): List<String> = db.tx { tx -> tx.query<String>(sql"select name
 `)
 }
 
-// B, D: Postgres's int4[] says neither how many dimensions a value
-// has nor whether an element is null. Two dimensions read as one
-// flat list; a null element fills a List<Int> and is the driver's
-// panic. C: an array of a domain is a type the driver does not know,
-// and only Go's own types are read from its text.
+// Findings 4, 6 and 8: Postgres's int4[] says neither how many
+// dimensions a value has nor whether an element is null. Two
+// dimensions read as one flat list; a null element fills a List<Int>
+// and is the driver's panic. An array of a domain is a type the
+// driver does not know, and only Go's own types are read from its
+// text.
 func TestStressArrays(t *testing.T) {
 	stress(t, `
 create domain d_num as numeric(10, 2);
@@ -179,8 +180,9 @@ fun uuids(db: Db): List<Uuid> = db.tx { tx -> tx.querySingle<List<Uuid>>(sql"sel
 `)
 }
 
-// G: a String holds U+0000 and Postgres's text does not; spec.md 10.4
-// lists the edges between the two sides' types and not this one.
+// Finding 7: a String holds U+0000 and Postgres's text does not;
+// spec.md 10.4 lists the edges between the two sides' types and not
+// this one.
 func TestStressZeroByteInAString(t *testing.T) {
 	stress(t, `create table p (id integer primary key, name text not null);`, [][2]string{
 		{`t.Keep(db, "a\x00b")`, `not: panics: ERROR: invalid byte sequence for encoding "UTF8": 0x00 (SQLSTATE 22021)`},
@@ -190,9 +192,9 @@ fun keep(db: Db, name: String): Int = db.tx { tx -> tx.execute(sql"insert into p
 `)
 }
 
-// H: execute gives an Int (spec.md 10.2) and Postgres counts rows in
-// 64 bits: 2,200,000,000 of them come back as -2094967296. It runs
-// for over two minutes, so only when KOGO_STRESS_SLOW is set.
+// Finding 5: execute gives an Int (spec.md 10.2) and Postgres counts
+// rows in 64 bits: 2,200,000,000 of them come back as -2094967296.
+// It runs for over two minutes, so only when KOGO_STRESS_SLOW is set.
 func TestStressRowsAffectedPastInt(t *testing.T) {
 	if os.Getenv("KOGO_STRESS_SLOW") == "" {
 		t.Skip("set KOGO_STRESS_SLOW=1 to run it")

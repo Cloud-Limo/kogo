@@ -23,8 +23,8 @@ and `rpc.NewHandler` take no clock yet (Q8). `rpc.Call`'s error is an
 browser would get. Changed on 23 Nov 2026, each marked with the date:
 Go listens on `deployment.goPort`, a key of its own, and the settings
 move is its own PR, DEV-1124. Built since (DEV-1125, cusoon2 PR
-1611), the slice the ops list needs; where it departs from the paper,
-a mark says so, dated 23 Nov 2026 and naming DEV-1125.
+1611): the slice the ops list needs, marked where it departs from the
+paper.
 
 ## The file
 
@@ -141,7 +141,8 @@ func run() int {
 // 23 Nov 2026, built (DEV-1125): smtpConfig and stripeConfig are read and
 // dropped whole, as upstreamTimeouts is, and are not on load's list of
 // keys that must be present; their typed structs and required keys come
-// back with the mail and Stripe handles.
+// back with the mail and Stripe handles; "strictly" does not hold with
+// encoding/json (the table's [1] row).
 type Config struct {
 	Deployment struct {
 		BackendHost      string
@@ -166,7 +167,6 @@ type Config struct {
 	}
 	GooglePlaceAPIKey string
 	GoogleAddress     string          // CI's files alone: a local server that replays (Q10)
-	// 23 Nov 2026, built (DEV-1125): the key is googleBaseUrl ("Where it differs").
 	StripeConfig      struct{ SecretKey string }
 	Settings          json.RawMessage // Kogo's: app.Settings declares its keys
 
@@ -372,7 +372,7 @@ days after a deploy). **Never** means no test sees it.
 
 | Part | Lines | Grows with | Written wrong | Shows |
 | --- | --- | --- | --- | --- |
-| `run`: modes, flag, signals | 55 | nothing | a mode misspelt: it is taken for a command; 23 Nov 2026, built (DEV-1125): while there are no commands, the usage line, before the file is read | start: "unknown command", exit 1 |
+| `run`: modes, flag, signals | 55 | nothing | a mode misspelt: it is taken for a command | start: "unknown command", exit 1; 23 Nov 2026, built (DEV-1125): while there are no commands, the usage line, before the file is read |
 | | | | words after the mode not refused | never: `web --config f` reads `CUSOON_CONFIG_FILE`, the ambient file `-D` exists to beat |
 | [1] Go's keys | 54 | a key of Go's: 1 to 2 | a key unread or misspelt in the struct | start: unknown key. 23 Nov 2026, built (DEV-1125): not as written. `encoding/json` matches a key whatever its case and takes a duplicate, so `goport`, `Settings` or a key given twice pass, as does a stray key inside an object Go drops whole (`settings` itself `rpc.ReadSettings` reads case-sensitively). Harmless while the deploy runs the Kotlin's `check-config` on the same file, which refuses each. Go's reader moves to Go 1.27's `encoding/json/v2`, which refuses both by default (about 10 code / 1 test, a tag on each field), in the issue that has Go read a file the Kotlin does not ("Open") |
 | | | | a required key left off the list in `load` | use: a zero value, e.g. Stripe answers 401 at the first charge |

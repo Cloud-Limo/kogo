@@ -1,0 +1,9 @@
+// kotlinc refuses line 6
+// An effect (doc/work.md, "The list of work"; a sketch, DEV-1141):
+// kotlinc must refuse it.
+fun prepareRow(row: Int): Int = row
+
+effect send on outbox {
+    attempts  1
+    prepare   prepareRow
+}

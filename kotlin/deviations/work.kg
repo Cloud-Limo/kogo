@@ -1,0 +1,9 @@
+// kotlinc refuses line 6
+// A work list (doc/work.md, "The list of work"; a sketch, DEV-1141):
+// kotlinc must refuse it.
+fun tell(): String = "told"
+
+work daemon alertedBy tell {
+    tidy
+    send
+}

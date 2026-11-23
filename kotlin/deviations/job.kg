@@ -1,0 +1,10 @@
+// kotlinc refuses line 7
+// A job (doc/work.md, "The list of work"; a sketch, DEV-1141): kotlinc
+// must refuse it.
+fun nextRow(): Int? = null
+fun runRow(row: Int) { }
+
+job tidy {
+    next    nextRow
+    run     runRow
+}

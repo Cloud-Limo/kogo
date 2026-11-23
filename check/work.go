@@ -272,10 +272,15 @@ func (c *checker) queue(d *syntax.Queue) *Queue {
 				c.errorf(parts["prepare"].Name, "prepare", "%s returns %s: an effect's prepare returns Either<String, Prepared>, a refusal in words or what act takes", f.Name, f.Result)
 			} else {
 				q.Prepared = f.Result.(*Named).Args[1]
+				c.outlives(parts["prepare"].Name, "prepare", f.Name, q.Prepared,
+					"the runner commits prepare's transaction before it calls act, which runs with none open, so give act the facts it needs and not the transaction")
 			}
 		}
 		if f := fun("act", "an effect's act", "env: Env, key: EffectKey, prepared: Prepared): Act<Result>", "env", "EffectKey", ""); f != nil {
 			id := parts["act"].Name
+			if path := c.reachesDb(f.Params[0].Type, map[*TypeDecl]bool{}); path != "" {
+				c.errorf(id, "act", "%s's environment holds a Db, at %s: an effect's act reaches no database, so that prepare and record are the effect's only writes there; keep the Db out of the environment", f.Name, path)
+			}
 			if !f.Action {
 				c.errorf(id, "act", "%s is a fun, and an effect's act is an action fun: it is the one place a worker acts, with no transaction open", f.Name)
 			}
@@ -315,6 +320,32 @@ func (c *checker) queue(d *syntax.Queue) *Queue {
 		return nil
 	}
 	return q
+}
+
+// reachesDb gives the path to a Db or a Tx that a value of the type t
+// holds in a property, or "" where it holds none.
+func (c *checker) reachesDb(t Type, seen map[*TypeDecl]bool) string {
+	n, _ := nonNull(t).(*Named)
+	if n == nil || seen[n.Decl] {
+		return ""
+	}
+	seen[n.Decl] = true
+	if n.Decl == c.prelude("Db") || c.isTx(n) {
+		return n.Decl.Name
+	}
+	for _, a := range n.Args {
+		if path := c.reachesDb(a, seen); path != "" {
+			return path
+		}
+	}
+	if n.Decl.Kind == "data class" {
+		for _, p := range n.Decl.Props {
+			if path := c.reachesDb(p.Type, seen); path != "" {
+				return n.Decl.Name + "." + p.Name
+			}
+		}
+	}
+	return ""
 }
 
 func article(kind string) string {

@@ -117,6 +117,15 @@ action fun tell(env: Env, alert: Alert): Either<String, Unit> = either { ring() 
 		{head + strings.Replace(plain, "on q", "on ‸odd", 1) + job + list, "effect-table", "odd.attempts is a String, and the runner's attempts is a Int"},
 		{with("data class Wide(val id: Uuid, val weight: Int)\nfun prepW(tx: Tx, env: Env, row: Wide): Either<String, Int> = either { 1 }\nfun recW(tx: Tx, env: Env, row: Wide, s: String): Either<String, Unit> = either { }\n") +
 			"effect e on ‸q {\n    attempts 1\n    prepare prepW\n    act send\n    record recW\n}\n" + job + list, "effect-table", `column "weight" does not exist`},
+		// Nor does prepare hand act its transaction.
+		{with("data class Held(val tx: Tx, val n: Int)\nfun prepH(tx: Tx, env: Env, row: Row): Either<String, Held> = either { Held(tx, 1) }\naction fun sendH(env: Env, key: EffectKey, h: Held): Act<String> {\n    ring()\n    return Act.Done(\"x\")\n}\n") +
+			effect("attempts 1", "prepare ‸prepH", "act sendH", "record rec") + job + list, "prepare", "prepH answers Held, which holds a transaction, tx, a property of Held: the runner commits prepare's transaction before it calls act"},
+		// act reaches no database: its environment holds no Db.
+		{"package kogo.work\nexternal class EffectKey\nsealed interface Act<out R> {\n    data class Done<R>(val result: R) : Act<R>\n}\ndata class Alert(val queue: String)\naction external fun ring()\n---\n" +
+			"import kogo.work.Act\nimport kogo.work.Alert\nimport kogo.work.EffectKey\nimport kogo.work.ring\ndata class Handles(val db: Db)\ndata class Env(val handles: Handles)\ndata class Row(val id: Uuid)\n" +
+			"fun prep(tx: Tx, env: Env, row: Row): Either<String, Int> = either { 1 }\naction fun send(env: Env, key: EffectKey, n: Int): Act<String> {\n    ring()\n    return Act.Done(\"x\")\n}\n" +
+			"fun rec(tx: Tx, env: Env, row: Row, s: String): Either<String, Unit> = either { }\naction fun tell(env: Env, alert: Alert): Either<String, Unit> = either { ring() }\n" +
+			"effect e on q {\n    attempts 1\n    prepare prep\n    act ‸send\n    record rec\n}\nwork w alertedBy tell { e }\n", "act", "send's environment holds a Db, at Env.handles"},
 		{with("fun recO(tx: Tx, env: Env, row: Env, s: String): Either<String, Unit> = either { }\n") + effect("attempts 1", "prepare prep", "act send", "record ‸recO") + job + list,
 			"part", "the steps of one queue take one row type"},
 	})

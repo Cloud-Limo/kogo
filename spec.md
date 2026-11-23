@@ -716,6 +716,18 @@ column.
   `legal_name` fills property `legalName` (snake_case to camelCase). Every
   property must be filled and every column used; give a column a name with
   `as`.
+- A query call sends the statement as written, wrapped under a select
+  of its columns by the names `kogo check` saw: a select as
+  `select "a", "b" from (...) _`, any other statement as
+  `with _ as (...) select "a", "b" from _`. So a row is read by name
+  even when the database served orders a table's columns otherwise than
+  the one checked (a column dropped and added again) or has one more,
+  and `select *` and `returning *` are safe. An `order by` in the
+  statement is kept. Two columns of one name are an error. A statement
+  whose own `with` writes is an error under a query call, since Postgres
+  takes such a `with` only at the top level: run the write as a
+  statement of its own. The fields of a whole row read as one column
+  (`select b as business`) are still read in the table's order.
 - A property may itself be a data class, written with a nullable or
   non-null type. It is filled from the columns whose names start with the
   property's name and an underscore:

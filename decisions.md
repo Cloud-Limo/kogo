@@ -4538,3 +4538,39 @@ The agent's, on DEV-1133's stress run; the issue gave the three mends and left t
   Not taken: a count for each cause. Reopen if Postgres's log is not kept beside ours.
 - **A pool's wait for a connection still has no limit of its own** (Q12 stands): the
   request's deadline ends it.
+
+## A read sends the names it checked (DEV-1167), 24 Nov 2026
+
+Greg's ruling of 24 Nov 2026 on DEV-1161's research; the agent's where marked.
+
+- **Every read is wrapped, not only a star**: `query`, `queryOne` and `querySingle`
+  send the author's statement under a select of the columns by the names `kogo
+  check` saw. Postgres's tree is the same for `select *` and for its columns named
+  in order, so Kogo cannot see a star without reading SQL text. Not taken: wrapping
+  only a star. `exists` and `execute` discard their columns and send the statement
+  as written.
+- **A select is wrapped as a subquery, any other statement as a `with`**, told apart
+  by `commandType`. Postgres does not inline a `with` that holds `for update` or a
+  volatile function, so one `with` form for all would plan those reads as a `CTE
+  Scan` of the whole result. Not taken: one `with` form. Insert, update, delete and
+  merge go only in a `with`.
+- **Up to about 20 µs of planning on a call Postgres plans afresh is accepted**, the
+  wrap's one measured cost (DEV-1161).
+- **The order of an `order by` inside the wrap is kept by Postgres 18's planner and
+  guarded by a test** (`TestWrapKeepsOrder`, under forced parallel plans), not
+  promised by Postgres's documentation, which says it must not be relied on. Reopen
+  if that test fails after an upgrade.
+- **A read whose own `with` writes is refused at check**, `sql-writing-with`:
+  Postgres takes a writing `with` only at the top level, so the wrap cannot hold it.
+  Not taken: sending it as written, read by position.
+- **Two columns of one name are refused in the SQL pass, `sql-duplicate-column`**
+  (the agent's, after DEV-1161's sketch): the wrap's outer select would otherwise
+  fail with Postgres's "column reference is ambiguous". Not taken: leaving it to the
+  checker's `sql-column-unused`, which never sees it now.
+- **A wrap that Postgres refuses, or that describes other names or types than the
+  statement, is a fault at the literal, `sql-wrap`** (the agent's, as the sketch had
+  it), so `kogo check` names the file and line. Not taken: a failure to check, which
+  ends the run without a place.
+- **Nullability and tables are still read from the statement as written** (the
+  sketch's): the wrap neither renames nor reorders, and its description is compared
+  with the statement's.

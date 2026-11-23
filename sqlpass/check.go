@@ -200,7 +200,56 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 		}
 		st.Columns = append(st.Columns, col)
 	}
-	return st, nil
+	return st, c.wrap(ctx, st, query, sd)
+}
+
+// wrap makes the SQL that a read sends: the author's statement, never
+// edited, under a select of its columns by the names Postgres gave
+// them, so that a row is read by name even where the database served
+// orders its columns otherwise than the one checked (a column dropped
+// and added again) or has one more. A select is wrapped as a subquery,
+// which Postgres plans as the statement alone; any other statement, as
+// a with, the one place Postgres takes insert, update, delete and
+// merge. The wrap is prepared too, so that what is checked is what is
+// sent. Postgres takes a with that writes only at the top level, so a
+// read whose own with writes is refused. The fields of a whole row
+// read as one column are still sent in the table's order.
+func (c *Checker) wrap(ctx context.Context, st *Statement, query *node, sd *pgconn.StatementDescription) error {
+	if query.field("hasModifyingCTE").text() == "true" {
+		return &Error{0, "sql-writing-with", "a statement that reads rows into R cannot have a with that writes, " +
+			"since Kogo wraps it to read its columns by name and Postgres takes such a with only at the top level: " +
+			"move the writing with into a statement of its own, run before this one"}
+	}
+	if st.Utility != "" || len(sd.Fields) == 0 {
+		return nil
+	}
+	names := make([]string, len(sd.Fields))
+	seen := map[string]bool{}
+	for i, f := range sd.Fields {
+		if seen[f.Name] {
+			return &Error{0, "sql-duplicate-column", fmt.Sprintf(
+				"two columns are named %s, and Kogo reads a column by its name: name each once, as in t.%s as t_%s", f.Name, f.Name, f.Name)}
+		}
+		seen[f.Name] = true
+		names[i] = pgx.Identifier{f.Name}.Sanitize()
+	}
+	cols := strings.Join(names, ", ")
+	// The newline ends a -- comment that the statement ends with.
+	sql := "select " + cols + " from (" + st.SQL + "\n) _"
+	if query.num("commandType") != cmdSelect {
+		sql = "with _ as (" + st.SQL + "\n) select " + cols + " from _"
+	}
+	wd, err := c.conn.PgConn().Prepare(ctx, "", sql, sd.ParamOIDs)
+	if err != nil {
+		return &Error{0, "sql-wrap", fmt.Sprintf("Postgres refused the statement as Kogo sends it, %s: %v", sql, err)}
+	}
+	for i, f := range wd.Fields {
+		if len(wd.Fields) != len(sd.Fields) || f.Name != sd.Fields[i].Name || f.DataTypeOID != sd.Fields[i].DataTypeOID {
+			return &Error{0, "sql-wrap", fmt.Sprintf("the statement as Kogo sends it, %s, does not describe column %d as the statement does, %s", sql, i+1, sd.Fields[i].Name)}
+		}
+	}
+	st.SQL = sql
+	return nil
 }
 
 // tables gives the tables and views the tree lists, with what the

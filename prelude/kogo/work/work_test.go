@@ -465,6 +465,23 @@ func TestJob(t *testing.T) {
 		}
 		s.want("alerts", len(s.alerts), 3)
 	})
+	t.Run("a job whose next takes a SerializableTx runs at SERIALIZABLE, and its failed too", func(t *testing.T) {
+		j, levels := queueParcel(base), []string{}
+		j.Serializable = true
+		run, failed := j.Run, j.Failed
+		j.Run = func(t kogo.Tx, e env, id kogo.Uuid) rt.Unit {
+			levels = append(levels, kogo.Tx_QuerySingle(t, "show transaction_isolation", text))
+			return run(t, e, id)
+		}
+		j.Failed = func(t kogo.Tx, e env, id kogo.Uuid, why string) rt.Unit {
+			levels = append(levels, kogo.Tx_QuerySingle(t, "show transaction_isolation", text))
+			return failed(t, e, id, why)
+		}
+		s := open(t, 3, j.Queue())
+		s.parcel(1, "nowhere", false)
+		s.want("outcome", s.at(0, "queueParcel"), Failed)
+		s.want("levels", levels, []string{"serializable", "serializable"})
+	})
 	t.Run("next panics: there is no row to fail, so nothing is marked and nobody is alerted", func(t *testing.T) {
 		j := queueParcel(base)
 		j.Next = func(kogo.Tx, env) *kogo.Uuid { panic("next has a bug") }

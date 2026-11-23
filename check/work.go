@@ -222,6 +222,17 @@ func (c *checker) queue(d *syntax.Queue) *Queue {
 		if f != nil {
 			q.Funcs[word] = f
 			env(p.Name, f, slices.Index(kinds, "env"))
+			// The sketch's runner opens an effect's transactions at READ
+			// COMMITTED, and a job's as its next says: the design does
+			// not say how a claim and two transactions would be
+			// SERIALIZABLE.
+			if serializable := kinds[0] == "tx" && c.serializable(f.Params[0].Type); serializable && d.Effect {
+				c.errorf(p.Name, word, "%s takes a SerializableTx: the runner calls %s in a transaction at READ COMMITTED, so take a Tx and lock what it reads", f.Name, what)
+				return nil
+			} else if serializable && word != "next" && !q.Serializable {
+				c.errorf(p.Name, word, "%s takes a SerializableTx, and the job's next takes a Tx: the runner opens a job's transactions as its next's first parameter says, so take a Tx, or have next take a SerializableTx", f.Name)
+				return nil
+			}
 		}
 		return f
 	}

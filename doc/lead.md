@@ -141,7 +141,7 @@ against the code before passing it on.
   the issue, and then takes the label `lead` off.
 - A Ruling answers everything the `Clerk:` comment raised, since the
   clerk raises none of it twice, and says what changes or that nothing
-  does: the clerk then launches the Fix, quoting it, or merges. New
+  does: the clerk then launches the Fix or merges. New
   work it names, you file.
 - A move of Greg's (a Zed step, a walkthrough) goes in You can do
   now. A cusoon2 PR ready to merge does not, unless he asks for it:

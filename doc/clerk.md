@@ -98,14 +98,14 @@ queues the rest. Then exit: the run's comment starts the next clerk.
 | Code | `pr opus medium 40m` | how: files, what to leave alone, tests |
 | Code, heavy design | `pr fable high 40m` | the same |
 | Review | `comment opus high 40m` | the PR; what to look at hardest |
-| Fix | `pr opus medium 40m` | the PR; each Ruling in full; it pushes and does not merge |
+| Fix | `pr opus medium 40m` | the PR; it pushes and does not merge |
 
 - 40m is nearly always enough: the largest PR so far took 50m. Raise
   it for a reason you can state.
 - A run sees the description, the `Start:` with its brief, Linear
   documents it links, the repository and the PR. It does not see the
-  issue's other comments. So quote a Ruling in the brief, and point a
-  review or a fix at the PR, where the Handoff and Review also are.
+  issue's other comments. So point a review or a fix at the PR, where
+  the Handoff, the Review and its Rulings are whole, and quote none.
 - The Review and Fix briefs name the step in `AGENTS.md` and add only
   what is particular to this PR. A port's Review brief names
   `doc/porting.md`'s "Keep the Kotlin's shape".
@@ -135,8 +135,8 @@ label `lead`.
 
 `lin local DEV-NNN <where> "<phrase>"`, `<where>` as above. It posts
 the `Start:` itself. The phrase is the step's, "Code review DEV-NNN"
-or "Fix DEV-NNN", and a Fix's quotes each Ruling in full after it, as
-a brief would. It returns at once, with the model and effort of the
+or "Fix DEV-NNN", and nothing after it: a Fix reads the Review and its
+Rulings on the PR. It returns at once, with the model and effort of the
 step's run; then exit, since the session's comment starts the next
 clerk. When it refuses, a clone another issue holds or a session
 already running for the issue, hand on with its line.
@@ -159,9 +159,9 @@ Merging when it has none. A Budget outgrown's sizes go in your
 `Merged:` or `Checked:` comment.
 
 A `Ruling:` answers what the `Clerk:` comment before it raised: raise
-none of it again. Launch a Fix, each Ruling quoted in full, when the
-Review or a Ruling leaves something to change; go to Merging when
-nothing is left. Hand on again only for a Question still unanswered.
+none of it again. Launch a Fix when the Review or a Ruling leaves
+something to change; go to Merging when nothing is left. Hand on
+again only for a Question still unanswered.
 
 ## Merging
 
@@ -217,6 +217,10 @@ one of three:
   check's last lines, and for a comparison what `main` says of the
   same check. When `main` fails the same way, the PR is not the cause.
   Run nothing again to get past it.
+  One that names a comment of Greg's newer than any `PRQ:` of his,
+  or a `PRQ:` with no `PRA:` yet, is a question on a Kogo PR that no
+  PR session has answered: hand on, and the lead has him post a
+  `PRQ:`, or waits for the `PRA:` (AGENTS.md: PR questions).
 
 Say the order on a `Checked:` line when it matters. A port's PR, one
 whose `fix:` would run `kogo/run.sh`, that goes behind `renew` costs a

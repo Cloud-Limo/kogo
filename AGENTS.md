@@ -54,8 +54,9 @@ with them. `$LINEAR_API_KEY` is already in the shell.
 <!-- Workflow, shared: begin -->
 Linear holds the state of every piece of work and GitHub holds its
 code. The PR holds each step's comment in full, and the issue the
-first line of each, which is all the board shows. An issue goes Todo,
-In Progress, In Review, Done, and the first line of its newest event
+first line of each, which is all the board shows, with the PR's
+address in Linear's review view under it. An issue goes Todo, In
+Progress, In Review, Done, and the first line of its newest event
 says what happens next. An event is a comment that begins with a word
 of cusoon2's `doc/plans/pipeline-events.md`, section 5, and a colon;
 any other is a note, which no reader takes for a step. A session
@@ -157,6 +158,27 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   names. It merges when every one passes and nothing is Open, and
   otherwise hands the PR to the lead. Greg does not review Kogo's PRs
   on GitHub: review is the Code review step.
+- **PR questions.** Greg comments on a PR in Linear's review view,
+  on a line, a file or the whole, and then posts a comment that
+  begins `PRQ:`, a question of its own or nothing more. `lin clerk`
+  starts a fresh headless session, "PR questions DEV-NNN <PR url>
+  <branch>" with his comments since the last `PRQ:` under it as JSON,
+  in `~/Dev/kogo` or `~/Dev/cusoon2-tasks`, fetched, at opus medium
+  $5. It reads `origin/<branch>` with `git show`, the PR and its
+  Handoff, and answers each comment: one with `"thread": true` in its
+  thread, `gh api repos/Cloud-Limo/<repo>/pulls/<n>/comments/<id>/replies
+  -f body=<answer>`, any other with `gh pr comment <PR url>`, the
+  answer under a quote of it. Each reply begins `PRA:`: one without
+  it is read as Greg's at his next `PRQ:`. Where the answer is "this
+  should change", it says what would change and its size: the change
+  is the lead's Ruling. It changes no code, posts no step's comment,
+  starts nothing and waits on no step. When it ends, the poller posts
+  `PRA: <PR url> · N answered` on the issue as the application, with
+  Linear's review-view address of the PR under it, a note that
+  reaches Greg's inbox; one that fails gets a `Failed:` with `lead`.
+  `lin merge-check` refuses a Kogo PR with a comment of his newer
+  than his newest `PRQ:`, or that `PRQ:` with no `PRA:` after it. A
+  comment with no `PRQ:` after it is not read.
 - **Async runs.** The lead or the clerk starts one with `lin launch
   DEV-NNN < brief.md`, the brief's first line `Start: <step> · async ·
   <directive>`: it posts the `Start:` with the brief under it, then
@@ -171,11 +193,12 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   it with `agent-step < answer.md`: it refuses a first line that does
   not fit its word, as `lin step` does, and posts on the PR the line
   names with the run's marker line last. The wrapper posts on the
-  issue the first line when the PR has that text, and `answer.md`
-  whole when not: what an interrupted run leaves behind. Its own
-  comment begins `Answer:` for a run that is no step, `Failed:` for
-  one that ended with no answer. A review or fix run leaves its tree
-  clean: whatever is left is pushed to the PR's branch. No run merges.
+  issue the first line and the PR's address in Linear's review view
+  when the PR has that text, and `answer.md` whole when not: what an
+  interrupted run leaves behind. Its own comment begins `Answer:` for
+  a run that is no step, `Failed:` for one that ended with no answer.
+  A review or fix run leaves its tree clean: whatever is left is
+  pushed to the PR's branch. No run merges.
 - **Local runs.** A step that needs this VM, a stack or the other
   repository runs here as a headless session: the lead or the clerk
   starts it with `lin local DEV-NNN <where> "<phrase>"`, which returns

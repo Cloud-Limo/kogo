@@ -248,8 +248,8 @@ him, as `doc/clerk.md` says, and you do not wait for it.
   the phrase for that session.
 - **Async** is the default otherwise: the issue stands alone and a
   launch comment can say the rest. `lin launch` exports each other
-  issue it or the description names into a document linked as
-  `Reads:`, made only when one is named; the issue's own comments
+  issue the brief or the description names into a document linked
+  as `Reads:`, made only when one is named; the issue's own comments
   are not sent (`doc/clerk.md`, Launching a run).
 - **On paper first**, as `pr fable high`, when a piece changes the
   form of a port that later pieces will copy, while its answers and

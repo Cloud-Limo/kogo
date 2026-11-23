@@ -506,8 +506,8 @@ func TestOver(t *testing.T) {
 	e, j := bookCourier(3), queueParcel(base)
 	e.Over, e.Enter, j.Over, j.Enter = depots, enter, depots, enter
 	s := open(t, 3, e.Queue(), j.Queue())
-	for n, depot := range []string{"north", "north", "north", "south", "west", "west"} {
-		s.parcel(n+1, "1 High St", false)
+	for n, depot := range []string{"north", "north", "north", "south", "west", "west", "south"} {
+		s.parcel(n+1, map[bool]string{true: "nowhere", false: "1 High St"}[n == 6], false)
 		s.exec("update parcel set depot = $2 where id = $1", id(n+1), depot)
 	}
 	// The policies stand on a table with no row-level security, as a
@@ -527,8 +527,12 @@ func TestOver(t *testing.T) {
 	e.Over, j.Over = depotsUnbound, depotsUnbound
 	s.r.List.Queues = []Queue[env]{e.Queue(), j.Queue()}
 	s.want("the job's first pass", s.r.Pass(ctx, "queueParcel"), []Outcome{Done, Done, Done})
-	s.want("its second", s.r.Pass(ctx, "queueParcel"), []Outcome{Done, Idle, Done})
+	// South's second parcel is one run panics on: failed is called
+	// with south entered again, or under row-level security it would
+	// mark no row and the parcel would fail on every pass.
+	s.want("its second", s.r.Pass(ctx, "queueParcel"), []Outcome{Done, Failed, Done})
 	s.want("its third", s.r.Pass(ctx, "queueParcel"), []Outcome{Done, Idle, Idle})
+	s.want("alerts", len(s.alerts), 1)
 	s.want("the effect's first pass", s.r.Pass(ctx, "bookCourier"), []Outcome{Done, Done, Done})
 	s.want("keys", s.keys, []string{"parcel_dispatch-" + id(1), "parcel_dispatch-" + id(4), "parcel_dispatch-" + id(5)})
 	s.want("its second", s.r.Pass(ctx, "bookCourier"), []Outcome{Done, Idle, Done})

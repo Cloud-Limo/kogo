@@ -9,6 +9,6 @@ fun invoice(tx: Tx, id: Uuid, forUpdate: Boolean): Invoice? =
     else
         tx.queryOne<Invoice>(sql"select id, number, total_cents from invoice where id = $id")
 
-// An aggregate is nullable unless asserted: "n!" says count(*) is never null.
+// count(*) is never null, so it fills a Long with no "n!"; a sum would need one.
 fun paidCount(tx: Tx): Long =
-    tx.querySingle<Long>(sql"""select count(*) as "n!" from invoice where status = 'paid'""")
+    tx.querySingle<Long>(sql"""select count(*) as n from invoice where status = 'paid'""")

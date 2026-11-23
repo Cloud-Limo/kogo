@@ -248,6 +248,8 @@ func (c *checker) queue(d *syntax.Queue) *Queue {
 				c.errorf(parts["next"].Name, "next", "%s returns %s: a job's next returns its row or null, as Row?, with null where no row is owed", f.Name, f.Result)
 			}
 			q.Row, q.Serializable = nonNull(f.Result), c.serializable(f.Params[0].Type)
+			c.outlives(parts["next"].Name, "next", f.Name, q.Row,
+				"where run panics the runner rolls next's transaction back and hands the row to failed in another, so give the row's facts and not the transaction")
 		}
 		if f := fun("run", "a job's run", "tx: Tx, env: Env, row: Row)", "tx", "env", ""); f != nil {
 			row(parts["run"].Name, f.Params[2].Type)

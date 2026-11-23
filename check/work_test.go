@@ -117,6 +117,9 @@ action fun tell(env: Env, alert: Alert): Either<String, Unit> = either { ring() 
 		{head + strings.Replace(plain, "on q", "on ‸odd", 1) + job + list, "effect-table", "odd.attempts is a String, and the runner's attempts is a Int"},
 		{with("data class Wide(val id: Uuid, val weight: Int)\nfun prepW(tx: Tx, env: Env, row: Wide): Either<String, Int> = either { 1 }\nfun recW(tx: Tx, env: Env, row: Wide, s: String): Either<String, Unit> = either { }\n") +
 			"effect e on ‸q {\n    attempts 1\n    prepare prepW\n    act send\n    record recW\n}\n" + job + list, "effect-table", `column "weight" does not exist`},
+		// A job's row goes from next's transaction into failed's.
+		{with("data class HeldRow(val tx: Tx, val id: Uuid)\nfun nextH(tx: Tx, env: Env): HeldRow? = null\nfun goH(tx: Tx, env: Env, row: HeldRow) { }\nfun goneH(tx: Tx, env: Env, row: HeldRow, why: String) { }\n") +
+			plain + "job j {\n    next ‸nextH\n    run goH\n    failed goneH\n}\n" + list, "next", "nextH answers HeldRow, which holds a transaction, tx, a property of HeldRow: where run panics"},
 		// Nor does prepare hand act its transaction.
 		{with("data class Held(val tx: Tx, val n: Int)\nfun prepH(tx: Tx, env: Env, row: Row): Either<String, Held> = either { Held(tx, 1) }\naction fun sendH(env: Env, key: EffectKey, h: Held): Act<String> {\n    ring()\n    return Act.Done(\"x\")\n}\n") +
 			effect("attempts 1", "prepare ‸prepH", "act sendH", "record rec") + job + list, "prepare", "prepH answers Held, which holds a transaction, tx, a property of Held: the runner commits prepare's transaction before it calls act"},

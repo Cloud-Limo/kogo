@@ -229,7 +229,10 @@ work daemon alertedBy opsAlert {
   waiting payer first across all tenants, the longest waiting first,
   then every other row by `next_attempt_at`. It names no `fair`: one
   tenant's invoice run may delay another's, where the Kotlin's pass
-  serves the queue a tenant at a time (Q12).
+  serves the queue a tenant at a time (Q12). *23 Nov 2026*: within a
+  tenant, as the Kotlin's pass has it, since the loop over tenants is
+  kept and `find` and `fair` go ("A worker keeps the loop over
+  tenants", `decisions.md`).
 - **`failed` and `recovery`** run in the transaction that fails the
   row, after the runner marked it. A refusal alerts nobody. The words'
   step 4, which in the Kotlin carries the reset statement, says "run
@@ -445,7 +448,9 @@ this queue one tenant at a time (`runEffectQueue(tenantId, ...)`).
   invoice runs, but never a payer.
 - c. Fair only among unwatched rows, a new rule.
 - **Settled: b** (Greg, 18 Nov 2026), reversing item 9 of the Ruling
-  on PR 66.
+  on PR 66. *23 Nov 2026*: the loop over tenants is kept, so a waiting
+  payer goes first within a tenant ("A worker keeps the loop over
+  tenants", `decisions.md`).
 
 **Q13. How does the runner read the row a step takes?** `doc/work.md`
 said `Claim` is "read from the view, by the rule SQL's columns have";

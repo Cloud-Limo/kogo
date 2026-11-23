@@ -30,7 +30,8 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   need, then the next area. Not taken: every designed piece first;
   the runner first.
 - **Behaviour changes are made in the Kotlin first**, under its tests,
-  and the port then matches them exactly.
+  and the port then matches them exactly; so is the mending of what
+  the Kotlin answers (`doc/porting.md`, "Mend the Kotlin first").
 - **Where a port leaves the Kotlin** (Greg, 21 Nov 2026): the test is
   whether `kogo/run.sh` can see the change. Where it can (an answer, a
   row, what Postgres is asked or holds), the Kotlin goes first, as

@@ -4499,3 +4499,59 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
   - Not taken: `find` and `fair` as designed on 17 Nov; `find` held to an id, a tenant and
     one time, with a test pinning each view's columns.
   - Reopen with tenants in the dozens or more, when the idle cost or that wait is felt.
+
+## Taken building the runner's sketch (DEV-1141), 23 Nov 2026
+
+The sketch is not meant to merge as it is, and none of these is Greg's ruling: each is the
+simplest thing that let the runner run, taken by the session that built it where
+`doc/work.md` did not say. The run's answer on DEV-1141 ranks what they answer.
+
+- **The runner is `prelude/kogo/work`, Kogo's `kogo.work`**, not a file beside `db.go`: it
+  takes the clock of `kogo.time`, which imports `kogo`.
+  - Not taken: package `kogo`, with the clock moved.
+- **An attempt is counted at each claim, a replay's too, and `attempts` is read only after
+  `Act.Unknown`**, as DEV-1127 has cusoon2's Kotlin count. So `attempts 1` does not bound
+  the calls of `act`: a crash after `act` gives a second under the same key.
+  - Not taken: a replay as the attempt that was cut short, which leaves the Kotlin.
+  - Reopen if Greg wants `attempts` to bound the calls.
+- **No limit is spelt `attempts unlimited`.** A word of the language, so Greg's to change.
+- **A `Left` or a panic from `prepare` or `record` rolls back what the step wrote**: each
+  runs in a savepoint. A Kogo `either` that raises after an `execute` has still executed,
+  where the Kotlin's throw rolled back.
+- **A panic in `act` is `Act.Unknown`**: the write may have been made.
+  - Not taken: leaving the row claimed, which sends again at every lease.
+  - Reopen with `doc/work.md`'s open question; on a queue with no limit it alerts nobody.
+- **`failed` and `recovery` run in a savepoint, and where they panic the row is failed all
+  the same** and the alert says so, a refusal's too.
+  - Not taken: rolling the failure back, which offers the row again.
+- **A `next`, `enter` or `over` that panics is logged, alerts nobody, and its queue waits
+  10 seconds**: there is no row to fail.
+  - Not taken: an alert with no row.
+- **A deadlock or a serialization failure runs its transaction again without limit.**
+  - Not taken: a count, after which a job's row would be failed for a conflict.
+- **An effect's steps take a `Tx`, never a `SerializableTx`; a job runs as its `next`'s first
+  parameter says.** The design does not say how a claim and two transactions would be
+  SERIALIZABLE.
+  - Reopen when an effect needs it.
+- **`act` reaches no database**: an effect's environment holds no `Db`, and neither a
+  prepared value nor a job's row holds a transaction (spec 15.7's rule for a gate).
+  - Not taken: leaving both to review, as the design's sentence did.
+- **A queue is found by its name across the program**; two of one name are refused, a
+  queue stands in one work list and a table under one effect.
+  - Not taken: imports; two effects on one table, which would share its rows and its keys.
+- **The runner finds a row by its id as the driver reads it, and keeps the text for the
+  key and the alert.** `where id::text = $1` cannot use the table's index.
+- **The row is read by the checked `select` with `where id = $1 for update` added by the
+  runner**, which names only its own column there.
+  - Not taken: a parameter in the statement the compiler builds.
+- **`Alert` has `id: String?` and `row`, the row's text** (DEV-1127's C), and the alert
+  answers `Either<E, Unit>`.
+  - Not taken: `Uuid?`, since a table's id need not be one; `Unit`.
+- **The reset statement says no time**: `update <table> set failed = false, attempts = 0,
+  claimed_at = null, last_error = null where id = '<id>'`. A failed row is still due.
+  - Not taken: `next_attempt_at = now()`, the database's clock.
+- **Rows due at one instant go by `id`**, so that a test under a fixed clock has one order.
+- **The runner's columns are written twice**, in `check` and in `prelude/kogo/work`, each
+  with its type and whether it may be null.
+  - Not taken: the checker importing the runner (`doc/remains.md` wants one list).
+- **The handed clock cannot wait, so the runner is handed `Wait` beside it.**

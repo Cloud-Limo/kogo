@@ -210,8 +210,9 @@ one of three:
   posts a `Failed:` with `lead` on red.
 - `fix: <why>`. The base moved and the command could not merge it: a
   conflict, or any cusoon2 PR. Merge nothing and post no `Checked:`.
-  Start the Fix it names as a run, whose brief asks only that it
-  merge the base, test and push.
+  Start the Fix it names the way How the next step starts says, whose
+  brief asks only that it merge the base, test and push; for a port's
+  PR, the line under it holds the brief's phrase.
 - `fail: <what>`. Hand on with that line and the lines under it: a
   check's last lines, and for a comparison what `main` says of the
   same check. When `main` fails the same way, the PR is not the cause.

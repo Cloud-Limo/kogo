@@ -4413,3 +4413,7 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
   `kogo/run.sh` before `Checked:`, which tests the head it vouches for, and a step
   that lands in the other repository stays a local run. Not taken: keeping the
   local Fix. Reopen if a run's `kogo/run.sh` fails where the dev VM's passes.
+- **The `fix:` bullet points to How the next step starts** (the lead's Ruling,
+  23 Nov 2026), so it stays true whether the command prints a `lin local` line or,
+  after cusoon2's DEV-1116, the phrase alone. Not taken: the Review's wording,
+  false once DEV-1116 lands.

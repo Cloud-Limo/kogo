@@ -112,11 +112,8 @@ queues the rest. Then exit: the run's comment starts the next clerk.
 - A run clones the repository of its issue's project, Kogo for Kogo
   and cusoon2 for any other. When the PR is in the other one, the
   step is a local run, below.
-- A cusoon2 run that needs Kogo's documents or the `kogo` tool is told
-  how in its brief: `gh repo clone Cloud-Limo/kogo` outside its clone,
-  and `go build ./cmd/kogo` there. cusoon2's `kogo/go/go.mod` names no
-  commit and mise installs no `kogo` on a run's VM: delete this when
-  they do.
+- A cusoon2 run has Kogo's `main` cloned beside its clone, where
+  `kogo/run.sh` looks for it, and its prompt names the commit.
 - When the Handoff says the PR outgrew its Budget or added what the
   Scope did not name, the Review brief gives the sizes and asks it to
   answer each thing that could go, or was added, as a Fix (cut it), a
@@ -132,8 +129,7 @@ Pickup said in a session, launch a run, but start a local
 one in the newest `Taken`'s `<where>` when the PR is in the other
 repository than the issue's project's. A `Lead:` comment does not
 choose: the lead holds an issue whose next step is Greg's with the
-label `lead`. The Fix that runs `kogo/run.sh` (Merging) is a local
-run however the steps before it ran.
+label `lead`.
 
 ## Starting a local run
 
@@ -214,17 +210,17 @@ one of three:
   posts a `Failed:` with `lead` on red.
 - `fix: <why>`. The base moved and the command could not merge it: a
   conflict, or any cusoon2 PR. Merge nothing and post no `Checked:`.
-  Start the Fix it names, whose brief asks only that it merge the
-  base, test and push: a run, or the `lin local` line under it when
-  the Fix must run `kogo/run.sh`, which no run can.
+  Start the Fix it names the way How the next step starts says, whose
+  brief asks only that it merge the base, test and push; for a port's
+  PR, the line under it holds the brief's phrase.
 - `fail: <what>`. Hand on with that line and the lines under it: a
   check's last lines, and for a comparison what `main` says of the
   same check. When `main` fails the same way, the PR is not the cause.
   Run nothing again to get past it.
 
 Say the order on a `Checked:` line when it matters. A port's PR, one
-whose `fix:` would be a local run, that goes behind `renew` costs a
-local Fix round. So list the others open, `gh pr list --base renew`
+whose `fix:` would run `kogo/run.sh`, that goes behind `renew` costs a
+Fix round. So list the others open, `gh pr list --base renew`
 in `~/Dev/cusoon2-dev-NNN`, with `gh pr diff N --name-only` for each,
 and count only those with a `Review:` on the PR (`gh pr view N --json
 comments`). When

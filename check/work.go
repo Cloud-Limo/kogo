@@ -90,8 +90,8 @@ func (c *checker) works(program []*syntax.File) {
 				switch info := c.info.Queues[q]; {
 				case q == nil:
 					c.errorf(id, "work", "%s is no job or effect: a work list names queues, each declared as job %s { ... } or effect %s on <table> { ... }", id.Name, id.Name, id.Name)
-				case listed[q] && slices.Contains(l.Queues, q):
-					c.errorf(id, "duplicate", "%s is already in work %s: a queue has one worker, so name it once", id.Name, d.Name)
+				case listed[q]:
+					c.errorf(id, "duplicate", "%s is already in a work list: a queue has one worker, so name it once", id.Name)
 				case info != nil:
 					listed[q] = true
 					l.Queues = append(l.Queues, q)

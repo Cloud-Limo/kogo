@@ -217,11 +217,13 @@ func (r *Runner[Env]) Run(ctx context.Context) {
 	loops.Wait()
 }
 
-// tx runs block in a transaction of the runner's, again on a deadlock
-// or a serialization failure, five times at most.
+// tx runs block in a transaction of the runner's, and again for as
+// long as Postgres ends it with a deadlock or a serialization failure.
 func tx[Env, A any](r *Runner[Env], ctx context.Context, serializable bool, block func(kogo.Tx) A) A {
-	runs := 0
-	return kogo.InTx(kogo.NewDb(ctx, r.Pool), serializable, func(*pgconn.PgError) bool { runs++; return runs < 5 }, block)
+	return kogo.InTx(kogo.NewDb(ctx, r.Pool), serializable, func(conflict *pgconn.PgError) bool {
+		r.Log.Info("work: a transaction is run again", "code", conflict.Code)
+		return true
+	}, block)
 }
 
 // guarded runs block in a savepoint and gives what it panicked with,
@@ -415,20 +417,19 @@ type held[Row, P any] struct {
 
 // claim finds the row the queue owes soonest, locked: not done, not
 // failed, not past its not_after, due, and either unclaimed or
-// abandoned within the replay window. replay says the row was claimed
-// before, by a worker that did not record it.
+// abandoned within the replay window.
 func (e Effect[Env, V, Row, P, R]) claim(t kogo.Tx, now time.Time) (c *claimed) {
 	order := "next_attempt_at, id" // id, so that rows due at one instant have one order
 	if e.Soonest != "" {
 		order = e.Soonest + " nulls last, " + order
 	}
-	return kogo.Tx_QueryOne(t, `select id::text, attempts, claimed_at is not null from `+e.Table+`
+	return kogo.Tx_QueryOne(t, `select id::text, attempts from `+e.Table+`
 		where done_at is null and not failed and (not_after is null or not_after > $1) and next_attempt_at <= $1
 		  and (claimed_at is null or claimed_at <= $2 and claimed_at > $3)
 		order by `+order+` limit 1 for update skip locked`,
 		func(scan kogo.Scan) *claimed {
 			c := &claimed{}
-			scan(&c.id, &c.attempts, &c.replay)
+			scan(&c.id, &c.attempts)
 			return c
 		}, now, now.Add(-Lease), now.Add(-Replay))
 }
@@ -436,7 +437,6 @@ func (e Effect[Env, V, Row, P, R]) claim(t kogo.Tx, now time.Time) (c *claimed) 
 type claimed struct {
 	id       string
 	attempts int32
-	replay   bool
 }
 
 func (e Effect[Env, V, Row, P, R]) row(t kogo.Tx, id string) Row {
@@ -491,10 +491,11 @@ func (e Effect[Env, V, Row, P, R]) serve(r *Runner[Env], ctx context.Context, v 
 		if c == nil {
 			return rt.Unit{}
 		}
-		attempts := int(c.attempts)
-		if !c.replay { // a replay is the attempt that was cut short, not a new one
-			attempts++
-		}
+		// An attempt is counted at the claim, a replay's too, before
+		// prepare; the row is marked claimed once prepare has given
+		// what act takes.
+		attempts := int(c.attempts) + 1
+		kogo.Tx_Execute(t, "update "+e.Table+" set attempts = $2 where id::text = $1", c.id, attempts)
 		row := e.row(t, c.id)
 		prepared, refused, panicked := step(t, func() kogo.Either[string, P] { return e.Prepare(t, r.Env, row) })
 		if panicked != nil {
@@ -503,7 +504,7 @@ func (e Effect[Env, V, Row, P, R]) serve(r *Runner[Env], ctx context.Context, v 
 		} else if refused != nil {
 			out, alert = e.fail(r, t, c.id, row, Failure_Refused{Why: *refused}, *refused, Refused)
 		} else {
-			kogo.Tx_Execute(t, "update "+e.Table+" set claimed_at = $2, attempts = $3 where id::text = $1", c.id, now, attempts)
+			kogo.Tx_Execute(t, "update "+e.Table+" set claimed_at = $2 where id::text = $1", c.id, now)
 			h = &held[Row, P]{c.id, attempts, prepared}
 		}
 		return rt.Unit{}

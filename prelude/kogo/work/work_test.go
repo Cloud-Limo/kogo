@@ -127,6 +127,24 @@ type stage struct {
 	alerts []Alert
 	answer Act[string]
 	told   kogo.Either[string, rt.Unit]
+	reruns strings.Builder // the SQLSTATE of each transaction run again
+}
+
+// codes keeps the code of each transaction the runner ran again.
+type codes struct {
+	slog.Handler
+	to *strings.Builder
+}
+
+func (c codes) Enabled(context.Context, slog.Level) bool { return true }
+func (c codes) Handle(_ context.Context, r slog.Record) error {
+	r.Attrs(func(a slog.Attr) bool {
+		if a.Key == "code" {
+			c.to.WriteString(a.Value.String() + "\n")
+		}
+		return true
+	})
+	return nil
 }
 
 var ctx = context.Background()
@@ -152,7 +170,7 @@ func open(t *testing.T, attempts int, queues ...Queue[env]) *stage {
 		*e.alerts = append(*e.alerts, a)
 		return e.alert()
 	}, queues...)
-	s.r = &Runner[env]{Pool: pool, Clock: clock(base), Env: e, List: list, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	s.r = &Runner[env]{Pool: pool, Clock: clock(base), Env: e, List: list, Log: slog.New(codes{slog.NewTextHandler(io.Discard, nil), &s.reruns})}
 	return s
 }
 
@@ -263,7 +281,7 @@ func TestEffect(t *testing.T) {
 		s := open(t, 3)
 		s.parcel(1, "", true)
 		s.want("outcome", s.at(0, "bookCourier"), Refused)
-		s.want("row", s.row(1), "attempts 0 failed next +0 Failure_Refused (The parcel has no address.)")
+		s.want("row", s.row(1), "attempts 1 failed next +0 Failure_Refused (The parcel has no address.)")
 		s.want("keys", len(s.keys), 0)
 		s.want("alerts", len(s.alerts), 0)
 	})
@@ -271,7 +289,7 @@ func TestEffect(t *testing.T) {
 		s := open(t, 3)
 		s.parcel(1, "-1 High St", true)
 		s.want("outcome", s.at(0, "bookCourier"), NotMade)
-		s.want("row", s.row(1), "attempts 0 failed next +0 Failure_NotMade (prepare panicked: a parcel weighs less than nothing)")
+		s.want("row", s.row(1), "attempts 1 failed next +0 Failure_NotMade (prepare panicked: a parcel weighs less than nothing)")
 		s.want("keys", len(s.keys), 0)
 		s.want("alerts", len(s.alerts), 1)
 	})
@@ -283,7 +301,7 @@ func TestEffect(t *testing.T) {
 		s.want("row", s.row(1), "attempts 1 failed next +0 Failure_Unrecorded (The parcel was withdrawn while the courier was booked.)")
 		s.want("alerts", len(s.alerts), 1)
 	})
-	t.Run("the process dies after act, before record: the row is not claimed again inside the lease, and when the lease ends it is, under the same key and as the same attempt", func(t *testing.T) {
+	t.Run("the process dies after act, before record: the row is not claimed again inside the lease, and when the lease ends it is, under the same key: with attempts 1, act is called twice", func(t *testing.T) {
 		s := open(t, 1)
 		s.parcel(1, "1 High St", true)
 		s.r.StopAfterAct = true
@@ -294,6 +312,69 @@ func TestEffect(t *testing.T) {
 		s.want("the lease ends", s.at(2, "bookCourier"), Done)
 		s.want("row", s.row(1), "attempts 0 done next +0 tracking T-1")
 		s.want("keys", s.keys, []string{key, key})
+	})
+	t.Run("the process dies after act, and at the replay act answers unknown: the replay was the row's second attempt of 1, and the row is exhausted", func(t *testing.T) {
+		s := open(t, 1)
+		s.parcel(1, "1 High St", true)
+		s.r.StopAfterAct = true
+		s.want("dies", s.at(0, "bookCourier"), Stopped)
+		s.r.StopAfterAct = false
+		s.answer = Act_Unknown{Why: "the courier did not answer"}
+		s.want("the lease ends", s.at(2, "bookCourier"), Exhausted)
+		s.want("row", s.row(1), "attempts 2 failed next +0 Failure_Exhausted (the courier did not answer)")
+	})
+	t.Run("a second worker on the queue takes a slow act's row when its lease ends: act is called twice under one key and record runs twice, the slower over the faster", func(t *testing.T) {
+		s := open(t, 3)
+		s.parcel(1, "1 High St", true)
+		slow, release, first := *s.r, make(chan struct{}), make(chan Outcome)
+		slow.Env.act = func(label) Act[string] { <-release; return Act_Done[string]{Result: "T-slow"} }
+		go func() { first <- slow.Pass(ctx, "bookCourier")[0] }()
+		for s.row(1) != "attempts 1 claimed next +0" {
+			time.Sleep(5 * time.Millisecond)
+		}
+		s.want("inside the lease", s.at(1.9, "bookCourier"), Idle)
+		s.want("the second worker", s.at(2, "bookCourier"), Done)
+		s.want("row", s.row(1), "attempts 0 done next +0 tracking T-1")
+		close(release)
+		s.want("the first worker", <-first, Done)
+		s.want("row", s.row(1), "attempts 0 done next +0 tracking T-slow")
+		s.want("keys", s.keys, []string{key, key})
+	})
+	t.Run("record deadlocks with another transaction: its transaction is run again, act is not, and the row is done", func(t *testing.T) {
+		e := bookCourier(3)
+		record, locked := e.Record, make(chan struct{}, 1)
+		e.Record = func(t kogo.Tx, v env, row dispatch, tracking string) kogo.Either[string, rt.Unit] {
+			kogo.Tx_Execute(t, "select 1 from parcel where id = $1 for update", id(1))
+			select {
+			case locked <- struct{}{}:
+			default:
+			}
+			kogo.Tx_Execute(t, "select 1 from parcel where id = $1 for update", id(2))
+			return record(t, v, row, tracking)
+		}
+		s := open(t, 3, e.Queue())
+		s.parcel(1, "1 High St", true)
+		s.parcel(2, "2 High St", false)
+		other, err := s.pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		other.Exec(ctx, "select 1 from parcel where id = $1 for update", id(2))
+		done := make(chan error)
+		go func() { // once record waits on parcel 2, wait on parcel 1: record's wait began first, so it is the one Postgres ends
+			<-locked
+			time.Sleep(300 * time.Millisecond)
+			_, err := other.Exec(ctx, "select 1 from parcel where id = $1 for update", id(1))
+			if err == nil {
+				err = other.Commit(ctx)
+			}
+			done <- err
+		}()
+		s.want("outcome", s.at(0, "bookCourier"), Done)
+		s.want("the other transaction", <-done, nil)
+		s.want("row", s.row(1), "attempts 0 done next +0 tracking T-1")
+		s.want("keys", s.keys, []string{key})
+		s.want("reruns", s.reruns.String(), "40P01\n")
 	})
 	t.Run("a row claimed more than 20 hours ago is parked: never replayed, never failed, and nobody is told", func(t *testing.T) {
 		s := open(t, 1)
@@ -340,7 +421,7 @@ func TestEffect(t *testing.T) {
 		s := open(t, 3, e.Queue())
 		s.parcel(1, "", true)
 		s.want("outcome", s.at(0, "bookCourier"), Refused)
-		s.want("row", s.row(1)[:25], "attempts 0 failed next +0")
+		s.want("row", s.row(1)[:25], "attempts 1 failed next +0")
 		s.want("alerts", len(s.alerts), 1)
 	})
 	t.Run("act panics: taken for unknown, so the row backs off", func(t *testing.T) {

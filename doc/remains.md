@@ -49,7 +49,9 @@ the design to work from, not built, not in `spec.md`, no example run.
   owner's rights (`doc/work.md`, "Discover, then enter"). And a
   column a queue is fair by, in place of the loop's one job for each
   tenant in a pass. Made in the Kotlin first, and not yet run against
-  cusoon2's schema.
+  cusoon2's schema. *Superseded on 23 Nov 2026*: the loop is kept, so
+  no view and no column ("A worker keeps the loop over tenants",
+  `decisions.md`).
 
 ## For whoever reviews the whole design
 
@@ -88,12 +90,16 @@ Agreed subject to this review:
   that a view which passes row-level security on purpose, for an id,
   a tenant and the runner's columns, is as narrow as it reads, and
   that replacing the loop over tenants loses nothing the loop gave.
+  *Settled on 23 Nov 2026*: the loop is kept and `find` goes ("A
+  worker keeps the loop over tenants", `decisions.md`).
 - **Fair by a column** (the same section). Greg: "Pretty magical.
   But I accept, subject to overall review." The runner keeps the
   value it served last and takes the next owed row past it. Check
   that the one statement given does what the two that were run did,
   that a value kept in the runner's memory is enough when it
   restarts, and whether jobs, which are left oldest first, need it.
+  *Settled on 23 Nov 2026*: the loop is kept and `fair` goes ("A
+  worker keeps the loop over tenants", `decisions.md`).
 
 ## To check before relying on it
 

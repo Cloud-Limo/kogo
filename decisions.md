@@ -1252,7 +1252,8 @@ Each entry: what was decided, why, and what would reopen it.
   - **Kept: a waiting payer goes before an invoice run's charges.** `soonest` names a
     column of cusoon2's own, a `timestamptz` that the hosted page's request stamps with the
     handed clock's time and the invoice run leaves null (`payer_waiting_since` in the
-    sketches; the name is cusoon2's to choose). The view `find` names carries it. The
+    sketches; the name is cusoon2's to choose). The view `find` names carries it
+    (*`find` superseded 23 Nov 2026 by "A worker keeps the loop over tenants" below*). The
     runner orders by it, nulls last, then `next_attempt_at`. It replaces the Kotlin's
     `order by stripe_customer_id is null desc`, and goes into the Kotlin first.
   - **Direction, unchanged.** The request makes the charge itself in an outside step, with
@@ -1350,7 +1351,9 @@ Each entry: what was decided, why, and what would reopen it.
   Q12; `doc/work.md`, "Fair by a column"). It names no `fair`: it says `soonest` of the
   column a waiting payer's row is stamped with, so waiting payers go first across all
   tenants, the longest waiting first, then every other row by `next_attempt_at`. Mail
-  keeps `fair tenant_id`. This reverses item 9 of the Ruling on PR 66.
+  keeps `fair tenant_id`. This reverses item 9 of the Ruling on PR 66. *Superseded 23 Nov
+  2026 by "A worker keeps the loop over tenants" (DEV-1129) below: within a tenant, and no
+  `fair`.*
   - **Why.** Fairness is so that one tenant's flood is not felt by another. In mail it is
     felt. In charges the only one who feels a wait is a payer, and with `fair` a payer
     waits behind one unwatched charge for each other busy tenant, where without it never.
@@ -4471,3 +4474,27 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
   goes first under its tests, and the `main` then reads a file that already has
   the shape it wants. Not taken: one PR for both, as `doc/main.md` of 18 Nov had
   it. Reopen if the move cannot land without the `main`.
+
+## A worker keeps the loop over tenants (DEV-1129), 23 Nov 2026
+
+- **A worker finds its rows by the loop over tenants, not through a view across them**
+  (Greg, 23 Nov 2026: "we'll keep the loop for now"; DEV-1127 explored it). A worker's
+  queue names a function that gives the values to serve in turn, and the runner enters
+  each value, then asks for that value's next row, one row a value in a pass, as
+  cusoon2's Kotlin does for each active tenant. `enter` stays as written, for a job as
+  for an effect. The word and its form are not settled here: they are designed with
+  `job`, `effect` and `work`, and are Greg's. This supersedes `find` and `fair` (17 Nov
+  2026; `doc/work.md`, "Discover, then enter" and "Fair by a column") and, for the
+  charge, makes Q12's "waiting payers first across all tenants" within a tenant.
+  - **Why.** No schema work and no exception to row-level security; the port matches the
+    Kotlin as it is, with no Kotlin-first change; fairness between values is kept for
+    every queue, where `find` kept it for mail alone; one word in the language where
+    `find` and `fair` were two. Held against all 16 of cusoon2's queues, `find` needed
+    nine views that pass row-level security, one of twelve columns, where the design
+    counted three.
+  - **Accepted cost.** An idle pass grows as queues times values (about 30 queries at two
+    tenants, `doc/work.md`). There is no order across values, so `soonest` orders within
+    one, and a waiting payer may wait behind one charge of each other busy tenant.
+  - Not taken: `find` and `fair` as designed on 17 Nov; `find` held to an id, a tenant and
+    one time, with a test pinning each view's columns.
+  - Reopen with tenants in the dozens or more, when the idle cost or that wait is felt.

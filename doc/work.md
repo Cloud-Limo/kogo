@@ -670,7 +670,9 @@ effect sendMail on outbound_message {
   its name are cusoon2's to choose. It replaces the Kotlin's `order by
   stripe_customer_id is null desc`, and goes into the Kotlin first.
   A charge has no `not_after` ("An effect someone is watching"
-  below).
+  below). *23 Nov 2026*: a waiting payer goes first within a tenant,
+  not across all tenants, since the loop over tenants is kept ("A
+  worker keeps the loop over tenants", `decisions.md`).
 - **`not_after` means one thing for every queue**: the time after
   which the write is not made.
 - **The checker holds**, by Postgres's answer, that the column is one
@@ -833,7 +835,9 @@ list whose order means nothing. There are no lanes, no sweep and no pass.
   card can still both insert" (`StripeQueues.kt`): both are the card
   queue's, served one after the other.
 - **`soonest` and `fair` stay.** They order the rows of one queue,
-  which is still served a row at a time.
+  which is still served a row at a time. *23 Nov 2026*: `fair` goes; a
+  queue serves one row a value in turn ("A worker keeps the loop over
+  tenants", `decisions.md`).
 - **A deadlock between two queues can now happen**, and the runner
   runs the transaction again (`doc/gates.md`, "Two kinds of
   transaction").
@@ -841,7 +845,9 @@ list whose order means nothing. There are no lanes, no sweep and no pass.
   the daemon holds one.
 - **Idle queues ask no more than the pass did.** The Kotlin waits at
   most 0.2 seconds when there is no work; 16 queues asking at that
-  rate is fewer statements than its pass makes.
+  rate is fewer statements than its pass makes. *23 Nov 2026*: each
+  queue now enters and asks once for each value, so this grows as
+  queues times values (the same entry).
 - **A test steps one queue at a time**, through an entry of the
   runner that serves one row of a named queue, so that a run can be
   repeated and compared with the Kotlin's.
@@ -1004,6 +1010,20 @@ operators and the wording in Go. Agreed with Greg on 17 Nov 2026.
 
 ### Discover, then enter
 
+*Superseded on 23 Nov 2026* ("A worker keeps the loop over tenants",
+`decisions.md`). A worker's queue names a function that gives the
+values to serve in turn, and the runner enters each value, then asks
+for that value's next row, one row a value in a pass, as cusoon2's
+Kotlin does for each active tenant; no view passes row-level
+security, and `find` goes. The word and its form are not settled:
+they are designed with `job`, `effect` and `work`, and are Greg's.
+`enter` stays as written below, for a job as for an effect, though
+the runner now enters before it looks, not after a claim. Superseded
+below: "Kogo has no 'for each'", a queue finding its row unbound, the
+`find` view and its run, and a job's `next` reading such a view. The
+text below is kept as agreed on 17 and 18 Nov until the forms' issue
+rewrites it.
+
 cusoon2's daemon binds each active tenant in turn and asks each queue
 for work, because under row-level security an unbound transaction
 sees no rows (`doc/plans/tenant-job-tables.md` there, agreed 3 Sep
@@ -1076,6 +1096,13 @@ whole design (`doc/remains.md`): he has never liked the loop over
 tenants. The change alters how the daemon behaves, so it is made in
 the Kotlin first, under its tests, and ported after.
 
+*Superseded on 23 Nov 2026* ("A worker keeps the loop over tenants",
+`decisions.md`). The loop is kept, so every queue is served one row a
+value in a pass, as the Kotlin's `DaemonPassTest` pins; `fair` goes,
+and with it the statement below and the job's "oldest across
+tenants". The form that names the values is Greg's, designed with
+`job`, `effect` and `work`.
+
 **Fair by a column.** The loop gave a bound that its plan states and
 a test pins (`DaemonPassTest`): a flood in one tenant's queue delays
 every other tenant by at most one job in a pass. Claiming the oldest
@@ -1127,7 +1154,10 @@ The charge queue names no `fair`: in charges the only one who feels
 a wait is a payer, and with `fair` a payer would wait behind one
 unwatched charge for each other busy tenant. It says `soonest` of the
 column a waiting payer's row is stamped with, so waiting payers go
-first across all tenants (Q12, `decisions.md`).
+first across all tenants (Q12, `decisions.md`). *23 Nov 2026*: within
+a tenant, since the loop is kept ("A worker keeps the loop over
+tenants", `decisions.md`); a waiting payer may wait behind one charge
+of each other busy tenant.
 
 Weighed and not taken: no fairness, the oldest first for every
 queue, which drops what the Kotlin has a test for where a flood is

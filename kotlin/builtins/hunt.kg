@@ -80,7 +80,7 @@ fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int
     "hLiterals" -> "${1_000} ${1__000 + n} ${1_0_0L * x} ${1_000.5} ${1_0.0_1} ${000.5 + d} ${0_1.5} ${1__0.2_5} ${2_147_483_647} ${-2_147_483_648} ${9_223_372_036_854_775_807L} ${1.0} ${10.0} ${100000000.0} ${0.000001} ${123456789012345678.0} ${0.1234567890123456789} ${'\b' == '\t'} ${"\b\t".length} ${'\$'} ${'é'} ${"\u0000".length} ${'\''}${'"'}"
     "hLayout" -> layout(xs, s, n, m, x,)
     "hMemberWins" -> "${Money(x, s).toString()} ${Money(x, s)} ${Money(x, s).copy(cents = 1L)} ${Money(x, s).copy(1L)} ${Light.red.name} ${lightOf(n)?.name} ${Money(y, t).toString().length}"
-    "hWhenValues" -> "${whenMoney(Money(x % 3L, s))} ${whenList(xs.take(2))} ${whenPair(n % 3 to s.take(1))} ${'a' in s} ${"ab" in s} ${s in listOf(t, "a")} ${n in setOf(m, 1)}"
+    "hWhenValues" -> "${whenMoney(Money(x % 3L, s))} ${whenList(xs.take(2))} ${whenPair(n % 3 to s.take(1))} ${'a' in s} ${"ab" in s} ${s in listOf(t, "a")} ${n in setOf(m, 1)} ${whenLongInt(x)} ${whenLongInt(y - 3L)}"
     "hCharJoin" -> s.map { if (it == ' ') '_' else it }.joinToString("") { "$it" } // kept: spec 3, half of a pair is U+FFFD
     // The four below differ (DEV-1143): mise run kotlin prints each and exits 1.
     "hInOrder" -> inOrder(n)
@@ -1292,5 +1292,11 @@ fun whenList(xs: List<Long>): String = when (xs) {
 fun whenPair(pair: Pair<Int, String>): String = when (pair) {
     0 to "" -> "zero"
     1 to "a" -> "one a"
+    else -> "other"
+}
+
+fun whenLongInt(v: Long): String = when (v) {
+    in 0..10 -> "small"
+    in -5..-1, in 2147483647..2147483647 -> "edge"
     else -> "other"
 }

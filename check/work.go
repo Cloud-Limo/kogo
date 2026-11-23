@@ -354,14 +354,14 @@ func (c *checker) table(d *syntax.Queue, q *Queue, soonest *syntax.Part) {
 		names = append(names, col[0])
 	}
 	if _, st := asked(d.Table, strings.Join(names, ", "), fmt.Sprintf("an effect's table has the runner's columns, %s", strings.Join(names, ", "))); st != nil {
-		for i, col := range st.Columns {
+		for i, col := range st.Columns[:min(len(st.Columns), len(RunnerColumns))] {
 			if want := RunnerColumns[i][1]; want != "" && (col.Type.Name != want || col.Type.List) {
 				c.errorf(d.Table, "effect-table", "%s.%s is a %s, and the runner's %s is a %s", table, col.Name, col.Type, col.Name, want)
 			}
 		}
 	}
 	if soonest != nil {
-		if _, st := asked(soonest.Name, soonest.Name.Name, "soonest names a column of the effect's table"); st != nil && (st.Columns[0].Type.Name != "Instant" || st.Columns[0].Type.List) {
+		if _, st := asked(soonest.Name, soonest.Name.Name, "soonest names a column of the effect's table"); st != nil && len(st.Columns) == 1 && (st.Columns[0].Type.Name != "Instant" || st.Columns[0].Type.List) {
 			c.errorf(soonest.Name, "soonest", "%s.%s is a %s, and soonest names a timestamptz: rows with a time there go first, the soonest first", table, soonest.Name.Name, st.Columns[0].Type)
 		}
 	}

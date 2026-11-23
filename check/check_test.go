@@ -111,6 +111,9 @@ func run(t *testing.T, src string) (*Info, []*syntax.Error) {
 // update of the table person, and @person that it reads it;
 // @utility:LOCKSTMT that it is the utility statement Postgres tags so.
 func signature(lit *syntax.SQL) (*sqlpass.Statement, error) {
+	if st, err, ok := tableSelect(lit); ok {
+		return st, err
+	}
 	if i := strings.Index(lit.Text, "«"); i >= 0 {
 		return nil, &sqlpass.Error{Offset: i, Code: "sql-rejected", Message: "Postgres refused this"}
 	}

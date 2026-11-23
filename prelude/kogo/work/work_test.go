@@ -277,6 +277,16 @@ func TestEffect(t *testing.T) {
 		s.exec(*a.Reset)
 		s.want("after the reset", s.row(1)[:15], "attempts 0 next")
 	})
+	t.Run("the reset statement, run after an unrecorded failure, has act called again under the same key", func(t *testing.T) {
+		s := open(t, 3)
+		s.parcel(1, "1 High St", true)
+		s.answer = Act_Done[string]{Result: "withdrawn"}
+		s.want("outcome", s.at(0, "bookCourier"), Unrecorded)
+		s.exec(*s.alerts[0].Reset)
+		s.answer = Act_Done[string]{Result: "T-2"}
+		s.want("a day on", s.at(24*60, "bookCourier"), Done)
+		s.want("keys", s.keys, []string{key, key})
+	})
 	t.Run("prepare refuses: the row is failed, act is never called and nobody is alerted", func(t *testing.T) {
 		s := open(t, 3)
 		s.parcel(1, "", true)
@@ -532,6 +542,45 @@ func TestOver(t *testing.T) {
 	s.want("keys", s.keys, []string{"parcel_dispatch-" + id(1), "parcel_dispatch-" + id(4), "parcel_dispatch-" + id(5)})
 	s.want("its second", s.r.Pass(ctx, "bookCourier"), []Outcome{Done, Idle, Done})
 	s.want("its third", s.r.Pass(ctx, "bookCourier"), []Outcome{Done, Idle, Idle})
+}
+
+// Run, stopped while an act is out, lets the row in flight reach its
+// record before it returns.
+func TestDrain(t *testing.T) {
+	s := open(t, 3)
+	s.parcel(1, "1 High St", true)
+	out, release := make(chan struct{}), make(chan struct{})
+	s.r.Env.act = func(label) Act[string] { close(out); <-release; return Act_Done[string]{Result: "T-1"} }
+	ctx, stop := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() { s.r.Run(ctx); close(done) }()
+	<-out
+	stop()
+	select {
+	case <-done:
+		t.Fatal("Run returned while an act was out")
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(release)
+	<-done
+	s.want("row", s.row(1), "attempts 0 done next +0 tracking T-1")
+}
+
+// A queue whose pass was broken waits 10 seconds before its next, each
+// time.
+func TestBrokenWaits(t *testing.T) {
+	j := queueParcel(base)
+	j.Next = func(kogo.Tx, env) *kogo.Uuid { panic("next has a bug") }
+	s := open(t, 3, j.Queue())
+	ctx, stop := context.WithCancel(ctx)
+	var waits []time.Duration
+	s.r.Wait = func(_ context.Context, d time.Duration) {
+		if waits = append(waits, d); len(waits) == 2 {
+			stop()
+		}
+	}
+	s.r.Run(ctx)
+	s.want("waits", waits, []time.Duration{10 * time.Second, 10 * time.Second})
 }
 
 // Run serves every queue in a loop of its own until its context ends:

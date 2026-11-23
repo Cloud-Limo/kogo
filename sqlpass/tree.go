@@ -189,11 +189,16 @@ func outputs(q *node) []*node {
 	return exprs
 }
 
+// jsonbCasts are pg_catalog's casts from jsonb, by oid: each gives
+// null for JSON's null.
+var jsonbCasts = map[int]bool{3556: true, 3449: true, 3450: true, 3451: true, 3452: true, 3453: true, 2580: true}
+
 // notNull reports whether expr, an expression of query q, cannot be
 // null by spec 10.5, and whether it is a table's whole row at all,
 // nulled or not. Nothing nulls a reference to a NOT NULL column or a
 // table's whole row; count; exists; a coalesce with an argument that
-// is not null, a constant included; or a cast of any of these.
+// is not null, a constant included; or a cast of any of these, but
+// one from jsonb or by a function of the schema's.
 // constant is whether a constant that is not null counts, as it does
 // among coalesce's arguments and nowhere else.
 func (c *Checker) notNull(ctx context.Context, q, expr *node, constant bool) (notNull, whole bool, err error) {
@@ -219,9 +224,11 @@ func (c *Checker) notNull(ctx context.Context, q, expr *node, constant bool) (no
 		}
 	case expr.tag == "RELABELTYPE" || expr.tag == "COERCEVIAIO":
 		notNull, _, err = c.notNull(ctx, q, expr.field("arg"), constant)
-	case expr.tag == "FUNCEXPR" && (expr.num("funcformat") == 1 || expr.num("funcformat") == 2):
-		// a cast function, explicit or implicit: its first argument is
-		// the value, any others a type modifier
+	case expr.tag == "FUNCEXPR" && (expr.num("funcformat") == 1 || expr.num("funcformat") == 2) &&
+		expr.num("funcid") < 16384 && !jsonbCasts[expr.num("funcid")]:
+		// a cast function of Postgres's own (below FirstNormalObjectId),
+		// explicit or implicit: its first argument is the value, any
+		// others a type modifier
 		if args := expr.field("args").items(); len(args) > 0 {
 			notNull, _, err = c.notNull(ctx, q, args[0], constant)
 		}

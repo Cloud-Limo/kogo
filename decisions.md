@@ -78,7 +78,9 @@ Each entry: what was decided, why, and what would reopen it.
   the sum that drops its `coalesce` look like every other. The SQL pass reads each shape in
   Postgres's tree, as it reads a reference: an `AGGREF` that is `count`, an `exists` `SUBLINK`,
   a `COALESCEEXPR` with an argument non-null by the rule or a constant that is not null, and a
-  `RELABELTYPE`, `COERCEVIAIO` or cast `FUNCEXPR` (explicit or implicit) of a non-null value.
+  `RELABELTYPE`, `COERCEVIAIO` or cast `FUNCEXPR` (explicit or implicit) of a non-null value,
+  where the cast function is Postgres's own (`funcid` below 16384) and not one of its seven
+  casts from `jsonb` (lead's Ruling on the Code review, 23 Nov 2026).
   A reference to a subquery's column that is one of these is followed and nulled as any
   reference is, so a `count(*)` on the nullable side of a `left join` is nullable. `count` is
   known by its two oids in `pg_catalog`, 2147 and 2803, which Postgres fixes in its catalogue
@@ -87,10 +89,14 @@ Each entry: what was decided, why, and what would reopen it.
   only as a `coalesce` argument, so `select 1` stays nullable. Not taken: any other function
   or aggregate (`sum`, `max`, a schema's), an operator or comparison, a view's or a CTE's
   column, a scalar subquery, a window `count`, an `array(...)` subquery, a cast to a domain;
-  Postgres declares none of them non-null and the pass does not reason about strictness. A
-  needless `"name!"` stays allowed. Reopen when one of the four turns out nullable: a cast
-  function of the schema's own (`create cast ... with function`) can return null, and is
-  taken today as Postgres's own are.
+  Postgres declares none of them non-null and the pass does not reason about strictness. Nor
+  a cast from `jsonb` to a number or `boolean`, which gives null for JSON's `null`
+  (`'null'::jsonb::int`), known by oid as `count` is; `::text` from `jsonb` goes through I/O
+  and stays taken. Nor a cast by a function of the schema's (`create cast ... with
+  function`), an extension's included: it is a function of the schema's, and may return
+  null. Not taken: every cast function of Postgres's, which promises non-null where Postgres
+  gives null. A needless `"name!"` stays allowed. Reopen when one of the four turns out
+  nullable in another case Postgres makes null.
 - **The module is `github.com/Cloud-Limo/kogo`** (19 Nov 2026), the repository's own
   path, so that a program fetches it as an ordinary Go module pinned by commit. It was
   `module kogo` from 15 Nov, while everything built on one machine where a `replace` to

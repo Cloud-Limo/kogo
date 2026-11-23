@@ -138,3 +138,7 @@ create table session (
 create view people as select id, name, email from person;
 create sequence ticket;
 create function rename_all() returns void language sql as $$ update person set name = name $$;
+
+-- A cast the schema defines, whose function can return null.
+create function amount_of(text) returns amount language sql as $$ select null::amount $$;
+create cast (text as amount) with function amount_of(text);

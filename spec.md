@@ -807,7 +807,8 @@ empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
   null: a reference to a `NOT NULL` column of a table or to a table's
   whole row, `count(...)`, `exists (...)`, a `coalesce(...)` with an
   argument non-null by this rule or a constant other than `null`, or a
-  cast of any of these; and none of it on the nullable side of an outer
+  cast of any of these other than from `jsonb` or by a function of the
+  schema's; and none of it on the nullable side of an outer
   join. Every other column (other functions and aggregates, as `sum`,
   operators, scalar subqueries, outer-joined columns) is nullable.
 - A composite value is null as a whole, never field by field: the whole

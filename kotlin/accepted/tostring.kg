@@ -1,0 +1,7 @@
+// kotlinc refuses line 6
+// kogo check passes an interface that declares toString, which every Kotlin value has.
+package accepted
+
+interface Titled {
+    fun toString(): String
+}

@@ -71,11 +71,14 @@ func wantCode(t *testing.T, c *Checker, literal, code string) {
 
 // A: a name written twice is one parameter, so the one Postgres sees
 // outside a quoted string hides the one inside it, whose text is then
-// sent as $1: 'costs $1', and a jsonpath that looks for a variable
-// named 1.
+// sent as $1: 'costs $1', an interval of '$1 days', which Postgres
+// reads as one day, a pattern that looks for the text $1, and a
+// jsonpath that looks for a variable named 1.
 func TestStressNameInsideAString(t *testing.T) {
-	c := stressed(t, `create table t (id integer primary key, name text not null, j jsonb not null);`)
+	c := stressed(t, `create table t (id integer primary key, name text not null, at timestamptz not null, j jsonb not null);`)
 	wantCode(t, c, `select 'costs $x' as label from t where id = $x`, "sql-parameter-syntax")
+	wantCode(t, c, `select name from t where at > now() - interval '$n days' and id < $n`, "sql-parameter-syntax")
+	wantCode(t, c, `select name from t where name like '%$q%' or name = $q`, "sql-parameter-syntax")
 	wantCode(t, c, `select 1 from t where jsonb_path_exists(j, '$.tags[*] ? (@ == $tag)', jsonb_build_object('tag', $tag::text))`,
 		"sql-parameter-syntax")
 }

@@ -4538,3 +4538,23 @@ The agent's, on DEV-1133's stress run; the issue gave the three mends and left t
   Not taken: a count for each cause. Reopen if Postgres's log is not kept beside ours.
 - **A pool's wait for a connection still has no limit of its own** (Q12 stands): the
   request's deadline ends it.
+
+## A string on the wire is written as Kotlin writes it (DEV-1172), 24 Nov 2026
+
+The lead ruled the encoder changes, not the comparison; the agent's, for the rest.
+
+- **`rpc`'s `quote` is its own loop, not `encoding/json` with `SetEscapeHTML(false)`** as
+  `http/json.go` has it: Go escapes U+2028 and U+2029 whatever the setting, and Kotlin
+  does not, so the setting alone leaves a difference. It escapes `"`, `\` and each
+  control character, `\b \t \n \f \r` short and the rest `\u00xx` in lower case, byte for
+  byte what kotlinx.serialization 1.13.0 wrote for each (checked by hand, the probe in the
+  handoff). Not taken: the encoder followed by a replace of ` `, which a string
+  holding a backslash then `u2028` breaks.
+- **A lone surrogate stays a limit, stated in spec 15.4**: Go reads one as U+FFFD and Kotlin
+  keeps it. A Kogo string is UTF-8, and no row of Postgres holds one.
+- **No case in `mise run kotlin`**: it runs the prelude's built-ins under kotlinc with
+  Arrow alone, and the wire is kotlinx.serialization's, a jar and a compiler plugin more.
+  The test holds the bytes Kotlin wrote instead. Reopen if the wire gets a check of its own
+  against Kotlin.
+- **`http/json.go`'s `encode` is left as it is**: it writes to a third party, which
+  compares no bytes, and still escapes U+2028 there.

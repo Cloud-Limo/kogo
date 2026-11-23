@@ -168,3 +168,22 @@ func TestUnwritable(t *testing.T) {
 		}()
 	}
 }
+
+// A string is written as kotlinx.serialization writes it: & < > and
+// U+2028 as themselves, a control character as \u00XX but for the five
+// with a short form. Each want is the bytes Kotlin wrote for it.
+func TestQuote(t *testing.T) {
+	j := jobValue
+	j.Notes = "a&b<c>"
+	if back := answer("op", j); !bytes.Contains(back.body, []byte(`"notes":"a&b<c>"`)) {
+		t.Errorf("a&b<c> writes as %s", back.body)
+	}
+	for s, want := range map[string]string{
+		"\x00\x07\x1f": `\u0000\u0007\u001f`, "\b\t\n\v\f\r": `\b\t\n\u000b\f\r`,
+		`"\/`: `\"\\/`, "'=\x7f\u0080\ufeff": "'=\x7f\u0080\ufeff", "\u2028\u2029\U0001f600": "\u2028\u2029\U0001f600",
+	} {
+		if got := quote(s); got != `"`+want+`"` {
+			t.Errorf("%q writes as %s, want %q", s, got, `"`+want+`"`)
+		}
+	}
+}

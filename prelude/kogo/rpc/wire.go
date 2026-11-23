@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
 )
@@ -60,10 +61,25 @@ func name(t reflect.Type) string {
 	return t.Field(0).Tag.Get("kogo")
 }
 
+// quote writes s as a JSON string, as kotlinx.serialization does:
+// only a quote, a backslash and a control character are escaped, so
+// & < > and U+2028 go out as themselves, where encoding/json escapes
+// them.
 func quote(s string) string {
-	text, _ := json.Marshal(s)
-	return string(text)
+	b := []byte{'"'}
+	for _, r := range s { // a byte that is not UTF-8 is U+FFFD
+		if e, ok := escapes[r]; ok {
+			b = append(b, e...)
+		} else if r < 0x20 {
+			b = fmt.Appendf(b, `\u%04x`, r)
+		} else {
+			b = utf8.AppendRune(b, r)
+		}
+	}
+	return string(append(b, '"'))
 }
+
+var escapes = map[rune]string{'"': `\"`, '\\': `\\`, '\b': `\b`, '\t': `\t`, '\n': `\n`, '\f': `\f`, '\r': `\r`}
 
 func bad(at, why string, args ...any) error {
 	return fmt.Errorf("%s %s", at, fmt.Sprintf(why, args...))

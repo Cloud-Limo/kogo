@@ -1688,6 +1688,12 @@ Inputs and answers are JSON.
 - A wire type's name begins with an upper-case letter, so it is none
   of the names TypeScript keeps for its own, as `string` and `never`.
 - Nothing is optional: a property that may be `null` is still a key.
+- A string is written as Kotlin's `kotlinx.serialization` writes one:
+  `"` and `\` escaped, a control character as `\b`, `\t`, `\n`, `\f`,
+  `\r` or `\u00XX`, and every other character as itself in UTF-8,
+  `&`, `<`, `>` and U+2028 among them. A Kogo `String` is UTF-8 and
+  holds no lone surrogate: an input's `"\ud800"` reads as U+FFFD,
+  which an answer then writes, where Kotlin keeps the surrogate.
 - Reading is strict. A key that is missing, a key the type does not
   have, a value of another type, a number that is not whole or does
   not fit where an `Int` or a `Long` is wanted, a string that is not a

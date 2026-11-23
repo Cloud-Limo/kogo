@@ -67,6 +67,10 @@ fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int
     "hFailScope" -> "${failScope(n, x)} ${failScope(m, y).fold({ failText(it) }, { "$it" })} ${nothingLeft(x, n)}"
     "hBoth" -> "${takesLong(x.takeIf { it > y } ?: 0)} ${xs.contains(1)} ${1 in xs} ${Tag(s) == asNamed(Tag(s))} ${asNamed(Tag(t)) == Tag(s)} ${lightElse(lightOf(n))} ${flagElse(n > m)} ${Deal(x, s).show()} ${Deal(y, t).same(Deal(x, s))} ${run()} ${Trio(n, m, n).second()}"
     "hGenericT" -> "${whenNull(s.takeIf { it.length > n })} ${orElse(x, 7L)} ${has(x)} ${whenNull(s)} ${textOf(x.takeIf { it > y })} ${textOf(s)}"
+    "hNullKinds" -> nullKinds(xs, s, n, m, x, d)
+    "hDecls" -> decls(xs, s, n, x)
+    "hWords" -> words(s, n, x)
+    "hExtensions" -> extensions(xs, s, n, x)
     "hCharJoin" -> s.map { if (it == ' ') '_' else it }.joinToString("") { "$it" } // kept: spec 3, half of a pair is U+FFFD
     // The three below differ (DEV-1143): mise run kotlin prints each and exits 1.
     "hInOrder" -> inOrder(n)
@@ -877,3 +881,172 @@ fun <T> whenNull(v: T): String = when (v) {
 }
 
 fun <T> textOf(v: T): String = "$v ${listOf(v)} ${v to v}"
+
+fun nullKinds(xs: List<Long>, s: String, n: Int, m: Int, x: Long, d: Double): String {
+    val fix: ((Long) -> Long)? = if (n > 0) ::double else null
+    val a = fix?.let { it(x) } ?: -1L
+    val named: Named? = Tag(s).takeIf { n > 1 }
+    val b = named?.title() ?: "untitled"
+    val c = named == null
+    val e = named == Tag(s)
+    val list: List<Long>? = xs.takeIf { it.isNotEmpty() }
+    val g = list?.size ?: -1
+    val h = (list ?: listOf(0L)).first()
+    val i = list == xs
+    val either: Either<String, Long>? = pick(s, n, m, x).takeIf { m > 0 }
+    val j = either?.getOrNull() ?: -2L
+    val k = either?.fold({ it.length.toLong() }, { it }) ?: -3L
+    val flag: Boolean? = (n > m).takeIf { m != 0 }
+    val l = when (flag) {
+        true -> "t"
+        false -> "f"
+        null -> "n"
+    }
+    val o = flag == true
+    val p = flag ?: (n == 0)
+    val num: Double? = d.takeIf { it > 0.0 }
+    val q = num ?: -1.0
+    val r = num?.let { it * 2.0 }
+    val pair: Pair<Long?, String?> = xs.firstOrNull() to s.takeIf { it.isNotEmpty() }
+    val (first, second) = pair
+    val shape: Shape? = shapeOrNull(n)
+    val u = shape ?: Shape.Empty
+    val v = shape == Shape.Empty
+    val w = shape?.let { it is Shape.Dot } ?: false
+    val unit: Unit? = xs0().takeIf { n > 0 }
+    val light: Light? = lightOf(m)
+    val z = light?.name ?: "off"
+    val ch: Char? = s.map { it }.firstOrNull()
+    val y = ch?.isWhitespace() ?: true
+    return "$a $b $c $e $g $h $i $j $k $l $o $p $q $r ${first ?: -4L} ${second ?: "none"} $pair $u $v $w $unit $z $y $named $list $either $flag $num $shape $light $ch ${fix == null}"
+}
+
+typealias Cents = Long
+
+typealias Check = (Cents) -> Boolean
+
+typealias Price = Money
+
+const val LIMIT: Int = 3
+
+val table: List<Cents> = listOf(1L, 2L, 3L)
+
+val tableTotal: Cents = table.sum() + rate + LIMIT
+
+interface Keyed<K> {
+    val label: String
+    fun card(key: K): String
+}
+
+data class ByLong(override val label: String) : Keyed<Long> {
+    override fun card(key: Long): String = "$label $key"
+}
+
+data class ByText(override val label: String, val width: Int) : Keyed<String> {
+    override fun card(key: String): String = label + key.padStart(width)
+}
+
+fun <K> cards(keyed: Keyed<K>, keys: List<K>): List<String> = keys.map { keyed.card(it) }
+
+fun worth(price: Price): Cents = price.cents
+
+fun decls(xs: List<Long>, s: String, n: Int, x: Long): String {
+    val cents: Cents = 5
+    val check: Check = { it > cents }
+    val prices: List<Price> = xs.map { Money(it, s) }
+    val checks: List<Check> = listOf(check, { v: Cents -> v < 0 })
+    var lights = ""
+    for (light in Light.entries) lights += light.name.take(1)
+    return "$cents ${check(x)} ${xs.filter(check)} ${prices.map { worth(it) }.sum()} ${checks.map { it(x) }} $tableTotal $table ${cards(ByLong(s), xs)} ${cards(ByText(s, n % 5), listOf(s, "k"))} ${ByLong(s) == ByLong(s)} ${ByText(s, 1)} $lights ${Light.entries.map { Light.valueOf(it.name) == it }} ${Light.entries.size} ${LIMIT + n}"
+}
+
+data class Record(val data: String, val value: Long, val action: Int, val api: String = "api", val out: Boolean = true, val sql: String = "sql", val tests: Int = 0, val external: Long = 1L)
+
+fun action(action: Int): Int = action + 1
+
+fun api(sql: String, tests: Int): String = sql.padStart(tests)
+
+fun words(s: String, n: Int, x: Long): String {
+    val data = s
+    val value = x
+    val action = action(n)
+    val api = api(data, action % 7)
+    val sql = "$api$data"
+    val tests = sql.length
+    val external = value + tests
+    val out = external > 0L
+    val get = Record(data, value, action)
+    val set = get.copy(api = api, sql = sql, tests = tests, external = external, out = !out)
+    val field = set.data + set.api
+    val by = field.length
+    val where = by + 1
+    val open = where > 2
+    val inner = if (open) "in" else "out"
+    val constructor = inner + "!"
+    val init = constructor.length
+    val import = init * 2
+    val file = "$import"
+    val enum = file + file
+    val sealed = enum.take(1)
+    val override = sealed == "1"
+    val private = override || open
+    val internal = !private
+    val const = if (internal) 1 else 2
+    val operator = const + 1
+    val infix = operator - 1
+    val annotation = infix * 3
+    val catch = annotation / 2
+    val finally = catch % 2
+    val dynamic = finally == 0
+    val param = dynamic && out
+    val receiver = "$param"
+    val vararg = receiver.length
+    val lateinit = vararg + 1
+    val suspend = lateinit + 1
+    val tailrec = suspend + 1
+    val reified = tailrec + 1
+    val inline = reified + 1
+    val abstract = inline + 1
+    val companion = abstract + 1
+    val final = companion + 1
+    val expect = final + 1
+    val actual = expect + 1
+    val crossinline = actual + 1
+    val noinline = crossinline + 1
+    val protected = noinline + 1
+    val public = protected + 1
+    val property = public + 1
+    val setparam = property + 1
+    val delegate = setparam + 1
+    val nested = get.copy(data = set.copy(value = 0L).data + "n", value = set.copy(value = -1L).value)
+    return "$get $set $field $where $inner $enum $private $internal $infix $catch $receiver $delegate $nested ${get.action} ${set.sql} ${set.tests} ${set.external} ${set.out}"
+}
+
+fun <T> List<T>.second(): T = this[1]
+
+fun <T> T.pipe(f: (T) -> T): T = f(this)
+
+val <T> List<T>.head: T
+    get() = first()
+
+val String.shout: String
+    get() = this + "!"
+
+fun Long.half(): Long = this / 2L
+
+fun Int.isBig(): Boolean = this > 100
+
+fun String.wrapIn(open: String = "[", close: String = "]"): String = open + this + close
+
+fun applied(x: Long, f: (Long) -> Long = { it }): Long = f(x)
+
+fun <A, B> pairUp(a: A, b: B, swap: Boolean = false): String = if (swap) "$b $a" else "$a $b"
+
+fun extensions(xs: List<Long>, s: String, n: Int, x: Long): String {
+    val two = xs + listOf(x, x + 1L)
+    val empty: List<Long> = listOf()
+    val none: List<String> = emptyList()
+    val größe = n
+    val _under = größe + 1
+    return "${two.second()} ${two.head} ${x.pipe { it + 1L }.pipe(::double)} ${s.pipe { it.trim() }.shout} ${x.half().half()} ${n.isBig()} ${(-x).half()} ${-x.half()} ${s.wrapIn()} ${s.wrapIn("<")} ${s.wrapIn(close = ">")} ${applied(x)} ${applied(x) { it * 3L }} ${applied(f = { -it }, x = x)} ${pairUp(n, s)} ${pairUp(s, x, swap = true)} $empty $none ${empty + two.take(1)} ${listOf<Long>() == empty} ${setOf<Long>()} ${empty.sum()} $größe ${größe} $_under ${none.joinToString("-")} ${two.map { it.half() }.filter { it.toInt().isBig() }}"
+}

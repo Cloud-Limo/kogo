@@ -443,6 +443,17 @@ func TestEffect(t *testing.T) {
 		s.want("outcome", s.at(0, "bookCourier"), Done)
 		s.want("keys", s.keys, []string{key})
 	})
+	t.Run("the row is deleted while its act is out: the write was made, nothing records it, and nobody is alerted", func(t *testing.T) {
+		s := open(t, 3)
+		s.parcel(1, "1 High St", true)
+		s.r.Env.act = func(label) Act[string] {
+			s.exec("delete from parcel_dispatch")
+			return Act_Done[string]{Result: "T-1"}
+		}
+		s.want("outcome", s.at(0, "bookCourier"), Broken)
+		s.want("keys", s.keys, []string{key})
+		s.want("alerts", len(s.alerts), 0)
+	})
 	t.Run("act panics on a queue with no limit: the row is offered for ever, and nobody is ever alerted", func(t *testing.T) {
 		s := open(t, 0)
 		s.parcel(1, "1 High St", true)

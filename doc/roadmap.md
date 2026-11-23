@@ -140,13 +140,19 @@ issue where there is one.
 | 13i | Kogo | `Json.strings`; `split`, `padStart`, `toIntOrNull`, `toLongOrNull`; a log line for every failed call | 45 / 65 | PR 120 |
 | 13j | cusoon2 | A Google stand-in for the comparison and the port's tests | ~160 / 40 | cusoon2 PR 1572 |
 | 13k | cusoon2 | The port of Place Details, the time zone and `compositePlace` | ~230 / 120 | cusoon2 PR 1576, 1580 |
-| 13l | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13l's: ~1,600 / 850) | no |
-| 19 | cusoon2 | The ops site's Go `main`; settings move | 150 / 80 | no |
+| 13l | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13l's: ~1,600 / 850) | cusoon2 PR 1597, 1600, 1603, 1604, 1605, 1608 |
+| 18 | cusoon2 | Kotlin first: ten keys move into `settings`; `deployment.goPort` | ~60 / 50 | no, DEV-1124 |
+| 19 | cusoon2 | The ops site's Go `main`; settings move | 150 / 80 | no, DEV-1125 |
 | 20 | cusoon2 | Serve the ops site from Go | | no |
 
 Beside 13b to 13l, as tests in the Kotlin: the probes of each second id
 and admin-only field, the storefront's (DEV-1031, cusoon2 PR 1563)
 and then the ops site's (DEV-1038, 0 / 40).
+
+`sendInvite` compares with its `outbound_message` rows forgiven as
+owed until the port queues the invite's email (DEV-885), so "the 21
+operations switch together once all 21 compare clean" waits on it: it
+stands before row 20, not row 19.
 
 Beside it, before the first list goes live (DEV-930, about 290 / 220):
 the release carries Go; units, health and CI; routing and the port

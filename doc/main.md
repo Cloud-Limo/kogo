@@ -20,7 +20,9 @@ step's type such as `DeliveryFailure_needsRcpt`, and
 `rpc.ReadSettings`. Two lines below are ahead of them: `rpc.NewCalls`
 and `rpc.NewHandler` take no clock yet (Q8). `rpc.Call`'s error is an
 `rpc.Refused` for a refusal, and otherwise the status and text a
-browser would get.
+browser would get. Changed on 23 Nov 2026, each marked with the date:
+Go listens on `deployment.goPort`, a key of its own, and the settings
+move is its own PR, DEV-1124.
 
 ## The file
 
@@ -134,7 +136,8 @@ func run() int {
 type Config struct {
 	Deployment struct {
 		BackendHost      string
-		BackendPort      int
+		GoPort           int             // 23 Nov 2026: Go's own key, the lead's name (DEV-930)
+		BackendPort      json.RawMessage // the JVM's, which keeps it while both serve
 		PlatformAdminIds json.RawMessage // retired; old files carry it
 	}
 	DbConfig struct {
@@ -175,7 +178,7 @@ func load(path string) (c Config, err error) {
 	for key, present := range map[string]bool{ // Q7: Go reads a missing key as zero
 		"dbConfig.uri": c.DbConfig.URI != "", "dbConfig.maximumPoolSize": c.DbConfig.MaximumPoolSize > 0,
 		"dbConfig.user": c.DbConfig.User != "", "dbConfig.password": c.DbConfig.Password != "",
-		"deployment.backendPort": c.Deployment.BackendPort > 0,
+		"deployment.goPort":      c.Deployment.GoPort > 0,
 		"smtpConfig.server":      c.SmtpConfig.Server != "", "smtpConfig.port": c.SmtpConfig.Port > 0,
 		"smtpConfig.transport":   c.SmtpConfig.Transport != "",
 		"authConfig.apiKey":      c.AuthConfig.APIKey != "", "googlePlaceApiKey": c.GooglePlaceAPIKey != "",
@@ -252,7 +255,7 @@ func web(ctx context.Context, c Config, env app.Env, pool *pgxpool.Pool, clock k
 	mux.HandleFunc("GET /backend/logout", logout(calls))
 	mux.HandleFunc("POST /backend/smtp2go-webhook", webhook(calls, c.SmtpConfig.WebhookSecret, log))
 	srv := &http.Server{
-		Addr:              net.JoinHostPort(or(c.Deployment.BackendHost, "127.0.0.1"), strconv.Itoa(c.Deployment.BackendPort)),
+		Addr:              net.JoinHostPort(or(c.Deployment.BackendHost, "127.0.0.1"), strconv.Itoa(c.Deployment.GoPort)),
 		Handler:           http.MaxBytesHandler(behindProxy(mux), 1<<20),
 		ReadHeaderTimeout: 10 * time.Second,
 		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
@@ -423,10 +426,12 @@ login (`doc/gates.md`, "Routes that are not operations"), so
   `authConfig.faUrl`. None has a default, `dev`, the old name of
   `operators`, is no longer read, and a key `Settings` does not have
   is reported where the Kotlin refuses it. cusoon2 moves its reader,
-  the deploy script's `jq` and each file first, in the issue that
-  writes this `main` (Q11). `googleAddress`, CI's key for the replay
-  server (Q10), is one the Kotlin's reader refuses, so CI's file
-  carries it only once cusoon2's reader knows it, in that same move.
+  the deploy script's `jq` and each file first, in its own PR before
+  this `main`'s, DEV-1124 (Q11; 23 Nov 2026, where 18 Nov had it in
+  the issue that writes this `main`), which adds `deployment.goPort`.
+  `googleAddress`, CI's key for the replay server (Q10), is one the
+  Kotlin's reader refuses, so CI's file carries it only once cusoon2's
+  reader knows it, in that same move.
 - The identity service's public address reaches Kogo as the file has
   it: only the handle's copy is trimmed of its trailing `/`, where the
   paper of 17 Nov trimmed it in `load` for `Env` too. The trim's owner
@@ -530,7 +535,8 @@ their own issues is in their entries.
   at a local server that replays; nothing in Kogo.
 - **Q11 (lead, after Greg's rule). Which configuration file.** The
   Kotlin's with a `settings` object added, cusoon2 moving its keys
-  first, in the issue that writes its `main`.
+  first, in its own PR before the `main`'s, DEV-1124 (23 Nov 2026;
+  18 Nov had it in the issue that writes the `main`).
 - **Q12 (lead). Waiting for a connection: a.** Left at the request's
   limit.
 - **Q13 (Greg). A data class that cannot be built short: c, a chain

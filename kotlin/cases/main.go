@@ -38,7 +38,7 @@ var (
 // matches names, both results are rewritten, from to to, and a case
 // that then agrees is counted under why and does not fail the check.
 var kept = []struct{ names, from, to, why string }{
-	{"substringPlus", `[\x{10000}-\x{10FFFF}]`, "\uFFFD\uFFFD", "spec.md section 3: a String never holds half of a surrogate pair"},
+	{"substringPlus|hCharJoin", `[\x{10000}-\x{10FFFF}]`, "\uFFFD\uFFFD", "spec.md section 3: a String never holds half of a surrogate pair"},
 	{"lowercase|lowercaseContains", "ς", "σ", "spec.md section 12: lowercase keeps σ at a word's end"},
 	{"lowercaseContains", `^(?:true|false) (.*σ.*)$`, "_ $1", "spec.md section 12: lowercase keeps σ at a word's end"},
 	{"get", `Empty list doesn't contain element at index (-?\d+)\.`, "Index $1 out of bounds for length 0", "spec.md section 12: an index into Kotlin's empty list"},

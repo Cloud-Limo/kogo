@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// kogo check passes a type parameter declared twice.
+package accepted
+
+fun <T, T> twice(a: T): T = a

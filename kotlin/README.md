@@ -35,5 +35,15 @@ and is not part of `go test ./...`.
   habit applies to one unnoticed (principle 3). A new deviation adds
   a file.
 
+- `builtins/hunt.kg` is DEV-1143's hunt, a sketch: combinations a port
+  leans on (the order of effects, shadowing, a lambda's `var`, data
+  classes' text and `==`, chains of `?.` and `?:`, `Either` and raise
+  scopes, loops with jumps). Its last three cases differ and are marked;
+  while they do, `mise run kotlin` prints them and exits 1.
+- `accepted/*.kg` are what DEV-1143 found `kogo check` to pass and
+  kotlinc to refuse, on the line each file's first line names, that is
+  no deviation of spec 1. The task does not read them: each is to become
+  a refusal of the checker's, with its test there, or a deviation.
+
 To cover a function, add a branch: the generator reads the names from
 the source. Everything written is under `kotlin/_work`.

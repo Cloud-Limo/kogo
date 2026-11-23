@@ -12,13 +12,23 @@ go build -tags kotlin -o _work/driver ./driver
 rm -r _work/builtins # built in: gofmt -l . stays clean
 _work/driver < _work/cases > _work/kogo
 
-# Either is Arrow's: its jar, fetched once and checked.
-arrow=${XDG_CACHE_HOME:-$HOME/.cache}/kogo/arrow-core-jvm-2.2.3.jar
-if ! sha256sum -c --status <<<"a2d334ad01cf22cc534ff254788d1877e4df1564fd2b1101736a6c0e8d9a7a47  $arrow" 2>/dev/null; then
-    mkdir -p "$(dirname "$arrow")"
-    curl -fsSLo "$arrow" https://repo1.maven.org/maven2/io/arrow-kt/arrow-core-jvm/2.2.3/arrow-core-jvm-2.2.3.jar
-    sha256sum -c --quiet <<<"a2d334ad01cf22cc534ff254788d1877e4df1564fd2b1101736a6c0e8d9a7a47  $arrow"
-fi
+# Either is Arrow's: its jar, fetched once and checked, and the two
+# that its raise scope loads when either { } runs.
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/kogo
+arrow=
+while read -r sum name; do
+    jar=$cache/$name-2.2.3.jar
+    if ! sha256sum -c --status <<<"$sum  $jar" 2>/dev/null; then
+        mkdir -p "$cache"
+        curl -fsSLo "$jar" "https://repo1.maven.org/maven2/io/arrow-kt/$name/2.2.3/$name-2.2.3.jar"
+        sha256sum -c --quiet <<<"$sum  $jar"
+    fi
+    arrow=${arrow:+$arrow:}$jar
+done <<'JARS'
+a2d334ad01cf22cc534ff254788d1877e4df1564fd2b1101736a6c0e8d9a7a47 arrow-core-jvm
+9605a129250898db4a8e1011fb6faab1f1ade1dea290dae467eae2e60289f755 arrow-atomic-jvm
+1a6604e1dbe1af48a743ed1923f4754b389933c9ef3ec8aad6b7543418196796 arrow-exception-utils-jvm
+JARS
 
 # kotlinc reads only .kt: the same bytes, under that name.
 for f in builtins/*.kg; do cp "$f" "_work/$(basename "$f" .kg).kt"; done

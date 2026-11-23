@@ -1,0 +1,7 @@
+// kotlinc refuses line 7
+// kogo check passes a const val of a call, and of a type that is not a number or a String.
+package accepted
+
+fun one(): Long = 1L
+
+const val made: Long = one()

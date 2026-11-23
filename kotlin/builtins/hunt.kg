@@ -1,0 +1,735 @@
+// DEV-1143's hunt: combinations a port leans on that no other file
+// lists. Each branch is one case, as in constructs.kg.
+package builtins
+
+data class Money(val cents: Long, val code: String)
+
+data class Line(val label: String, val price: Money?, val tags: List<String>, val ratio: Double, val mark: Char = 'x')
+
+data class Wrap<T>(val value: T)
+
+data class Deal(val rate: Long, val name: String)
+
+val rate: Long = 7L
+
+fun Deal.cost(): Long = rate * 2L
+
+fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int, m: Int, x: Long, y: Long, d: Double): String? = when (f) {
+    "hOrderAssign" -> orderAssign(n, s)
+    "hOrderIndex" -> orderIndex(xs, n)
+    "hOrderTemplate" -> orderTemplate(n)
+    "hOrderEq" -> orderEq(n, m)
+    "hOrderSafe" -> orderSafe(s, n)
+    "hIntMath" -> "${n / m} ${n % m} ${-n / m} ${n % -m} ${n * m} ${n + m} ${n - m} ${-n} ${n * m / 7} ${(n + m) / 2}"
+    "hLongMath" -> "${x / y} ${x % y} ${-x / y} ${x * y} ${x + y} ${x - y} ${-x} ${x * n} ${n * x} ${x / n} ${n / x} ${x % n} ${n % x} ${n + x} ${n - x}"
+    "hMixedCompare" -> "${n < x} ${x < n} ${n <= x} ${x >= n} ${n > y} ${n.toLong() == x} ${x.toInt() == n}"
+    "hLiteralLong" -> literalLong(x, n)
+    "hDoubleMath" -> "${d + 0.1} ${d - 0.1} ${d * 3.0} ${d / 3.0} ${d % 3.0} ${-d} ${d % -0.7} ${0.1 + 0.2} ${1.0 / 3.0} ${d * d - d} ${d / 0.0} ${0.0 / 0.0 == d} ${d < 0.0} ${d >= 0.0} ${d != d} ${d == d}"
+    "hDoubleInt" -> "${x.toDouble() * 0.1} ${x.toDouble() / 3.0} ${(x.toDouble() * 1.1).toLong()} ${(n.toLong().toDouble() / 7.0).toInt()} ${(d * 100.0).toLong()} ${(d + 0.5).toLong()} ${n.toLong().toDouble() / m.toLong().toDouble()}"
+    "hTemplateForms" -> templateForms(s, n, x)
+    "hDataText" -> dataText(s, t, n, x, d)
+    "hDataEq" -> dataEq(s, t, x, y, d)
+    "hThisName" -> "${Deal(x, s).cost()} ${Deal(y, t).cost()}"
+    "hOrderIn" -> orderIn(n, m)
+    "hShadow" -> shadow(xs, s, n, x)
+    "hCapture" -> capture(xs, n)
+    "hNullNull" -> nullNull(xs, ys, s, n, x)
+    "hEitherChain" -> eitherChain(s, n, m, x, y)
+    "hEitherScope" -> "${scoped(s, n, m, x)} ${scopedList(xs, n)} ${nestedScope(s, n, m)}"
+    "hRanges" -> ranges(n, m, x, y)
+    "hLoopJumps" -> loopJumps(xs, ys, n)
+    "hUnitValue" -> "${xs.map { if (it > 0L) xs0() }} ${xs0()} ${listOf(xs0()) == listOf(xs0())}"
+    "hMinusLiteral" -> "${-1L.coerceAtLeast(0L)} ${-x.coerceAtMost(y)} ${-1.toLong()} ${-n.toLong()} ${-2147483647 - 1} ${-(-2147483647 - 1)} ${-(n * 0)} ${-0.0} ${-(d * 0.0)}"
+    "hPrecedence" -> "${x.takeIf { it > 0L } ?: y + 1L} ${(x.takeIf { it > 0L } ?: y) == y} ${x.takeIf { it > 0L } ?: y == y} ${n to m + 1} ${n + 1 to m} ${n to m to x} ${if (n > m) n else m + 1} ${if (n > m) x else x.takeIf { it > 0L } ?: y} ${n in m..m + 3} ${!(n > m) == (m > n)} ${-n in -3..3}"
+    "hGeneric" -> generic(xs, x, n)
+    "hWhenForms" -> whenForms(xs, s, n, x, d)
+    "hSafeChains" -> safeChains(s, t, n, xs)
+    "hDefaults" -> "${span(n)} ${span(n, m)} ${span(to = m, from = n)} ${Span(n)} ${Span(n, m)} ${Span(n).copy(from = m)} ${Span(to = m, from = n)} ${label(s)} ${label(s, t)} ${label(suffix = t, text = s)}"
+    "hWhitespace" -> "\u0009\u000A\u000B\u000C\u000D\u001C\u001D\u001E\u001F \u0085\u00A0\u1680\u180E\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u200B\u2028\u2029\u202F\u205F\u2060\u3000\uFEFF".map { if (it.isWhitespace()) 1 else 0 }.joinToString("") { "$it" } + " <${"\u00A0\u2007\u202F${s}\u3000\u2028\u0085".trim()}> ${"\u00A0\u2007\u202F\u3000\u2028\u2029\u1680".isBlank()} ${"\u0085".isBlank()} ${"\u200B".isBlank()} ${"\u180E\uFEFF".isBlank()} <${"\u2003x\u2003".trimEnd()}>"
+    "hCase" -> "\u0130\u0131\u017F\u212A\u1E9E\u00DF\u01C5\u01C4\u03A3\u03C2\uFB01\u0149\u01F0\u0390\u1F88\u2126\u00C5\u212B\u0401\u10A0\u13A0\u1C90\u2160\u24B6\uFF21\uA7AE\uD801\uDC00\uD83A\uDD00".lowercase() + " ${"\u0130".lowercase().length} ${"I\u0307".lowercase()}"
+    "hNumberText" -> "${(s + "1").toIntOrNull()} ${"-0".toIntOrNull()} ${"+".toIntOrNull()} ${"-".toLongOrNull()} ${" 1".toIntOrNull()} ${"1 ".toIntOrNull()} ${"1_000".toIntOrNull()} ${"\uFF11\uFF12".toIntOrNull()} ${"0x10".toIntOrNull()} ${"1.0".toIntOrNull()} ${"1e3".toLongOrNull()} ${"00012".toIntOrNull()} ${"2147483648".toIntOrNull()} ${"-2147483648".toIntOrNull()} ${"9223372036854775808".toLongOrNull()} ${"-9223372036854775808".toLongOrNull()} ${"+0".toLongOrNull()} ${"--1".toIntOrNull()} ${"\u0661\u06F2\u0967".toIntOrNull()} ${"\u2460".toIntOrNull()} ${"\u00B2".toIntOrNull()} ${"\u2212" + "1"} ${("\u2212" + "1").toIntOrNull()}"
+    "hTextEdges" -> "${s.split(t).joinToString("|")} ${s.padStart(n % 7, '\u00E9')} ${s.take(n % 5 + 5) + s.substring(s.length)} ${s.substringAfter(t).length} ${(s + t).trim().length} ${s.trim(' ').length} ${s.startsWith("")} ${s.endsWith("")} ${s.contains("")} ${"".split("")} ${"ab".split("")} ${"\uD83D\uDE00".split("").size} ${"a,b,,c,".split(",")} ${",".split(",")} ${"aXbxc".split("x")} ${s.ifEmpty { t }.ifBlank { "blank" }} ${s.filterNot { it == 'a' }}"
+    "hOwnNames" -> "${Deal(x, s).twice()} ${Deal(x, s).label} ${twice(n)} ${Deal(y, t).both()} ${describe(Deal(x, s))} ${describe(Money(y, t))}"
+    "hLambdas" -> lambdas(xs, n, x)
+    "hLoopBounds" -> loopBounds(xs, n)
+    "hKeys" -> keys(xs, ys, s, d)
+    "hBraces" -> "${"}"}${"{"}${"\""}${if (n > 0) "{" else "}"}${"${"${n}"}"} ${ /* c */ n } ${"a//b"} ${"/*"}${"*/"} ${"""//"""}" + /* a /* b */ c */ "d" // "e"
+    "hAssignOps" -> assignOps(xs, n, x, d)
+    "hInterface" -> "${named(Deal(x, s))} ${named(Money(y, t))} ${listOf<Named>(Tag(s), Tag(t)).map { it.title() }} ${Tag(s) == Tag(s)} ${listOf<Named>(Tag(s)) == listOf<Named>(Tag(s))} ${Tag(s)} ${titles(listOf(Tag(s), Tag(t)))}"
+    "hWiden" -> widen(xs, n, x)
+    "hLiteralWant" -> literalWant(n)
+    "hScopePanic" -> "${scopePanic(n, m)}"
+    "hDestructure" -> destructureMore(xs, s, n, x)
+    "hOrderNamed" -> orderNamed(n, m)
+    "hCharJoin" -> s.map { if (it == ' ') '_' else it }.joinToString("") { "$it" } // kept: spec 3, half of a pair is U+FFFD
+    // The three below differ (DEV-1143): mise run kotlin prints each and exits 1.
+    "hInOrder" -> inOrder(n)
+    "hGenericNull" -> genericNull(xs)
+    "hFunctionText" -> "${Rule(s, { it > 0L })}"
+    else -> null
+}
+
+fun orderAssign(n: Int, s: String): String {
+    var k = n
+    var log = s
+    fun bump(by: Int): Int {
+        k += by
+        log += "<$k>"
+        return k
+    }
+    k += bump(1)
+    k = k + bump(2) * k
+    k -= bump(3) - k
+    log += "a${bump(4)}" + log
+    log = log + "${bump(5)}" + log
+    val pair = k to bump(6)
+    val list = listOf(k, bump(7), k)
+    return "$k $log $pair $list"
+}
+
+fun orderIndex(xs: List<Long>, n: Int): String {
+    var list = xs + listOf(9L)
+    var i = 0
+    fun shrink(): Int {
+        list = list.drop(1) + listOf(8L, 7L)
+        i += 1
+        return i
+    }
+    val a = list[shrink()]
+    val b = list[i] + list[shrink()].toInt()
+    val c = list.take(shrink()).size + list.size
+    return "$a $b $c $list"
+}
+
+fun orderTemplate(n: Int): String {
+    var v = n
+    fun next(): Int {
+        v += 1
+        return v
+    }
+    return "$v ${next()} $v ${next() + v} ${v + next()} ${"$v${next()}$v"}"
+}
+
+fun orderEq(n: Int, m: Int): String {
+    var log = ""
+    fun at(tag: String, k: Int?): Int? {
+        log += tag
+        return k
+    }
+    val a = at("a", n) == at("b", m)
+    val b = null == at("c", null)
+    val c = at("d", null) != null
+    val e = at("e", n) == null || at("f", m) != at("g", n)
+    val g = at("h", n.takeIf { it > 0 }) ?: at("i", m.takeIf { it > 0 }) ?: at("j", 0)
+    return "$a $b $c $e $g $log"
+}
+
+fun orderSafe(s: String, n: Int): String {
+    var log = ""
+    fun at(tag: String, v: String?): String? {
+        log += tag
+        return v
+    }
+    fun len(tag: String, v: String): Int {
+        log += tag
+        return v.length
+    }
+    val a = at("a", s.takeIf { it.length > n })?.let { len("b", it) } ?: len("c", "cc")
+    val b = at("d", s)?.takeIf { it.isNotEmpty() }?.let { at("e", null) } ?: at("f", "f")
+    val c = at("g", null)?.plus(at("h", "h") ?: "") ?: "none"
+    val e = at("i", s)?.substringAfter(at("j", "a") ?: "")?.length
+    return "$a $b $c $e $log"
+}
+
+fun takesLong(v: Long): Long = v
+
+fun literalLong(x: Long, n: Int): String {
+    val a: Long = 5
+    val b: Long = -3
+    val c: Long = if (n > 0) 1 else 2
+    val e: Long = x.takeIf { it > 0L } ?: 0
+    val g = takesLong(7) + takesLong(-7)
+    val h = x + 1 - 2 * 3
+    val i = 7 / 2 * x
+    val j = x * 7 / 2
+    val k = x.coerceAtLeast(0).coerceAtMost(100)
+    return "$a $b $c $e $g $h $i $j $k ${x + 2147483647 + 1} ${2147483647 + 1 + x} ${x > 0} ${0 < x}"
+}
+
+fun templateForms(s: String, n: Int, x: Long): String {
+    val a_b = n
+    val it = x
+    return "$s.length ${s}.length $s[0] $s() $a_b $n$x$s a$ $ $$ $$n \$n \\$n $it ${'$'}n ${"$"}n $n-$x $n.$x ${n}L" +
+        """ raw $n ${x} \$n \n $s"q" """ + """a"b""c""" + """ ${"\n"}| """ + "\u0041\u00e9${'\u0041'}${'\\'}${'\''}${'"'}'"
+}
+
+fun dataText(s: String, t: String, n: Int, x: Long, d: Double): String {
+    val money = Money(x, s)
+    val line = Line(t, money.takeIf { n > 0 }, listOf(s, t), d)
+    val wrapped = Wrap(line.takeIf { n > 1 })
+    val nested = Wrap(Wrap(listOf(money to n, money.copy(cents = 0L) to -n)))
+    val unit = xs0()
+    return "$money $line $wrapped $nested ${line.copy(mark = ' ', price = null)} ${Wrap(Light.red)} ${Wrap(Shape.Empty)} ${Wrap(shapeOf(n))} ${Wrap(lightOf(n))} ${Wrap(d)} ${Wrap(s.map { it })} $unit ${Wrap(unit)} ${line.toString().length} ${money.toString()} ${listOf(lightOf(n), null)} ${Light.entries} ${Light.amber.name} ${Wrap(x.right())} ${Wrap(listOf(xs0()))}"
+}
+
+fun xs0() {
+}
+
+fun dataEq(s: String, t: String, x: Long, y: Long, d: Double): String {
+    val a = Line(s, Money(x, t), listOf(s), d)
+    val b = Line(s, Money(x, t), listOf(s), d)
+    val c = a.copy(ratio = -d)
+    val e = a.copy(price = null)
+    val zero = Wrap(0.0)
+    val minus = Wrap(-0.0)
+    val wn = Wrap(d.takeIf { it == it })
+    val nan = Wrap(0.0 / 0.0)
+    val ma: Money? = Money(x, s).takeIf { x > y }
+    return "${a == b} ${a == c} ${a != e} ${e == a.copy(price = null)} ${zero == minus} ${nan == Wrap(0.0 / 0.0)} ${wn == Wrap(d.takeIf { x > y })} ${Wrap(d) == Wrap(d)} ${ma == Money(x, s)} ${Money(x, s) == ma} ${ma == null} ${listOf(a, c) == listOf(b, c)} ${(a to 1) == (b to 1)} ${Wrap(listOf(d)) == Wrap(listOf(d))} ${Wrap(listOf(0.0)) == Wrap(listOf(-0.0))} ${listOf(d).contains(d)} ${listOf(0.0).contains(-0.0)} ${Wrap(Wrap(x)) == Wrap(Wrap(y))} ${a.ratio == b.ratio} ${zero.value == minus.value}"
+}
+
+fun orderIn(n: Int, m: Int): String {
+    var i = n % 5
+    var log = ""
+    fun bump(): Int {
+        i += 1
+        log += "b"
+        return i
+    }
+    val g = listOf(bump(), i).contains(i)
+    val h = i == bump()
+    val j = i < bump()
+    val k = i to bump()
+    return "$g $h $j $k $i $log"
+}
+
+// Differs: Kotlin reads what stands after in first, as the receiver
+// of contains, and Kogo what stands before it.
+fun inOrder(n: Int): String {
+    var i = n % 5
+    var log = ""
+    fun at(tag: String, k: Int): Int {
+        log += tag
+        return k
+    }
+    fun bump(): Int {
+        i += 1
+        return i
+    }
+    val a = at("x", 1) in listOf(at("c", 1))
+    val b = at("y", 1) in at("lo", 0)..at("hi", 2)
+    val c = i in listOf(bump())
+    val e = i in bump()..bump()
+    return "$a $b $c $e $log"
+}
+
+fun shadow(xs: List<Long>, s: String, n: Int, x: Long): String {
+    var out = ""
+    val v = n
+    if (n > 0) {
+        val v = v + 1
+        out += "$v "
+        for (v in xs) out += "$v,"
+        val f = { v: Int -> v * 2 }
+        out += " ${f(v)} ${xs.map { v -> v + 1L }} ${xs.map { it.let { it + 1L }.let { it * 2L } }}"
+    }
+    out += " $v"
+    var w = x
+    for (x in xs) {
+        val w = x + w
+        out += " $w"
+    }
+    w += 1L
+    val (s, n) = n to s
+    fun plusW(x: Long): Long = x + w
+    val len = s + 1
+    val string = n + "!"
+    val type = plusW(2L)
+    val range = xs.size
+    val func = { len: Int -> len + range }
+    val nil = xs.firstOrNull()
+    val copy = xs + xs
+    val append = copy.size
+    val new = append + 1
+    val panic = "p"
+    val error = panic + string
+    val min = xs.take(1)
+    val max = min + min
+    val go = func(len)
+    val map = xs.map { it }
+    val select = map == copy
+    val chan = select == (nil == null)
+    val default = if (chan) 1 else 0
+    val switch = when (default) { 1 -> "one"; else -> "other" }
+    val struct = Wrap(switch)
+    val int = struct.value.length
+    val any = int > 1
+    val bool = !any
+    val print = "$bool"
+    val defer = print.length
+    val goto = defer - 1
+    val fallthrough = goto * 2
+    val iota = fallthrough + 1
+    val cap = iota % 3
+    val make = cap.toLong()
+    val real = make.toDouble()
+    val close = real / 2.0
+    val delete = close.toInt()
+    val clear = delete == 0
+    val recover = if (clear) "r" else "s"
+    val rt = recover + print
+    val kogo = rt.length
+    val fmt = kogo + 1
+    val strings = "$fmt"
+    val true_ = strings.isNotEmpty()
+    return "$out $w $s $n $len $string $type $range $go $nil $append $new $error $max $select $chan $switch $struct $int $any $iota $make $close $delete $recover $rt $kogo $fmt $strings $true_"
+}
+
+fun capture(xs: List<Long>, n: Int): String {
+    var total = 0L
+    var fs = listOf({ total })
+    for (x in xs) {
+        fs = fs + listOf({ x + total })
+        total += x
+    }
+    var i = 0
+    var gs = listOf({ i })
+    while (i < n % 4) {
+        val j = i
+        gs = gs + listOf({ i * 10 + j })
+        i += 1
+    }
+    val add = { k: Int -> total += k.toLong() }
+    add(n)
+    xs.forEach { total += it }
+    val seen = xs.map { total += 1L; total }
+    fun fact(k: Long): Long = if (k <= 1L) 1L else k * fact(k - 1L)
+    var later = 1
+    val read = { later }
+    later = 2
+    return "${fs.map { it() }} ${gs.map { it() }} $total $seen ${fact((n % 10).toLong())} ${read()}"
+}
+
+fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallback
+
+fun <T> same(a: T, b: T): Boolean = a == b
+
+fun <T> listed(a: T, b: T?): List<T?> = listOf(a, b)
+
+fun nullNull(xs: List<Long>, ys: List<Long>, s: String, n: Int, x: Long): String {
+    val holes: List<Long?> = xs.map { it.takeIf { v -> v > 0L } }
+    val k = holes.mapNotNull { it }
+    val l = holes.groupBy { it }[null]
+    val o = holes.groupBy { it }[x]?.size
+    val p = holes.contains(null)
+    val q = holes.toSet().contains(null)
+    val r = holes.distinctBy { it }
+    val u = holes.sortedBy { it }
+    val w = same(holes.take(1), listOf(null))
+    val either: Either<String, Long?> = if (n > 0) x.takeIf { it > 0L }.right() else s.left()
+    val wrapped = Wrap(x.takeIf { it > 0L })
+    return "$holes $k $l $o $p $q $r $u $w $either ${either.map { it ?: -10L }} ${either.fold({ -13L }, { it ?: -14L })} $wrapped ${wrapped == Wrap(ys.firstOrNull())} ${wrapped.value ?: -11L} ${holes.map { it ?: 0L }.sum()} ${holes.filter { it != null }.size} ${holes == ys.map { it.takeIf { v -> v > 0L } }} ${holes.zip(ys).map { (a, b) -> (a ?: b) + b }}"
+}
+
+fun eitherChain(s: String, n: Int, m: Int, x: Long, y: Long): String {
+    val e = pick(s, n, m, x)
+    var log = ""
+    val a = e.map { log += "m"; it + 1L }.mapLeft { log += "l"; it.length }.flatMap { pick("a", if (it > y) 1 else 0, 0, it).mapLeft { v -> v.length } }
+    val b = e.fold({ it }, { "$it" })
+    val c: Either<String, Shape> = e.map { shapeOf(it.toInt()) }
+    val got = c.getOrNull()
+    val g = c.fold({ "left $it" }, { "right ${shape(it)}" })
+    val h = e.map { it.takeIf { v -> v > 0L } }
+    val i = e.mapLeft { it.takeIf { v -> v.isNotEmpty() } }
+    val j = e.flatMap { v -> pick(t(v), m, n, y).mapLeft { w -> "inner $w" } }
+    val k = e.getOrElse { it.length.toLong() } + (e.getOrNull() ?: -1L)
+    return "$a $b $c $got $g $h $i $j $k $log ${e == pick(s, n, m, x)} ${e == x.right()} ${e == s.left()} ${a == a} ${Wrap(e)} ${listOf(e, e).map { it.getOrNull() }}"
+}
+
+fun t(v: Long): String = "t$v"
+
+fun scoped(s: String, n: Int, m: Int, x: Long): Either<String, Long> = either {
+    val a = pick(s, n, m, x).bind()
+    ensure(a != 0L) { "zero" }
+    val b = ensureNotNull(a.takeIf { it > -5L }) { "low $a" }
+    val c = if (b > 100L) raise("big") else b
+    val d = pick("second", m, n, c).mapLeft { "$it!" }.bind()
+    c + d
+}
+
+fun scopedList(xs: List<Long>, n: Int): Either<String, List<Long>> = either {
+    var seen = ""
+    val out = xs.map {
+        seen += "$it,"
+        ensure(it != 3L) { "three after $seen" }
+        if (it < 0L) raise("negative $it after $seen") else it * 2L
+    }
+    xs.forEach { ensure(it < n.toLong()) { "past $n: $it" } }
+    out.filter { it != 4L }.sortedBy { ensureNotNull(it.takeIf { v -> v != 12L }) { "twelve" } }
+}
+
+fun nestedScope(s: String, n: Int, m: Int): String {
+    val outer: Either<String, Int> = either {
+        val inner: Either<Int, String> = either {
+            if (n == 1) raise(7)
+            ensure(n != 2) { 8 }
+            "inner done"
+        }
+        val text = inner.mapLeft { "inner failed $it" }.bind()
+        text.length + inner.fold({ it }, { it.length })
+    }
+    return "$outer"
+}
+
+fun ranges(n: Int, m: Int, x: Long, y: Long): String {
+    var out = ""
+    var count = 0
+    fun lim(k: Int): Int {
+        count += 1
+        return k
+    }
+    for (i in lim(n % 4)..lim(m % 4)) out += "a$i"
+    for (i in lim(m % 4) until lim(n % 4)) out += "b$i"
+    for (i in x % 3L..y % 5L) out += "c$i"
+    for (i in n % 3..y % 5L) out += "d$i"
+    for (i in 2147483645..2147483647) out += "e"
+    for (i in -2147483647 - 1 until -2147483646) out += "f$i"
+    for (i in 9223372036854775806L..9223372036854775807L) out += "g"
+    for (i in n until m) {
+        if (i > n + 3) break
+        out += "h$i"
+    }
+    return "$out $count ${n in m..2147483647} ${x in n..y} ${n in x..y} ${x in 0..10} ${n in 0L..10L} ${n in 5..1} ${x in y until y} ${n + 1 in n..n} ${2147483647 in n until 2147483647} ${n in m until m + 1}"
+}
+
+fun loopJumps(xs: List<Long>, ys: List<Long>, n: Int): String {
+    var out = ""
+    for (x in xs) {
+        for (y in ys) {
+            if (y == x) continue
+            if (y > x + 2L) break
+            when {
+                y < 0L -> continue
+                y == 1L -> break
+                else -> out += "$x$y "
+            }
+        }
+        var k = 0
+        while (k < 3) {
+            k += 1
+            val v = when (k) {
+                1 -> continue
+                2 -> if (x == 2L) break else k
+                else -> k * 2
+            }
+            out += "k$v "
+        }
+        if (x == 3L) break
+        out += "| "
+    }
+    var rest = xs
+    while (true) {
+        val head = rest.firstOrNull() ?: break
+        rest = rest.drop(1)
+        val even = head.takeIf { it % 2L == 0L } ?: continue
+        out += "e$even "
+        if (rest.size < n) return "early $out"
+    }
+    return out
+}
+
+fun <T> lastOr(items: List<T>, fallback: T): T = items.lastOrNull() ?: fallback
+
+fun <T> keep(v: T, fallback: T): T = v.takeIf { it != null } ?: fallback
+
+fun <T> notNulls(items: List<T>): Int = items.mapNotNull { it }.size + listOfNotNull(items.firstOrNull()).size
+
+fun <T> firstIs(items: List<T>): String = if (items.firstOrNull() == null) "none" else "some"
+
+fun <T> viaLet(v: T, fallback: T): T = v?.let { it } ?: fallback
+
+fun <T> must(items: List<T>): T = requireNotNull(items.firstOrNull()) { "no first" }
+
+fun <K> grouped(items: List<K>, key: K): Int = items.groupBy { it }[key]?.size ?: -1
+
+fun generic(xs: List<Long>, x: Long, n: Int): String {
+    val holes: List<Long?> = xs.map { it.takeIf { v -> v > 0L } }
+    val none: Long? = x.takeIf { n > 100 }
+    return "${grouped(holes, none)} ${firstOr(xs, 5L)} ${lastOr(xs, 6L)} ${keep(x, 7L)} ${notNulls(xs)} ${firstIs(xs)} ${must(xs + listOf(1L))} ${viaLet(x, 8L)}"
+}
+
+// Differs: T is Long?, and the T? each body makes of a null T is not
+// null in Kogo. kogo emit refuses keep, notNulls, viaLet and must on
+// such a list (not-yet-emitted), and not these three.
+fun genericNull(xs: List<Long>): String {
+    val holes: List<Long?> = xs.map { it.takeIf { v -> v > 0L } }
+    return "${firstOr(holes, 5L)} ${lastOr(holes, 6L)} ${firstIs(holes)}"
+}
+
+fun whenForms(xs: List<Long>, s: String, n: Int, x: Long, d: Double): String {
+    var log = ""
+    fun next(k: Int): Int? {
+        log += "n"
+        return k.takeIf { it != 3 }
+    }
+    val a = when (next(n)) {
+        null -> "null"
+        0, 1 -> "low"
+        2, n -> "mid"
+        else -> "high"
+    }
+    val first = xs.firstOrNull()
+    val b = when (first) {
+        null -> "none"
+        else -> "first ${first + 1L}"
+    }
+    val c = when (s.trim()) {
+        "" -> "blank"
+        s -> "same"
+        else -> "trimmed"
+    }
+    val e = when (x) {
+        0L -> "zero"
+        in 1L..9L, in -9L..-1L -> "digit"
+        x / 10L * 10L -> "round"
+        else -> "other"
+    }
+    val g = when (n > 0) {
+        true -> when (lightOf(n)) {
+            Light.red -> "r"
+            null -> "-"
+            else -> "x"
+        }
+        false -> "f"
+    }
+    val h = when {
+        d != d -> "nan"
+        d > 0.0 && d < 1.0 -> "frac"
+        d == 0.0 -> "zero"
+        else -> "num"
+    }
+    val i = when (shapeOrNull(n)) {
+        null -> "null"
+        is Shape.Dot -> "dot"
+        Shape.Empty -> "empty"
+        is Shape.Line -> "line"
+    }
+    val j = when (s.map { it }.firstOrNull()) {
+        'a' -> "a"
+        ' ', '\t' -> "space"
+        null -> "none"
+        else -> "char"
+    }
+    return "$a $b $c $e $g $h $i $j $log"
+}
+
+fun safeChains(s: String, t: String, n: Int, xs: List<Long>): String {
+    val ns: String? = s.takeIf { it.length > n }
+    val a = ns?.length.let { "$it" }
+    val b = ns?.trim()?.takeIf { it.isNotEmpty() }?.length ?: -1
+    val c = (ns ?: t).length
+    val e = ns?.let { it.toIntOrNull() } ?: t.toIntOrNull() ?: 0
+    val g = ns?.length == null
+    val h = ns?.length == t.length
+    val i = xs.firstOrNull()?.let { it > 0L } == true
+    val j = ns?.let { if (it.isNotEmpty()) it else null } ?: "empty-or-null"
+    val k = ns?.also { }?.substring(0)?.padStart(3) ?: "k"
+    val l = xs.firstOrNull { it > 1L }?.toInt()?.let { n + it }
+    val o = ns ?: t.takeIf { it.isNotEmpty() } ?: "o"
+    val p = if (ns != null && ns.length > 1) ns.take(2) else "p"
+    val q = if (ns == null || !ns.isNotEmpty()) "q" else ns.take(1)
+    return "$a $b $c $e $g $h $i $j $k $l $o $p $q ${early(ns, xs)} ${early(null, xs)}"
+}
+
+fun early(ns: String?, xs: List<Long>): String {
+    val first = xs.firstOrNull() ?: return "no first"
+    val text = ns ?: error("no text for $first")
+    if (first < 0L) return "negative"
+    val len = ns?.length ?: return "unreachable"
+    return "$first $text $len"
+}
+
+data class Span(val from: Int, val to: Int = 1, val size: Int = 2)
+
+fun span(from: Int, to: Int = from + 1, size: Int = to - from): String = "$from..$to ($size)"
+
+fun label(text: String, suffix: String = text.take(1), both: String = text + suffix): String = "$text$suffix$both"
+
+fun Deal.twice(): Long = rate * 2L
+
+fun twice(n: Int): Int = n * 3
+
+val Deal.label: String
+    get() = "$name@$rate"
+
+fun name(): String = "top"
+
+fun Deal.both(): String = "$name ${name()} ${twice()} ${twice(2)} $label"
+
+fun describe(deal: Deal): String = "deal ${deal.name}"
+
+fun describe(money: Money): String = "money ${money.code}"
+
+fun double(v: Long): Long = v * 2L
+
+data class Rule(val name: String, val test: (Long) -> Boolean, val fix: (Long) -> Long = ::double)
+
+fun lambdas(xs: List<Long>, n: Int, x: Long): String {
+    val rules = listOf(Rule("pos", { it > 0L }), Rule("small", { v -> v < n.toLong() }, { it - 1L }))
+    val passed = rules.filter { it.test(x) }.map { it.name }
+    val fixed = rules.map { it.fix(x) }
+    val compose = { f: (Long) -> Long, g: (Long) -> Long -> { v: Long -> g(f(v)) } }
+    val both = compose(::double, rules[1].fix)
+    val adder = { a: Long -> { b: Long -> a + b } }
+    var calls = 0
+    val counted = { v: Long -> calls += 1; v + calls.toLong() }
+    val units = xs.map { calls += 1 }
+    val pairs = xs.zip(xs.map(::double)).map { (a, b) -> a + b }
+    val nested = xs.map { a -> xs.filter { it > a }.map { it - a } }
+    val picked = xs.mapIndexed { i, v -> if (i % 2 == 0) counted(v) else v }
+    return "$passed $fixed ${both(x)} ${adder(x)(1L)} $units $pairs $nested $picked $calls ${xs.map(::double)} ${rules.map { it.name }}"
+}
+
+fun loopBounds(xs: List<Long>, n: Int): String {
+    var out = ""
+    var lim = n % 4
+    for (i in 0 until lim) {
+        lim += 1
+        out += "a$i"
+    }
+    var list = xs.take(3)
+    for (v in list) {
+        list = list + listOf(v)
+        out += "b$v"
+    }
+    var k = 0
+    while (k < list.size) {
+        if (k < 2) list = list.drop(1)
+        k += 1
+    }
+    for (i in lim..lim + 1) lim -= 1
+    return "$out $lim $list $k"
+}
+
+fun keys(xs: List<Long>, ys: List<Long>, s: String, d: Double): String {
+    val ds = listOf(d, 0.0, -0.0, d, 0.0 / 0.0, -(0.0 / 0.0), 1.0)
+    val words = listOf("\uFF21", "\uD83D\uDE00", "a", "A", "\u00E9", "", s, "aa", "B")
+    return "${ds.distinctBy { it }} ${ds.groupBy { it }} ${ds.toSet()} ${ds.sortedBy { it }} ${words.sortedBy { it }} ${words.groupBy { it.length }} ${xs.groupBy { Wrap(it % 2L) }} ${xs.distinctBy { it to it % 2L }} ${xs.groupBy { listOf(it % 2L) }[listOf(1L)]} ${setOf(Wrap(ds.take(1)), Wrap(listOf(d)), Wrap(listOf(-d)))} ${xs.zip(ys).toSet()} ${xs.map { Wrap(it.takeIf { v -> v > 0L }) }.toSet()} ${(xs + ys).groupBy { it }.get(0L)} ${setOf(xs, ys, xs.reversed().reversed()).contains(ys + listOf<Long>())}"
+}
+
+fun assignOps(xs: List<Long>, n: Int, x: Long, d: Double): String {
+    var total = 0L
+    total += n
+    total -= 1
+    total *= n
+    var all = listOf<Long>()
+    all += xs
+    all += listOf(total)
+    var text = ""
+    text += "a"
+    text += "$total"
+    var ratio = d
+    ratio += 1.0
+    ratio *= ratio
+    ratio /= 3.0
+    ratio %= 7.0
+    var flag = n > 0
+    flag = flag && x > 0L || !flag
+    var count = n
+    count %= 7
+    count /= 2
+    count -= -count
+    return "$total $all $text $ratio $flag $count"
+}
+
+interface Named {
+    val name: String
+    fun title(): String
+}
+
+data class Tag(override val name: String) : Named {
+    override fun title(): String = "Tag $name"
+}
+
+fun titles(items: List<Named>): String = items.joinToString("+") { it.title() + it.name }
+
+fun named(deal: Deal): String = deal.name
+
+fun named(money: Money): String = money.code
+
+sealed interface Outcome<out T> {
+    data class Ok<T>(val value: T) : Outcome<T>
+    data class Refused(val message: String) : Outcome<Nothing>
+}
+
+fun okOf(x: Long): Outcome<Long> = if (x > 0L) Outcome.Ok(x) else Outcome.Refused("no $x")
+
+fun dotOf(n: Int): Outcome<Shape.Dot> = Outcome.Ok(Shape.Dot(n))
+
+fun told(o: Outcome<Long?>): String = when (o) {
+    is Outcome.Ok -> "ok ${o.value ?: -1L}"
+    is Outcome.Refused -> "refused ${o.message}"
+}
+
+fun shown(o: Outcome<Shape>): String = when (o) {
+    is Outcome.Ok -> shape(o.value)
+    is Outcome.Refused -> o.message
+}
+
+fun widen(xs: List<Long>, n: Int, x: Long): String {
+    val wide: Outcome<Long?> = if (x > 0L) Outcome.Ok(x.takeIf { it != 7L }) else Outcome.Refused("no $x")
+    val shapes: List<Shape> = listOf(Shape.Dot(n), Shape.Dot(n + 1))
+    val dots = listOf(Shape.Dot(n))
+    val mixed: List<Shape> = shapes + listOf(Shape.Empty)
+    val maybe: List<Long?> = xs
+    val pair: Pair<Shape, Long?> = Shape.Dot(n) to x
+    val right: Either<String, Shape> = Shape.Dot(n).right()
+    val fromDot: Either<String, Shape> = if (n > 0) Shape.Dot(n).right() else "none".left()
+    val asShape: Outcome<Shape> = Outcome.Ok(shapeOf(n))
+    return "${told(wide)} ${told(Outcome.Refused(""))} ${shown(asShape)} $wide ${wide == Outcome.Refused("no $x")} $shapes ${shapes.take(1) == dots} $mixed ${maybe == xs} ${maybe.contains(x)} ${maybe.contains(null)} $pair ${pair == (Shape.Dot(n) to x)} $right ${right == Shape.Dot(n).right()} ${fromDot.map { shape(it) }} ${fromDot.fold({ it }, { shape(it) })} ${wide is Outcome.Ok} ${shapes.map { it is Shape.Dot }} ${setOf(wide, wide)} ${okOf(x)} ${dotOf(n)}"
+}
+
+fun literalWant(n: Int): String {
+    val a: Long = (2147483647 + 1).toLong()
+    val c = takesLong(2147483647) + 1
+    val e: Long = if (n > 0) 2147483647 else 3
+    val g = (365 * 24 * 60 * 60 * 1000).toLong()
+    val h: Long = -2147483647
+    return "$a $c $e $g $h ${takesLong(1) + 2147483647} ${1 + takesLong(2147483647)}"
+}
+
+fun scopePanic(n: Int, m: Int): Either<String, Int> = either {
+    check(n != 1) { "check $n" }
+    if (n == 2) error("error in scope")
+    val inner: Either<Int, Int> = either {
+        require(m != 1) { "require $m" }
+        ensure(m != 2) { m }
+        (listOf(1) + listOf(2, 3)).take(2)[m] / (n - 3)
+    }
+    inner.mapLeft { "inner $it" }.bind() + n
+}
+
+fun destructureMore(xs: List<Long>, s: String, n: Int, x: Long): String {
+    val boxes = xs.map { Box(it, s, n) }
+    var out = ""
+    for ((a, b, c) in boxes) out += "$a$b$c "
+    val sums = boxes.map { (a, _, c) -> a + c }
+    val (p, q) = Box(x, s, n)
+    val pairs = xs.zip(boxes).map { (v, box) -> v + box.a }
+    val (first, second) = xs.take(1) to xs.drop(1)
+    return "$out $sums $p $q $pairs $first $second"
+}
+
+fun orderNamed(n: Int, m: Int): String {
+    var log = ""
+    fun at(tag: String, k: Int): Int {
+        log += tag
+        return k
+    }
+    val a = Span(to = at("a", n), from = at("b", m))
+    val b = a.copy(size = at("c", 1), from = at("d", 2))
+    val c = Box(c = at("e", 3), a = at("f", 4).toLong())
+    val e = greet(sep = "${at("g", 5)}", who = "${at("h", 6)}")
+    val g = listOf(at("i", 1), at("j", 2))[at("k", 0)]
+    return "$a $b $c $e $g $log"
+}

@@ -1,0 +1,8 @@
+// kotlinc refuses line 6
+// kogo check passes it, and f(1) is "one": Go's default runs last.
+package accepted
+
+fun f(n: Int): String = when (n) {
+    else -> "else"
+    1 -> "one"
+}

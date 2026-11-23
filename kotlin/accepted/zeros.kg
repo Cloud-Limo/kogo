@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// kogo check passes it, and ten() is 10.
+package accepted
+
+fun ten(): Int = 010

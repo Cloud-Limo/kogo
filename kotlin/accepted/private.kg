@@ -1,0 +1,7 @@
+// kotlinc refuses line 7
+// kogo check passes a public fun that takes or gives a private type.
+package accepted
+
+private data class Hidden(val n: Int)
+
+fun shown(hidden: Hidden): Int = hidden.n

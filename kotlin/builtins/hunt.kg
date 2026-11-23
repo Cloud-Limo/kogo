@@ -82,6 +82,7 @@ fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int
     "hMemberWins" -> "${Money(x, s).toString()} ${Money(x, s)} ${Money(x, s).copy(cents = 1L)} ${Money(x, s).copy(1L)} ${Light.red.name} ${lightOf(n)?.name} ${Money(y, t).toString().length}"
     "hWhenValues" -> "${whenMoney(Money(x % 3L, s))} ${whenList(xs.take(2))} ${whenPair(n % 3 to s.take(1))} ${'a' in s} ${"ab" in s} ${s in listOf(t, "a")} ${n in setOf(m, 1)} ${whenLongInt(x)} ${whenLongInt(y - 3L)}"
     "hQuote" -> quoteCase(xs, ys, s, t, n, m, x)
+    "hExamples" -> examplesCase(xs, s, t, n, m, x, y, d)
     "hCharJoin" -> s.map { if (it == ' ') '_' else it }.joinToString("") { "$it" } // kept: spec 3, half of a pair is U+FFFD
     // The four below differ (DEV-1143): mise run kotlin prints each and exits 1.
     "hInOrder" -> inOrder(n)
@@ -1356,4 +1357,132 @@ fun quoteCase(xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int, m: I
     val labels = quote.extras.distinctBy { it.label }.sortedBy { it.label }.joinToString(",") { it.label }
     val best = listOf(quote, cheaper).mapNotNull { q -> q.total().getOrNull()?.let { q to it } }.sortedBy { (_, total) -> total }.firstOrNull()
     return "${quote.summary()} | ${cheaper.summary()} | ${byKind[true]?.size ?: 0}/${byKind[false]?.size ?: 0} | $labels | ${best?.let { (q, total) -> "${q.passengers}:${money(total)}" } ?: "none"} | ${quote == cheaper} | ${quote.extrasTotal()} | ${quote.total() == cheaper.total()}"
+}
+
+// examples/01 to 09, the ones with no SQL, under names of their own.
+fun exDiscountedCents(amount: Cents, discountPercent: Double): Cents =
+    (amount * 10000 - (amount.toDouble() * discountPercent * 100.0).toLong()) / 10000
+
+data class ExDiscount(val description: String, val amount: Cents, val struck: Boolean)
+
+data class ExDiscountStack(val discounts: List<ExDiscount>, val total: Cents)
+
+fun exStack(amounts: List<Cents>, percent: Double, label: String): ExDiscountStack {
+    fun nett(p: Double): Cents = amounts.sumOf { exDiscountedCents(it, p) }
+    val discounts =
+        listOf(ExDiscount(label, nett(percent) - amounts.sum(), struck = false))
+            .filter { it.amount != 0L }
+    return ExDiscountStack(discounts, nett(percent))
+}
+
+fun exIsValidAbn(abn: String): Boolean {
+    if (!Regex("[0-9]{11}").matches(abn)) return false
+    val weights = listOf(10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19)
+    val digits = abn.map { it.digitToInt() }.mapIndexed { i, d -> if (i == 0) d - 1 else d }
+    return digits.zip(weights).sumOf { (d, w) -> d * w } % 89 == 0
+}
+
+fun exFormatAbn(abn: String): String =
+    if (abn.length == 11)
+        "${abn.substring(0, 2)} ${abn.substring(2, 5)} " +
+            "${abn.substring(5, 8)} ${abn.substring(8)}"
+    else abn
+
+data class ExPrice(val amount: Cents)
+
+data class ExBooking(
+    val price: ExPrice?,
+    val sharePercentWhenGiven: Int?,
+    val hadCardWhenGiven: Boolean?,
+    val stripeCardId: String?,
+    val fixedPayCents: Cents?,
+)
+
+data class ExCharge(val amount: Cents)
+
+val exAutoChargeDiscount: Double = 2.5
+
+fun exJobWorth(booking: ExBooking, extras: List<ExCharge>, card: Boolean): Cents? =
+    booking.price?.let { price ->
+        val total = price.amount + extras.sumOf { it.amount }
+        if (card) exDiscountedCents(total, exAutoChargeDiscount) else total
+    }
+
+fun exSupplierPay(worth: Cents?, sharePercent: Int, fixedPayCents: Cents?): Cents? =
+    fixedPayCents ?: worth?.let { shareOf(it, sharePercent) }
+
+fun ExBooking.supplierPay(extras: List<ExCharge>): Cents? {
+    val share = sharePercentWhenGiven ?: return null
+    val card = hadCardWhenGiven == true && stripeCardId != null
+    return exSupplierPay(exJobWorth(this, extras, card), share, fixedPayCents)
+}
+
+enum class ExStatus { draft, issued, paid, void }
+
+fun exCanPay(status: ExStatus): Boolean =
+    when (status) {
+        ExStatus.issued -> true
+        ExStatus.draft, ExStatus.paid, ExStatus.void -> false
+    }
+
+data class ExPerson(val name: String, val mobile: String?)
+
+fun exContact(person: ExPerson?): String {
+    val p = person ?: return "nobody"
+    val mobile = p.mobile?.trim()?.takeIf { it.isNotEmpty() }
+    return if (mobile != null) "${p.name} on $mobile" else p.name
+}
+
+fun exMobileOf(person: ExPerson): String =
+    requireNotNull(person.mobile) { "person ${person.name} has no mobile" }
+
+sealed interface ExSignupError {
+    data class BadEmail(val email: String) : ExSignupError
+    data object TooYoung : ExSignupError
+}
+
+fun exCheckedEmail(text: String): Either<ExSignupError, String> = either {
+    val email = text.trim().lowercase()
+    ensure(email.contains("@")) { ExSignupError.BadEmail(text) }
+    email
+}
+
+fun exSignup(email: String, age: Int): Either<ExSignupError, String> = either {
+    val checked = exCheckedEmail(email).bind()
+    if (age < 18) raise(ExSignupError.TooYoung)
+    checked
+}
+
+fun exMessage(result: Either<ExSignupError, String>): String =
+    result.fold(
+        { e ->
+            when (e) {
+                is ExSignupError.BadEmail -> "${e.email} is not an email address."
+                ExSignupError.TooYoung -> "You must be 18."
+            }
+        },
+        { email -> "Welcome, $email." },
+    )
+
+sealed interface ExStoreError {
+    data object Missing : ExStoreError
+}
+
+fun exLoad(id: Int): Either<ExStoreError, String> =
+    if (id == 1) "one".right() else ExStoreError.Missing.left()
+
+fun exTitle(id: Int): Either<String, String> = either {
+    val a = exLoad(id).mapLeft { "No item $id." }.bind()
+    // Several calls converted at once: a block of the inner error type.
+    val b = either<ExStoreError, String> { "${exLoad(id + 1).bind()}, ${exLoad(id + 2).bind()}" }
+        .mapLeft { "No items after $id." }
+        .bind()
+    "$a and $b"
+}
+
+fun examplesCase(xs: List<Long>, s: String, t: String, n: Int, m: Int, x: Long, y: Long, d: Double): String {
+    val abn = xs.joinToString("") { "${abs(it % 10L)}" }.padStart(11, '5').take(11)
+    val booking = ExBooking(ExPrice(x % 1000000L).takeIf { n > 0 }, m.takeIf { it > 0 }, (n > m).takeIf { m != 1 }, s.takeIf { it.isNotEmpty() }, y.takeIf { n == 2 })
+    val person = ExPerson(s, t.takeIf { n > 1 })
+    return "${exDiscountedCents(x % 100000000L, d)} ${exDiscountedCents(y, 2.5)} ${exStack(xs, 2.5, s)} ${exStack(xs, 0.0, t)} ${exIsValidAbn(abn)} ${exIsValidAbn("51824753556")} ${exIsValidAbn(s)} ${exFormatAbn(abn)} ${exFormatAbn(s)} ${booking.supplierPay(xs.map { ExCharge(it) })} ${exJobWorth(booking, listOf(), n > 2)} ${ExStatus.entries.map { exCanPay(it) }} ${exContact(person)} ${exContact(person.takeIf { m > 0 })} ${exMessage(exSignup(s + t, n))} ${exMessage(exSignup("A@b.c ", m + 15))} ${exTitle(n)} ${exTitle(m % 3)} ${exMobileOf(person)}"
 }

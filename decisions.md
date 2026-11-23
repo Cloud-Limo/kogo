@@ -4428,6 +4428,7 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
 - **Section 14 lists a call to a fun after a local of its name** (lead, 23 Nov 2026:
   DEV-1096's Ruling), the rule section 6 states. `val job = job(1)` alone passes
   `kogo check`, its initializer seeing the fun; a later `job(2)` is `not-callable`,
-  so the row names the later call. Not taken: resolving a call past a local that
-  cannot be called, as Kotlin does. Reopen if a port meets the row often enough
-  that renaming costs more than the resolution.
+  so the row names the later call. Not taken: the Scope's row, a local named as a
+  fun it calls, which names a form `kogo check` accepts. Not taken either:
+  resolving a call past a local that cannot be called, as Kotlin does. Reopen if
+  a port meets the row often enough that renaming costs more than the resolution.

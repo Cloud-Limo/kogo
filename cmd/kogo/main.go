@@ -112,7 +112,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	var sigs check.Signatures
 	var lost error // a failure to ask the database, which stops the check
-	if slices.ContainsFunc(files, func(f *syntax.File) bool { return f.SQL != nil }) {
+	// An effect's table is checked against the database too, though its
+	// file may hold no literal.
+	if slices.ContainsFunc(files, func(f *syntax.File) bool { return f.SQL != nil || f.Queues != nil }) {
 		ctx := context.Background()
 		db, err := sqlpass.Connect(ctx, os.Getenv("DATABASE_URL"))
 		if err != nil {

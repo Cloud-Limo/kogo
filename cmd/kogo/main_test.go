@@ -302,6 +302,46 @@ at 09:01:
 	}
 }
 
+// An effect's table is checked against the database where the program
+// holds no sql literal: Postgres says which of the runner's columns the
+// table lacks.
+func TestEffectWithNoLiteral(t *testing.T) {
+	testDB(t)
+	code, out := kogo(t, map[string]string{"w.kg": `package p
+
+import kogo.io.Console
+import kogo.work.Act
+import kogo.work.Alert
+import kogo.work.EffectKey
+
+data class Env(val console: Console)
+data class Row(val id: Uuid)
+
+fun prep(tx: Tx, env: Env, row: Row): Either<String, Int> = either { 1 }
+
+action fun send(env: Env, key: EffectKey, n: Int): Act<String> {
+    env.console.println("sent")
+    return Act.Done("x")
+}
+
+fun rec(tx: Tx, env: Env, row: Row, s: String): Either<String, Unit> = either { }
+
+action fun tell(env: Env, alert: Alert): Either<String, Unit> = either { env.console.println(alert.cause) }
+
+effect e on parcel {
+    attempts 1
+    prepare prep
+    act send
+    record rec
+}
+
+work w alertedBy tell { e }
+`})
+	if code != 1 || !strings.Contains(out, `"code":"effect-table"`) || !strings.Contains(out, `column \"attempts\" does not exist`) {
+		t.Errorf("exit %d, want 1 and effect-table for the column the table lacks\n%s", code, out)
+	}
+}
+
 // What the emitter does not write yet is an error like any other, and
 // then nothing is written; with no go.mod above the out directory,
 // kogo emit cannot say how the Go's packages import each other.

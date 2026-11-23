@@ -1,0 +1,9 @@
+// kotlinc refuses line 5
+// kogo check passes override before a top-level fun, and a visibility on an interface's member (line 8, which kotlinc refuses too).
+package accepted
+
+override fun topLevel(n: Int): Int = n
+
+interface Guarded {
+    private val secret: Int
+}

@@ -611,6 +611,46 @@ func TestIdleCost(t *testing.T) {
 	s.want("its statements, and begins and commits", []int{statements, brackets}, []int{5, 6})
 }
 
+// Each queue holds at most one connection, and none while its act is
+// out or its alert is sent: two queues are served through a pool of
+// one connection.
+func TestOneConnection(t *testing.T) {
+	s := open(t, 3)
+	for n := 1; n <= 10; n++ {
+		s.parcel(n, map[bool]string{true: "nowhere", false: "1 High St"}[n == 5], false)
+	}
+	cfg, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.ConnConfig.RuntimeParams["search_path"] = fmt.Sprintf("test_%d, public", os.Getpid())
+	cfg.MaxConns = 1
+	one, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer one.Close()
+	s.r.Pool = one
+	s.r.Env.act = func(label) Act[string] {
+		if n := one.Stat().AcquiredConns(); n != 0 {
+			t.Errorf("%d connections are held while act is out", n)
+		}
+		return Act_Done[string]{Result: "T-1"}
+	}
+	ctx, stop := context.WithTimeout(ctx, 20*time.Second)
+	done := make(chan struct{})
+	go func() { s.r.Run(ctx); close(done) }()
+	for booked := 0; booked < 9 && ctx.Err() == nil; time.Sleep(10 * time.Millisecond) {
+		s.pool.QueryRow(ctx, "select count(*) from parcel_dispatch where done_at is not null").Scan(&booked)
+	}
+	stop()
+	<-done
+	var booked int
+	s.pool.QueryRow(context.Background(), "select count(*) from parcel_dispatch where done_at is not null").Scan(&booked)
+	s.want("booked", booked, 9)
+	s.want("alerts", len(s.alerts), 1)
+}
+
 // Run, stopped while an act is out, lets the row in flight reach its
 // record before it returns.
 func TestDrain(t *testing.T) {

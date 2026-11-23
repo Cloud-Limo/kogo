@@ -39,7 +39,9 @@ and is not part of `go test ./...`.
   leans on (the order of effects, shadowing, a lambda's `var`, data
   classes' text and `==`, chains of `?.` and `?:`, `Either` and raise
   scopes, loops with jumps). Its last four cases differ and are marked;
-  while they do, `mise run kotlin` prints them and exits 1.
+  while they do, `mise run kotlin` prints them and exits 1. `math.kt`
+  names `abs` for kotlinc, which a Kotlin file imports and a Kogo file
+  does not, and `arrow.kt` the forms of a raise scope.
 - `accepted/*.kg` are what DEV-1143 found `kogo check` to pass and
   kotlinc to refuse, on the line each file's first line names, that is
   no deviation of spec 1. The task does not read them: each is to become

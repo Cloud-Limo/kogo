@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// kogo check passes a data class with no property.
+package accepted
+
+data class Nothings()

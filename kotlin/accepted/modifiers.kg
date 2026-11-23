@@ -1,0 +1,7 @@
+// kotlinc refuses line 5
+// kogo check passes a visibility written twice, and private beside internal (line 7, which kotlinc refuses too).
+package accepted
+
+private private fun twiceHidden(n: Int): Int = n
+
+private internal fun bothWays(n: Int): Int = n

@@ -4404,3 +4404,16 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
   way B, the poller running the checks and putting their result in the clerk's prompt.
   A Handoff that names two PRs gives the one to check after `DEV-NNN`, as the command
   takes it. Reopen if a clerk merges on a `pass` the base had passed by.
+
+## A cusoon2 step that runs `kogo/run.sh` is an ordinary run (DEV-1106), 23 Nov 2026
+
+- **The clerk starts a port's Fix as it starts any other** (Greg, 23 Nov 2026:
+  DEV-1091's way A), since the wrapper clones Kogo's `main` beside every cusoon2
+  run's clone (cusoon2's DEV-1105). `doc/clerk.md` keeps the clerk's own
+  `kogo/run.sh` before `Checked:`, which tests the head it vouches for, and a step
+  that lands in the other repository stays a local run. Not taken: keeping the
+  local Fix. Reopen if a run's `kogo/run.sh` fails where the dev VM's passes.
+- **The `fix:` bullet points to How the next step starts** (the lead's Ruling,
+  23 Nov 2026), so it stays true whether the command prints a `lin local` line or,
+  after cusoon2's DEV-1116, the phrase alone. Not taken: the Review's wording,
+  false once DEV-1116 lands.

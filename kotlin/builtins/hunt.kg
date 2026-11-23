@@ -75,7 +75,7 @@ fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int
     "hSortRaise" -> "${sortRaise(xs + ys)} ${sortRaise(xs + ys + xs + ys + xs + ys + xs + ys + xs + ys + xs)}"
     "hLambdaCalls" -> lambdaCalls(xs, ys, s, n)
     "hAbs" -> "${abs(x)} ${abs(y)} ${abs(x - y)} ${abs(-x)} ${abs(n.toLong())} ${-abs(x) % 7L}"
-    "hScopes" -> "${unitScope(n)} ${sameE(s, n, m)} ${outerFromInner(xs, n)} ${scopeInLambda(xs, n)}"
+    "hScopes" -> "${unitScope(n)} ${sameE(s, n, m)} ${outerFromInner(xs, n)} ${scopeInLambda(xs, n)} ${cachedOr(xs, s, n, x)}"
     "hRecursive" -> recursive(xs, n, x)
     "hLiterals" -> "${1_000} ${1__000 + n} ${1_0_0L * x} ${1_000.5} ${1_0.0_1} ${000.5 + d} ${0_1.5} ${1__0.2_5} ${2_147_483_647} ${-2_147_483_648} ${9_223_372_036_854_775_807L} ${1.0} ${10.0} ${100000000.0} ${0.000001} ${123456789012345678.0} ${0.1234567890123456789} ${'\b' == '\t'} ${"\b\t".length} ${'\$'} ${'é'} ${"\u0000".length} ${'\''}${'"'}"
     "hLayout" -> layout(xs, s, n, m, x,)
@@ -1485,4 +1485,27 @@ fun examplesCase(xs: List<Long>, s: String, t: String, n: Int, m: Int, x: Long, 
     val booking = ExBooking(ExPrice(x % 1000000L).takeIf { n > 0 }, m.takeIf { it > 0 }, (n > m).takeIf { m != 1 }, s.takeIf { it.isNotEmpty() }, y.takeIf { n == 2 })
     val person = ExPerson(s, t.takeIf { n > 1 })
     return "${exDiscountedCents(x % 100000000L, d)} ${exDiscountedCents(y, 2.5)} ${exStack(xs, 2.5, s)} ${exStack(xs, 0.0, t)} ${exIsValidAbn(abn)} ${exIsValidAbn("51824753556")} ${exIsValidAbn(s)} ${exFormatAbn(abn)} ${exFormatAbn(s)} ${booking.supplierPay(xs.map { ExCharge(it) })} ${exJobWorth(booking, listOf(), n > 2)} ${ExStatus.entries.map { exCanPay(it) }} ${exContact(person)} ${exContact(person.takeIf { m > 0 })} ${exMessage(exSignup(s + t, n))} ${exMessage(exSignup("A@b.c ", m + 15))} ${exTitle(n)} ${exTitle(m % 3)} ${exMobileOf(person)}"
+}
+
+// doc/porting.md's own example of a port's shape: a cached value, or
+// one fetched, bound and stored.
+fun cachedOr(xs: List<Long>, s: String, n: Int, x: Long): String {
+    var log = ""
+    fun cached(key: Long): String? {
+        log += "c$key "
+        return xs.firstOrNull { it == key }?.let { "cached $it" }
+    }
+    fun fetch(key: Long): Either<String, String> {
+        log += "f$key "
+        return if (key % 2L == 0L) "fetched $key".right() else "no $key".left()
+    }
+    val got: Either<String, String> = either {
+        cached(x)?.let { it + "!" }
+            ?: fetch(x).bind().also { log += "stored $it " }
+    }
+    val second: Either<String, String> = either {
+        cached(n.toLong())?.takeIf { it.length > n }
+            ?: fetch(n.toLong()).mapLeft { "$it ($s)" }.bind().also { log += "stored " }
+    }
+    return "$got $second $log"
 }

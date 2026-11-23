@@ -16,6 +16,7 @@ import (
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
 	ktime "github.com/Cloud-Limo/kogo/prelude/kogo/time"
 	"github.com/Cloud-Limo/kogo/rt"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -434,6 +435,14 @@ func TestEffect(t *testing.T) {
 		s.want("row", s.row(1)[:25], "attempts 1 failed next +0")
 		s.want("alerts", len(s.alerts), 1)
 	})
+	t.Run("a table named with its schema: the key is the table's name without it", func(t *testing.T) {
+		e := bookCourier(3)
+		e.Table = fmt.Sprintf("test_%d.parcel_dispatch", os.Getpid())
+		s := open(t, 3, e.Queue())
+		s.parcel(1, "1 High St", true)
+		s.want("outcome", s.at(0, "bookCourier"), Done)
+		s.want("keys", s.keys, []string{key})
+	})
 	t.Run("act panics: taken for unknown, so the row backs off", func(t *testing.T) {
 		s := open(t, 3)
 		s.parcel(1, "1 High St", true)
@@ -542,6 +551,54 @@ func TestOver(t *testing.T) {
 	s.want("keys", s.keys, []string{"parcel_dispatch-" + id(1), "parcel_dispatch-" + id(4), "parcel_dispatch-" + id(5)})
 	s.want("its second", s.r.Pass(ctx, "bookCourier"), []Outcome{Done, Idle, Done})
 	s.want("its third", s.r.Pass(ctx, "bookCourier"), []Outcome{Done, Idle, Idle})
+}
+
+// sent counts what a pool sends: the statements, and the begins and
+// commits round them.
+type sent struct{ statements, brackets *int }
+
+func (c sent) TraceQueryStart(ctx context.Context, _ *pgx.Conn, q pgx.TraceQueryStartData) context.Context {
+	if sql := strings.ToLower(q.SQL); strings.HasPrefix(sql, "begin") || strings.HasPrefix(sql, "commit") {
+		*c.brackets++
+	} else {
+		*c.statements++
+	}
+	return ctx
+}
+func (sent) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
+
+// What an idle pass costs with over: each queue asks over for itself,
+// then enters and looks once for each value, each in a transaction.
+func TestIdleCost(t *testing.T) {
+	depots := func(t kogo.Tx, e env) kogo.List[string] {
+		return kogo.Tx_Query(t, "select depot from parcel_depot order by depot", text)
+	}
+	enter := func(t kogo.Tx, e env, depot string) rt.Unit {
+		kogo.Tx_Execute(t, "select set_config('depot.name', $1, true)", depot)
+		return rt.Unit{}
+	}
+	e, j := bookCourier(3), queueParcel(base)
+	e.Over, e.Enter, j.Over, j.Enter = depots, enter, depots, enter
+	s := open(t, 3, e.Queue(), j.Queue())
+	s.exec("create table parcel_depot (depot text); insert into parcel_depot values ('north'), ('south')")
+	cfg, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var statements, brackets int
+	cfg.ConnConfig.RuntimeParams["search_path"] = fmt.Sprintf("test_%d, public", os.Getpid())
+	cfg.ConnConfig.Tracer = sent{&statements, &brackets}
+	counted, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer counted.Close()
+	s.r.Pool = counted
+	s.want("the effect's idle pass", s.r.Pass(ctx, "bookCourier"), []Outcome{Idle, Idle})
+	s.want("its statements, and begins and commits", []int{statements, brackets}, []int{5, 6})
+	statements, brackets = 0, 0
+	s.want("the job's idle pass", s.r.Pass(ctx, "queueParcel"), []Outcome{Idle, Idle})
+	s.want("its statements, and begins and commits", []int{statements, brackets}, []int{5, 6})
 }
 
 // Run, stopped while an act is out, lets the row in flight reach its

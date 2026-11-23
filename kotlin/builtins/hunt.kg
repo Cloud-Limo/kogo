@@ -61,6 +61,11 @@ fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int
     "hScopePanic" -> "${scopePanic(n, m)}"
     "hDestructure" -> destructureMore(xs, s, n, x)
     "hOrderNamed" -> orderNamed(n, m)
+    "hLines" -> lines(xs, n, m, x, y)
+    "hNullT" -> "${isNull(x.takeIf { it > y })} ${isNull(x)} ${isNull(s)} ${orDash(s.takeIf { it.length > n })} ${orDash(xs.firstOrNull())} ${Shape.Empty == shapeOf(n)} ${lightOf(n) == Light.red} ${Light.red == lightOf(m)} ${setOf(shapeOf(n), Shape.Empty, shapeOf(m))} ${Deal(x, s).name} ${listOf(lightOf(n), lightOf(m)).contains(null)}"
+    "hSameT" -> "${same(d, d)} ${same(0.0, -0.0)} ${same(d, -d)} ${same(listOf(d), listOf(d))} ${d == d.takeIf { it > 0.0 }} ${d.takeIf { n > 0 } == d.takeIf { m > 0 }} ${0.0 == (-0.0).takeIf { n > 0 }} ${same(x, y)} ${same(s, t)} ${same(shapeOf(n), shapeOf(m))} ${itName(xs, x)}"
+    "hFailScope" -> "${failScope(n, x)} ${failScope(m, y).fold({ failText(it) }, { "$it" })} ${nothingLeft(x, n)}"
+    "hBoth" -> "${takesLong(x.takeIf { it > y } ?: 0)} ${xs.contains(1)} ${1 in xs} ${Tag(s) == asNamed(Tag(s))} ${asNamed(Tag(t)) == Tag(s)} ${lightElse(lightOf(n))} ${flagElse(n > m)} ${Deal(x, s).show()} ${Deal(y, t).same(Deal(x, s))} ${run()} ${Trio(n, m, n).second()}"
     "hCharJoin" -> s.map { if (it == ' ') '_' else it }.joinToString("") { "$it" } // kept: spec 3, half of a pair is U+FFFD
     // The three below differ (DEV-1143): mise run kotlin prints each and exits 1.
     "hInOrder" -> inOrder(n)
@@ -733,3 +738,129 @@ fun orderNamed(n: Int, m: Int): String {
     val g = listOf(at("i", 1), at("j", 2))[at("k", 0)]
     return "$a $b $c $e $g $log"
 }
+
+fun <T> isNull(v: T): Boolean = v == null
+
+fun <T> orDash(v: T?): String = if (v == null) "-" else "$v"
+
+val Deal.name: String
+    get() = "an extension, which the property hides"
+
+fun lines(xs: List<Long>, n: Int, m: Int, x: Long, y: Long): String {
+    var out = ""
+    val a = (n
+        - m)
+    val b = takesLong(x
+        - y)
+    val c = listOf(n,
+        -m)
+    val e = n +
+        m
+    val g = n > 0
+        && m > 0
+        || n == m
+    val h = xs.firstOrNull()
+        ?: y
+    val i = xs
+        .map { it + 1L }
+        .filter { it > 0L }
+    val j = if (n > 0) "a"
+    else "b"
+    val k = (xs + listOf(1L))[n
+        - n]
+    val q = if (n > m)
+        "gt"
+    else
+        "le"
+    if (n > 0)
+        out += "p"
+    if (n > 5)
+        out += "big"
+    else if (n > 2)
+        out += "mid"
+    else
+        out += "low"
+    for (v in xs)
+        out += "$v"
+    var w = 0
+    while (w < n % 4)
+        w += 1
+    fun stop(k: Int) {
+        if (k > 0) return
+        out += "s"
+    }
+    stop(n)
+    stop(m)
+    val made = xs.map { v -> { v + 1L } }.size
+    val r = when (n) {
+        1 ->
+            "one"
+        2 -> { "two" }
+        else ->
+            if (m > 0) "else+" else
+                "else-"
+    }
+    return "$a $b $c $e $g $h $i $j $k $q $out $w $made $r"
+}
+
+fun itName(xs: List<Long>, x: Long): String {
+    val it = x
+    return "${xs.map { it + 1L }} ${xs.filter { v -> v > it }} $it"
+}
+
+sealed interface Fail {
+    data class NotFound(val id: Long) : Fail
+    data object Denied : Fail
+}
+
+fun load(id: Long): Either<Fail.NotFound, Long> = if (id > 0L) id.right() else Fail.NotFound(id).left()
+
+fun allow(n: Int): Either<Fail, Int> = if (n % 3 == 0) Fail.Denied.left() else n.right()
+
+fun failScope(n: Int, x: Long): Either<Fail, Long> = either {
+    val who = allow(n).bind()
+    val found = load(x).bind()
+    val again = load(x - 5L).mapLeft { Fail.NotFound(it.id * 2L) }.bind()
+    found + again + who
+}
+
+fun failText(fail: Fail): String = when (fail) {
+    is Fail.NotFound -> "not found ${fail.id}"
+    Fail.Denied -> "denied"
+}
+
+fun nothingLeft(x: Long, n: Int): String {
+    val right = x.right()
+    val left = n.left()
+    val sum: Either<String, Long> = either { right.bind() + right.bind() }
+    val mixed: Either<Int, Long> = either { if (n > 0) left.bind() else right.bind() }
+    return "$right $left $sum $mixed"
+}
+
+fun asNamed(tag: Tag): Named = tag
+
+fun lightElse(light: Light?): Int = when (light) {
+    Light.red -> 1
+    Light.amber -> 2
+    Light.green -> 3
+    null -> 4
+    else -> 5
+}
+
+fun flagElse(flag: Boolean): Int = when (flag) {
+    true -> 1
+    false -> 2
+    else -> 3
+}
+
+fun Deal.show(): String = "$this ${this} ${this.name} ${this.rate + rate} ${listOf(this, this.copy(rate = 0L))} ${this == this.copy()} ${itself().itself().name}"
+
+fun Deal.itself(): Deal = this
+
+fun Deal.same(other: Deal): Boolean = this == other || other == this || name == other.name
+
+fun run(): String = "ran"
+
+data class Trio(val first: Int, val second: Int, val third: Int)
+
+fun Trio.second(): Int = first + third

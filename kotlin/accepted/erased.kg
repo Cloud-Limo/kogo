@@ -1,0 +1,7 @@
+// kotlinc refuses line 5
+// kogo check passes two funs that differ only in a parameter's type argument: on the JVM they are one signature.
+package accepted
+
+fun count(xs: List<Int>): Int = xs.size
+
+fun count(xs: List<Long>): Int = xs.size + 1

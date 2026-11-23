@@ -1,0 +1,9 @@
+// kotlinc refuses line 9
+// kogo check passes two funs of the program's that differ only in what a lambda returns, and a call that the lambda chooses (spec 5.2).
+package accepted
+
+fun pick(f: () -> Int): Int = f()
+
+fun pick(f: () -> String): String = f()
+
+fun picked(): Int = pick { 1 }

@@ -83,6 +83,7 @@ fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int
     "hWhenValues" -> "${whenMoney(Money(x % 3L, s))} ${whenList(xs.take(2))} ${whenPair(n % 3 to s.take(1))} ${'a' in s} ${"ab" in s} ${s in listOf(t, "a")} ${n in setOf(m, 1)} ${whenLongInt(x)} ${whenLongInt(y - 3L)}"
     "hQuote" -> quoteCase(xs, ys, s, t, n, m, x)
     "hExamples" -> examplesCase(xs, s, t, n, m, x, y, d)
+    "hBothMore" -> "${dupWhen(n)} ${dupWhen(m)} ${chainEq(n)} ${elvisReturn2(n.takeIf { it > m })} ${useTop()} ${unitBody(n)} ${isOk(okOf(x))}"
     "hCharJoin" -> s.map { if (it == ' ') '_' else it }.joinToString("") { "$it" } // kept: spec 3, half of a pair is U+FFFD
     // The five below differ (DEV-1143): mise run kotlin prints each and exits 1.
     "hInOrder" -> inOrder(n)
@@ -1526,3 +1527,28 @@ fun Shape.toString(): String = "my shape"
 fun String.toString(): String = "my string"
 
 fun <A, B> Pair<A, B>.toString(): String = "my pair"
+
+fun dupWhen(n: Int): Int = when (n) {
+    1 -> 1
+    1 -> 2
+    in 5..1 -> 3
+    else -> 0
+}
+
+fun chainEq(n: Int): Boolean = n == 1 == true == false != true
+
+fun elvisReturn2(n: Int?): Int = n ?: return 0 ?: 1
+
+val topFirst: Int = dupWhen(1)
+
+fun useTop(): Int = topFirst + topLater
+
+val topLater: Int = 2
+
+fun unitOf(n: Int): Unit {
+    return Unit
+}
+
+fun unitBody(n: Int) = unitOf(n)
+
+fun isOk(o: Outcome<Long>): Boolean = o is Outcome.Ok<Long>

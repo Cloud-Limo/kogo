@@ -157,6 +157,27 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   names. It merges when every one passes and nothing is Open, and
   otherwise hands the PR to the lead. Greg does not review Kogo's PRs
   on GitHub: review is the Code review step.
+- **PR questions.** Greg comments on a PR in Linear's review view,
+  on a line, a file or the whole, and then posts a comment that
+  begins `PRQ:`, a question of its own or nothing more. `lin clerk`
+  starts a fresh headless session, "PR questions DEV-NNN <PR url>
+  <branch>" with his comments since the last `PRQ:` under it as JSON,
+  in `~/Dev/kogo` or `~/Dev/cusoon2-tasks`, fetched, at opus medium
+  $5. It reads `origin/<branch>` with `git show`, the PR and its
+  Handoff, and answers each comment: one with `"thread": true` in its
+  thread, `gh api repos/Cloud-Limo/<repo>/pulls/<n>/comments/<id>/replies
+  -f body=<answer>`, any other with `gh pr comment <PR url>`, the
+  answer under a quote of it. Each reply begins `PRA:`: one without
+  it is read as Greg's at his next `PRQ:`. Where the answer is "this
+  should change", it says what would change and its size: the change
+  is the lead's Ruling. It changes no code, posts no step's comment,
+  starts nothing and waits on no step. When it ends, the poller posts
+  `PRA: <PR url> · N answered` on the issue as the application, with
+  Linear's review-view address of the PR under it, a note that
+  reaches Greg's inbox; one that fails gets a `Failed:` with `lead`.
+  `lin merge-check` refuses a Kogo PR with a comment of his newer
+  than his newest `PRQ:`, or that `PRQ:` with no `PRA:` after it. A
+  comment with no `PRQ:` after it is not read.
 - **Async runs.** The lead or the clerk starts one with `lin launch
   DEV-NNN < brief.md`, the brief's first line `Start: <step> · async ·
   <directive>`: it posts the `Start:` with the brief under it, then

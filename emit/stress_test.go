@@ -154,7 +154,7 @@ fun names(db: Db): List<String> = db.tx { tx -> tx.query<String>(sql"select name
 `)
 }
 
-// Findings 4, 6 and 8: Postgres's int4[] says neither how many
+// Findings 4, 7 and 8: Postgres's int4[] says neither how many
 // dimensions a value has nor whether an element is null. Two
 // dimensions read as one flat list; a null element fills a List<Int>
 // and is the driver's panic. An array of a domain is a type the
@@ -180,7 +180,7 @@ fun uuids(db: Db): List<Uuid> = db.tx { tx -> tx.querySingle<List<Uuid>>(sql"sel
 `)
 }
 
-// Finding 7: a String holds U+0000 and Postgres's text does not;
+// Finding 6: a String holds U+0000 and Postgres's text does not;
 // spec.md 10.4 lists the edges between the two sides' types and not
 // this one.
 func TestStressZeroByteInAString(t *testing.T) {

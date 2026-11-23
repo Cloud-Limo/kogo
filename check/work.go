@@ -1,6 +1,7 @@
 package check
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"slices"
@@ -39,10 +40,11 @@ type WorkList struct {
 }
 
 // RunnerColumns are the columns an effect's table has for the runner
-// (doc/work.md, "Owed is the runner's rule"), with the Kogo type of
-// each: the same list as prelude/kogo/work's Columns.
-var RunnerColumns = [][2]string{{"id", ""}, {"attempts", "Int"}, {"next_attempt_at", "Instant"}, {"claimed_at", "Instant"},
-	{"last_error", "String"}, {"failed", "Boolean"}, {"done_at", "Instant"}, {"not_after", "Instant"}}
+// (doc/work.md, "Owed is the runner's rule"), each with its Kogo type,
+// "" for any, and ? where it may be null: the same list as
+// prelude/kogo/work's Columns.
+var RunnerColumns = [][2]string{{"id", ""}, {"attempts", "Int"}, {"next_attempt_at", "Instant"}, {"claimed_at", "Instant?"},
+	{"last_error", "String?"}, {"failed", "Boolean"}, {"done_at", "Instant?"}, {"not_after", "Instant?"}}
 
 // The words of an effect and of a job, in the order they run.
 var (
@@ -397,8 +399,15 @@ func (c *checker) table(d *syntax.Queue, q *Queue, soonest *syntax.Part) {
 	}
 	if _, st := asked(d.Table, strings.Join(names, ", "), fmt.Sprintf("an effect's table has the runner's columns, %s", strings.Join(names, ", "))); st != nil {
 		for i, col := range st.Columns[:min(len(st.Columns), len(RunnerColumns))] {
-			if want := RunnerColumns[i][1]; want != "" && (col.Type.Name != want || col.Type.List) {
-				c.errorf(d.Table, "effect-table", "%s.%s is a %s, and the runner's %s is a %s", table, col.Name, col.Type, col.Name, want)
+			want, null := strings.CutSuffix(RunnerColumns[i][1], "?")
+			got := col.Type.String()
+			if col.Nullable {
+				got += "?"
+			}
+			// A column the runner sets to null must take one, and one it
+			// compares must hold a value, or its rows are never claimed.
+			if want != "" && (col.Type.Name != want || col.Type.List || col.Nullable != null) || want == "" && col.Nullable {
+				c.errorf(d.Table, "effect-table", "%s.%s is a %s, and the runner's %s is a %s: an effect's table declares it so, not null where there is no ?", table, col.Name, got, col.Name, cmp.Or(RunnerColumns[i][1], "column that is not null"))
 			}
 		}
 	}

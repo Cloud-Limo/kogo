@@ -17,6 +17,8 @@ var tables = map[string]string{
 	"plain": "id: Uuid, parcel_id: Uuid",
 	"odd": "id: Uuid, attempts: String, next_attempt_at: Instant, claimed_at: Instant?, last_error: String?, failed: Boolean, " +
 		"done_at: Instant?, not_after: Instant?, parcel_id: Uuid",
+	"loose": "id: Uuid, attempts: Int, next_attempt_at: Instant?, claimed_at: Instant?, last_error: String?, failed: Boolean, " +
+		"done_at: Instant?, not_after: Instant?, parcel_id: Uuid",
 }
 
 var selectFrom = regexp.MustCompile(`^select (.*) from (\w+)$`)
@@ -116,6 +118,8 @@ action fun tell(env: Env, alert: Alert): Either<String, Unit> = either { ring() 
 		{head + strings.Replace(plain, "attempts unlimited", "soonest ‸tracking\n    attempts 1", 1) + job + list, "soonest", "q.tracking is a String, and soonest names a timestamptz"},
 		{head + strings.Replace(plain, "on q", "on ‸plain", 1) + job + list, "effect-table", "an effect's table has the runner's columns"},
 		{head + strings.Replace(plain, "on q", "on ‸odd", 1) + job + list, "effect-table", "odd.attempts is a String, and the runner's attempts is a Int"},
+		// A due time that may be null is never due: its row would wait unseen.
+		{head + strings.Replace(plain, "on q", "on ‸loose", 1) + job + list, "effect-table", "loose.next_attempt_at is a Instant?, and the runner's next_attempt_at is a Instant"},
 		{with("data class Wide(val id: Uuid, val weight: Int)\nfun prepW(tx: Tx, env: Env, row: Wide): Either<String, Int> = either { 1 }\nfun recW(tx: Tx, env: Env, row: Wide, s: String): Either<String, Unit> = either { }\n") +
 			"effect e on ‸q {\n    attempts 1\n    prepare prepW\n    act send\n    record recW\n}\n" + job + list, "effect-table", `column "weight" does not exist`},
 		// A job's row goes from next's transaction into failed's.

@@ -30,7 +30,9 @@ zone 'UTC' - interval '28 days') at time zone 'UTC'`. The port keeps the
 Kotlin's comments and adds beside the code only its marks and the
 records a Ruling asks for; what the port went through (the comparison, a
 DEV number, how the Java client did it) goes in the handoff. A comment
-beyond these is a Fix.
+beyond these is a Fix. A port's Budget counts its code and imports, not
+its comments; the handoff gives its comment lines on a line of their
+own, and how many of them are the Kotlin's.
 
 For one, the Kotlin
 

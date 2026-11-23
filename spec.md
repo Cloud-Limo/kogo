@@ -1408,6 +1408,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `==` on a value that holds a function, as `rule == rule` | compare the other properties |
 | two funs of one name imported from two packages | `import ... as` on one |
 | an import of a name the file's own package declares | `import ... as`, or rename one |
+| a call to a fun after a local of its name, as `val job = job(id)` then `job(2)` | name the local otherwise (section 6) |
 | `a.b.Name` written in code | import it and write `Name` |
 | `import a.b.Outer.Inner` | `import a.b.Outer`, and write `Outer.Inner` |
 | a constructor or a constant through a typealias, `PRow(1)` | the type's own name |

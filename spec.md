@@ -1346,9 +1346,9 @@ external fun List<Long>.sum(): Long
   anywhere, and section 7 has effects arrive as parameters.
 - A binding with an effect, an outbound call, takes a handle: an
   external class such as `Http`, passed to the function that calls out
-  as `Tx` and `Db` are, so the signature shows it. A handle will carry
-  the request's context once the one deadline of `doc/work.md`, "Time
-  limits", is built; `Http` today has its own `Timeout` alone. Nothing checks that a binding keeps to this;
+  as `Tx` and `Db` are, so the signature shows it. The request's
+  deadline (15.5) is on its `Db`; `Http` does not carry it yet, and has
+  its own `Timeout` alone. Nothing checks that a binding keeps to this;
   it is the rule for whoever writes one.
 - `external class Name<T>` names a type that Go implements. It has no
   body, and Kogo code cannot construct or implement it. An external
@@ -1745,7 +1745,8 @@ application chooses.
 - A request has one limit, from its start to its answer: 90 seconds
   unless `main` sets another. Whatever the request waits on when it
   passes ends there: a connection of the pool, a statement, a lock,
-  the pause before a rerun. Its connection goes back to the pool.
+  the pause before a rerun. Its connection goes back to the pool, or
+  is closed where the limit cut a statement.
 - A rerun (15.3, 10.7) comes after a short random pause, so that two
   requests that conflicted do not meet again in step.
 - A client that leaves ends its request as the limit would, and is

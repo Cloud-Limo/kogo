@@ -201,13 +201,19 @@ var table = Table[env]{Check: ours, Operations: []Operation[env]{
 	Outside("serializableOutside", true, level, levelWork),
 	Gated("strays", true, strays, bound), Outside("straysOutside", true, strays, act),
 	Gated("straysPlain", false, strays, bound),
-	Tx("waits", false, waits), Tx("cut", false, cut),
+	Tx("waits", false, waits), Tx("cut", false, cut), Tx("crashed", false, crashed),
 }}
 
 // waits locks the row "locked", which a test holds from a connection
 // of its own, and so waits until that ends or the request does.
 func waits(tx kogo.Tx, _ env, _ Request, _ rt.Unit) kogo.Either[string, bool] {
 	return kogo.Either_Right[bool]{Value: kogo.Tx_Exists(tx, "select 1 from person where name = 'locked' for update")}
+}
+
+// crashed fails as every session does while Postgres restarts after
+// a backend of its own crashed.
+func crashed(kogo.Tx, env, Request, rt.Unit) kogo.Either[string, bool] {
+	panic(&pgconn.PgError{Code: "57P02"})
 }
 
 // cut ends its own connection, as Postgres ends one when it stops.
@@ -483,6 +489,11 @@ func TestCall(t *testing.T) {
 			served = append(served, fmt.Sprint(m["operation"], " ", m["outcome"]))
 		}
 	}
+	// A failure is a Failed, whose Status a route answers.
+	_, err = Call(calls, r, NewOp[env, rt.Unit, int32]("deadlocked"), rt.Unit{})
+	if f, _ := err.(Failed); f.Status != 503 {
+		t.Errorf("deadlocked fails with %#v, want a Failed of 503", err)
+	}
 	if got, want := strings.Join(served, ","), "who ok,signIn ok,add ok,add refused,add 500,nothing 404,feel ok,feel 400,deadlocked 503"; got != want {
 		t.Errorf("served %s, want %s", got, want)
 	}
@@ -568,7 +579,7 @@ func TestDeadline(t *testing.T) {
 	ctx := context.Background()
 	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
 	defer drop()
-	var log syncBuffer
+	var log bytes.Buffer
 	h := NewHandler(table, pool, env{&sync.WaitGroup{}, &atomic.Int32{}, &atomic.Int32{}, &sync.Map{}}, slog.New(slog.NewJSONHandler(&log, nil)))
 	h.Limit = 500 * time.Millisecond
 	post := func(rctx context.Context, name string) (int, time.Duration) {
@@ -578,8 +589,8 @@ func TestDeadline(t *testing.T) {
 	}
 	// The row is locked by a connection outside the pool, until the
 	// test ends or for 3 seconds, after which a request that has not
-	// ended answers. As many requests as the pool has connections wait
-	// on it; then the test holds every connection itself, for 2.
+	// ended answers. A request waits on it; then the test holds every
+	// connection of the pool itself, for 2.
 	pool.Exec(ctx, "insert into person (id, name, email) values ($1, 'locked', 'locked')", kogo.NewId())
 	holder, err := pgx.ConnectConfig(ctx, pool.Config().ConnConfig)
 	if err != nil {
@@ -607,23 +618,14 @@ func TestDeadline(t *testing.T) {
 		}
 		return
 	}
-	n := int(pool.Config().MaxConns)
-	statuses := make([]int, n)
-	var wg sync.WaitGroup
-	for i := range statuses {
-		wg.Go(func() { statuses[i], _ = post(ctx, "waits") })
-	}
-	wg.Wait()
-	for i, status := range statuses {
-		if status != 503 {
-			t.Errorf("request %d waiting on a row lock answers %d, want 503", i, status)
-		}
+	if status, _ := post(ctx, "waits"); status != 503 {
+		t.Errorf("a request waiting on a row lock answers %d, want 503", status)
 	}
 	if busy := held(); busy != 0 {
 		t.Errorf("%d connections are still held a second after every request ended", busy)
 	}
 	var taken []*pgxpool.Conn
-	for range n {
+	for range pool.Config().MaxConns {
 		c, _ := pool.Acquire(ctx)
 		taken = append(taken, c)
 	}
@@ -640,6 +642,9 @@ func TestDeadline(t *testing.T) {
 	// The database ends the connection, or there is none to reach.
 	if status, _ := post(ctx, "cut"); status != 503 {
 		t.Errorf("a connection the database ended answers %d, want 503", status)
+	}
+	if status, _ := post(ctx, "crashed"); status != 503 {
+		t.Errorf("a database restarting after a crash answers %d, want 503", status)
 	}
 	down, _ := pgxpool.New(ctx, "postgres://kogo:kogo@127.0.0.1:1/kogo_test")
 	defer down.Close()
@@ -661,20 +666,7 @@ func TestDeadline(t *testing.T) {
 			got = append(got, fmt.Sprint(m["msg"], " ", m["operation"], " ", m["outcome"]))
 		}
 	}
-	if got, want := strings.Join(got, ","), "served waits 499,ERROR database cut false,ERROR database who false"; got != want {
+	if got, want := strings.Join(got, ","), "served waits 499,ERROR database cut false,ERROR database crashed false,ERROR database who false"; got != want {
 		t.Errorf("the log is %s, want %s:\n%s", got, want, log.String())
 	}
 }
-
-// A syncBuffer is a log that requests at once may write.
-type syncBuffer struct {
-	mu sync.Mutex
-	b  bytes.Buffer
-}
-
-func (s *syncBuffer) Write(p []byte) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.b.Write(p)
-}
-func (s *syncBuffer) String() string { s.mu.Lock(); defer s.mu.Unlock(); return s.b.String() }

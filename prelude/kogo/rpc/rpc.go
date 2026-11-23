@@ -427,7 +427,7 @@ func (h *server[Env]) run(r *http.Request, name string, input func(Operation[Env
 			res = result{status: statusLeft}
 		case (ranOut || ended) && ctx.Err() != nil:
 			res = result{status: http.StatusServiceUnavailable, text: "request " + id}
-		case code == "57014" || code == "57P01" || strings.HasPrefix(code, "08") || errors.Is(err, pgconn.ErrConnClosed) ||
+		case code == "57014" || strings.HasPrefix(code, "57P") || strings.HasPrefix(code, "08") || errors.Is(err, pgconn.ErrConnClosed) ||
 			errors.As(err, new(*pgconn.ConnectError)) || errors.As(err, new(net.Error)) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF):
 			log.Error("database", "error", err.Error())
 			res = result{status: http.StatusServiceUnavailable, text: "request " + id}
@@ -497,12 +497,21 @@ type Refused string
 
 func (r Refused) Error() string { return string(r) }
 
+// Failed is the error Call gives where a browser would be answered
+// other than 200: the status, for a route to answer, and the text.
+type Failed struct {
+	Status int
+	Text   string
+}
+
+func (f Failed) Error() string { return fmt.Sprintf("%d %s", f.Status, f.Text) }
+
 // Call runs op of c's list with input for the request r, as a Handler
 // runs a browser's call: with a request id, the served line, the
 // limit and the reruns. It reads no body: the input is Go's, and only
 // its enums can be wrong, which Call checks as the strict reader
-// does. Its error is a Refused, or the status and text a browser
-// would be answered: 400 for an enum or a header that is not UTF-8,
+// does. Its error is a Refused, or a Failed with the status and text
+// a browser would be answered: 400 for an enum or a header that is not UTF-8,
 // 404 for an operation not of the list, 499 where r's client left,
 // 500 with the request's id for a panic, 503 with it past the limit
 // or where the database is down.
@@ -516,7 +525,7 @@ func Call[Env, I, A any](c *Calls[Env], r *http.Request, op Op[Env, I, A], input
 	var none A
 	switch {
 	case res.status != http.StatusOK:
-		return none, fmt.Errorf("%d %s", res.status, res.text)
+		return none, Failed{res.status, res.text}
 	case res.refused:
 		return none, Refused(res.text)
 	}

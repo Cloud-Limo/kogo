@@ -1,0 +1,10 @@
+// kotlinc refuses line 6
+// kogo check passes an interface that declares one val twice, and a data class that names one interface twice (line 10, which kotlinc refuses too).
+package accepted
+
+interface Counted {
+    val count: Int
+    val count: Int
+}
+
+data class Tally(override val count: Int) : Counted, Counted

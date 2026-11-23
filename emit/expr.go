@@ -297,10 +297,10 @@ func (e *emitter) is(code string, t, v check.Type) string {
 }
 
 // inRange gives code in a..b or code in a until b. It is a call, so
-// that both ends are read, in order, as Kotlin reads them.
+// that the ends are read, in order, before code, as Kotlin reads them.
 func (e *emitter) inRange(code string, r *syntax.Binary) string {
 	fn := map[string]string{"..": "In", "until": "InUntil"}[r.Op]
-	return fmt.Sprintf("%s.%s(int64(%s), int64(%s), int64(%s))", e.rt(), fn, code, e.expr(r.X), e.expr(r.Y))
+	return fmt.Sprintf("%s.%s(int64(%s), int64(%s), int64(%s))", e.rt(), fn, e.expr(r.X), e.expr(r.Y), code)
 }
 
 // num gives a whole number as the type to: an Int beside a Long is
@@ -379,8 +379,8 @@ type operand struct {
 
 // ordered gives the Go that build makes of the operands, read in the
 // order they are written. Go reads a call's operands in the order of
-// their slots, which named arguments and x in c do not follow: then
-// each is read into a temporary first.
+// their slots, which named arguments do not follow: then each is read
+// into a temporary first.
 func (e *emitter) ordered(ops []operand, result check.Type, build func(codes []string) string) string {
 	var codes []string
 	var written []int
@@ -530,6 +530,11 @@ func (e *emitter) call(at syntax.Node, c *check.Call, recv *operand, rt check.Ty
 	case check.Method:
 		build = func(codes []string) string {
 			return codes[0] + "." + export(f.Name) + "(" + strings.Join(codes[1:], ", ") + ")"
+		}
+	}
+	if b, ok := at.(*syntax.Binary); ok && b.Op == "in" { // c.contains(x): Kotlin reads c first, its slot's order
+		for i := range ops {
+			ops[i].x = nil
 		}
 	}
 	return e.ordered(ops, result, build), result

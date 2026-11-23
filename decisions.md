@@ -1252,7 +1252,8 @@ Each entry: what was decided, why, and what would reopen it.
   - **Kept: a waiting payer goes before an invoice run's charges.** `soonest` names a
     column of cusoon2's own, a `timestamptz` that the hosted page's request stamps with the
     handed clock's time and the invoice run leaves null (`payer_waiting_since` in the
-    sketches; the name is cusoon2's to choose). The view `find` names carries it. The
+    sketches; the name is cusoon2's to choose). The view `find` names carries it
+    (*`find` superseded 23 Nov 2026 by "A worker keeps the loop over tenants" below*). The
     runner orders by it, nulls last, then `next_attempt_at`. It replaces the Kotlin's
     `order by stripe_customer_id is null desc`, and goes into the Kotlin first.
   - **Direction, unchanged.** The request makes the charge itself in an outside step, with
@@ -1350,7 +1351,9 @@ Each entry: what was decided, why, and what would reopen it.
   Q12; `doc/work.md`, "Fair by a column"). It names no `fair`: it says `soonest` of the
   column a waiting payer's row is stamped with, so waiting payers go first across all
   tenants, the longest waiting first, then every other row by `next_attempt_at`. Mail
-  keeps `fair tenant_id`. This reverses item 9 of the Ruling on PR 66.
+  keeps `fair tenant_id`. This reverses item 9 of the Ruling on PR 66. *Superseded 23 Nov
+  2026 by "A worker keeps the loop over tenants" (DEV-1129) below: within a tenant, and no
+  `fair`.*
   - **Why.** Fairness is so that one tenant's flood is not felt by another. In mail it is
     felt. In charges the only one who feels a wait is a payer, and with `fair` a payer
     waits behind one unwatched charge for each other busy tenant, where without it never.

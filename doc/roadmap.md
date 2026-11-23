@@ -91,7 +91,9 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
 - **`driverJobs` becomes one call per operator** (c): an
   `operatorJobs` operation under `driverJob`'s gate. Not taken: a view
   across tenants; a proof holding a list of operators. The runner's
-  `find` keeps its review, which looks back at this.
+  `find` keeps its review, which looks back at this: made on 23 Nov
+  2026, and the loop over tenants kept ("A worker keeps the loop over
+  tenants", `decisions.md`).
 - **The lead's calls, Greg not objecting:** `updateJob`'s hours rounded
   in SQL; the 21 operations switch together once all 21 compare clean;
   a PDF compared by its marks (text, positions to 0.01 pt); only Go
@@ -168,7 +170,7 @@ the rest are estimates.
 | Area | Size |
 | --- | --- |
 | The `commands` list, then the ten `--op` commands | 350 / 180 |
-| The work list and the runner (`find`'s review here) | 750 / 600 |
+| The work list and the runner | 750 / 600 |
 | Mail: templates, outbox, bounces | 1,345 / 415 in the port, 295 / 260 in the prelude |
 | PDF: our own small writer (about 380 Go and font data) and the layouts | 1,610 / 640, the tests holding a comparison harness of about 200 |
 | The daemon's 16 queues, Stripe's two among them (245 / 200) | 1,400 / 600 |
@@ -192,5 +194,6 @@ longest lead time and can go out early.
 - From the test form's build (DEV-940): what three refusals buried in
   application code and two expected panics become.
 - `doc/remains.md`'s review of `find` and `fair`, with the runner.
+  Settled on 23 Nov 2026 ("A worker keeps the loop over tenants").
 - A paged list's design, before DEV-893's lists slice.
 - The login design's details, when the session slice is scoped.

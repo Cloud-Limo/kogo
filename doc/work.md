@@ -667,13 +667,12 @@ effect sendMail on outbound_message {
   clock's time and an invoice run leaves null, so a waiting payer's
   row goes before an invoice run's, as the charge's own order has it.
   `payer_waiting_since` is a name for the sketches; the column and
-  its name are cusoon2's to choose. *23 Nov 2026*: a waiting payer
-  goes first within a tenant, not across all tenants, since the loop
-  over tenants is kept ("A worker keeps the loop over tenants",
-  `decisions.md`). It replaces the Kotlin's `order by
+  its name are cusoon2's to choose. It replaces the Kotlin's `order by
   stripe_customer_id is null desc`, and goes into the Kotlin first.
   A charge has no `not_after` ("An effect someone is watching"
-  below).
+  below). *23 Nov 2026*: a waiting payer goes first within a tenant,
+  not across all tenants, since the loop over tenants is kept ("A
+  worker keeps the loop over tenants", `decisions.md`).
 - **`not_after` means one thing for every queue**: the time after
   which the write is not made.
 - **The checker holds**, by Postgres's answer, that the column is one
@@ -836,7 +835,9 @@ list whose order means nothing. There are no lanes, no sweep and no pass.
   card can still both insert" (`StripeQueues.kt`): both are the card
   queue's, served one after the other.
 - **`soonest` and `fair` stay.** They order the rows of one queue,
-  which is still served a row at a time.
+  which is still served a row at a time. *23 Nov 2026*: `fair` goes; a
+  queue serves one row a value in turn ("A worker keeps the loop over
+  tenants", `decisions.md`).
 - **A deadlock between two queues can now happen**, and the runner
   runs the transaction again (`doc/gates.md`, "Two kinds of
   transaction").
@@ -844,7 +845,9 @@ list whose order means nothing. There are no lanes, no sweep and no pass.
   the daemon holds one.
 - **Idle queues ask no more than the pass did.** The Kotlin waits at
   most 0.2 seconds when there is no work; 16 queues asking at that
-  rate is fewer statements than its pass makes.
+  rate is fewer statements than its pass makes. *23 Nov 2026*: each
+  queue now enters and asks once for each value, so this grows as
+  queues times values (the same entry).
 - **A test steps one queue at a time**, through an entry of the
   runner that serves one row of a named queue, so that a run can be
   repeated and compared with the Kotlin's.
@@ -1018,7 +1021,7 @@ they are designed with `job`, `effect` and `work`, and are Greg's.
 the runner now enters before it looks, not after a claim. Superseded
 below: "Kogo has no 'for each'", a queue finding its row unbound, the
 `find` view and its run, and a job's `next` reading such a view. The
-section stands as agreed on 17 and 18 Nov until the forms' issue
+text below is kept as agreed on 17 and 18 Nov until the forms' issue
 rewrites it.
 
 cusoon2's daemon binds each active tenant in turn and asks each queue

@@ -443,6 +443,16 @@ func TestEffect(t *testing.T) {
 		s.want("outcome", s.at(0, "bookCourier"), Done)
 		s.want("keys", s.keys, []string{key})
 	})
+	t.Run("act panics on a queue with no limit: the row is offered for ever, and nobody is ever alerted", func(t *testing.T) {
+		s := open(t, 0)
+		s.parcel(1, "1 High St", true)
+		s.r.Env.act = func(label) Act[string] { panic("a nil in the client") }
+		for i, minute := range []float64{0, 1, 3, 7, 15, 25, 35} {
+			s.want(fmt.Sprint("attempt ", i+1), s.at(minute, "bookCourier"), Retry)
+		}
+		s.want("row", s.row(1), "attempts 7 next +45 (act panicked: a nil in the client)")
+		s.want("alerts", len(s.alerts), 0)
+	})
 	t.Run("act panics: taken for unknown, so the row backs off", func(t *testing.T) {
 		s := open(t, 3)
 		s.parcel(1, "1 High St", true)

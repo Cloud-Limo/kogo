@@ -52,7 +52,7 @@ var (
 
 // works checks the job and effect forms and the work lists.
 func (c *checker) works(program []*syntax.File) {
-	queues := map[string]*syntax.Queue{}
+	queues, tables := map[string]*syntax.Queue{}, map[string]string{} // by name; and by table, the effect on it
 	for _, f := range program {
 		c.enter(f, c.pkgOf(f.Package.Name))
 		for _, d := range f.Queues {
@@ -64,6 +64,15 @@ func (c *checker) works(program []*syntax.File) {
 			if c.pkgs["kogo.work"] == nil {
 				c.errorf(d, "work", "the prelude has no kogo.work")
 				continue
+			}
+			if d.Effect {
+				// One key text for every effect, <table>-<id>, and one
+				// worker a queue: a second effect would share both.
+				if other := tables[d.Table.Name]; other != "" {
+					c.errorf(d.Table, "duplicate", "effect %s is on %s too: a table is one effect's, since the runner claims its rows by its own rule and keys each by the table's name and the row's id; give %s a table of its own", other, d.Table.Name, d.Name)
+					continue
+				}
+				tables[d.Table.Name] = d.Name
 			}
 			c.info.Queues[d] = c.queue(d)
 		}

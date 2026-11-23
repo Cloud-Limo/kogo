@@ -99,6 +99,7 @@ action fun tell(env: Env, alert: Alert): Either<String, Unit> = either { ring() 
 		{head + "‸" + plain + job + "work w alertedBy tell { j }\n", "unserved", "e is in no work list"},
 		{head + plain + job + list + "work v alertedBy tell { ‸e }\n", "duplicate", "e is already in a work list"},
 		{head + plain + job + "work w alertedBy tell { e, j, ‸k }\n", "work", "k is no job or effect"},
+		{head + plain + strings.Replace(strings.Replace(plain, "effect e", "effect e2", 1), "on q", "on ‸q", 1) + job + "work w alertedBy tell { e, e2, j }\n", "duplicate", "effect e is on q too: a table is one effect's"},
 		{head + plain + job + "‸work w { e, j }\n", "no-alert", "work w names no alert"},
 		{with("fun quiet(env: Env, alert: Alert): Either<String, Unit> = either { }\n") + plain + job + "work w alertedBy ‸quiet { e, j }\n", "alert", "a work list's alert is an action fun"},
 		{head + plain + "‸job j {\n    next next\n    run go\n}\n" + list, "part", "job j states no failed"},

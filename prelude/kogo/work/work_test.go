@@ -285,7 +285,7 @@ func TestEffect(t *testing.T) {
 		s.want("outcome", s.at(0, "bookCourier"), Unrecorded)
 		s.exec(*s.alerts[0].Reset)
 		s.answer = Act_Done[string]{Result: "T-2"}
-		s.want("a day on", s.at(24*60, "bookCourier"), Done)
+		s.want("at once", s.at(0, "bookCourier"), Done)
 		s.want("keys", s.keys, []string{key, key})
 	})
 	t.Run("prepare refuses: the row is failed, act is never called and nobody is alerted", func(t *testing.T) {

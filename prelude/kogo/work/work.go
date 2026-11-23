@@ -410,8 +410,8 @@ func (e Effect[Env, V, Row, P, R]) Queue() Queue[Env] {
 
 // held is a row between its transactions.
 type held[Row, P any] struct {
-	id       string
-	attempts int // counting this one
+	*claimed
+	tries    int // the row's attempts, counting this one
 	prepared P
 }
 
@@ -423,37 +423,42 @@ func (e Effect[Env, V, Row, P, R]) claim(t kogo.Tx, now time.Time) (c *claimed) 
 	if e.Soonest != "" {
 		order = e.Soonest + " nulls last, " + order
 	}
-	return kogo.Tx_QueryOne(t, `select id::text, attempts from `+e.Table+`
+	return kogo.Tx_QueryOne(t, `select id, id::text as id_text, attempts from `+e.Table+`
 		where done_at is null and not failed and (not_after is null or not_after > $1) and next_attempt_at <= $1
 		  and (claimed_at is null or claimed_at <= $2 and claimed_at > $3)
 		order by `+order+` limit 1 for update skip locked`,
 		func(scan kogo.Scan) *claimed {
 			c := &claimed{}
-			scan(&c.id, &c.attempts)
+			scan(&c.id, &c.text, &c.attempts)
 			return c
 		}, now, now.Add(-Lease), now.Add(-Replay))
 }
 
+// A claimed row: its id as the driver reads it, by which the runner's
+// statements find the row through the table's own index, and as
+// Postgres writes it as text, for the key and the alert.
 type claimed struct {
-	id       string
+	id       any
+	text     string
 	attempts int32
 }
 
-func (e Effect[Env, V, Row, P, R]) row(t kogo.Tx, id string) Row {
-	return kogo.Tx_QuerySingle(t, e.Select+" where id::text = $1 for update", e.Read, id)
+func (e Effect[Env, V, Row, P, R]) row(t kogo.Tx, id any) Row {
+	return kogo.Tx_QuerySingle(t, e.Select+" where id = $1 for update", e.Read, id)
 }
 
-// Reset is the statement that offers a failed row of table again.
+// Reset is the statement that offers a failed row of table again. It
+// says no time: the row was due when it failed, so it is due still.
 func Reset(table, id string) string {
-	return fmt.Sprintf("update %s set failed = false, attempts = 0, claimed_at = null, last_error = null, next_attempt_at = now() where id = '%s'",
+	return fmt.Sprintf("update %s set failed = false, attempts = 0, claimed_at = null, last_error = null where id = '%s'",
 		table, strings.ReplaceAll(id, "'", "''"))
 }
 
 // fail marks the row failed, calls the queue's failed and recovery in
 // a savepoint, and gives the alert to send once the transaction has
 // committed: none for a refusal.
-func (e Effect[Env, V, Row, P, R]) fail(r *Runner[Env], t kogo.Tx, id string, row Row, why Failure, cause string, out Outcome) (Outcome, *Alert) {
-	kogo.Tx_Execute(t, "update "+e.Table+" set failed = true, claimed_at = null, last_error = $2 where id::text = $1", id, cause)
+func (e Effect[Env, V, Row, P, R]) fail(r *Runner[Env], t kogo.Tx, c *claimed, row Row, why Failure, cause string, out Outcome) (Outcome, *Alert) {
+	kogo.Tx_Execute(t, "update "+e.Table+" set failed = true, claimed_at = null, last_error = $2 where id = $1", c.id, cause)
 	words, panicked := guarded(t, func() (words *string) {
 		if e.Failed != nil {
 			e.Failed(t, r.Env, row, why)
@@ -468,8 +473,8 @@ func (e Effect[Env, V, Row, P, R]) fail(r *Runner[Env], t kogo.Tx, id string, ro
 	} else if out == Refused {
 		return out, nil
 	}
-	reset := Reset(e.Table, id)
-	return out, &Alert{Queue: e.Name, Table: &e.Table, Id: &id, Row: rt.ToString(row), Cause: cause, Recovery: words, Reset: &reset}
+	reset := Reset(e.Table, c.text)
+	return out, &Alert{Queue: e.Name, Table: &e.Table, Id: &c.text, Row: rt.ToString(row), Cause: cause, Recovery: words, Reset: &reset}
 }
 
 func (e Effect[Env, V, Row, P, R]) enter(t kogo.Tx, env Env, v V) {
@@ -495,17 +500,17 @@ func (e Effect[Env, V, Row, P, R]) serve(r *Runner[Env], ctx context.Context, v 
 		// prepare; the row is marked claimed once prepare has given
 		// what act takes.
 		attempts := int(c.attempts) + 1
-		kogo.Tx_Execute(t, "update "+e.Table+" set attempts = $2 where id::text = $1", c.id, attempts)
+		kogo.Tx_Execute(t, "update "+e.Table+" set attempts = $2 where id = $1", c.id, attempts)
 		row := e.row(t, c.id)
 		prepared, refused, panicked := step(t, func() kogo.Either[string, P] { return e.Prepare(t, r.Env, row) })
 		if panicked != nil {
 			cause := fmt.Sprintf("prepare panicked: %v", panicked)
-			out, alert = e.fail(r, t, c.id, row, Failure_NotMade{Why: cause}, cause, NotMade)
+			out, alert = e.fail(r, t, c, row, Failure_NotMade{Why: cause}, cause, NotMade)
 		} else if refused != nil {
-			out, alert = e.fail(r, t, c.id, row, Failure_Refused{Why: *refused}, *refused, Refused)
+			out, alert = e.fail(r, t, c, row, Failure_Refused{Why: *refused}, *refused, Refused)
 		} else {
-			kogo.Tx_Execute(t, "update "+e.Table+" set claimed_at = $2 where id::text = $1", c.id, now)
-			h = &held[Row, P]{c.id, attempts, prepared}
+			kogo.Tx_Execute(t, "update "+e.Table+" set claimed_at = $2 where id = $1", c.id, now)
+			h = &held[Row, P]{c, attempts, prepared}
 		}
 		return rt.Unit{}
 	})
@@ -517,11 +522,11 @@ func (e Effect[Env, V, Row, P, R]) serve(r *Runner[Env], ctx context.Context, v 
 	var result Act[R]
 	start := time.Now()
 	if p := caught(func() {
-		result = e.Act(r.Env, EffectKey{e.Table[strings.LastIndexByte(e.Table, '.')+1:] + "-" + h.id}, h.prepared)
+		result = e.Act(r.Env, EffectKey{e.Table[strings.LastIndexByte(e.Table, '.')+1:] + "-" + h.text}, h.prepared)
 	}); p != nil {
 		result = Act_Unknown{Why: fmt.Sprintf("act panicked: %v", p)}
 	}
-	r.Log.Info("work: act", "queue", e.Name, "id", h.id, "result", fmt.Sprintf("%T", result), "duration", time.Since(start))
+	r.Log.Info("work: act", "queue", e.Name, "id", h.text, "result", fmt.Sprintf("%T", result), "duration", time.Since(start))
 	if r.StopAfterAct {
 		return Stopped
 	}
@@ -536,23 +541,23 @@ func (e Effect[Env, V, Row, P, R]) serve(r *Runner[Env], ctx context.Context, v 
 			_, refused, panicked := step(t, func() kogo.Either[string, rt.Unit] { return e.Record(t, r.Env, row, a.Result) })
 			if panicked != nil {
 				cause := fmt.Sprintf("the act was made, and record panicked: %v", panicked)
-				out, alert = e.fail(r, t, h.id, row, Failure_Unrecorded{Why: cause}, cause, Unrecorded)
+				out, alert = e.fail(r, t, h.claimed, row, Failure_Unrecorded{Why: cause}, cause, Unrecorded)
 			} else if refused != nil {
-				out, alert = e.fail(r, t, h.id, row, Failure_Unrecorded{Why: *refused}, *refused, Unrecorded)
+				out, alert = e.fail(r, t, h.claimed, row, Failure_Unrecorded{Why: *refused}, *refused, Unrecorded)
 			} else {
-				kogo.Tx_Execute(t, "update "+e.Table+" set done_at = $2, attempts = 0, claimed_at = null, last_error = null where id::text = $1", h.id, now)
+				kogo.Tx_Execute(t, "update "+e.Table+" set done_at = $2, attempts = 0, claimed_at = null, last_error = null where id = $1", h.id, now)
 				out = Done
 			}
 		case Act_Refused:
-			out, alert = e.fail(r, t, h.id, row, Failure_Refused{Why: a.Why}, a.Why, Refused)
+			out, alert = e.fail(r, t, h.claimed, row, Failure_Refused{Why: a.Why}, a.Why, Refused)
 		case Act_NotMade:
-			out, alert = e.fail(r, t, h.id, row, Failure_NotMade{Why: a.Why}, a.Why, NotMade)
+			out, alert = e.fail(r, t, h.claimed, row, Failure_NotMade{Why: a.Why}, a.Why, NotMade)
 		case Act_Unknown:
-			if e.Attempts > 0 && h.attempts >= e.Attempts {
-				out, alert = e.fail(r, t, h.id, row, Failure_Exhausted{Why: a.Why}, a.Why, Exhausted)
+			if e.Attempts > 0 && h.tries >= e.Attempts {
+				out, alert = e.fail(r, t, h.claimed, row, Failure_Exhausted{Why: a.Why}, a.Why, Exhausted)
 			} else {
-				kogo.Tx_Execute(t, "update "+e.Table+" set claimed_at = null, next_attempt_at = $2, last_error = $3 where id::text = $1",
-					h.id, now.Add(backOff(h.attempts)), a.Why)
+				kogo.Tx_Execute(t, "update "+e.Table+" set claimed_at = null, next_attempt_at = $2, last_error = $3 where id = $1",
+					h.id, now.Add(backOff(h.tries)), a.Why)
 				out = Retry
 			}
 		default:

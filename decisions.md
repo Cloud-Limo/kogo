@@ -4538,3 +4538,31 @@ The agent's, on DEV-1133's stress run; the issue gave the three mends and left t
   Not taken: a count for each cause. Reopen if Postgres's log is not kept beside ours.
 - **A pool's wait for a connection still has no limit of its own** (Q12 stands): the
   request's deadline ends it.
+
+## A Tx runs no utility statement (DEV-1176), 24 Nov 2026
+
+- **Every utility statement is refused, `sql-utility`** (Greg's ruling, 24 Nov 2026): a
+  statement whose `commandType` is Postgres's utility, by the tag `sqlpass` records in
+  `Statement.Utility`, never by its text. Not taken: a list of the harmful ones (`commit`,
+  `rollback`, a `set` without `local`), since a list misses what it forgot, as `discard
+  all`, `listen` and `copy ... from stdin`, which never returns. No port or example has a
+  utility statement. Reopen when a port needs one, as `lock table` or `set constraints`.
+- **The refusal is made in `check`, where the literal's statement comes back from the
+  pass**, beside `gate-writes`, not in `sqlpass`: what a `Tx` may run is the language's
+  rule, and the pass stays one that types any statement Postgres describes. Not taken:
+  refusing in `sqlpass`, which would drop `Statement.Utility` for every other user.
+- **A gate's utility statement gets `sql-utility`, not `gate-writes`**: one message serves
+  both, since the work may not run it either, so `gate-writes` loses its utility branch
+  and says what a gate does to a table alone. A refused statement is left out of what the
+  gate check reads, so it is said once. Not taken: keeping `gate-writes` for a gate's,
+  which would tell the author to move to the work what the work refuses too.
+- **`tx.refusal` is held to it too**, as it goes through the same check as the five calls
+  and runs on the same `Tx`. Not taken: the five calls alone, which the issue named.
+- **A test cannot make a deferred constraint fire**: spec.md 16 told a test to run `set
+  constraints all immediate`, which is now refused; no test did. Named as a gap in 16.
+  The `kogo test` fixture that set `statement_timeout` with `set local` uses
+  `set_config(..., true)`, as the message says.
+- **The gap named, not closed**: a function that sets a session's state,
+  `set_config(..., false)` among them, is not seen, since the pass does not look into a
+  function. Not taken: refusing `set_config` with `false` by reading the call, which
+  re-reads SQL that Postgres does not type for us.

@@ -305,8 +305,12 @@ func TestTables(t *testing.T) {
 		`select name from people for update`:                                                        "people lock",
 		`merge into person p using session s on p.id = s.id when matched then delete`:               "person delete, session",
 		`insert into session (id, csrf_token, expires_at) values ($id, $token, now()) on conflict (id) do update set expires_at = now()`: "session insert update",
-		`truncate person`:                 "TRUNCATESTMT",
-		`lock table person in share mode`: "LOCKSTMT",
+		`truncate person`:                    "TRUNCATESTMT",
+		`lock table person in share mode`:    "LOCKSTMT",
+		`commit`:                             "TRANSACTIONSTMT",
+		`set search_path = other`:            "VARIABLESETSTMT",
+		`set local statement_timeout = '5s'`: "VARIABLESETSTMT",
+		`copy person from stdin`:             "COPYSTMT",
 	} {
 		st, err := check(c, literal)
 		if err != nil {

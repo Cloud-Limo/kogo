@@ -77,6 +77,8 @@ fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int
     "hAbs" -> "${abs(x)} ${abs(y)} ${abs(x - y)} ${abs(-x)} ${abs(n.toLong())} ${-abs(x) % 7L}"
     "hScopes" -> "${unitScope(n)} ${sameE(s, n, m)} ${outerFromInner(xs, n)} ${scopeInLambda(xs, n)}"
     "hRecursive" -> recursive(xs, n, x)
+    "hLiterals" -> "${1_000} ${1__000 + n} ${1_0_0L * x} ${1_000.5} ${1_0.0_1} ${000.5 + d} ${0_1.5} ${1__0.2_5} ${2_147_483_647} ${-2_147_483_648} ${9_223_372_036_854_775_807L} ${1.0} ${10.0} ${100000000.0} ${0.000001} ${123456789012345678.0} ${0.1234567890123456789} ${'\b' == '\t'} ${"\b\t".length} ${'\$'} ${'é'} ${"\u0000".length} ${'\''}${'"'}"
+    "hLayout" -> layout(xs, s, n, m, x,)
     "hCharJoin" -> s.map { if (it == ' ') '_' else it }.joinToString("") { "$it" } // kept: spec 3, half of a pair is U+FFFD
     // The four below differ (DEV-1143): mise run kotlin prints each and exits 1.
     "hInOrder" -> inOrder(n)
@@ -1210,3 +1212,57 @@ fun recursive(xs: List<Long>, n: Int, x: Long): String {
 }
 
 fun <T> Wrap<T>.valueOr(fallback: T): T = value ?: fallback
+
+/**
+ * KDoc before a fun, with a [link], a `"quote` and a // inside.
+ */
+fun layout(
+    xs: List<Long>,
+    s: String,
+    n: Int,
+    m: Int,
+    x: Long,
+): String {
+    val chained = xs
+        // a comment between the links of a chain
+        .map { it + 1L }
+
+        .filter { it > 0L } // a comment after a link
+        /* a block comment
+           over two lines */
+        .take(3)
+    val first = xs.firstOrNull()
+        // a comment before ?:
+        ?: x
+    val picked = if (n > m) "a"
+    // a comment before else
+    else "b"
+    val both = n > 0 // a comment before &&
+        && m > 0
+    val sum = n + // a comment after an operator
+        m
+    val raw = """
+        first "line" $n
+          second\tline ${'$'}{n} $
+        third \ line"""
+    val (a, b,) = n to m
+    val list = listOf(
+        a,
+        b,
+    )
+    val f = { p: Int, q: Int, -> p - q }
+    var out = ""; out += "x"; out += "y";
+    if (n > 0) {} else {}
+    for (v in xs) {}
+    xs.forEach {}
+    xs.forEach { /* nothing */ }
+    when (n) {
+        1 -> {}
+        2, 3, -> out += "few"
+        else -> {
+            // only a comment
+        }
+    }
+    val unit = when (n) { 1 -> {}; else -> {} }
+    return "$chained $first $picked $both $sum <$raw> $list ${f(a, b,)} $out $unit ${pairUp<Int, String,>(n, s,)}"
+}

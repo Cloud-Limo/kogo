@@ -803,10 +803,13 @@ empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
 
 ### 10.5 Nullability
 
-- A result column is non-null only when it is a plain reference to a
-  `NOT NULL` column of a table, or to a table's whole row, that is not on
-  the nullable side of an outer join. Every other column (expressions,
-  aggregates, outer-joined columns) is nullable.
+- A result column is non-null only when Postgres can never make it
+  null: a reference to a `NOT NULL` column of a table or to a table's
+  whole row, `count(...)`, `exists (...)`, a `coalesce(...)` with an
+  argument non-null by this rule or a constant other than `null`, or a
+  cast of any of these; and none of it on the nullable side of an outer
+  join. Every other column (other functions and aggregates, as `sum`,
+  operators, scalar subqueries, outer-joined columns) is nullable.
 - A composite value is null as a whole, never field by field: the whole
   row of an outer-joined table is null where the table is absent. Where
   it is there, a field that may be null fills only a `T?` property. A

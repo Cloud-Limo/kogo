@@ -63,7 +63,7 @@
 == 17_sql_two_statements.kg [] example []
 (ClassDecl "data class" Invoice [(Param Val id (NamedType Uuid)) (Param Val number (NamedType String)) (Param Val totalCents (NamedType Long Nullable))])
 (FunDecl invoice [(Param tx (NamedType Tx)) (Param id (NamedType Uuid)) (Param forUpdate (NamedType Boolean))] (NamedType Invoice Nullable) (If (Ident forUpdate) (Block [(Call (Select (Ident tx) queryOne) [(NamedType Invoice)] [(Arg (SQL queryOne "select id, number, total_cents from invoice where id = $id for update" [(SQLParam id (Ident id))]))])]) (Block [(Call (Select (Ident tx) queryOne) [(NamedType Invoice)] [(Arg (SQL queryOne "select id, number, total_cents from invoice where id = $id" [(SQLParam id (Ident id))]))])])))
-(FunDecl paidCount [(Param tx (NamedType Tx))] (NamedType Long) (Call (Select (Ident tx) querySingle) [(NamedType Long)] [(Arg (SQL querySingle "select count(*) as \"n!\" from invoice where status = 'paid'"))]))
+(FunDecl paidCount [(Param tx (NamedType Tx))] (NamedType Long) (Call (Select (Ident tx) querySingle) [(NamedType Long)] [(Arg (SQL querySingle "select count(*) as n from invoice where status = 'paid'"))]))
 == 18_tx.kg [] example []
 (ClassDecl "sealed interface" AcceptError [(ClassDecl "data object" NoInvite [(NamedType AcceptError)]) (ClassDecl "data object" NoShare [(NamedType AcceptError)])])
 (ClassDecl "data class" PendingInvite [(Param Val businessId (NamedType Uuid)) (Param Val driverSharePercent (NamedType Int Nullable))])

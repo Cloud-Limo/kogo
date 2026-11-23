@@ -186,7 +186,7 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 		whole := false // a table's whole row, whose fields are NOT NULL as its columns are
 		if len(exprs) == len(sd.Fields) {
 			var notNull bool
-			if notNull, whole, err = c.notNull(ctx, query, exprs[i]); err != nil {
+			if notNull, whole, err = c.notNull(ctx, query, exprs[i], false); err != nil {
 				return nil, err
 			}
 			col.Nullable = !notNull

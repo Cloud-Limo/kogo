@@ -189,50 +189,74 @@ func outputs(q *node) []*node {
 	return exprs
 }
 
-// notNull reports whether expr, an expression of query q, is a plain
-// reference to a NOT NULL column, or a table's whole row, that nothing
-// in the query can null, and whether it is a table's whole row at all,
-// nulled or not.
-func (c *Checker) notNull(ctx context.Context, q, expr *node) (notNull, whole bool, err error) {
-	rte, att, nulled := source(q, expr)
-	whole = rte != nil && att == 0
-	if rte == nil || nulled || whole {
-		return rte != nil && !nulled, whole, nil
-	}
-	notNull, err = c.columnNotNull(ctx, rte.num("relid"), att)
-	return notNull, false, err
-}
-
-// source follows expr, an expression of query q, to the table it
-// reads: the table's range table entry and the column's number, 0 for
-// the whole row; nil when expr is not a plain reference. A reference to
-// a subquery's column or a grouped column is followed to what it
-// names. nulled is whether an outer join, a grouping set or returning's
-// old or new can null the reference on the way: Postgres marks a
-// reference with the outer joins and grouping sets that null it
-// (varnullingrels).
-func source(q, expr *node) (rte *node, att int, nulled bool) {
-	if expr == nil || expr.tag != "VAR" || expr.num("varlevelsup") != 0 {
-		return nil, 0, false
-	}
-	nulled = expr.num("varreturningtype") != 0 || len(expr.field("varnullingrels").items()) != 1
-	rtable, att := q.field("rtable").items(), expr.num("varattno")
-	if no := expr.num("varno"); no >= 1 && no <= len(rtable) && att >= 0 {
-		var under bool
-		switch rte = rtable[no-1]; rte.num("rtekind") {
-		case rteRelation:
-			return rte, att, nulled
-		case rteSubquery:
-			if sub := rte.field("subquery"); att >= 1 && att <= len(outputs(sub)) {
-				rte, att, under = source(sub, outputs(sub)[att-1])
-				return rte, att, nulled || under
-			}
-		case rteGroup:
-			if exprs := rte.field("groupexprs").items(); att >= 1 && att <= len(exprs) {
-				rte, att, under = source(q, exprs[att-1])
-				return rte, att, nulled || under
+// notNull reports whether expr, an expression of query q, cannot be
+// null by spec 10.5, and whether it is a table's whole row at all,
+// nulled or not. Nothing nulls a reference to a NOT NULL column or a
+// table's whole row; count; exists; a coalesce with an argument that
+// is not null, a constant included; or a cast of any of these.
+// constant is whether a constant that is not null counts, as it does
+// among coalesce's arguments and nowhere else.
+func (c *Checker) notNull(ctx context.Context, q, expr *node, constant bool) (notNull, whole bool, err error) {
+	q, expr, rte, nulled := source(q, expr)
+	whole = rte != nil && expr.num("varattno") == 0
+	switch {
+	case nulled || expr == nil:
+	case rte != nil && whole:
+		notNull = true
+	case rte != nil:
+		notNull, err = c.columnNotNull(ctx, rte.num("relid"), expr.num("varattno"))
+	case expr.tag == "AGGREF": // count() and count("any"), pg_catalog's by oid
+		notNull = expr.num("aggfnoid") == 2803 || expr.num("aggfnoid") == 2147
+	case expr.tag == "SUBLINK":
+		notNull = expr.num("subLinkType") == 0 // EXISTS_SUBLINK
+	case expr.tag == "CONST":
+		notNull = constant && expr.field("constisnull").text() == "false"
+	case expr.tag == "COALESCEEXPR":
+		for _, arg := range expr.field("args").items() {
+			if notNull, _, err = c.notNull(ctx, q, arg, true); notNull || err != nil {
+				break
 			}
 		}
+	case expr.tag == "RELABELTYPE" || expr.tag == "COERCEVIAIO":
+		notNull, _, err = c.notNull(ctx, q, expr.field("arg"), constant)
+	case expr.tag == "FUNCEXPR" && (expr.num("funcformat") == 1 || expr.num("funcformat") == 2):
+		// a cast function, explicit or implicit: its first argument is
+		// the value, any others a type modifier
+		if args := expr.field("args").items(); len(args) > 0 {
+			notNull, _, err = c.notNull(ctx, q, args[0], constant)
+		}
 	}
-	return nil, 0, false
+	return notNull, whole, err
+}
+
+// source follows expr, an expression of query q, through references
+// to a subquery's column or a grouped column, to what they name: an
+// expression of the query it ends in, and when that is a reference to
+// a table, the table's range table entry. nulled is whether an outer
+// join, a grouping set or returning's old or new can null a reference
+// on the way: Postgres marks a reference with the outer joins and
+// grouping sets that null it (varnullingrels).
+func source(q, expr *node) (endQ, endExpr, rte *node, nulled bool) {
+	for expr != nil && expr.tag == "VAR" && expr.num("varlevelsup") == 0 {
+		nulled = nulled || expr.num("varreturningtype") != 0 || len(expr.field("varnullingrels").items()) != 1
+		rtable, att, no := q.field("rtable").items(), expr.num("varattno"), expr.num("varno")
+		if no < 1 || no > len(rtable) || att < 0 {
+			break
+		}
+		in, exprs := q, []*node(nil)
+		switch rte := rtable[no-1]; rte.num("rtekind") {
+		case rteRelation:
+			return q, expr, rte, nulled
+		case rteSubquery:
+			in = rte.field("subquery")
+			exprs = outputs(in)
+		case rteGroup:
+			exprs = rte.field("groupexprs").items()
+		}
+		if att < 1 || att > len(exprs) {
+			break
+		}
+		q, expr = in, exprs[att-1]
+	}
+	return q, expr, nil, nulled
 }

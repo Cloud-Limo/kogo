@@ -1538,9 +1538,10 @@ Each entry: what was decided, why, and what would reopen it.
      accept.
   3. **Kogo's keys and Go's keys do not share an object.** Go's keys are what makes a
      handle or opens the server (the database, SMTP, each service's address and secret,
-     the port), read by `main`'s own struct, which refuses a key it does not know; it
-     grows with a service and not with a setting. Inside `settings` the application nests
-     as it likes.
+     the port), read by `main`'s own struct, which refuses a key it does not know (23
+     Nov 2026, DEV-1125: with `encoding/json`, not one in another case or given twice;
+     `doc/main.md`, "Part by part", [1]); it grows with a service and not with a
+     setting. Inside `settings` the application nests as it likes.
   A guess: 20 code in the handler's package, 30 tests, nothing in the checker or the
   emitter, after an issue that writes it into `doc/main.md` and the spec.
   - **Why.** It is the seam of 18 Nov applied to the one data class the runtime hands

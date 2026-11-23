@@ -22,7 +22,9 @@ and `rpc.NewHandler` take no clock yet (Q8). `rpc.Call`'s error is an
 `rpc.Refused` for a refusal, and otherwise the status and text a
 browser would get. Changed on 23 Nov 2026, each marked with the date:
 Go listens on `deployment.goPort`, a key of its own, and the settings
-move is its own PR, DEV-1124.
+move is its own PR, DEV-1124. Built since (DEV-1125, cusoon2 PR
+1611): the slice the ops list needs, marked where it departs from the
+paper.
 
 ## The file
 
@@ -119,6 +121,9 @@ func run() int {
 	case "batch": // [5] returns once each queue's row in hand is done
 		err = work.Run(ctx, daemon.Daemon, pool, env, clock, log)
 	default: // [6] a command, or "unknown command", with exit 1
+		// 23 Nov 2026, built (DEV-1125): while there are no commands, an
+		// unknown mode gets the usage line and exit 1 before the file is
+		// read; this line holds again once commands is mounted.
 		return command.Run(kogo.NewDb(ctx, pool), env, admin.Admin, mode, flag.Args()[1:], os.Stdout, os.Stderr)
 	}
 	if err != nil {
@@ -133,6 +138,11 @@ func run() int {
 // Kogo's object, handed on unread. Keys the Kotlin reads and this does
 // not, and the keys the Kotlin itself ignores, are named and ignored as
 // json.RawMessage.
+// 23 Nov 2026, built (DEV-1125): smtpConfig and stripeConfig are read and
+// dropped whole, as upstreamTimeouts is, and are not on load's list of
+// keys that must be present; their typed structs and required keys come
+// back with the mail and Stripe handles; "strictly" does not hold with
+// encoding/json (the table's [1] row).
 type Config struct {
 	Deployment struct {
 		BackendHost      string
@@ -214,6 +224,9 @@ func environment(c Config, clock ktime.Clock) (app.Env, error) {
 		Security: c.SmtpConfig.Transport, Username: c.SmtpConfig.Username, Password: c.SmtpConfig.Password})
 	// The emitter's chain: a step for each property of Env, in its order,
 	// so one left out or misplaced does not compile (Q13). Never app.Env{}.
+	// 23 Nov 2026, built (DEV-1125): a refusal from the settings is returned
+	// alone, not joined: the identity service's address is a setting, so the
+	// join printed two lines about an empty address under it.
 	return app.Env_().Clock(clock).Stripe(stripe).Google(google).Idp(idp).Smtp(smtp).Settings(settings),
 		errors.Join(e0, e1, e2, e3, e4)
 }
@@ -359,9 +372,9 @@ days after a deploy). **Never** means no test sees it.
 
 | Part | Lines | Grows with | Written wrong | Shows |
 | --- | --- | --- | --- | --- |
-| `run`: modes, flag, signals | 55 | nothing | a mode misspelt: it is taken for a command | start: "unknown command", exit 1 |
+| `run`: modes, flag, signals | 55 | nothing | a mode misspelt: it is taken for a command | start: "unknown command", exit 1; 23 Nov 2026, built (DEV-1125): while there are no commands, the usage line, before the file is read |
 | | | | words after the mode not refused | never: `web --config f` reads `CUSOON_CONFIG_FILE`, the ambient file `-D` exists to beat |
-| [1] Go's keys | 54 | a key of Go's: 1 to 2 | a key unread or misspelt in the struct | start: unknown key |
+| [1] Go's keys | 54 | a key of Go's: 1 to 2 | a key unread or misspelt in the struct | start: unknown key. 23 Nov 2026, built (DEV-1125): not as written. `encoding/json` matches a key whatever its case and takes a duplicate, so `goport`, `Settings` or a key given twice pass, as does a stray key inside an object Go drops whole (`settings` itself `rpc.ReadSettings` reads case-sensitively). Harmless while the deploy runs the Kotlin's `check-config` on the same file, which refuses each. Go's reader moves to Go 1.27's `encoding/json/v2`, which refuses both by default (about 10 code / 1 test, a tag on each field), in the issue that has Go read a file the Kotlin does not ("Open") |
 | | | | a required key left off the list in `load` | use: a zero value, e.g. Stripe answers 401 at the first charge |
 | [2] the settings | 1 | nothing: a setting is Kogo's and the file's | a setting missing, misspelt or of the wrong type in the file | start: `settings.opsOrigin is missing` |
 | | | | a key `Settings` does not have | start: reported, and ignored |
@@ -431,7 +444,10 @@ login (`doc/gates.md`, "Routes that are not operations"), so
   the issue that writes this `main`), which adds `deployment.goPort`.
   `googleAddress`, CI's key for the replay server (Q10), is one the
   Kotlin's reader refuses, so CI's file carries it only once cusoon2's
-  reader knows it, in that same move.
+  reader knows it, in that same move. 23 Nov 2026, built (DEV-1125):
+  the key is `googleBaseUrl`, the name the Kotlin's reader landed with,
+  optional, omitted by every deployed file and set by the comparison
+  and by CI.
 - The identity service's public address reaches Kogo as the file has
   it: only the handle's copy is trimmed of its trailing `/`, where the
   paper of 17 Nov trimmed it in `load` for `Env` too. The trim's owner
@@ -505,6 +521,11 @@ settings reaching Q7 and Q11. `decisions.md` has each rule, what was
 not taken and what reopens it. What Q4 and the settings leave to
 their own issues is in their entries.
 
+Open since 23 Nov 2026 (DEV-1125): Go's own keys are not read strictly
+by `encoding/json` ("Part by part", [1]); its reader moves to
+`encoding/json/v2` in the issue that has Go read a file the Kotlin
+does not.
+
 - **Q1 (Greg). How a route reaches its operation: a, then the emitted
   types.** Through a handler of its list that `main` does not mount,
   with `rpc.Call` and the operation's `_op` value.
@@ -532,7 +553,8 @@ their own issues is in their entries.
 - **Q9 (lead). Postgres's idle limit: a.** The handler and the runner
   read it from the pool.
 - **Q10 (lead). Google's answers in CI: a.** `main` points the handle
-  at a local server that replays; nothing in Kogo.
+  at a local server that replays; nothing in Kogo. Its key is
+  `googleBaseUrl`, not `googleAddress` (23 Nov 2026, built, DEV-1125).
 - **Q11 (lead, after Greg's rule). Which configuration file.** The
   Kotlin's with a `settings` object added, cusoon2 moving its keys
   first, in its own PR before the `main`'s, DEV-1124 (23 Nov 2026;

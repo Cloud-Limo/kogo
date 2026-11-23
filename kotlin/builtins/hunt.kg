@@ -81,6 +81,7 @@ fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int
     "hLayout" -> layout(xs, s, n, m, x,)
     "hMemberWins" -> "${Money(x, s).toString()} ${Money(x, s)} ${Money(x, s).copy(cents = 1L)} ${Money(x, s).copy(1L)} ${Light.red.name} ${lightOf(n)?.name} ${Money(y, t).toString().length}"
     "hWhenValues" -> "${whenMoney(Money(x % 3L, s))} ${whenList(xs.take(2))} ${whenPair(n % 3 to s.take(1))} ${'a' in s} ${"ab" in s} ${s in listOf(t, "a")} ${n in setOf(m, 1)} ${whenLongInt(x)} ${whenLongInt(y - 3L)}"
+    "hQuote" -> quoteCase(xs, ys, s, t, n, m, x)
     "hCharJoin" -> s.map { if (it == ' ') '_' else it }.joinToString("") { "$it" } // kept: spec 3, half of a pair is U+FFFD
     // The four below differ (DEV-1143): mise run kotlin prints each and exits 1.
     "hInOrder" -> inOrder(n)
@@ -1299,4 +1300,60 @@ fun whenLongInt(v: Long): String = when (v) {
     in 0..10 -> "small"
     in -5..-1, in 2147483647..2147483647 -> "edge"
     else -> "other"
+}
+
+// A module of the shape a port has: rules over data classes, absence
+// and expected failures, in one piece.
+data class Extra(val label: String, val cents: Cents, val perPassenger: Boolean = false)
+
+data class Quote(val base: Cents, val extras: List<Extra>, val passengers: Int, val discountPercent: Int?, val code: String?)
+
+sealed interface QuoteError {
+    data class Negative(val what: String) : QuoteError
+    data object Empty : QuoteError
+    data class BadCode(val code: String) : QuoteError
+}
+
+fun shareOf(cents: Cents, percent: Int): Cents = cents * percent / 100
+
+fun Quote.extrasTotal(): Cents = extras.sumOf { if (it.perPassenger) it.cents * passengers else it.cents }
+
+fun discountFor(code: String): Either<QuoteError, Int> = when (code.trim().lowercase()) {
+    "a", "abc" -> 10.right()
+    "" -> 0.right()
+    else -> if (code.length > 6) 25.right() else QuoteError.BadCode(code).left()
+}
+
+fun Quote.total(): Either<QuoteError, Cents> = either {
+    ensure(base >= 0L) { QuoteError.Negative("base") }
+    ensure(passengers > 0) { QuoteError.Empty }
+    val bad = extras.firstOrNull { it.cents < 0L }
+    if (bad != null) raise(QuoteError.Negative(bad.label))
+    val gross = base + extrasTotal()
+    val percent = (discountPercent ?: 0) + (code?.let { discountFor(it).bind() } ?: 0)
+    val capped = if (percent > 100) 100 else percent
+    gross - shareOf(gross, capped)
+}
+
+fun money(cents: Cents): String = "${cents / 100L}.${"${abs(cents % 100L)}".padStart(2, '0')}"
+
+fun Quote.summary(): String = total().fold(
+    { e ->
+        when (e) {
+            is QuoteError.Negative -> "negative ${e.what}"
+            QuoteError.Empty -> "nobody"
+            is QuoteError.BadCode -> "bad code <${e.code}>"
+        }
+    },
+    { "total ${money(it)}" },
+)
+
+fun quoteCase(xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int, m: Int, x: Long): String {
+    val extras = xs.mapIndexed { i, v -> Extra("e${v % 3L}", v * 100L, i % 2 == 1) }
+    val quote = Quote(x % 100000L, extras, n % 5, m.takeIf { it in 0..100 }, s.takeIf { it.isNotBlank() })
+    val cheaper = quote.copy(extras = extras.filter { !it.perPassenger }, code = t.ifBlank { "abc" })
+    val byKind = quote.extras.groupBy { it.perPassenger }
+    val labels = quote.extras.distinctBy { it.label }.sortedBy { it.label }.joinToString(",") { it.label }
+    val best = listOf(quote, cheaper).mapNotNull { q -> q.total().getOrNull()?.let { q to it } }.sortedBy { (_, total) -> total }.firstOrNull()
+    return "${quote.summary()} | ${cheaper.summary()} | ${byKind[true]?.size ?: 0}/${byKind[false]?.size ?: 0} | $labels | ${best?.let { (q, total) -> "${q.passengers}:${money(total)}" } ?: "none"} | ${quote == cheaper} | ${quote.extrasTotal()} | ${quote.total() == cheaper.total()}"
 }

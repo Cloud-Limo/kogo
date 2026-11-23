@@ -66,7 +66,7 @@ fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int
     "hSameT" -> "${same(d, d)} ${same(0.0, -0.0)} ${same(d, -d)} ${same(listOf(d), listOf(d))} ${d == d.takeIf { it > 0.0 }} ${d.takeIf { n > 0 } == d.takeIf { m > 0 }} ${0.0 == (-0.0).takeIf { n > 0 }} ${same(x, y)} ${same(s, t)} ${same(shapeOf(n), shapeOf(m))} ${itName(xs, x)}"
     "hFailScope" -> "${failScope(n, x)} ${failScope(m, y).fold({ failText(it) }, { "$it" })} ${nothingLeft(x, n)}"
     "hBoth" -> "${takesLong(x.takeIf { it > y } ?: 0)} ${xs.contains(1)} ${1 in xs} ${Tag(s) == asNamed(Tag(s))} ${asNamed(Tag(t)) == Tag(s)} ${lightElse(lightOf(n))} ${flagElse(n > m)} ${Deal(x, s).show()} ${Deal(y, t).same(Deal(x, s))} ${run()} ${Trio(n, m, n).second()}"
-    "hGenericT" -> "${whenNull(s.takeIf { it.length > n })} ${orElse(x, 7L)} ${has(x)} ${whenNull(s)} ${textOf(x.takeIf { it > y })} ${textOf(s)} ${Wrap(x).valueOr(9L)}"
+    "hGenericT" -> "${whenNull(s.takeIf { it.length > n })} ${orElse(x, 7L)} ${has(x)} ${whenNull(s)} ${textOf(x.takeIf { it > y })} ${textOf(s)} ${Wrap(x).valueOr(9L)} ${keep(x.takeIf { it > y }, 7L)}"
     "hNullKinds" -> nullKinds(xs, s, n, m, x, d)
     "hDecls" -> decls(xs, s, n, x)
     "hWords" -> words(s, n, x)
@@ -485,8 +485,9 @@ fun generic(xs: List<Long>, x: Long, n: Int): String {
 
 // Differs: T is Long?, and inside each fun a null T is a value: to the
 // T? that firstOrNull makes of it, and to ?: and ?. on the T itself, a
-// generic class's property included. kogo emit refuses keep, notNulls,
-// viaLet and must on such a list (not-yet-emitted), and not these six.
+// generic class's property included. kogo emit refuses notNulls, viaLet
+// and must on such a list (not-yet-emitted), and not these six; keep
+// agrees on a null (hGenericT), since its takeIf tests for one.
 fun genericNull(xs: List<Long>, none: Long?): String {
     val holes: List<Long?> = xs.map { it.takeIf { v -> v > 0L } }
     return "${firstOr(holes, 5L)} ${lastOr(holes, 6L)} ${firstIs(holes)} ${orElse(none, 7L)} ${has(none)} ${Wrap(none).valueOr(9L)}"

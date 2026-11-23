@@ -496,8 +496,10 @@ func TestJob(t *testing.T) {
 // and the runner enters each before it looks: one row a value in a
 // pass, under row-level security that hides every other value's rows.
 func TestOver(t *testing.T) {
+	// over runs before any value is entered, so it reads a table with
+	// no row-level security, as a tenant table is.
 	depots := func(t kogo.Tx, e env) kogo.List[string] {
-		return kogo.Tx_Query(t, "select distinct depot from parcel order by depot", text)
+		return kogo.Tx_Query(t, "select distinct depot from parcel_depot order by depot", text)
 	}
 	enter := func(t kogo.Tx, e env, depot string) rt.Unit {
 		kogo.Tx_Execute(t, "select set_config('depot.name', $1, true)", depot)
@@ -510,8 +512,6 @@ func TestOver(t *testing.T) {
 		s.parcel(n+1, map[bool]string{true: "nowhere", false: "1 High St"}[n == 6], false)
 		s.exec("update parcel set depot = $2 where id = $1", id(n+1), depot)
 	}
-	// The policies stand on a table with no row-level security, as a
-	// tenant table does, which over reads unbound.
 	s.exec(`create table parcel_depot as select id, depot from parcel;
 		alter table parcel enable row level security; alter table parcel force row level security;
 		create policy own on parcel using (depot = current_setting('depot.name', true));
@@ -521,11 +521,6 @@ func TestOver(t *testing.T) {
 	var seen int
 	s.pool.QueryRow(ctx, "select count(*) from parcel").Scan(&seen)
 	s.want("parcels seen unbound", seen, 0)
-	depotsUnbound := func(t kogo.Tx, e env) kogo.List[string] {
-		return kogo.Tx_Query(t, "select distinct depot from parcel_depot order by depot", text)
-	}
-	e.Over, j.Over = depotsUnbound, depotsUnbound
-	s.r.List.Queues = []Queue[env]{e.Queue(), j.Queue()}
 	s.want("the job's first pass", s.r.Pass(ctx, "queueParcel"), []Outcome{Done, Done, Done})
 	// South's second parcel is one run panics on: failed is called
 	// with south entered again, or under row-level security it would

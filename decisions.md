@@ -4457,3 +4457,17 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
   fun it calls, which names a form `kogo check` accepts. Not taken either:
   resolving a call past a local that cannot be called, as Kotlin does. Reopen if
   a port meets the row often enough that renaming costs more than the resolution.
+
+## Go's port key, and the settings move as its own PR (DEV-1126), 23 Nov 2026
+
+- **Go listens on `deployment.goPort`, a key of its own** (the lead's name, 23 Nov
+  2026; DEV-930's port key). The JVM keeps `deployment.backendPort` while both
+  serve, so the two run side by side from one file; Go's `Config` holds
+  `backendPort` as a key it ignores. Not taken: `backendPort` shared, which lets
+  only one of the two listen. Reopen when the JVM no longer serves: Go may then
+  take `backendPort` back.
+- **The ten keys' move into `settings`, with `goPort`, is its own cusoon2 PR,
+  DEV-1124, before the `main`'s, DEV-1125** (the lead, 23 Nov 2026). The Kotlin
+  goes first under its tests, and the `main` then reads a file that already has
+  the shape it wants. Not taken: one PR for both, as `doc/main.md` of 18 Nov had
+  it. Reopen if the move cannot land without the `main`.

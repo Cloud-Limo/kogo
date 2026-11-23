@@ -84,11 +84,12 @@ fun hunt(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: Int
     "hQuote" -> quoteCase(xs, ys, s, t, n, m, x)
     "hExamples" -> examplesCase(xs, s, t, n, m, x, y, d)
     "hCharJoin" -> s.map { if (it == ' ') '_' else it }.joinToString("") { "$it" } // kept: spec 3, half of a pair is U+FFFD
-    // The four below differ (DEV-1143): mise run kotlin prints each and exits 1.
+    // The five below differ (DEV-1143): mise run kotlin prints each and exits 1.
     "hInOrder" -> inOrder(n)
     "hGenericNull" -> genericNull(xs, x.takeIf { it > y })
     "hFunctionText" -> "${Rule(s, { it > 0L })}"
     "hSortCalls" -> sortCalls(xs + ys)
+    "hOwnToString" -> "${xs.toString()} ${(n > m).toString()} ${Light.red.toString()} ${shapeOf(n).toString()} ${s.toString()} ${(n to m).toString()} $xs ${n > m} ${Light.red} ${shapeOf(n)}"
     else -> null
 }
 
@@ -1509,3 +1510,19 @@ fun cachedOr(xs: List<Long>, s: String, n: Int, x: Long): String {
     }
     return "$got $second $log"
 }
+
+// Differs: in Kotlin every value has toString as a member, which
+// hides an extension of that name, so none of these is ever called
+// there. Kogo has the member for a data class and a number alone
+// (hMemberWins), and calls these.
+fun List<Long>.toString(): String = "my list"
+
+fun Boolean.toString(): String = "my boolean"
+
+fun Light.toString(): String = "my light"
+
+fun Shape.toString(): String = "my shape"
+
+fun String.toString(): String = "my string"
+
+fun <A, B> Pair<A, B>.toString(): String = "my pair"

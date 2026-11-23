@@ -38,7 +38,7 @@ and is not part of `go test ./...`.
 - `builtins/hunt.kg` is DEV-1143's hunt, a sketch: combinations a port
   leans on (the order of effects, shadowing, a lambda's `var`, data
   classes' text and `==`, chains of `?.` and `?:`, `Either` and raise
-  scopes, loops with jumps). Its last four cases differ and are marked;
+  scopes, loops with jumps). Its last five cases differ and are marked;
   while they do, `mise run kotlin` prints them and exits 1. `math.kt`
   names `abs` for kotlinc, which a Kotlin file imports and a Kogo file
   does not, and `arrow.kt` the forms of a raise scope.

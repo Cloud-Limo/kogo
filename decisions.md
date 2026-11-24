@@ -4752,3 +4752,19 @@ limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
   Kogo's text for one value of each type. A composite type is no parameter, so its three
   cells are written by hand and send its fields back; its lists, and an enum's, are
   cells that must be refused. The table's domains are in `testdata/schema.sql`.
+
+## A gated transaction stays in the serialization checks (DEV-1151), 24 Nov 2026
+
+- **`reading` runs `select 1` before the gate's savepoint**, as DEV-1145 tried on a copy:
+  the first snapshot is then not read-only, and Postgres keeps the transaction in its
+  checks after it writes. The cost is one round trip per gated request on a
+  `SerializableTx`. Not taken: dropping the savepoint and holding the gate to reading by
+  `gate-writes` alone, DEV-1145's other option, which saves the trip and loses Postgres's
+  refusal of a write inside a function and of `nextval`. Reopen if the gate stops being
+  run in a read-only savepoint, or if Postgres stops judging a transaction read-only by
+  its first snapshot.
+- **`heldRace`'s gate reads the table the race counts** (`person`), not the session's
+  table, which the test schema has not: the read that matters is any first read.
+- **A sentence each in spec 15 and `doc/gates.md`**, though neither said the gate's read
+  is the first: each describes the savepoint, and the statement before it is now part of
+  how the gate runs.

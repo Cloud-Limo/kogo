@@ -62,7 +62,7 @@ func name(t reflect.Type) string {
 }
 
 // quote writes s as a JSON string, as kotlinx.serialization does:
-// only a quote, a backslash and a control character are escaped, so
+// only a quote, a backslash and a character below U+0020 are escaped, so
 // & < > and U+2028 go out as themselves, where encoding/json escapes
 // them.
 func quote(s string) string {

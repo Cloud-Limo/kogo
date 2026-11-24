@@ -172,9 +172,11 @@ func bound(_ env, h Held, _ Person) kogo.Either[string, string] {
 	return kogo.Either_Right[string]{Value: kogo.Tx_QuerySingle(h.tx, "select coalesce(current_setting('kogo.who', true), 'unset')", func(s kogo.Scan) (v string) { s(&v); return })}
 }
 
-// raceGate counts its runs and gives its Tx, on which the work races.
+// raceGate counts its runs, reads a row of the table the work races
+// on, as a real gate reads the session, and gives its Tx.
 func raceGate(tx kogo.Tx, e env, _ Request, _ rt.Unit) kogo.Either[string, kogo.Tx] {
 	e.gates.Add(1)
+	kogo.Tx_Exists(tx, "select 1 from person limit 1")
 	return kogo.Either_Right[kogo.Tx]{Value: tx}
 }
 

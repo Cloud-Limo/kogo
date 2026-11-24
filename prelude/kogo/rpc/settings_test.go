@@ -41,6 +41,7 @@ func TestReadSettings(t *testing.T) {
 		{`{"opsOrigin":"secret","flags":[],"limits":{"retries":"secret"},"note":null}`, "settings.limits.retries is not a number"},
 		{`{"opsOrigin":"secret","flags":[],"limits":{},"note":null}`, "settings.limits.retries is missing"},
 		{`{"opsOrigin":"secret","flags":[],"limits":{"retries":3}}`, "settings.note is missing"},
+		{`{"opsOrigin":"x\u0000","flags":[],"limits":{"retries":3},"note":null}`, "settings.opsOrigin holds U+0000, which no input or setting may: leave it out"},
 		{`null`, "settings is null"},
 		{``, "settings is missing"},
 		{`{`, "settings is not JSON"},

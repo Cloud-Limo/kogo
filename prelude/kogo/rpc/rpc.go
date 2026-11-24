@@ -512,9 +512,10 @@ func (f Failed) Error() string { return fmt.Sprintf("%d %s", f.Status, f.Text) }
 // Call runs op of c's list with input for the request r, as a Handler
 // runs a browser's call: with a request id, the served line, the
 // limit and the reruns. It reads no body: the input is Go's, and only
-// its enums can be wrong, which Call checks as the strict reader
-// does. Its error is a Refused, or a Failed with the status and text
-// a browser would be answered: 400 for an enum or a header that is not UTF-8,
+// its enums and its Strings can be wrong, which Call checks as the
+// strict reader does. Its error is a Refused, or a Failed with the
+// status and text a browser would be answered: 400 for an enum, a
+// String holding U+0000 or a header that is not UTF-8,
 // 404 for an operation not of the list, 499 where r's client left,
 // 500 with the request's id for a panic, 503 with it past the limit
 // or where the database is down.

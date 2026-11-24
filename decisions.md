@@ -4871,6 +4871,24 @@ agent's where marked.
   statement's** (the agent's): the null column and the fields are compared by name,
   since the SQL pass keeps no field's oid.
 
+## U+0000 in a string on the wire is a 400 (DEV-1192), 24 Nov 2026
+
+- **The reader refuses a `String` that holds U+0000**, wherever it stands in the input,
+  as the lead ruled on DEV-1153 under Greg's rule that nothing a caller can cause is a
+  500. The refusal is at the plain `String` alone: an enum or a `Uuid` that holds one is
+  already refused as not one of its names or not a `Uuid`. Not taken: refusing only a
+  string an operation sends to Postgres, which the reader cannot know.
+- **Settings are refused too**: they are read by the same reader (15.4), so a setting
+  holding U+0000 stops the start, naming the key. Not taken: a reader with a flag to let
+  them through, a line for a case no one has.
+- **`rpc.Call` refuses it too**, with the reader's message from one constant: a route in
+  Go's `main` reads a caller's body and calls an operation without the reader, and Greg's
+  rule covers every operation. Not taken: leaving routes to check their own input.
+- **One message for inputs and settings**: "holds U+0000, which no input or setting may:
+  leave it out", since a setting is not on the wire. Not taken: a message per case.
+- **Spec 10.4's line stays**: a `String` the program makes that holds U+0000 is still a
+  panic when it is sent; an input can no longer bring one.
+
 ## A port asks Postgres for a moment (DEV-1170), 24 Nov 2026
 
 - **A port builds no moment from a date, a time and a zone** (Greg's ruling of 24 Nov

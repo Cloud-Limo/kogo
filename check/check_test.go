@@ -218,6 +218,7 @@ func TestNames(t *testing.T) {
 		"private val limit: Int = 50\nfun f(): Int = limit\n---\npackage t\nprivate val limit: String = \"\"\nfun g(): String = limit",
 		"data class Either(val n: Int)\nfun f(): Either = Either(1)\nval limit: Int = 50\n---\npackage kogo\nval limit: String = \"\"\n---\npackage t\nfun h(): Int = limit",
 		"typealias Money = Long\ndata class P(val n: Int?, val s: String, val m: Money)\nfun f(xs: List<P>): List<P> = xs.sortedBy { it.n }.sortedBy { it.s }.sortedBy { it.m }.sortedBy { it.m < 0 }\n---\npackage kogo\nexternal fun <T, R> List<T>.sortedBy(selector: (T) -> R): List<T>",
+		"fun f(s: Set<List<Int>>, xs: List<Int>, ys: Set<Int>): Set<List<Int>> = s - setOf(xs) + listOf(xs)\nfun g(ys: Set<Int>, xs: List<Int>, ns: List<Int?>): Int? = (ys + 1 - xs - ys).toList().maxOrNull() ?: ns.filterNotNull().maxOrNull()\n---\npackage kogo\nexternal class Set<out T>\nexternal fun <T> Set<T>.plus(element: T): Set<T>\nexternal fun <T> Set<T>.plus(elements: List<T>): Set<T>\nexternal fun <T> Set<T>.minus(elements: List<T>): Set<T>\nexternal fun <T> Set<T>.minus(elements: Set<T>): Set<T>\nexternal fun <T> Set<T>.minus(element: T): Set<T>\nexternal fun <T> setOf(vararg elements: T): Set<T>\nexternal fun <T> Set<T>.toList(): List<T>\nexternal fun <T> List<T?>.filterNotNull(): List<T>\nexternal fun <T> List<T>.maxOrNull(): T?",
 		"package a\nimport b.twice\nfun f(): Int = 2.twice()\n---\npackage b\nfun Int.twice(): Int = this * 2",
 		"package a\nimport b.Shape\nfun f(s: Shape): Int = when (s) {\n    is Shape.Dot -> 0\n    is Shape.Line -> s.length\n}\nfun g(): Shape = Shape.Line(2)\n---\npackage b\nsealed interface Shape {\n    data object Dot : Shape\n    data class Line(val length: Int) : Shape\n}",
 	)
@@ -245,6 +246,15 @@ func TestNames(t *testing.T) {
 		{"data class P(val n: Int)\nfun f(xs: List<P>): List<P> = xs.sortedBy ‸{ it }\n---\npackage kogo\nexternal fun <T, R> List<T>.sortedBy(selector: (T) -> R): List<T>", "sort-key", "this key is a P, and sortedBy orders only by an Int, a Long, a Double, a String, a Char or a Boolean, or one of these that may be null: give it one of these, such as a field of the P (spec 12)"},
 		{"enum class E { a }\nfun f(xs: List<Int>): List<Int> = xs.sortedBy(selector = ‸{ E.a })\n---\npackage kogo\nexternal fun <T, R> List<T>.sortedBy(selector: (T) -> R): List<T>", "sort-key", "this key is a E"},
 		{"fun f(xs: List<List<Int>>): List<List<Int>> = xs.sortedBy ‸{ it }\n---\npackage kogo\nexternal fun <T, R> List<T>.sortedBy(selector: (T) -> R): List<T>", "sort-key", "this key is a List<Int>"},
+		{"data class P(val n: Int)\nfun f(xs: List<P>): List<P> = xs.sortedByDescending ‸{ it }\n---\npackage kogo\nexternal fun <T, R> List<T>.sortedByDescending(selector: (T) -> R): List<T>", "sort-key", "this key is a P, and sortedByDescending orders only by"},
+		// maxOrNull takes the largest of these, and none that may be null, as Kotlin's.
+		{"fun f(xs: List<Long?>): Long? = xs.‸maxOrNull()\n---\npackage kogo\nexternal fun <T> List<T>.maxOrNull(): T?", "sort-key", "this list's element is a Long?, and maxOrNull finds the largest only of an Int, a Long, a Double, a String, a Char or a Boolean: map the list to one of these first, as mapNotNull does to drop a null (spec 12)"},
+		{"enum class E { a }\nfun f(xs: List<E>): E? = xs.‸maxOrNull()\n---\npackage kogo\nexternal fun <T> List<T>.maxOrNull(): T?", "sort-key", "this list's element is a E"},
+		// A Set's + or - of one element that is a collection: Kotlin
+		// reads it as the elements to add or remove.
+		{"fun f(s: Set<List<Int>>, xs: List<Int>): Set<List<Int>> = s ‸- xs\n---\npackage kogo\nexternal class Set<out T>\nexternal fun <T> Set<T>.minus(element: T): Set<T>\nexternal fun <T> Set<T>.minus(elements: List<T>): Set<T>", "set-operand", "this is a List<Int>, and Kotlin takes a List or a Set after a Set's + or - as the elements to add or remove: write setOf(...) around it to add or remove it whole (spec 12)"},
+		{"fun f(s: Set<Set<Int>>, xs: Set<Int>): Set<Set<Int>> = s.‸plus(xs)\n---\npackage kogo\nexternal class Set<out T>\nexternal fun <T> Set<T>.plus(element: T): Set<T>", "set-operand", "this is a Set<Int>"},
+		{"fun f(s: Set<List<Int>?>, xs: List<Int>): Set<List<Int>?> = s ‸+ xs\n---\npackage kogo\nexternal class Set<out T>\nexternal fun <T> Set<T>.plus(element: T): Set<T>", "set-operand", "this is a List<Int>, and"},
 		{"package a\nimport ‸kogo.time.seconds\n---\npackage kogo.time\nexternal class Stamp\nexternal fun Stamp.seconds(): Int", "member-import", "seconds is a member, in scope wherever a value of its receiver's type is: remove this import"},
 		// Section 13: only the prelude declares bindings, and an
 		// external object holds funs.

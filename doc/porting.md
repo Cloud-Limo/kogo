@@ -136,6 +136,10 @@ door, and of those drawn for a state, how many reached it. Then plant
 one bug in the port (a cent off, a dropped `where`, a swapped share),
 see the comparison exit 1 and name the right case, and say so in the
 handoff: rule 6 applied to the comparison itself.
+An area with no booking under it, as cusoon2's places, logins,
+suppliers and invites, and email, has nothing for a generated world to
+draw, so its cases are written by hand, each planted bug with a case
+that sees it: a deviation by name, Greg's of 24 Nov 2026 (DEV-1171).
 
 **Add what the spec lists.** A name the port needs that the spec lists
 and the prelude lacks is added to the prelude (DEV-875), not written

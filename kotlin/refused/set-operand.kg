@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// A Set minus a List, where the Set's elements are Lists.
+package refused
+
+fun f(s: Set<List<Long>>, xs: List<Long>): Set<List<Long>> = s - xs

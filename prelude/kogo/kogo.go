@@ -97,6 +97,14 @@ func List_Get[T any](this List[T], index int32) T {
 	return this[index]
 }
 
+// List_GetOrNull is the element at index, or null outside the list.
+func List_GetOrNull[T any](this List[T], index int32) *T {
+	if index < 0 || int(index) >= len(this) {
+		return nil
+	}
+	return rt.Ptr(this[index])
+}
+
 func List_IsNotEmpty[T any](this List[T]) bool { return len(this) > 0 }
 
 // List_Contains compares as == does, by value.
@@ -106,6 +114,11 @@ func List_Contains[T any](this List[T], element T) bool {
 
 func List_None[T any](this List[T], predicate func(T) bool) bool {
 	return !slices.ContainsFunc(this, predicate)
+}
+
+// List_All stops at the first element predicate refuses, as Kotlin's.
+func List_All[T any](this List[T], predicate func(T) bool) bool {
+	return !slices.ContainsFunc(this, func(x T) bool { return !predicate(x) })
 }
 
 // ListT_FirstOrNull_fun, as every nullable result, is a copy: a
@@ -260,12 +273,46 @@ func List_MapNotNull[T, R any](this List[T], transform func(T) *R) List[R] {
 	return ListOfNotNull(List_widen(this, transform)...)
 }
 
+func List_FlatMap[T, R any](this List[T], transform func(T) List[R]) List[R] {
+	out := List[R]{}
+	for _, x := range this {
+		out = append(out, transform(x)...)
+	}
+	return out
+}
+
+// List_MaxOrNull is the first of the largest elements, ordered as
+// compare orders: a NaN above every Double and 0.0 above -0.0, as
+// Kotlin's, whose Math.max gives the same.
+func List_MaxOrNull[T any](this List[T]) *T {
+	if len(this) == 0 {
+		return nil
+	}
+	m := this[0]
+	for _, x := range this[1:] {
+		if compare(reflect.ValueOf(m), reflect.ValueOf(x)) < 0 {
+			m = x
+		}
+	}
+	return rt.Ptr(m)
+}
+
 // List_SortedBy is stable, and orders keys as Kotlin's compareValues
 // does (compare).
 func List_SortedBy[T, R any](this List[T], selector func(T) R) List[T] {
+	return sortBy(this, selector, 1)
+}
+
+// List_SortedByDescending is SortedBy turned round, null last, and
+// still stable: equal keys keep their order, as in Kotlin.
+func List_SortedByDescending[T, R any](this List[T], selector func(T) R) List[T] {
+	return sortBy(this, selector, -1)
+}
+
+func sortBy[T, R any](this List[T], selector func(T) R, sign int) List[T] {
 	out := List_Plus(this, nil)
 	slices.SortStableFunc(out, func(a, b T) int {
-		return compare(reflect.ValueOf(selector(a)), reflect.ValueOf(selector(b)))
+		return sign * compare(reflect.ValueOf(selector(a)), reflect.ValueOf(selector(b)))
 	})
 	return out
 }
@@ -296,7 +343,7 @@ func compare(a, b reflect.Value) int {
 		}
 		return cmp.Or(cmp.Compare(x, y), cmp.Compare(boolInt(math.Signbit(y)), boolInt(math.Signbit(x))))
 	}
-	panic("sortedBy orders by an Int, a Long, a Double, a String, a Char or a Boolean, or one of these that may be null (spec 12)")
+	panic("sortedBy, sortedByDescending and maxOrNull order by an Int, a Long, a Double, a String, a Char or a Boolean, or one of these that may be null (spec 12)")
 }
 
 func boolInt(b bool) int {
@@ -320,6 +367,10 @@ func List_DistinctBy[T, K any](this List[T], selector func(T) K) List[T] {
 	return out
 }
 
+func List_Distinct[T any](this List[T]) List[T] {
+	return List_DistinctBy(this, func(x T) T { return x })
+}
+
 func List_Reversed[T any](this List[T]) List[T] {
 	out := List_Plus(this, nil)
 	slices.Reverse(out)
@@ -337,6 +388,26 @@ func List_GroupBy[T, K any](this List[T], keySelector func(T) K) Map[K, List[T]]
 		} else {
 			m.add(k)
 			m.values = append(m.values, List[T]{x})
+		}
+	}
+	return m
+}
+
+// List_AssociateBy and List_Associate keep each key where it was first
+// given and the last value given for it, as Kotlin's LinkedHashMap.
+func List_AssociateBy[T, K any](this List[T], keySelector func(T) K) Map[K, T] {
+	return List_Associate(this, func(x T) Pair[K, T] { return Pair[K, T]{keySelector(x), x} })
+}
+
+func List_Associate[T, K, V any](this List[T], transform func(T) Pair[K, V]) Map[K, V] {
+	var m Map[K, V]
+	for _, x := range this {
+		p := transform(x)
+		if i := m.index(p.First); i >= 0 {
+			m.values[i] = p.Second
+		} else {
+			m.add(p.First)
+			m.values = append(m.values, p.Second)
 		}
 	}
 	return m
@@ -427,6 +498,31 @@ func Set_MapNotNull[T, R any](this Set[T], transform func(T) *R) List[R] {
 	return List_MapNotNull(this.keys, transform)
 }
 
+// A Set's plus keeps its keys' order and adds each new one after them;
+// its minus keeps the order of those left, as Kotlin's LinkedHashSet.
+// Each builds a new Set: this one's keys may be shared (ordered).
+func SetT_Plus_T[T any](this Set[T], element T) Set[T] {
+	return SetT_Plus_ListT(this, List[T]{element})
+}
+
+func SetT_Plus_ListT[T any](this Set[T], elements List[T]) Set[T] {
+	return SetOf(List_Plus(this.keys, elements)...)
+}
+
+func SetT_Plus_SetT[T any](this Set[T], elements Set[T]) Set[T] {
+	return SetT_Plus_ListT(this, elements.keys)
+}
+
+func SetT_Minus_T[T any](this Set[T], element T) Set[T] { return SetT_Minus_SetT(this, SetOf(element)) }
+
+func SetT_Minus_ListT[T any](this Set[T], elements List[T]) Set[T] {
+	return SetT_Minus_SetT(this, SetOf(elements...))
+}
+
+func SetT_Minus_SetT[T any](this Set[T], elements Set[T]) Set[T] {
+	return Set[T]{ordered: orderedOf(List_Filter(this.keys, func(x T) bool { return elements.index(x) < 0 }))}
+}
+
 // A Map holds a value beside each key. Its Keys for == are its
 // entries, so that two maps are equal when they hold the same entries
 // in any order, as in Kotlin.
@@ -452,6 +548,9 @@ func (m Map[K, V]) String() string {
 func Map_widen[K, A, B any](m Map[K, A], f func(A) B) Map[K, B] {
 	return Map[K, B]{ordered: m.ordered, values: List_widen(m.values, f)}
 }
+
+// Map_Keys shares the map's keys, which nothing adds to (ordered).
+func Map_Keys[K, V any](this Map[K, V]) Set[K] { return Set[K]{ordered: this.ordered} }
 
 // Map_Get is map[k]: the key's value, or null where it has none.
 func Map_Get[K, V any](this Map[K, V], key K) *V {
@@ -522,15 +621,19 @@ func String_IfBlank(this string, defaultValue func() string) string {
 func String_StartsWith(this, prefix string) bool { return strings.HasPrefix(this, prefix) }
 func String_EndsWith(this, suffix string) bool   { return strings.HasSuffix(this, suffix) }
 
-// String_FilterNot keeps the UTF-16 units that predicate refuses.
-func String_FilterNot(this string, predicate func(rt.Char) bool) string {
+// String_Filter keeps the UTF-16 units that predicate takes.
+func String_Filter(this string, predicate func(rt.Char) bool) string {
 	var kept []uint16
 	for _, u := range units(this) {
-		if !predicate(rt.Char(u)) {
+		if predicate(rt.Char(u)) {
 			kept = append(kept, u)
 		}
 	}
 	return string(utf16.Decode(kept))
+}
+
+func String_FilterNot(this string, predicate func(rt.Char) bool) string {
+	return String_Filter(this, func(c rt.Char) bool { return !predicate(c) })
 }
 
 // String_Lowercase is Go's strings.ToLower but for U+0130, which it

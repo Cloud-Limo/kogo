@@ -1136,21 +1136,23 @@ no import;
 
 **Collections** (immutable; "changing" one returns a new one).
 `listOf`, `emptyList`, `setOf`, `mapOf`, `size`, `isEmpty`, `isNotEmpty`,
-`contains`/`in`, `list[i]`, `map[k]` (gives `V?`), `first`, `firstOrNull`,
-`last`, `lastOrNull`, `single`, `singleOrNull`, `map`, `mapIndexed`,
-`mapNotNull`, `flatMap`, `filter`, `filterNot`, `filterNotNull`, `any`,
-`all`, `none`, `count`, `sum`, `sumOf`, `maxOrNull`, `minOrNull`,
-`sortedBy`, `sortedByDescending`, `sorted`, `reversed`, `distinct`,
-`distinctBy`, `take`, `drop`, `zip`, `plus` (`+`), `groupBy`,
-`associateBy`, `associate`, `toSet`, `toList`, `joinToString`,
-`forEach`, `keys`, `values`, `listOfNotNull`. A `Map` and a `Set`
-iterate in insertion order and compare keys as `==` does, by value, so
-any type may be a key. A key that is a `String`, an `Int`, a `Long`, a
-`Boolean`, a `Uuid` or an enum is found at once. A key of any other
-type, a `T?` among them, is found by walking the keys: a lookup costs
-the size of the collection and building one its square, so think hard
-before keying a large `Set` or `Map` (or a `distinctBy`, `groupBy` or
-`associateBy`) by anything else. `==` of two `Set`s or two `Map`s walks
+`contains`/`in`, `list[i]`, `getOrNull(i)`, `map[k]` (gives `V?`),
+`first`, `firstOrNull`, `last`, `lastOrNull`, `single`, `singleOrNull`,
+`map`, `mapIndexed`, `mapNotNull`, `flatMap`, `filter`, `filterNot`,
+`filterNotNull`, `any`, `all`, `none`, `count`, `sum`, `sumOf`,
+`maxOrNull`, `minOrNull`, `sortedBy`, `sortedByDescending`, `sorted`,
+`reversed`, `distinct`, `distinctBy`, `take`, `drop`, `zip`, `plus`
+(`+`), a `Set`'s `plus` (`+`) and `minus` (`-`) of an element, a `List`
+or a `Set`, `groupBy`, `associateBy`, `associate`, `toSet`, `toList`,
+`joinToString`, `forEach`, `keys`, `values`, `listOfNotNull`. A `Map`
+and a `Set` iterate in insertion order and compare keys as `==` does,
+by value, so any type may be a key. A key that is a `String`, an `Int`,
+a `Long`, a `Boolean`, a `Uuid` or an enum is found at once. A key of
+any other type, a `T?` among them, is found by walking the keys: a
+lookup costs the size of the collection and building one its square,
+so think hard before keying a large `Set` or `Map` (or a `distinct`,
+`distinctBy`, `groupBy`, `associate` or `associateBy`) by anything
+else. `==` of two `Set`s or two `Map`s walks
 whatever the kind of key, so comparing two large ones costs the product
 of their sizes. This may be mended; nothing promises it.
 
@@ -1198,12 +1200,18 @@ and not a promise that it is all:
   ends: `"abc".replace(Regex("b*"), "-")` is `"-a-c-"` where Kotlin's is
   `"-a--c-"`. The text is read as Kotlin reads it: `$1` and `${name}`
   are groups, and a backslash takes the next character as it is.
-- `sortedBy` orders by an `Int`, a `Long`, a `Double`, a `String`, a
-  `Char` or a `Boolean`, or one of these that may be null, as Kotlin
-  does. A key of any other type, an enum or a time among them, is
-  refused at `kogo check` with `sort-key`. The list it gives is
+- `sortedBy` and `sortedByDescending` order by an `Int`, a `Long`, a
+  `Double`, a `String`, a `Char` or a `Boolean`, or one of these that
+  may be null, as Kotlin does. A key of any other type, an enum or a
+  time among them, is refused at `kogo check` with `sort-key`, and so
+  is `maxOrNull` of a list of any other type (and of one that may be
+  null, which kotlinc refuses too). The list each sort gives is
   Kotlin's, equal keys in the order they came; how often and in what
   order it calls the selector is not, and Kotlin promises neither.
+- A `Set`'s `+` or `-` of one element that is itself a `List` or a
+  `Set` is refused at `kogo check` with `set-operand`: Kotlin takes a
+  `List` or a `Set` there as the elements to add or remove, and gives
+  a `Set<Any>`. Write `setOf(x)` to add or remove `x` whole.
 - `trim(char)` takes one `Char`, where Kotlin's takes any number.
 - `split(delimiter)` takes one `String`, where Kotlin's also takes
   several, a `Char`, `ignoreCase` and `limit`.

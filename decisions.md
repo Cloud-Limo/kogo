@@ -4676,3 +4676,23 @@ The lead ruled the encoder changes, not the comparison; the agent's, for the res
   against Kotlin.
 - **`http/json.go`'s `encode` is left as it is**: it writes to a third party, which
   compares no bytes, and still escapes U+2028 there.
+
+## The SQL pass's five faults from the stress run (DEV-1154), 24 Nov 2026
+
+The lead ruled finding 11; the agent's, for the rest.
+
+- **Each `$name` is checked where it is written**, by the byte offset of each `PARAM`
+  in Postgres's tree against where the rewrite put it, and no SQL text is read. Not taken:
+  a scan of the literal for quotes, which re-implements Postgres's lexer.
+- **A syntax error at a parameter gets the hint for a `$` as text**, since a dollar
+  quote's tag, `$q$`, reads as one: told by the error's offset being a parameter's. Not
+  taken: telling a dollar quote from the text, which is more reading of SQL text. A real
+  syntax error there gets the hint too, beside Postgres's own message.
+- **A whole row's field under a `NOT NULL ... NO INHERIT` is nullable even after
+  `only`**: a composite type is read once per type, not per reference. Not taken: a type
+  per reference. A column named after `only` keeps its `NOT NULL`.
+- **Only an `instead` rule makes `returning` nullable**: Postgres keeps the statement's
+  own `returning` under an `also` rule. Every column of a statement done instead by a rule
+  is nullable, whatever the rule's `returning` says. Not taken: reading the rule's tree.
+- **42P08 gets 42P18's hint whatever its cause**: the other case, types deduced that
+  disagree, is mended by the same cast. Not taken: telling them apart by the message.

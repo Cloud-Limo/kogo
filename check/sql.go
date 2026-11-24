@@ -102,6 +102,10 @@ func (c *checker) sql(e *syntax.Call, lit *syntax.SQL) Type {
 		c.errorf(lit, "sql-check", "this literal could not be checked: %v", err)
 		return result
 	}
+	if st.Utility != "" {
+		c.errorf(lit, "sql-utility", "this is a utility statement (Postgres's %s), and a Tx runs select, insert, update, delete and merge alone: db.tx begins and ends the transaction, and a setting is bound with select set_config('name', $value, true) (spec.md 10.7)", st.Utility)
+		return result
+	}
 	q.Stmt, q.Args = st, make([]syntax.Expr, len(st.Params))
 	c.params(lit, q, types)
 	if q.Row != nil && q.Row != unknown {

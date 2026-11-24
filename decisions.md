@@ -4574,3 +4574,87 @@ Greg's ruling of 24 Nov 2026 on DEV-1161's research; the agent's where marked.
 - **Nullability and tables are still read from the statement as written** (the
   sketch's): the wrap neither renames nor reorders, and its description is compared
   with the statement's.
+
+## A Tx runs no utility statement (DEV-1176), 24 Nov 2026
+
+- **Every utility statement is refused, `sql-utility`** (Greg's ruling, 24 Nov 2026): a
+  statement whose `commandType` is Postgres's utility, by the tag `sqlpass` records in
+  `Statement.Utility`, never by its text. Not taken: a list of the harmful ones (`commit`,
+  `rollback`, a `set` without `local`), since a list misses what it forgot, as `discard
+  all`, `listen` and `copy ... from stdin`, which never returns. No port or example has a
+  utility statement. Reopen when a port needs one, as `lock table` or `set constraints`.
+- **The refusal is made in `check`, where the literal's statement comes back from the
+  pass**, beside `gate-writes`, not in `sqlpass`: what a `Tx` may run is the language's
+  rule, and the pass stays one that types any statement Postgres describes. Not taken:
+  refusing in `sqlpass`, which would drop `Statement.Utility` for every other user.
+- **A gate's utility statement gets `sql-utility`, not `gate-writes`**: one message serves
+  both, since the work may not run it either, so `gate-writes` loses its utility branch
+  and says what a gate does to a table alone. A refused statement is left out of what the
+  gate check reads, so it is said once. Not taken: keeping `gate-writes` for a gate's,
+  which would tell the author to move to the work what the work refuses too.
+- **`tx.refusal` is held to it too**, as it goes through the same check as the five calls
+  and runs on the same `Tx`. Not taken: the five calls alone, which the issue named.
+- **A test cannot make a deferred constraint fire**: spec.md 16 told a test to run `set
+  constraints all immediate`, which is now refused; no test did. Named as a gap in 16.
+  The `kogo test` fixture that set `statement_timeout` with `set local` uses
+  `set_config(..., true)`, as the message says.
+- **The gap named, not closed**: a function that sets a session's state,
+  `set_config(..., false)` among them, is not seen, since the pass does not look into a
+  function. Not taken: refusing a `set_config` whose third argument is `false`, which
+  the pass could find in the tree it already reads (`FUNCEXPR`'s `funcid` and `args`):
+  that argument may be a parameter or an expression, known only when the statement
+  runs, and every other function that sets a session's state stays unseen, so refusing
+  the one call closes almost none of the gap.
+
+## A bare `T` that is null, and the `T?` of a nullable `T` (DEV-1179), 24 Nov 2026
+
+Greg's ruling on DEV-1143's finding 1, and the agent's choices beside it.
+
+- **`?:` and `?.` test a bare `T` for null as `== null` does** (Greg): `rt.Equal` of it and
+  null, the one test `equals` gives, now named `isNull` in `emit/expr.go`. Not taken: a
+  second way of asking (a reflection test of its own, or a type switch).
+- **A `T?` whose `T` is itself nullable is refused, not emitted** (Greg): Kotlin holds one
+  null where Go's `**T` holds two, and the outer pointer is not nil when the value is.
+  Not taken: folding the two nulls into one wherever the value goes, a conversion at each
+  call, return and store that crosses a type parameter. Reopen when a port holds a generic
+  fun that forms a `T?` and is called with a nullable type.
+- **Only a type parameter made `T?` is refused a nullable type** (Greg): in its signature,
+  as since DEV-830, or in its body, by a `T?` it writes or a call whose own type parameter
+  is made `T?`, through as many generic funs as it is given to. The follow does not pass
+  through a generic type's type arguments (Greg, on the review): a value of `Opt<T>` whose
+  field is `T?` is built either as `Opt<Long?>`, which the type's own mark refuses, or in a
+  generic fun, where building it writes the `T?` and marks that fun's `T`, so following the
+  type as well refused only correct programs, as `val o: Opt<T>? = null`. Not taken:
+  refusing every nullable type argument to a generic fun, since a wrapper called with a
+  nullable result is what a port writes most. Reopen as above.
+- **The refusal stays `kogo emit`'s `not-yet-emitted`**, not `kogo check`'s. Which
+  parameters are made `T?` is learned as the emitter writes each body's Go types (a `T?`
+  local, a safe call's value, a prelude fun's signature), so the checker would need a
+  second walk over every body to know it. Not taken: a check in `kogo check`, the better
+  place were it as cheap. Reopen when `kogo check` has to answer it alone, as when the
+  emitter is not run before a port is called done.
+- **`v.takeIf { it != null } ?: fallback` on a nullable `T` is refused with the rest**,
+  though it gave Kotlin's answer: its `takeIf` makes a `T?` of the `T`, and its right
+  answer came only from the lambda's own test. Not taken: telling such a body apart, which
+  would be the folding above in one place.
+
+## A string on the wire is written as Kotlin writes it (DEV-1172), 24 Nov 2026
+
+The lead ruled the encoder changes, not the comparison; the agent's, for the rest.
+
+- **`rpc`'s `quote` is its own loop, not `encoding/json` with `SetEscapeHTML(false)`** as
+  `http/json.go` has it: Go escapes U+2028 and U+2029 whatever the setting, and Kotlin
+  does not, so the setting alone leaves a difference. It escapes `"`, `\` and each
+  character below U+0020, `\b \t \n \f \r` short and the rest `\u00xx` in lower case,
+  byte for byte what kotlinx.serialization 1.13.0 wrote for each (checked by hand, the
+  probe in the handoff). Not taken: the encoder followed by a replace of `\u2028`, which
+  a string holding a backslash then `u2028` breaks.
+- **A lone surrogate stays a limit, stated in spec 15.4**: Go reads one as U+FFFD, where
+  Kotlin's answer differs. A Kogo string holds no half of a surrogate pair (spec section 3),
+  and no row of Postgres holds one.
+- **No case in `mise run kotlin`**: its cases call Kogo built-ins from `.kg` source, and
+  `quote` is none, so the check has no form for this case.
+  The test holds the bytes Kotlin wrote instead. Reopen if the wire gets a check of its own
+  against Kotlin.
+- **`http/json.go`'s `encode` is left as it is**: it writes to a third party, which
+  compares no bytes, and still escapes U+2028 there.

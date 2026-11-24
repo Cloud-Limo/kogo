@@ -28,6 +28,7 @@ fun constructs(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, 
     "whenOrder" -> "${order(n)} ${order(m)} ${order(n % 5)}"
     "whenSubject" -> "${subjectOnce(n)} ${subjectOnce(m)}"
     "whenCondOrder" -> "${condOrder(n)} ${condOrder(m)}"
+    "hInOrder" -> inOrder(n)
     "whenJumps" -> "${jumps(xs)} ${jumps(ys)} ${jumps(xs + ys)}"
     "whenStatement" -> "${stmt(n)} ${stmt(m)} ${stmt(n % 12)}"
     "whenBlocks" -> "${blocks(n)} ${blocks(m)}"
@@ -124,6 +125,25 @@ fun order(n: Int): String {
         else -> "else"
     }
     return "$r $log"
+}
+
+// x in c is c.contains(x), and x in a..b reads a and b first too.
+fun inOrder(n: Int): String {
+    var i = n % 5
+    var log = ""
+    fun at(tag: String, k: Int): Int {
+        log += tag
+        return k
+    }
+    fun bump(): Int {
+        i += 1
+        return i
+    }
+    val a = at("x", 1) in listOf(at("c", 1))
+    val b = at("y", 1) in at("lo", 0)..at("hi", 2)
+    val c = i in listOf(bump())
+    val e = i in bump()..bump()
+    return "$a $b $c $e $log"
 }
 
 fun subjectOnce(n: Int): String {

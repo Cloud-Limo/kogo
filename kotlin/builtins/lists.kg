@@ -36,6 +36,7 @@ fun lists(f: String, xs: List<Long>, ys: List<Long>, n: Int, m: Int): String? = 
     "isEmpty" -> "${xs.isEmpty()} ${ys.isEmpty()} ${listOf<Long>().isEmpty()}"
     "mapNotNull" -> "${xs.mapNotNull { if (it > n) it * m else null }} ${(xs + ys).toSet().mapNotNull { x -> x.takeIf { it % 2L == 0L } }}"
     "sortedBy" -> "${xs.sortedBy { it % 3L }} ${ys.sortedBy { "$it" }} ${(xs + ys).sortedBy { if (it > n) null else -it }} ${xs.sortedBy { it > m }}"
+    "hSortCalls" -> sortCalls(xs + ys) // kept: spec 12, the selector's calls
     "sortedByDouble" -> "${(xs + ys).sortedBy { it.toDouble() / n.toLong().toDouble() }} ${(xs + ys).map { it.toDouble() / m.toLong().toDouble() }.sortedBy { -it }}"
     "distinctBy" -> "${xs.distinctBy { it % 3L }} ${(xs + ys).distinctBy { it > n }} ${ys.distinctBy { if (it > m) null else it / 2L }}"
     "reversed" -> "${xs.reversed()} ${xs.take(1).reversed()} ${xs.reversed() + ys} $xs"
@@ -84,4 +85,13 @@ fun grow(xs: List<Long>, ys: List<Long>, n: Int): String {
         stages = stages + listOf(all)
     }
     return "$stages"
+}
+
+fun sortCalls(xs: List<Long>): String {
+    var log = ""
+    val sorted = xs.sortedBy {
+        log += "$it "
+        it % 3L
+    }
+    return "$sorted $log"
 }

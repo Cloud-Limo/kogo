@@ -69,8 +69,8 @@ func Rem[T int32 | int64](a, b T) T {
 func Mod(a, b float64) float64 { return math.Mod(a, b) }
 
 // In reports x in lo..hi, and InUntil x in lo until hi.
-func In(x, lo, hi int64) bool      { return lo <= x && x <= hi }
-func InUntil(x, lo, hi int64) bool { return lo <= x && x < hi }
+func In(lo, hi, x int64) bool      { return lo <= x && x <= hi }
+func InUntil(lo, hi, x int64) bool { return lo <= x && x < hi }
 
 // Range gives lo..hi to a for, and Until gives lo until hi.
 func Range[T int32 | int64](lo, hi T) iter.Seq[T] {

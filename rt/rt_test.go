@@ -127,7 +127,7 @@ func TestRanges(t *testing.T) {
 			t.Errorf("got %v, want %v", c.got, c.want)
 		}
 	}
-	if !In(3, 1, 3) || InUntil(3, 1, 3) || In(0, 1, 3) {
+	if !In(1, 3, 3) || InUntil(1, 3, 3) || In(1, 3, 0) {
 		t.Error("In holds both ends, and InUntil not its last")
 	}
 }

@@ -45,6 +45,7 @@ var kept = []struct{ names, from, to, why string }{
 	{"replace", `[Ii]llegal group reference.*`, "illegal group reference", "spec.md section 12: replace with a bad group"},
 	{"replace", `No group (\d)`, "no group $1", "spec.md section 12: replace with a bad group"},
 	{"parseOrNull32", `[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}`, "null", "spec.md section 12: Uuid.parseOrNull of 32 hex digits"},
+	{"hSortCalls", `^(\[[^\]]*\]) .*$`, "$1", "spec.md section 12: how often and in what order sortedBy calls its selector"},
 	{"replace", `(no group in ".*" at \d+|No group with name \{.*\}|named capturing group .*)$`, "no such named group", "spec.md section 12: replace with a bad group"},
 }
 

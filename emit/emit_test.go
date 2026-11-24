@@ -161,11 +161,12 @@ func expectWith(t *testing.T, more, setup string, cases [][2]string, sources ...
 // Evaluation is left to right where Go does not promise it: Go reads
 // a variable when it likes beside a call that changes it, and reads
 // arguments in the order of the parameters, not as they are written.
+// x in c is c.contains(x), and Kotlin reads c first.
 func TestOrder(t *testing.T) {
 	expect(t, [][2]string{
 		{"t.ReadThenCall()", "11"},
 		{"t.Named()", "12 21"},
-		{"t.Within()", "babc true"},
+		{"t.Within()", "abcb true"},
 		{"t.Defaults()", "12 Span(from=2, to=1, step=9)"},
 		{"t.Copied()", "12 Span(from=2, to=1, step=0)"},
 	}, `package t

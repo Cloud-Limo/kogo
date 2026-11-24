@@ -1102,7 +1102,9 @@ and not a promise that it is all:
 - `sortedBy` orders by an `Int`, a `Long`, a `Double`, a `String`, a
   `Char` or a `Boolean`, or one of these that may be null, as Kotlin
   does. A key of any other type, an enum or a time among them, is
-  refused at `kogo check` with `sort-key`.
+  refused at `kogo check` with `sort-key`. The list it gives is
+  Kotlin's, equal keys in the order they came; how often and in what
+  order it calls the selector is not, and Kotlin promises neither.
 - `trim(char)` takes one `Char`, where Kotlin's takes any number.
 - `split(delimiter)` takes one `String`, where Kotlin's also takes
   several, a `Char`, `ignoreCase` and `limit`.

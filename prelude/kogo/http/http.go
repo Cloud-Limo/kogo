@@ -16,9 +16,11 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
@@ -346,7 +348,11 @@ func (h Http) call(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 		h.s.Log.Warn("kogo.http: sent a second time", "method", e.method, "path", e.path)
 	}
 	if err != nil {
-		return nil, &failed{left: sends > 0, why: reason(err)}
+		f := &failed{left: sends > 0, why: reason(err)}
+		if w, ok := watched.Load(goroutine()); ok {
+			*w.(*NoAnswer) = NoAnswer{h.base.Host, f.why}
+		}
+		return nil, f
 	}
 	defer resp.Body.Close()
 	text, err := io.ReadAll(io.LimitReader(resp.Body, h.s.MaxAnswer+1))
@@ -489,4 +495,35 @@ func object(fields []Field) []byte {
 	}
 	b.WriteByte('}')
 	return b.Bytes()
+}
+
+// A NoAnswer is a call that got no answer: its service's host, and
+// why, refused or timed out before any status came. kogo.rpc answers
+// a panic that names one 503, as a database that is down
+// (spec.md 15.5).
+type NoAnswer struct{ Service, Why string }
+
+// watched holds, by goroutine, the newest call that got no answer of
+// the request that goroutine serves, from Watch until its end.
+var watched sync.Map
+
+// Watch has this goroutine's calls watched until the func it gives,
+// which ends the watch and gives the newest call that got no answer,
+// when the panic p's text holds its why: a failure the program met
+// and dealt with does not make a later panic of its own a 503.
+func Watch() func(p any) (NoAnswer, bool) {
+	g := goroutine()
+	w := &NoAnswer{}
+	watched.Store(g, w)
+	return func(p any) (NoAnswer, bool) {
+		watched.Delete(g)
+		return *w, p != nil && w.Why != "" && strings.Contains(fmt.Sprint(p), w.Why)
+	}
+}
+
+// goroutine is the id of the goroutine that calls it, as its trace's
+// first line, "goroutine 7 [running]:", gives it.
+func goroutine() string {
+	b := make([]byte, 32)
+	return strings.Fields(string(b[:runtime.Stack(b, false)]))[1]
 }

@@ -1866,6 +1866,7 @@ application chooses.
 | a panic (section 8) | 500 | the request's id |
 | the request did not end within its limit | 503 | the request's id |
 | the database cannot be reached, or ended the connection | 503 | the request's id |
+| a panic that names a call out that got no answer (12) | 503 | the request's id |
 | the client left before the answer | 499, which nobody reads | |
 
 - A request has one limit, from its start to its answer: 90 seconds
@@ -1876,8 +1877,12 @@ application chooses.
 - A rerun (15.3, 10.7) comes after a short random pause, so that two
   requests that conflicted do not meet again in step.
 - A client that leaves ends its request as the limit would, and is
-  no bug: neither it nor a database that is down is answered or
-  logged as a panic.
+  no bug: neither it, nor a database that is down, nor a service that
+  does not answer is answered or logged as a panic. A service has not
+  answered where a call of the request got no status, refused or past
+  its time limit, and the panic's message holds that failure's `why`,
+  as `error("idp: $failure")` does: a later panic of the program's own
+  stays a panic.
 
 **Nothing a caller can cause by what it sends is a panic.** A panic
 is a bug of Kogo's or of the program's: it is answered 500 and logged
@@ -1907,8 +1912,9 @@ states it, and the test named holds it, by its package:
 | --- | --- | --- | --- |
 | A request's time | set no limit | The request's limit, on all it waits on; past it 503 | `rpc.TestDeadline` |
 | A body's length | read any | The list's limit; past it 413 (15.4) | `rpc.TestLimits` |
-| A client that leaves | end the context; the driver gives an error | 499, the served line alone | `rpc.TestDeadline` |
+| A client that leaves | end the context once the body is read, which a Unit operation never reads; the driver gives an error | The body is read whole first: 499 at once, also during the check or a Unit operation, the served line alone | `rpc.TestDeadline` |
 | A database that is down, or ended the connection | give the driver's error | 503 with the request's id, one `database` line, no trace | `rpc.TestDeadline` |
+| A service that does not answer | panic as the program's `error` does: 500, with a trace | 503 with the request's id, one `service` line with its host and why, no trace | `rpc.TestDeadline` |
 | A panic | log it in the server's own words and close the connection unanswered | 500 with the request's id, one `panic` line with its trace; the process lives | `rpc.TestHandler` |
 | A method | serve any | `POST` alone; another is 405, with `Allow: POST` | `rpc.TestHandler` |
 | An answer's type | guess it from the first bytes | `application/json` for `ok` and `refused`, `text/plain; charset=utf-8` for any other status | `rpc.TestHandler` |

@@ -4974,3 +4974,27 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   DEV-1201: eight such hand-ons, all ruled as the clerk recommended, waited 111 min).
   Not taken: hand on every one. Reopens on a `spec.md` change that the lead or Greg
   would have stopped, merged with no hand-on.
+
+## A client that leaves, and a service that does not answer (DEV-1196), 24 Nov 2026
+
+- **The body is read whole in `ServeHTTP`, before `run`**, whatever the operation, up
+  to `MaxBody`; the reader then decodes the bytes read, with the read's error after them,
+  so a 413 and a 400 come where they came. Not taken: reading it inside `run` before the
+  check, which `Call` shares and which reads no body. The served line's time no longer
+  counts the body's read.
+- **A call that got no answer reaches `run` by goroutine**: `khttp.Watch` marks the
+  goroutine `run` serves the request on, and a call on it that got no status (refused,
+  timed out, cut before any answer) records its host and why. Operations run on that
+  goroutine, so no program and no handle carries anything. Not taken: a name a program
+  writes, which the lead ruled out; the request's context on the handle, which `Http`
+  does not carry (spec 12); a record by `why` alone, shared by every request. Reopens
+  if an operation's work leaves its goroutine.
+- **The panic must hold the failure's `why`** for the 503, as `error("idp: $failure")`
+  does: a program that met the failure, dealt with it and later panicked on a bug of its
+  own still gets its 500 and trace. Not taken: any panic after a call that got no
+  answer. A program whose panic drops the failure's text stays a 500 (cusoon2's
+  `orThrow` is changed in its own issue).
+- **A 5xx, an answer that broke off and one past the limit are not "no answer"**: the
+  service answered, as a 4xx does. Not taken: every `Unknown`.
+- **The log line is `service`, with the service's host and why**, never its address's
+  user, path or query. Not taken: the handle's whole address.

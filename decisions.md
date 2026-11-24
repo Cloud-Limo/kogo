@@ -4722,6 +4722,6 @@ limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
   text Postgres makes of what came back with the text it makes of the value: Kogo's
   `toString()` is Kotlin's and not Postgres's, so the two texts cannot be compared
   directly. A fault that reads and sends wrongly alike would pass; `TestValues` holds
-  Kogo's text for one value of each type. A composite type is not a row of the table: it
-  is no parameter, so it cannot be sent back, and `TestRows` reads it. An enum's list
-  cells are `TestRefused`'s. Its domains are in `testdata/schema.sql`.
+  Kogo's text for one value of each type. A composite type is no parameter, so its three
+  cells are written by hand and send its fields back; its lists, and an enum's, are
+  cells that must be refused. The table's domains are in `testdata/schema.sql`.

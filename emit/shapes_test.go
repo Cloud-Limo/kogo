@@ -7,13 +7,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Cloud-Limo/kogo/sqlpass"
 	"github.com/jackc/pgx/v5"
 )
 
-// The types of spec.md 10.4 that are read as one value: Postgres's
-// name, Kogo's, a short name for the row's funs and domain, and two
-// values at the type's edges, as SQL. A composite type is read field
-// by field (TestRows), and an array of one has no Kogo type.
+// The types of spec.md 10.4: Postgres's name, Kogo's, a short name
+// for the row's funs and domain, and two values at the type's edges,
+// as SQL. A composite type, the table's last, is read field by field
+// and is no parameter, so its cells are written out in composite.
 var shaped = [][5]string{
 	{"boolean", "Boolean", "bool", "true", "false"},
 	{"integer", "Int", "int", "'-2147483648'", "2147483647"},
@@ -52,8 +53,9 @@ var shapes = [][5]string{
 // refuses (doc/design.md, principle 4; spec.md 10.4). Every type in
 // every shape is read by the emitted Go and sent back, and the text
 // Postgres makes of what came back is the text it makes of the value
-// itself; or the cell panics, naming its limit. An enum's lists are
-// refused when the program is emitted (TestRefused).
+// itself; or the cell names its limit: a panic, for an enum's lists
+// a refusal when the program is emitted, and for a composite type's
+// one of kogo check.
 func TestShapes(t *testing.T) {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, testURL())
@@ -61,24 +63,33 @@ func TestShapes(t *testing.T) {
 		t.Fatalf("no test database, create it with `mise run testdb`: %v", err)
 	}
 	defer conn.Close(ctx)
+	refused := "package t\n\nenum class Kind { in_house, outside }\n" // the cells of an enum's lists
 	source := "package t\n\nimport kogo.time.Duration\nimport kogo.time.Instant\nimport kogo.time.LocalDate\nimport kogo.time.LocalTime\n\nenum class Kind { in_house, outside }\n"
-	var cases [][2]string
+	text := func(value string) string { // Postgres's own text of a value
+		var text *string
+		if err := conn.QueryRow(ctx, "select ("+value+")::text").Scan(&text); err != nil {
+			t.Fatalf("%s: %v", value, err)
+		} else if text != nil {
+			return *text
+		}
+		return "null"
+	}
+	cases := [][2]string{
+		{"t.AmountPlain(db)", text("(1500, 'AUD')::amount")},
+		{"t.AmountNull(db)", text("null::amount")},
+		{"t.AmountDomain(db)", text("(null, 'NZD')::d_amount")},
+	}
 	for _, row := range shaped {
 		for _, shape := range shapes {
-			if row[1] == "Kind" && strings.Contains(shape[2], "List") {
-				continue
-			}
 			args := []any{row[0], row[1], row[2], row[3], row[4]}
 			value, kogo, back := fmt.Sprintf(shape[1], args...), fmt.Sprintf(shape[2], args...), fmt.Sprintf(shape[3], args...)
-			want := shape[4]
-			if want == "" {
-				var text *string
-				if err := conn.QueryRow(ctx, "select ("+value+")::text").Scan(&text); err != nil {
-					t.Fatalf("%s: %v", value, err)
-				}
-				if want = "null"; text != nil {
-					want = *text
-				}
+			if row[1] == "Kind" && strings.Contains(kogo, "List") {
+				refused += fmt.Sprintf("fun %s%s(tx: Tx): %s = tx.querySingle<%s>(sql\"\"\"select %s as \"v!\" \"\"\")\n", row[2], shape[0], kogo, kogo, value)
+				continue
+			}
+			want := "limit: " + shape[4]
+			if shape[4] == "" {
+				want = text(value)
 			}
 			source += fmt.Sprintf("fun %s%s(db: Db): String? = db.tx { tx ->\n    val v = tx.querySingle<%s>(sql\"\"\"select %s as \"v%s\" \"\"\")\n"+
 				"    tx.querySingle<String?>(sql\"select ${v}::%s::text as t\")\n}\n", row[2], shape[0], kogo, value,
@@ -86,16 +97,48 @@ func TestShapes(t *testing.T) {
 			cases = append(cases, [2]string{fmt.Sprintf("t.%s%s(db)", export(row[2]), shape[0]), want})
 		}
 	}
-	got := run(t, withDB, "defer drop()\n", calls(cases), source)
+	_, _, errs := emit(t, "x", refused)
+	if lists := strings.Count(refused, "fun "); len(errs) != lists || lists != 5 {
+		t.Errorf("%d of an enum's %d lists are refused, want each of 5: %v", len(errs), lists, errs)
+	}
+	for _, err := range errs {
+		if !strings.Contains(err.Message, "which holds a list of an enum") {
+			t.Errorf("got %v", err)
+		}
+	}
+	pass := must(sqlpass.Connect(ctx, testURL()))
+	defer pass.Close(ctx)
+	for _, list := range []string{"array[(1, 'AUD')::amount]", "array[null::amount]", "array[[(1, 'AUD')::amount]]", "array[(1, 'AUD')::d_amount]"} {
+		if _, err := pass.Check(ctx, "select "+list+" as v", nil); err == nil || !strings.Contains(err.Error(), "[], which has no Kogo type") {
+			t.Errorf("%s\n got %v\nwant a type with no Kogo type", list, err)
+		}
+	}
+	got := run(t, withDB, "defer drop()\n", calls(cases), source, composite)
 	if len(got) != len(cases) {
 		t.Fatalf("%d lines, want %d:\n%s", len(got), len(cases), strings.Join(got, "\n"))
 	}
 	for i, c := range cases {
-		if got[i] != c[1] && !(strings.HasPrefix(got[i], "panics: ") && strings.Contains(got[i], c[1]) && c[1] != "") {
+		limit, named := strings.CutPrefix(c[1], "limit: ")
+		if named && !(strings.HasPrefix(got[i], "panics: ") && strings.Contains(got[i], limit)) || !named && got[i] != c[1] {
 			t.Errorf("%s\n got %s\nwant %s", c[0], got[i], c[1])
 		}
 	}
+	t.Logf("%d cells read or panicking, %d refused", len(cases), len(errs)+4)
 }
+
+// The cells of a composite type: alone, null and through a domain. Its
+// fields are sent back, since the type is no parameter.
+const composite = `package t
+
+data class Amount(val cents: Long?, val currency: String?)
+data class Held(val v: Amount?)
+
+fun back(tx: Tx, a: Amount?): String? =
+    if (a == null) null else tx.querySingle<String?>(sql"select row(${a.cents}::bigint, ${a.currency}::text)::amount::text as t")
+fun amountPlain(db: Db): String? = db.tx { tx -> back(tx, tx.querySingle<Held>(sql"select (1500, 'AUD')::amount as v").v) }
+fun amountNull(db: Db): String? = db.tx { tx -> back(tx, tx.querySingle<Held>(sql"select null::amount as v").v) }
+fun amountDomain(db: Db): String? = db.tx { tx -> back(tx, tx.querySingle<Held>(sql"select (null, 'NZD')::d_amount as v").v) }
+`
 
 func testURL() string {
 	if url := os.Getenv("KOGO_TEST_DATABASE_URL"); url != "" {

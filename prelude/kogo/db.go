@@ -230,8 +230,10 @@ func bound(args []any) []any {
 			args[i] = reflect.MakeSlice(v.Type(), 0, 0).Interface()
 		}
 		noZero(v)
-		for j := 0; v.Kind() == reflect.Slice && j < v.Len(); j++ {
-			noZero(reflect.Indirect(v.Index(j)))
+		if v.Kind() == reflect.Slice && v.Type().Elem().Kind() != reflect.Uint8 { // not a ByteArray's bytes
+			for j := range v.Len() {
+				noZero(reflect.Indirect(v.Index(j)))
+			}
 		}
 	}
 	return args

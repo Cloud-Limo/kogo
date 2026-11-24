@@ -47,7 +47,7 @@ func (e *emitter) typ(t check.Type) string {
 		}
 		for i, a := range t.Args {
 			if _, ok := a.(*check.Nullable); ok {
-				e.insts = append(e.insts, inst{t.Decl.Params[i], e.file, e.at})
+				e.note(t.Decl.Name, t.Decl.Params[i], a, e.at)
 			}
 		}
 		s := e.qualify(t.Decl.Pkg, e.names[t.Decl])
@@ -108,9 +108,7 @@ func (e *emitter) instantiate(at syntax.Node, f *check.Func, args []check.Type) 
 		if builtin(a, "Nothing") && !bind && !never {
 			e.notYet(at, fmt.Sprintf("the type argument Nothing, settled here for %s", f.TypeParams[i].Name), "write the type arguments, "+f.Name+"<...>(...)")
 		}
-		if _, ok := a.(*check.Nullable); ok {
-			e.insts = append(e.insts, inst{f.TypeParams[i], e.file, at})
-		}
+		e.note(f.Name, f.TypeParams[i], a, at)
 	}
 	if !e.scanned[f] {
 		e.scanned[f] = true
@@ -118,6 +116,20 @@ func (e *emitter) instantiate(at syntax.Node, f *check.Func, args []check.Type) 
 		for _, p := range f.Params {
 			e.scan(p.Type)
 		}
+	}
+}
+
+// note notes a type argument a for the type parameter tp of the fun
+// or type called name: a nullable one, to refuse if tp is used as
+// T?, and a bare type parameter given to a fun, which is used as T?
+// if tp is. typ notes only the nullable ones: a generic type's T? is
+// written where its value is built, and that marks the T there.
+func (e *emitter) note(name string, tp *check.TypeParam, a check.Type, at syntax.Node) {
+	switch a := a.(type) {
+	case *check.Nullable:
+		e.insts = append(e.insts, inst{tp, name, e.file, at})
+	case *check.TypeParam:
+		e.flows = append(e.flows, [2]*check.TypeParam{a, tp})
 	}
 }
 

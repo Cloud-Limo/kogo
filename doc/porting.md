@@ -58,6 +58,26 @@ the port follows the design and the Kotlin is not reshaped first
 (`doc/roadmap.md`, "How it moves"). The file that departs says so in
 one line naming the design. The side-by-side run is unchanged.
 
+**Mend the Kotlin first, never the port.** Not assuming the Kotlin
+perfect bites before the port; porting it accurately, in it. Of an
+oddity the port asks what a person meets, against how the code encodes
+it: an encoding may change, what a person meets is ported. Where what
+the Kotlin answers would force something weaker or uglier into the
+port (a gate that never refuses, an `ungated` row, a hack, a new name
+in Kogo), the handoff's Next step proposes a change to the Kotlin, or
+the port stops and says so where it cannot go on without it, each with
+the change's size and who would see it. The change is made in the
+Kotlin first, as its own small piece with its test, and then ported as
+it stands; never in the port alone, since the side-by-side run is the
+check and a port that differs on purpose has nothing beside it. Any
+other oddity the port keeps, and moves on.
+
+For one, the storefront's `bookerProfile` answers a visitor null, and
+the page's only use of the null is "No booker. Please log in.": ported
+as it is, its row sits under a gate that never refuses, so the change
+is proposed in the Kotlin. `pastPassengers` answers a visitor an empty
+list, which is what the wizard really does, and is ported as it is.
+
 **Read each pattern as Go's.** A `Regex`'s pattern is Go's (`spec.md`
 section 12), so the port reads each one against that section's list and
 writes it in a form Go reads as the Kotlin meant: where a vertical tab

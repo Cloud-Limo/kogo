@@ -19,9 +19,9 @@ type reached struct {
 // gateWrites refuses each statement that a gate reaches, in its own
 // body or through the funs and vals it refers to, and that writes a
 // table, or locks one where the gate's transaction is a
-// SerializableTx, or is a utility statement, as truncate or lock
-// table, whose tree lists no table. A statement is refused once, for the first gate that
-// reaches it.
+// SerializableTx; a utility statement is sql-utility's, wherever it
+// is. A statement is refused once, for the first gate that reaches
+// it.
 func (c *checker) gateWrites(program []*syntax.File) {
 	said := map[*syntax.SQL]bool{}
 	for _, f := range program {
@@ -56,10 +56,6 @@ func (c *checker) gateWrites(program []*syntax.File) {
 // strays reports whether the statement of lit does what op's gate
 // must not, and says so of the first table it does it to.
 func (c *checker) strays(lit *syntax.SQL, q *Query, op *Op) bool {
-	if q.Stmt.Utility != "" {
-		c.errorf(lit, "gate-writes", "this statement is a utility statement (Postgres's %s), and a gate only reads: move it to the work, and bind a setting with set_config (the gate %s reaches it; spec.md 15.3)", q.Stmt.Utility, op.Gate.Name)
-		return true
-	}
 	does := map[string]string{"insert": "inserts into", "update": "updates", "delete": "deletes from"}
 	for _, t := range q.Stmt.Tables {
 		for _, need := range t.Needs {

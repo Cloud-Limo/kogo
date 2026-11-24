@@ -979,6 +979,11 @@ external class Instant`,
 		// The SQL pass's refusal, at its place in the literal.
 		{"fun f(tx: Tx): Int = tx.execute(sql\"\"\"\n    select\n    ‸«\"\"\")", "sql-rejected", "Postgres refused this"},
 		{"fun f(db: Db): Int = ‸db.execute(sql\"\")", "type-mismatch", "this is a Db where a Tx is wanted"},
+		// A Tx runs no utility statement, as commit or set, in a test
+		// file too (Postgres's tags, sqlpass.TestTables).
+		{"fun f(tx: Tx): Int = tx.execute(‸sql\"@utility:TRANSACTIONSTMT\")", "sql-utility", "(Postgres's TRANSACTIONSTMT), and a Tx runs select, insert, update, delete and merge alone: db.tx begins and ends the transaction"},
+		{"fun f(tx: Tx): Boolean = tx.exists(‸sql\"@utility:VARIABLESETSTMT\")", "sql-utility", "a setting is bound with select set_config('name', $value, true)"},
+		{"/*test*/\nfun f(tx: Tx): List<Int> = tx.query<Int>(‸sql\"@utility:VARIABLESETSTMT\")", "sql-utility", "(Postgres's VARIABLESETSTMT)"},
 	})
 	// A data class with no column at all hides only the columns it
 	// would take, not one that no property takes.

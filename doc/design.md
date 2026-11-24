@@ -275,10 +275,10 @@ null where the row type has none. The prelude's types take themselves
 to and from the driver's. A composite type is read field by field, once
 the connection's driver has been told of the type, as it is of an
 array type Postgres does not ship. An array is read by the prelude's
-`Array`, which refuses what a `List` cannot hold (principle 4). `db.tx` begins,
-commits and rolls back around its block, and `tx.atomically` is a
-savepoint; whatever Postgres refuses is a panic, which rolls back on
-its way out as a failure does.
+`Array`, which refuses what a `List` cannot hold (principle 4).
+`db.tx` begins, commits and rolls back around its block, and
+`tx.atomically` is a savepoint; whatever Postgres refuses is a panic,
+which rolls back on its way out as a failure does.
 
 ## The server
 

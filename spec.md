@@ -836,8 +836,9 @@ at `kogo check` where the catalog or the statement tells, else by a
 panic that names the limit (section 8). It never gives another value.
 The limits, with those above:
 
-- A type that is not in the table, an array of a composite type, a
-  `record`, an enum with a label no constant can have: `kogo check`.
+- A type that is not in the table, an array of a composite type or of a
+  domain over an array, a `record`, an enum with a label no constant
+  can have: `kogo check`.
 - A list of an enum, as a column or a parameter: refused when the
   program is emitted, with the cast to write.
 - An array of more than one dimension: a panic when it is read.

@@ -109,7 +109,7 @@ func emitAll(info *check.Info, prelude, program []*syntax.File, root, outDir str
 		out[dir+"/kogo.go"] = []byte(head.String() + "\n" + body)
 	}
 	// A T? whose T is itself nullable would be two pointers in Go. A
-	// T given to a fun or a type that uses its own as T? is used so.
+	// T given to a fun that uses its own as T? is used so.
 	for changed := true; changed; {
 		changed = false
 		for _, f := range e.flows {

@@ -46,7 +46,9 @@ func (e *emitter) typ(t check.Type) string {
 			return e.rt() + "." + t.Decl.Name
 		}
 		for i, a := range t.Args {
-			e.note(t.Decl.Name, t.Decl.Params[i], a, e.at)
+			if _, ok := a.(*check.Nullable); ok {
+				e.note(t.Decl.Name, t.Decl.Params[i], a, e.at)
+			}
 		}
 		s := e.qualify(t.Decl.Pkg, e.names[t.Decl])
 		if t.Decl.Pkg == "kogo" && t.Decl.Name == "SerializableTx" {
@@ -119,7 +121,9 @@ func (e *emitter) instantiate(at syntax.Node, f *check.Func, args []check.Type) 
 
 // note notes a type argument a for the type parameter tp of the fun
 // or type called name: a nullable one, to refuse if tp is used as
-// T?, and a bare type parameter, which is used as T? if tp is.
+// T?, and a bare type parameter given to a fun, which is used as T?
+// if tp is. typ notes only the nullable ones: a generic type's T? is
+// written where its value is built, and that marks the T there.
 func (e *emitter) note(name string, tp *check.TypeParam, a check.Type, at syntax.Node) {
 	switch a := a.(type) {
 	case *check.Nullable:

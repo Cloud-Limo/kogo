@@ -362,11 +362,13 @@ Kotlin does, so `fun <T> orElse(v: T, fallback: T): T = v ?: fallback`
 gives the fallback for a null `v`. Kotlin's `T?` of a nullable `T` holds
 one null where Go would hold two, so a nullable type is refused for a
 type parameter that its function or type makes a `T?` of: in its
-signature, or in its body by a call that gives one, as `firstOrNull`,
-`lastOrNull`, `getOrNull` and `takeIf` do, or a generic function that
-does so in turn. `firstOr` above, called on a `List<Long?>`, is refused
-by `kogo emit` (`not-yet-emitted`): pass a type that is not nullable
-and keep the null outside, `firstOr(holes.mapNotNull { it }, 5L)`. A
+signature, or anywhere in its body: a `T?` it writes (`val r: T? = v`,
+`if (c) v else null`, a type whose field is `T?`), or a call that gives
+one, as `firstOrNull`, `lastOrNull`, `getOrNull` and `takeIf` do, or a
+generic function that does so in turn. `firstOr` above, called on a
+`List<Long?>` `holes`, is refused by `kogo emit` (`not-yet-emitted`):
+pass a type that is not nullable and keep the null outside,
+`firstOr(holes.mapNotNull { it }, 5L)`. A
 function that only carries its `T`, as one that runs a block and returns
 its answer, takes a nullable type.
 

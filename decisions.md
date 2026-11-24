@@ -4552,10 +4552,14 @@ Greg's ruling on DEV-1143's finding 1, and the agent's choices beside it.
   call, return and store that crosses a type parameter. Reopen when a port holds a generic
   fun that forms a `T?` and is called with a nullable type.
 - **Only a type parameter made `T?` is refused a nullable type** (Greg): in its signature,
-  as since DEV-830, or in its body, by a call whose own type parameter is made `T?`, through
-  as many generic funs and types as it is given to. Not taken: refusing every nullable type
-  argument to a generic fun, since a wrapper called with a nullable result is what a port
-  writes most. Reopen as above.
+  as since DEV-830, or in its body, by a `T?` it writes or a call whose own type parameter
+  is made `T?`, through as many generic funs as it is given to. The follow does not pass
+  through a generic type's type arguments (Greg, on the review): a value of `Opt<T>` whose
+  field is `T?` is built either as `Opt<Long?>`, which the type's own mark refuses, or in a
+  generic fun, where building it writes the `T?` and marks that fun's `T`, so following the
+  type as well refused only correct programs, as `val o: Opt<T>? = null`. Not taken:
+  refusing every nullable type argument to a generic fun, since a wrapper called with a
+  nullable result is what a port writes most. Reopen as above.
 - **The refusal stays `kogo emit`'s `not-yet-emitted`**, not `kogo check`'s. Which
   parameters are made `T?` is learned as the emitter writes each body's Go types (a `T?`
   local, a safe call's value, a prelude fun's signature), so the checker would need a

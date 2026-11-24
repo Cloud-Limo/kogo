@@ -150,7 +150,7 @@ func TestRows(t *testing.T) {
 		{`t.HeldIn(db, "%")`, "panics: queryOne read more than one row, and reads one or none: select (\"quote\") is not distinct from null, (\"quote\").\"id\", " +
 			"((\"quote\").\"total\") is not distinct from null, ((\"quote\").\"total\").\"cents\", ((\"quote\").\"total\").\"currency\", " +
 			"((\"quote\").\"deposit\") is not distinct from null, ((\"quote\").\"deposit\").\"cents\", ((\"quote\").\"deposit\").\"currency\" " +
-			"from (select * from (select q as quote from quote q where (q.total).currency like $1\\n) _ offset 0) _ where 'quote'::regclass is not null and 'amount'::regclass is not null"},
+			"from (select q as quote from quote q where (q.total).currency like $1\\n) _"},
 		{`t.Nulls(db)`, "[Deposit(n=1, deposit=Amount(cents=null, currency=null)), Deposit(n=2, deposit=null)]"},
 		{`t.NoShop(db)`, "panics: column shop is null, and fills a property that is not nullable"},
 		{`t.Quoted(db)`, "Priced(price=Price(cents=250))"},
@@ -396,42 +396,5 @@ fun whole(db: Db): List<Held> = db.tx { tx -> tx.query<Held>(sql"select a as acc
 fun joined(db: Db): List<Maybe> = db.tx { tx ->
     tx.query<Maybe>(sql"""select n as "n!", a as account from generate_series(1, 2) n left join account a on a.id = n order by n""")
 }
-`)
-}
-
-// A type made with create type is read by its fields' names too, on a
-// connection that read it before its fields moved: alone, and inside
-// a table's whole row. Postgres plans the statement again only for a
-// change to a relation it names, which the type is not.
-func TestMovedFields(t *testing.T) {
-	alter := `
-func alter(sql string) string {
-if _, err := pool.Exec(ctx, sql); err != nil {
-panic(err)
-}
-return "altered"
-}
-`
-	setup := "defer drop()\nif _, err := pool.Exec(ctx, `" + `
-insert into quote (id, total, deposit) values ('00000000-0000-0000-0000-00000000000d', (7, 'AUD'), (3, 'NZD'));
-` + "`); err != nil {\npanic(err)\n}\n"
-	quote := "Quote(id=00000000-0000-0000-0000-00000000000d, total=Amount(cents=7, currency=AUD), deposit=Amount(cents=3, currency=NZD))"
-	expectWith(t, withDB+alter, setup, [][2]string{
-		{`t.Quotes(db)`, "[" + quote + "]"},
-		{`t.HeldOne(db)`, "Held(quote=" + quote + ")"},
-		{`alter("alter type amount add attribute was bigint cascade; update quote set total.was = (total).cents, deposit.was = (deposit).cents; " +
-			"alter type amount drop attribute cents cascade; alter type amount rename attribute was to cents cascade")`, "altered"},
-		{`t.Quotes(db)`, "[" + quote + "]"},
-		{`t.Quotes(db)`, "[" + quote + "]"},
-		{`t.HeldOne(db)`, "Held(quote=" + quote + ")"},
-	}, `package t
-
-data class Amount(val cents: Long?, val currency: String?)
-data class Quote(val id: Uuid, val total: Amount, val deposit: Amount?)
-data class Held(val quote: Quote)
-
-fun quotes(db: Db): List<Quote> = db.tx { tx -> tx.query<Quote>(sql"select id, total, deposit from quote order by id") }
-
-fun heldOne(db: Db): Held = db.tx { tx -> tx.querySingle<Held>(sql"select q as quote from quote q") }
 `)
 }

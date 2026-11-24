@@ -4844,7 +4844,8 @@ agent's where marked.
 - **A select with a composite column is wrapped once more, in `select * from (...) _
   offset 0`**, so that Postgres does not fold it into the select of the fields and work
   out a function or a subquery that gives a composite once for each field. Not taken:
-  only where the column is not a plain reference.
+  only where the column is not a plain reference. *Superseded 24 Nov 2026 by "A program
+  is promised only the schema it was checked against" below.*
 - **The outer select tests `'<type>'::regclass is not null` for each composite type
   read**, a table's row included: Postgres plans a prepared statement again when a
   relation it names changes, and a type made with `create type` is otherwise none of
@@ -4852,7 +4853,8 @@ agent's where marked.
   test leans on Postgres's source (`setrefs.c`, "Check for regclass reference"), not its
   documentation, and `TestMovedFields` guards it. Not taken: leaving types made with
   `create type` to the restart. `regclass` finds a relation, so an index named as the
-  type in an earlier schema of the search path would be named instead.
+  type in an earlier schema of the search path would be named instead. *Superseded 24
+  Nov 2026 by "A program is promised only the schema it was checked against" below.*
 - **Up to 15 to 40 µs more planning on a call Postgres plans afresh is accepted**, for
   a read of a whole row of 24 fields, on top of the wrap's 20 µs (DEV-1167); reads of
   many rows come out faster through the driver (DEV-1168, point 6).
@@ -4888,6 +4890,35 @@ agent's where marked.
   leave it out", since a setting is not on the wire. Not taken: a message per case.
 - **Spec 10.4's line stays**: a `String` the program makes that holds U+0000 is still a
   panic when it is sent; an input can no longer bring one.
+
+## A program is promised only the schema it was checked against (DEV-1195), 24 Nov 2026
+
+Greg's ruling of 24 Nov 2026: Kogo does not promise, or try, to keep a running program
+right across a schema change; after one, the program is checked, built and started
+again (spec 10). It supersedes DEV-1194's entries on the `offset 0` layer and the
+`regclass` test above, and DEV-1168's points 4 and 5 as reasons to keep them.
+
+- **The wrap no longer tests `'<type>'::regclass is not null`**: it guarded only a
+  connection held across an `alter type`, which the rule leaves unpromised, and it leaned
+  on Postgres's source, not its documentation. Reopens if Kogo comes to promise a
+  running program across a schema change.
+- **A select with a composite column is no longer wrapped in `select * from (...) _
+  offset 0`**: it guarded a slowdown in a column shape no program has, and made the SQL
+  sent harder to read. A whole row is sent as `select ("account") is not distinct from
+  null, ("account")."id", ... from (<statement>\n) _`, a write as `with _ as
+  (<statement>\n) select ... from _`. Reopens if a program reads a composite from a
+  function or a subquery whose cost shows.
+- **What stays**: the null column and the fields by name, since a read then does not
+  depend on the order of a table's columns or a type's fields, which two databases of
+  one schema can hold differently; `TestMovedColumns` tests it.
+- **`TestMovedFields` is deleted**, by Greg's ruling: it tested a connection held across
+  an `alter type`, what the language no longer promises (rule 6).
+- **Accepted**: on a connection held across an `alter type`, an attribute dropped and
+  added again, or one dropped, is read as null with no error until the connection
+  closes. Run on 24 Nov 2026 with `TestMovedFields`'s own statements and a nullable
+  field; a table's column moved the same way reads right.
+- **Accepted**: a function or a subquery in a select list that gives a composite may
+  run once for each field (DEV-1168, point 4): the answer is the same, the time is not.
 
 ## A port asks Postgres for a moment (DEV-1170), 24 Nov 2026
 

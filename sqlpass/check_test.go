@@ -366,34 +366,41 @@ func TestWrap(t *testing.T) {
 // this fails if a later Postgres loses it.
 func TestWrapKeepsOrder(t *testing.T) {
 	c, ctx := connect(t), context.Background()
-	st, err := check(c, `select id, k from ranked order by k`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, setting := range []string{"on", "off"} {
-		tx, err := c.conn.Begin(ctx)
+	// The second, a whole row, is sent under the fence of offset 0 too.
+	for _, sql := range []string{`select id, k from ranked order by k`, `select r as ranked from ranked r order by r.k`} {
+		st, err := check(c, sql)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer tx.Rollback(ctx)
-		if _, err := tx.Exec(ctx, "set local parallel_setup_cost = 0; set local parallel_tuple_cost = 0; "+
-			"set local min_parallel_table_scan_size = 0; set local min_parallel_index_scan_size = 0; "+
-			"set local max_parallel_workers_per_gather = 8; set local parallel_leader_participation = off; "+
-			"set local enable_gathermerge = "+setting); err != nil {
-			t.Fatal(err)
+		for _, setting := range []string{"on", "off"} {
+			tx, err := c.conn.Begin(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Rollback(ctx)
+			if _, err := tx.Exec(ctx, "set local parallel_setup_cost = 0; set local parallel_tuple_cost = 0; "+
+				"set local min_parallel_table_scan_size = 0; set local min_parallel_index_scan_size = 0; "+
+				"set local max_parallel_workers_per_gather = 8; set local parallel_leader_participation = off; "+
+				"set local enable_gathermerge = "+setting); err != nil {
+				t.Fatal(err)
+			}
+			rows, _ := tx.Query(ctx, "explain (costs off) "+st.SQL)
+			lines, err := pgx.CollectRows(rows, pgx.RowTo[string])
+			plan := strings.Join(lines, " / ")
+			t.Logf("enable_gathermerge = %s: %s", setting, plan)
+			if err != nil || !strings.Contains(plan, "Gather") {
+				t.Errorf("enable_gathermerge = %s: no parallel plan, so the order is not tested: %s %v", setting, plan, err)
+			}
+			rows, _ = tx.Query(ctx, st.SQL)
+			ks, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (k int, err error) {
+				dest := make([]any, len(r.FieldDescriptions())) // k is the last column
+				dest[len(dest)-1] = &k
+				return k, r.Scan(dest...)
+			})
+			if err != nil || len(ks) != 5000 || !slices.IsSorted(ks) {
+				t.Errorf("%s, enable_gathermerge = %s: %d rows, sorted %v, %v", sql, setting, len(ks), slices.IsSorted(ks), err)
+			}
+			tx.Rollback(ctx)
 		}
-		rows, _ := tx.Query(ctx, "explain (costs off) "+st.SQL)
-		lines, err := pgx.CollectRows(rows, pgx.RowTo[string])
-		plan := strings.Join(lines, " / ")
-		t.Logf("enable_gathermerge = %s: %s", setting, plan)
-		if err != nil || !strings.Contains(plan, "Gather") {
-			t.Errorf("enable_gathermerge = %s: no parallel plan, so the order is not tested: %s %v", setting, plan, err)
-		}
-		rows, _ = tx.Query(ctx, st.SQL)
-		ks, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (k int, err error) { return k, r.Scan(nil, &k) })
-		if err != nil || len(ks) != 5000 || !slices.IsSorted(ks) {
-			t.Errorf("enable_gathermerge = %s: %d rows, sorted %v, %v", setting, len(ks), slices.IsSorted(ks), err)
-		}
-		tx.Rollback(ctx)
 	}
 }

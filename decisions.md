@@ -2432,6 +2432,7 @@ Each entry: what was decided, why, and what would reopen it.
 - **The raising `db.tx` is `either` around the plain one**: the scope is made once, so a
   rerun raises on the same handle.
 - **The driver is told of a composite type on the connection that first reads one**
+  (*superseded 24 Nov 2026 by "A whole row is read by its fields' names" below*)
   (`Tx_Known`, called where a statement has a column of one). The types its fields are
   made of come with it. A `Db` is made from a pool that already exists, so there is no
   hook when a connection opens; the cost is a map lookup for each such statement. `citext`
@@ -2442,7 +2443,8 @@ Each entry: what was decided, why, and what would reopen it.
   own search path, tells the driver of it by schema and catalog name, and registers it
   under the written name too. Not taken: carrying the catalog name in `sqlpass.Type`,
   which would bind the type to the schema it was checked against.
-- **A connection knows a composite type by name until it closes.** A migration that drops
+- **A connection knows a composite type by name until it closes** (*superseded 24 Nov
+  2026 by "A whole row is read by its fields' names" below*). A migration that drops
   and makes again a type a running server reads leaves the old OID on each connection
   that read it, and those connections panic on it. Restart the server after such a
   migration. Reopen if migrations run under a live server.
@@ -4752,3 +4754,50 @@ limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
   Kogo's text for one value of each type. A composite type is no parameter, so its three
   cells are written by hand and send its fields back; its lists, and an enum's, are
   cells that must be refused. The table's domains are in `testdata/schema.sql`.
+
+## A whole row is read by its fields' names (DEV-1194), 24 Nov 2026
+
+Greg's ruling of 24 Nov 2026 on DEV-1168's research, which builds its proposal; the
+agent's where marked.
+
+- **A column of a composite type is sent as its fields, by the names `kogo check`
+  saw**, `("driver")."id", ("driver")."name"`, a nested composite the same way one
+  level down. No composite value reaches the driver, so it reads no field by position
+  and is told of no composite type: `Composite`, `Row` and the composite half of
+  `Tx_Known` go. This also mends an absent whole row with a `List` field, which
+  panicked. Not taken: loading the types again in each transaction, which still reads
+  by position; leaving it to the deploy's restart.
+- **Before a composite's fields, one column says whether it is null as a whole**,
+  `("driver") is not distinct from null`, for every composite, nullable or not. Not
+  taken: only where `kogo check` finds it nullable, which reads a null asserted with
+  `"name!"` as a row of nulls; null when every field is, the prefix form's rule, which
+  loses a row of nulls.
+- **A select with a composite column is wrapped once more, in `select * from (...) _
+  offset 0`**, so that Postgres does not fold it into the select of the fields and work
+  out a function or a subquery that gives a composite once for each field. Not taken:
+  only where the column is not a plain reference.
+- **The outer select tests `'<type>'::regclass is not null` for each composite type
+  read**, a table's row included: Postgres plans a prepared statement again when a
+  relation it names changes, and a type made with `create type` is otherwise none of
+  the statement's, so a held connection read a moved field's old place as null. The
+  test leans on Postgres's source (`setrefs.c`, "Check for regclass reference"), not its
+  documentation, and `TestMovedFields` guards it. Not taken: leaving types made with
+  `create type` to the restart. `regclass` finds a relation, so an index named as the
+  type in an earlier schema of the search path would be named instead.
+- **Up to 15 to 40 µs more planning on a call Postgres plans afresh is accepted**, for
+  a read of a whole row of 24 fields, on top of the wrap's 20 µs (DEV-1167); reads of
+  many rows come out faster through the driver (DEV-1168, point 6).
+- **One emitted shape for a composite, nullable or not**: the data class is built only
+  where the null column says it is there, under `kogo.NotNull` where its property is
+  not nullable. Not taken: a plainer shape where it is always there.
+- **Every field is read as a pointer** (the agent's, where DEV-1168's sketch read one as
+  a pointer only where the whole may be null), so a null whole row in a property that
+  is not nullable, asserted with `"name!"`, still panics naming the column, as before,
+  and not with the driver's `null is not a Uuid`. It costs a `kogo.NotNull` for each
+  field that is not nullable.
+- **`Tx_Known` stays for an array type Postgres does not ship** (the agent's: DEV-1153
+  gave it that work after DEV-1168 ran), and is now told of such an array where it is a
+  field's, since the field comes as a column of its own.
+- **The check of the wrap compares each column's type only where it is the
+  statement's** (the agent's): the null column and the fields are compared by name,
+  since the SQL pass keeps no field's oid.

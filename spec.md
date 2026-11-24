@@ -1660,7 +1660,10 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   transaction (15.7).
 - A gate on a `SerializableTx` runs held to reading, each time it
   runs: in a savepoint that Postgres holds read-only and the server
-  releases before the work. There a write, one inside a function of
+  releases before the work. The server runs a statement before the
+  savepoint, so that the transaction's first snapshot is not taken
+  read-only: Postgres would then leave the whole transaction out of
+  its serialization checks, also after the work writes. There a write, one inside a function of
   the database's too, `nextval` and a row lock are each a bug, and a
   panic (section 8). A setting the gate makes with `set_config` is
   allowed, and is still set in the work, which writes as before: a

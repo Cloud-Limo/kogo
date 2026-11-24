@@ -124,11 +124,19 @@ comparison sees, by the port's Decided under "Weigh a write-around";
 a module does not replace its Kotlin without such a run, nor with a
 difference owed.
 
-For each newly ported area, plant one bug in the port (a cent off, a
-dropped `where`, a swapped share), see the comparison exit 1 and name
-the right case, and say so in the handoff: rule 6 applied to the
-comparison itself, since nobody has measured what its pairing of ids
-and times forgives.
+A newly ported area's cases come from a generated world, beside those
+written by hand, since each set sees bugs the other misses (DEV-1162):
+cusoon2's `go/gen` writes them from a fixed seed on every run, each
+flag the area reads drawn both ways, each list of none, one and two,
+each limit on it and a step either side, and a limit drawn with the
+state that reaches it; `kogo/run.sh` runs both sets, or one alone by
+`KOGO_CASES`. `0 differ` does not say the cases reached anything, so
+the handoff gives the reach `go/compare` prints under its count: of
+each operation's generated calls, how many got past its door, and of
+those drawn for a state, how many reached it. Then plant one bug in
+the port (a cent off, a dropped `where`, a swapped share), see the
+comparison exit 1 and name the right case, and say so in the handoff:
+rule 6 applied to the comparison itself.
 
 **Add what the spec lists.** A name the port needs that the spec lists
 and the prelude lacks is added to the prelude (DEV-875), not written
@@ -141,6 +149,13 @@ One that would be Kogo's own, or would differ from Kotlin's in ordinary
 use, is Greg's. Until either is built the port writes round it as a
 marked departure. An operator on a prelude type is such a name: `a < b`
 is `compareTo` and `a + b` is `plus` (spec section 6).
+
+**Ask Postgres for a moment.** A port builds no moment from a date, a
+time and a zone. Where the Kotlin does (`ZonedDateTime.of`,
+`withLaterOffsetAtOverlap`), the port asks Postgres, which holds the
+one copy of the zone rules the stored rows are read by: `kogo.time`
+gains none of those names, and spec 14's row on `LocalDateTime` stands
+(DEV-1163).
 
 **Weigh a write-around before writing it.** Before writing round a name
 in more lines than the Kotlin took, most often a hand-built copy of a

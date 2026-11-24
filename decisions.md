@@ -1074,6 +1074,12 @@ Each entry: what was decided, why, and what would reopen it.
     takes a lock the Kotlin does not. A gate on a `Tx` cannot run in Postgres's read-only
     mode, so a `select` of a function that writes passes it.
   - Not taken: the level on the list or in `main`; a flag on the handle.
+  - Not taken (24 Nov 2026, Greg, on DEV-1142's B137): `kogo check` refusing a read with
+    no lock in a function that takes a plain `Tx`. Whether a read needs a lock turns on
+    what its author does with the answer, and a rightful lockless read on a `Tx` (an
+    `exists`, a setting, a cached row) would need a lock it does not want or a new mark.
+    Check holds a transaction's kind at the call (`needs-serializable`), not what a `Tx`
+    function locks. Reopen if a port's bug comes from a lockless read on a `Tx`.
   - Reopen if the two functions of a shared read become the common case in a port.
 - **A binding's behaviour is Kogo's: the spec states it, and a Go default it does not
   state is turned off, with a test** (17 Nov 2026, Greg; `doc/design.md`, "Keeping the
@@ -4864,3 +4870,13 @@ agent's where marked.
 - **The check of the wrap compares each column's type only where it is the
   statement's** (the agent's): the null column and the fields are compared by name,
   since the SQL pass keeps no field's oid.
+
+## A port asks Postgres for a moment (DEV-1170), 24 Nov 2026
+
+- **A port builds no moment from a date, a time and a zone** (Greg's ruling of 24 Nov
+  2026 on DEV-1163; `doc/porting.md`, "Ask Postgres for a moment"). Where the Kotlin
+  does (`ZonedDateTime.of`, `withLaterOffsetAtOverlap`), the port asks Postgres, which
+  holds the one copy of the zone rules the stored rows are read by; `kogo.time` gains
+  none of those names and spec 14's row on `LocalDateTime` stands. Not taken: the names
+  in `kogo.time`, about 110 code / 150 tests, which make Go's a third copy of the rules
+  beside the JVM's and Postgres's. Reopen if a port has no database beside it.

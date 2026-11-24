@@ -164,6 +164,7 @@ func TestLimits(t *testing.T) {
 		{`t.Ints(db)`, "panics: column ids holds an array whose element 0 is NULL, and fills a List whose elements are not nullable " +
 			"(spec.md 10.4): read it as a List<T?>, or keep the nulls out in the statement"},
 		{`t.IntsOrNull(db)`, "[null]"},
+		{`t.Lower(db)`, "[1, 2]"}, // a lower bound is not kept
 		{`t.Nums(db)`, "[0.00, 1.50]"},
 		{`t.Uuids(db)`, "[00000000-0000-0000-0000-000000000002]"},
 		{`t.Tags(db)`, "[a, b] [Fold] null"},
@@ -184,6 +185,7 @@ fun ints(db: Db): List<Int> = db.tx { tx ->
 fun intsOrNull(db: Db): List<Int?> = db.tx { tx ->
     tx.querySingle<List<Int?>>(sql"""select array_agg(t.id) as "ids!" from (select 1) one left join account t on false""")
 }
+fun lower(db: Db): List<Int> = db.tx { tx -> tx.querySingle<List<Int>>(sql"""select '[5:6]={1,2}'::int[] as "x!" """) }
 fun nums(db: Db): List<Decimal> = db.tx { tx -> tx.querySingle<List<Decimal>>(sql"""select '{0.00,1.50}'::d_numeric[] as "x!" """) }
 fun uuids(db: Db): List<Uuid> = db.tx { tx ->
     tx.querySingle<List<Uuid>>(sql"""select '{00000000-0000-0000-0000-000000000002}'::d_uuid[] as "x!" """)

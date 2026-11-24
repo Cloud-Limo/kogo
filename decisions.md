@@ -4908,3 +4908,8 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   a clock handed to `InTx`, which `doc/remains.md` still lists.
 - **`doc/remains.md` keeps the half of its line on the clock**: the handler still reads
   the system clock for its limit and the pause, and nothing here changes that.
+- **The test database's default zone is `Pacific/Chatham`, not UTC** (`mise run testdb`;
+  the Ruling on PR 174): a test that leans on the server's zone then fails on every
+  machine, not only on one whose zone differs, and a non-whole-hour offset shows in any
+  time's text. A test that reads times asks its session for UTC, as `testURL()` does.
+  Not taken: UTC, which hides such a test until it meets another server.

@@ -7,5 +7,6 @@ select 'create role kogo login password ''kogo'''
 where not exists (select from pg_roles where rolname = 'kogo') \gexec
 drop database if exists kogo_test;
 create database kogo_test owner kogo;
+alter database kogo_test set timezone = 'Pacific/Chatham';
 SQL
 PGPASSWORD=kogo psql -qX -v ON_ERROR_STOP=1 -h 127.0.0.1 -U kogo -d kogo_test -f testdata/schema.sql

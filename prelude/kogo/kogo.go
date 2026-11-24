@@ -634,13 +634,14 @@ func Char_DigitToInt(this rt.Char) int32 {
 
 func Char_IsWhitespace(this rt.Char) bool { return isWhitespace(rune(this)) }
 
-// A Regex is RE2, as Go's is; two of one pattern are equal.
+// A Regex is RE2, as Go's is. Kotlin compares two by identity, so its
+// fields are unexported and rt's == panics on one.
 type Regex struct {
-	Pattern   string
+	pattern   string
 	whole, re *regexp.Regexp
 }
 
-func (r Regex) String() string { return r.Pattern }
+func (r Regex) String() string { return r.pattern }
 
 // Regex_String is the fun Regex(pattern), named apart from the type.
 func Regex_String(pattern string) Regex {

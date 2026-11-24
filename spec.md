@@ -128,6 +128,12 @@ Equality `==` is structural for every type. There is no `===`. One of
 its two sides must fit where the other's type is wanted (section 5.1),
 `?` aside, so `x == null` passes and `Int == Long` and `String == Int`
 are errors.
+A handle of the prelude's (`Db`, `Tx`, `SerializableTx`, `Http`,
+`Console`, `Clock`, `Request`, `Test`, `Raise`) and a `Regex` are the
+exception: Kotlin compares each by identity, so `==` on one, or on a
+value whose type holds one, is an error where check sees it
+(`handle-equality`, `regex-equality`), as for a `ByteArray` below, and
+panics where it does not (section 14).
 
 A value that holds a function is not compared, though Kotlin compares
 functions by reference. `==` and `!=` are an error where either side's
@@ -1499,6 +1505,8 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `suspend`, coroutines, `Flow`, threads | plain blocking code |
 | `Sequence`, `generateSequence`, `MutableList`, arrays | a `while` loop with a local `var`, or the list functions |
 | `bytes[i]`, `bytes.size`, `byteArrayOf(...)`, `a == b` on a `ByteArray` | none: a `ByteArray` is carried, and a binding reads it (section 3) |
+| `a == b` on a `Regex`, or on a value that holds one (`regex-equality`), which Kotlin compares by identity | compare the patterns, as strings; where check cannot see one, `==` panics (section 3) |
+| `a == b` on a handle (`Db`, `Clock`, ...), or on a value that holds one (`handle-equality`), which Kotlin compares by identity | compare the other properties; where check cannot see one, `==` panics (section 3) |
 | `java.time.*`, `java.util.UUID`, `BigDecimal` | `kogo.time.*`, `Uuid`, `Decimal` |
 | `kotlin.test.*` | `kogo.test.*` |
 | `BigDecimal.valueOf(x).stripTrailingZeros().toPlainString()` | `plain(x)`, from `kogo.text`, not `Decimal` |

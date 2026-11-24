@@ -68,11 +68,27 @@ func TestEqual(t *testing.T) {
 		{pile{keys: []int32{1, 2}}, pile{keys: []int32{2, 1}}, true},
 		{pile{keys: []int32{1, 2}}, pile{keys: []int32{1, 3}}, false},
 		{pile{keys: []int32{1}}, pile{keys: []int32{1, 2}}, false},
+		{[]Unit{{}}, []Unit{{}}, true}, // a type with no fields has one value
 	} {
 		if got := Equal(c.a, c.b); got != c.want {
 			t.Errorf("Equal(%v, %v) is %v, want %v", c.a, c.b, got, c.want)
 		}
 	}
+}
+
+// handle is a type Go implements with no exported field, as a Db or a
+// Regex is: Kotlin compares one by identity, so == panics on it rather
+// than answer true for any two.
+type handle struct{ name string }
+
+func TestEqualHandle(t *testing.T) {
+	defer func() {
+		if p := recover(); p != "a handle cannot be compared: Kotlin compares it by identity, not by what it holds" {
+			t.Errorf("== on two handles panics with %v", p)
+		}
+	}()
+	Equal([]handle{{"a"}}, []handle{{"b"}})
+	t.Error("== on two handles answers")
 }
 
 // toString() writes what Kotlin writes.

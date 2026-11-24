@@ -84,8 +84,8 @@ func TestAsKotlin(t *testing.T) {
 		}
 	}
 	re := Regex_String("[0-9]{2}|a")
-	if !Regex_Matches(re, "12") || Regex_Matches(re, "123") || Regex_Matches(re, "ab") || !rt.Equal(re, Regex_String("[0-9]{2}|a")) {
-		t.Error("matches is of the whole input, and two of one pattern are equal")
+	if !Regex_Matches(re, "12") || Regex_Matches(re, "123") || Regex_Matches(re, "ab") {
+		t.Error("matches is of the whole input")
 	}
 }
 
@@ -729,4 +729,16 @@ func TestCheckPool(t *testing.T) {
 		}()
 		pool.Close()
 	}
+}
+
+// == on a Regex panics where the checker cannot see one compared, as
+// in a list's contains: Kotlin compares two by identity, not pattern.
+func TestRegexEqual(t *testing.T) {
+	defer func() {
+		if p := recover(); p != "a Regex cannot be compared: Kotlin compares it by identity, not by what it holds" {
+			t.Errorf("== on two Regexes panics with %v", p)
+		}
+	}()
+	List_Contains(ListOf(Regex_String("a+")), Regex_String("a+"))
+	t.Error("== on two Regexes answers")
 }

@@ -44,7 +44,10 @@ constraints) is worth typing.
    Kogo source need not compile under kotlinc, and nothing runs it on
    the JVM (`decisions.md`, DEV-894).
 4. **Postgres is the type checker for SQL.** Never re-implement SQL
-   typing; ask the database.
+   typing; ask the database. Kogo reads a subset of what Postgres can
+   send. Outside it Kogo refuses: at `kogo check` where the catalog or
+   the statement tells, else by a panic that names the limit. It never
+   gives another value. `spec.md` 10.4 lists the limits.
 5. **Go is a backend, not a source language.** Nobody reads the emitted
    Go, but line directives map it back to the source, written at the
    start of each line: `/*line ../../src/a.kg:26*/`, padded so that
@@ -270,10 +273,12 @@ columns, and nothing is found by reflection. A column that may be null
 is read as a pointer and any other as it is, so the driver refuses a
 null where the row type has none. The prelude's types take themselves
 to and from the driver's. A composite type is read field by field, once
-the connection's driver has been told of the type. `db.tx` begins,
-commits and rolls back around its block, and `tx.atomically` is a
-savepoint; whatever Postgres refuses is a panic, which rolls back on
-its way out as a failure does.
+the connection's driver has been told of the type, as it is of an
+array type Postgres does not ship. An array is read by the prelude's
+`Array`, which refuses what a `List` cannot hold (principle 4).
+`db.tx` begins, commits and rolls back around its block, and
+`tx.atomically` is a savepoint; whatever Postgres refuses is a panic,
+which rolls back on its way out as a failure does.
 
 ## The server
 

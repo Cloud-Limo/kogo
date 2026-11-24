@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -464,7 +465,7 @@ func feel(_ kogo.Db, _ env, _ Request, f Felt) kogo.Either[string, int32] {
 // rollback of a refusal. It gives the answer as its Go type, a
 // refusal as a Refused, and refuses an enum that is not an entry.
 func TestCall(t *testing.T) {
-	t.Setenv("DATABASE_URL", "postgres://kogo:kogo@127.0.0.1/kogo_test")
+	t.Setenv("DATABASE_URL", cmp.Or(os.Getenv("KOGO_TEST_DATABASE_URL"), "postgres://kogo:kogo@127.0.0.1/kogo_test"))
 	ctx := context.Background()
 	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
 	defer drop()
@@ -539,7 +540,7 @@ func TestCall(t *testing.T) {
 // names it, from the check as from an operation, and logs nothing
 // but the served line; one no program reads is left alone.
 func TestLimits(t *testing.T) {
-	t.Setenv("DATABASE_URL", "postgres://kogo:kogo@127.0.0.1/kogo_test")
+	t.Setenv("DATABASE_URL", cmp.Or(os.Getenv("KOGO_TEST_DATABASE_URL"), "postgres://kogo:kogo@127.0.0.1/kogo_test"))
 	pool, drop := testdb.Open(context.Background(), "../../../testdata/schema.sql")
 	defer drop()
 	var log bytes.Buffer
@@ -604,7 +605,7 @@ func TestLimits(t *testing.T) {
 // served as 499, a database that ends the connection or cannot be
 // reached is a 503 and one line, and neither is logged as a panic.
 func TestDeadline(t *testing.T) {
-	t.Setenv("DATABASE_URL", "postgres://kogo:kogo@127.0.0.1/kogo_test")
+	t.Setenv("DATABASE_URL", cmp.Or(os.Getenv("KOGO_TEST_DATABASE_URL"), "postgres://kogo:kogo@127.0.0.1/kogo_test"))
 	ctx := context.Background()
 	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
 	defer drop()

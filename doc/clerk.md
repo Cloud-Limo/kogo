@@ -35,7 +35,7 @@ last line>`, then the command and its last lines. Anyone may say
 "Clerk DEV-NNN" by hand.
 
 You start runs, async or local, check, merge and tidy. You write no
-code and make no commit but the merge of `main` into a Kogo PR that
+code and make no commit but the merge of the base into a PR that
 Merging gives, you run no Pickup, Code review or Fix yourself, and you
 make no choice a step left open: that goes to the lead. Write every
 file a command reads (`clerk.md`, `brief.md`, the `Merged:` note)
@@ -155,7 +155,8 @@ Read the Handoff and the Review on the PR, and `gh pr diff <PR url>
 - the Handoff says the PR outgrew its Budget or added what the Scope
   did not name, and a Fix or a Question of the Review cuts something
   or doubts a thing added;
-- the diff changes `spec.md`;
+- the diff changes `spec.md` in a passage the issue's Scope did not ask
+  for: read that diff against the Scope;
 - the Handoff's Next step names new work or a choice left open.
 
 Otherwise launch a Fix when the Review has one to make, and go to
@@ -188,16 +189,18 @@ pushes it (a clean merge of the base changes nothing the Review read, so
 it is yours though you write no code), runs the tests, `leaks` and,
 unless the PR changes only `.md` files, the two comparisons with Kotlin.
 For a cusoon2 PR it makes or moves `~/Dev/cusoon2-dev-NNN`, detached at
-the pushed head, and runs that checkout's `kogo/drift.sh`, then its
-`kogo/run.sh`, when the PR touches `kogo/` or a file `kogo/pins`
-names; a pin left behind answers `fix: kogo/pins` with the Fix's
-phrase. It takes a minute or so,
-and more when it must run a comparison on `main` too. Its first line is
-one of three:
+the pushed head, merges `renew` into one that fell behind and is no
+port when the merge is clean, and pushes it, then runs that checkout's
+`kogo/drift.sh`, then its `kogo/run.sh`, when the PR touches `kogo/`
+or a file `kogo/pins` names; a pin left behind answers `fix:
+kogo/pins` with the Fix's phrase. It takes a minute or so, and more
+when it must run a comparison on `main` too. Its first line is one of
+three:
 
 - `pass <sha>`. Hand on when `<sha>` is neither the head whose fix
   commits you read nor, when the line under it says it `merged
-  origin/main`, that merge onto it: the branch moved after you read it.
+  origin/main` or `origin/renew`, that merge onto it: the branch moved
+  after you read it.
   Else the line under `when the fix commits and Open pass too:` is what
   to do. For a Kogo PR that is `gh pr merge <PR url> --merge
   --match-head-commit <sha>`: run it as it stands, a command of its own
@@ -215,10 +218,10 @@ one of three:
   clerk` watches that sha's run, tells Greg in his inbox on green, and
   posts a `Failed:` with `lead` on red.
 - `fix: <why>`. The base moved and the command could not merge it (a
-  conflict, or any cusoon2 PR), or a port's cusoon2 PR left its line
-  of `kogo/pins` behind (`fix: kogo/pins`). Merge nothing and post no
-  `Checked:`. Start the Fix it names the way How the next step starts
-  says; its brief merges the base, tests and pushes, or for `fix:
+  conflict, or a port's cusoon2 PR), or a port's cusoon2 PR left its
+  line of `kogo/pins` behind (`fix: kogo/pins`). Merge nothing and post
+  no `Checked:`. Start the Fix it names the way How the next step
+  starts says; its brief merges the base, tests and pushes, or for `fix:
   kogo/pins` sets the changed lines and runs `kogo/run.sh`. For a
   port's PR, the line under it holds the brief's phrase.
 - `fail: <what>`. Hand on with that line and the lines under it: a

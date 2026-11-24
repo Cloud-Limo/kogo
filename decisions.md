@@ -4967,3 +4967,10 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   merged into, so a PR opened before this lands conflicts once more; GitHub's own merge
   does not read it, which does not matter, since `main` is merged in the worktree.
   Reopens if two kept versions of one rewritten entry reach `main`.
+
+## The clerk goes on past a spec.md change the Scope asked for (DEV-1203), 24 Nov 2026
+
+- **A `spec.md` change is handed on only where the Scope did not ask for it** (Greg, on
+  DEV-1201: eight such hand-ons, all ruled as the clerk recommended, waited 111 min).
+  Not taken: hand on every one. Reopens on a `spec.md` change that the lead or Greg
+  would have stopped, merged with no hand-on.

@@ -4779,27 +4779,16 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   naming the setting, and `NewHandler`, `NewCalls` and `test.Run` call it at start, so
   a test runs on a pool the server would take. Not taken: the prelude setting what it
   requires on the pool it is handed, which changes what the application made.
-- **The session's time zone is required to be UTC**, as the run-time parameter
-  `timezone` in the pool's config, read there and not from a connection: a statement's
-  `now()::date`, `date_trunc` or cast to text reads the session's zone, and the
-  failure is a quietly different answer. A role's or a database's default of UTC does
-  not meet it, since the config is what holds on every connection whatever the role.
-  Not taken: any zone, so long as one is stated, which lets a test database and a
-  served one read the same statement differently; asking a connection at start, which
-  costs a connection and tells nothing of the pool's next one.
+- **The session's time zone is required to be UTC, read from the pool's config**: every
+  key that is `timezone` in any case, as Postgres reads it, must be `UTC`, so a role's
+  or a database's default does not meet it. Not taken: any zone, so long as one is
+  stated; asking a connection at start, which tells nothing of the pool's next one.
 - **A connection's longest life is required above 0; its idle time and the health check
-  are pgxpool's, kept with nothing required.** A connection keeps the types it was told
-  of (`Tx_Known`) by their OIDs until it closes, so one that lived for ever would keep
-  failing to read a type a migration made again, under another OID; pgxpool's 0 is
-  "never". Closing an idle connection costs a new one and never an answer, and pgxpool
-  pings a connection idle over a second before it hands it out, so one the database
-  ended meanwhile reaches no request (`TestPool`). A health check of 0 is refused by
-  pgxpool itself, whose ticker panics as the pool is made. Not taken: a ceiling on the life
-  (the hour serves; nothing measured a better one); requiring `ShouldPing` to be
-  pgxpool's own, since without it a dead connection is a 503, not a wrong answer.
-- **A row's test is named by its package** (`rpc.TestLimits`, `emit.TestLimits`), as two
-  packages have a test of one name. Not taken: names alone, as spec 12's tables have
-  none.
+  are pgxpool's, with nothing required.** A connection keeps the OIDs of the types it
+  was told of (`Tx_Known`) until it closes, so one that never closed would keep failing
+  on a type a migration made again. Not taken: a ceiling on the life; requiring
+  pgxpool's own `ShouldPing`, since without it a dead connection is a 503, not a wrong
+  answer.
 - **The pause before a rerun is held by a ceiling on reruns**: a request that conflicts
   every time reruns at most 20 times in 50 ms (575 with no pause, tried). Not taken:
   a clock handed to `InTx`, which `doc/remains.md` still lists.

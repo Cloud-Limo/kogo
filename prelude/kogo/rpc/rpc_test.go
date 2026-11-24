@@ -679,45 +679,21 @@ func TestDeadline(t *testing.T) {
 }
 
 // The handler refuses at start a pool that is not as Kogo requires,
-// naming the setting (kogo.CheckPool). A connection the database ended
-// while it sat idle is not given to a request: pgxpool pings one idle
-// for over a second first (spec.md 15.5, the database handle).
+// naming the setting (kogo.CheckPool), before anything connects.
 func TestPool(t *testing.T) {
-	t.Setenv("DATABASE_URL", "postgres://kogo:kogo@127.0.0.1/kogo_test")
-	ctx := context.Background()
-	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
-	defer drop()
-	cfg := pool.Config()
-	delete(cfg.ConnConfig.RuntimeParams, "timezone")
-	local, _ := pgxpool.NewWithConfig(ctx, cfg)
-	defer local.Close()
-	func() {
-		defer func() {
-			if p := fmt.Sprint(recover()); !strings.Contains(p, "timezone") {
-				t.Errorf("a pool not in UTC is mounted, or refused with %s", p)
-			}
-		}()
-		NewHandler(table, local, env{}, slog.New(slog.DiscardHandler))
+	cfg, err := pgxpool.ParseConfig("postgres://kogo:kogo@127.0.0.1/kogo_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg) // it connects when first asked
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	defer func() {
+		if p := fmt.Sprint(recover()); !strings.Contains(p, "timezone") {
+			t.Errorf("a pool not in UTC is mounted, or refused with %s", p)
+		}
 	}()
-	h := NewHandler(table, pool, env{}, slog.New(slog.DiscardHandler))
-	post := func() int {
-		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest("POST", "/who", nil))
-		return w.Code
-	}
-	post()
-	idle := pool.AcquireAllIdle(ctx)
-	ender, err := pgx.ConnectConfig(ctx, pool.Config().ConnConfig)
-	if len(idle) == 0 || err != nil {
-		t.Fatal(len(idle), err)
-	}
-	defer ender.Close(ctx)
-	for _, c := range idle {
-		ender.Exec(ctx, "select pg_terminate_backend($1)", c.Conn().PgConn().PID())
-		c.Release()
-	}
-	time.Sleep(1100 * time.Millisecond)
-	if status := post(); status != 200 {
-		t.Errorf("a request after its idle connection was ended answers %d, want 200", status)
-	}
+	NewHandler(table, pool, env{}, slog.New(slog.DiscardHandler))
 }

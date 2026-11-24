@@ -709,6 +709,11 @@ func TestCheckPool(t *testing.T) {
 		{func(*pgxpool.Config) {}, "<nil>"},
 		{func(c *pgxpool.Config) { delete(c.ConnConfig.RuntimeParams, "timezone") }, `the pool does not set timezone to UTC`},
 		{func(c *pgxpool.Config) { c.ConnConfig.RuntimeParams["timezone"] = "Pacific/Chatham" }, `the pool does not set timezone to UTC`},
+		{func(c *pgxpool.Config) {
+			delete(c.ConnConfig.RuntimeParams, "timezone")
+			c.ConnConfig.RuntimeParams["TimeZone"] = "UTC"
+		}, "<nil>"},
+		{func(c *pgxpool.Config) { c.ConnConfig.RuntimeParams["TimeZone"] = "Pacific/Chatham" }, `the pool does not set timezone to UTC`},
 		{func(c *pgxpool.Config) { c.MaxConnLifetime = 0 }, "the pool's MaxConnLifetime is not above 0"},
 	} {
 		cfg := must(pgxpool.ParseConfig("postgres://kogo:kogo@127.0.0.1/kogo_test?timezone=UTC"))

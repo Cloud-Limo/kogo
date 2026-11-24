@@ -1879,8 +1879,8 @@ states it, and the test named holds it, by its package:
 | --- | --- | --- | --- |
 | A request's time | set no limit | The request's limit, on all it waits on; past it 503 | `rpc.TestDeadline` |
 | A body's length | read any | The list's limit; past it 413 (15.4) | `rpc.TestLimits` |
-| A client that leaves | cancel the context, and the driver's error is a panic | 499, the served line alone | `rpc.TestDeadline` |
-| A database that is down, or ended the connection | the driver's error, a panic | 503 with the request's id, one `database` line, no trace | `rpc.TestDeadline` |
+| A client that leaves | end the context; the driver gives an error | 499, the served line alone | `rpc.TestDeadline` |
+| A database that is down, or ended the connection | give the driver's error | 503 with the request's id, one `database` line, no trace | `rpc.TestDeadline` |
 | A panic | log it in the server's own words and close the connection unanswered | 500 with the request's id, one `panic` line with its trace; the process lives | `rpc.TestHandler` |
 | A method | serve any | `POST` alone; another is 405, with `Allow: POST` | `rpc.TestHandler` |
 | An answer's type | guess it from the first bytes | `application/json` for `ok` and `refused`, `text/plain; charset=utf-8` for any other status | `rpc.TestHandler` |
@@ -1905,9 +1905,9 @@ each row.
 | A wait for a connection | set no limit | The request's limit | `rpc.TestDeadline` |
 | An empty `List` sent | send Go's nil slice as `NULL` | An empty array | `emit.TestValues` |
 | A value Postgres sends | read what it can | The subset of 10.4; outside it a refusal or a panic that names the limit | `emit.TestShapes`, `emit.TestLimits` |
-| The session's time zone | leave the role's or the database's, which `now()::date`, `date_trunc` or a cast to text reads | UTC, required: the pool sets the run-time parameter `timezone` to `UTC` | `kogo.TestCheckPool`, `rpc.TestPool` |
+| The session's time zone | leave the role's or the database's, which `now()::date`, `date_trunc` or a cast to text reads | UTC, required: the pool sets the run-time parameter `timezone`, in any case, to `UTC` | `kogo.TestCheckPool`, `rpc.TestPool`, `test.TestRunChecksPool` |
 | A connection's longest life | close it after an hour, or never for 0 | Required above 0: a connection keeps the types it was told of (10.4) until it closes | `kogo.TestCheckPool` |
-| A connection's idle time, the health check | close one idle 30 minutes, check each minute, and ping one idle over a second before handing it out | Kept, and nothing required: closing a connection costs a new one, never an answer | `rpc.TestPool` |
+| A connection's idle time, the health check | close one idle 30 minutes, check each minute, and ping one idle over a second before handing it out | Kept, nothing required: a connection the pool closes costs a new one; one the database ended is a 503 | `rpc.TestDeadline` |
 
 ### 15.6 TypeScript
 

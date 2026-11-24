@@ -273,9 +273,8 @@ func double(t check.Type) check.Type {
 // values is compared by rt's walk: Go compares a pointer by its
 // address, and slices not at all.
 func (e *emitter) equals(a string, at check.Type, y syntax.Expr) string {
-	_, null := at.(*check.Nullable)
-	if l, ok := y.(*syntax.Literal); ok && l.Kind == "Null" && null {
-		return "(" + a + " == nil)"
+	if l, ok := y.(*syntax.Literal); ok && l.Kind == "Null" {
+		return e.isNull(a, at)
 	}
 	b, bt := e.expr(y), e.info.Types[y]
 	switch {
@@ -286,6 +285,16 @@ func (e *emitter) equals(a string, at check.Type, y syntax.Expr) string {
 		return e.rt() + ".EqualDouble(" + e.convert(a, at, opt) + ", " + e.convert(b, bt, opt) + ")"
 	}
 	return e.rt() + ".Equal(" + a + ", " + b + ")"
+}
+
+// isNull gives the test that code, of the type t, is null: a T? is
+// nil, and a bare T, which may stand for a nullable type, is asked as
+// it is compared with null.
+func (e *emitter) isNull(code string, t check.Type) string {
+	if _, ok := t.(*check.Nullable); ok {
+		return "(" + code + " == nil)"
+	}
+	return e.rt() + ".Equal(" + code + ", (*" + e.rt() + ".Nothing)(nil))"
 }
 
 // is gives the test that code, of the type t, is the variant v.

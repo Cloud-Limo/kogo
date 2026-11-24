@@ -142,3 +142,14 @@ create function rename_all() returns void language sql as $$ update person set n
 -- A cast the schema defines, whose function can return null.
 create function amount_of(text) returns amount language sql as $$ select null::amount $$;
 create cast (text as amount) with function amount_of(text);
+
+-- Two columns of one type, which a test moves in its own schema to
+-- see that a read takes each by its name.
+create table account (
+    id int primary key,
+    owner text not null,
+    payee text not null
+);
+
+-- Rows enough for a parallel plan, their keys out of their order.
+create table ranked as select n as id, n * 7919 % 5003 as k from generate_series(1, 5000) n;

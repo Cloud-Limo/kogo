@@ -108,11 +108,20 @@ func emitAll(info *check.Info, prelude, program []*syntax.File, root, outDir str
 		}
 		out[dir+"/kogo.go"] = []byte(head.String() + "\n" + body)
 	}
-	// A T? whose T is itself nullable would be two pointers in Go.
+	// A T? whose T is itself nullable would be two pointers in Go. A
+	// T given to a fun that uses its own as T? is used so.
+	for changed := true; changed; {
+		changed = false
+		for _, f := range e.flows {
+			if e.nullable[f[1]] && !e.nullable[f[0]] {
+				e.nullable[f[0]], changed = true, true
+			}
+		}
+	}
 	for _, i := range e.insts {
 		if e.nullable[i.param] {
 			e.file = i.file
-			e.refuse(i.at, "not-yet-emitted", "a nullable type argument for %s, which is used as %s? where it is declared, is not emitted yet: pass a type that is not nullable, and keep the null outside", i.param.Name, i.param.Name)
+			e.refuse(i.at, "not-yet-emitted", "a nullable type argument for %s, which is used as %s? in %s or a fun it calls, is not emitted yet: pass %s a type that is not nullable, and keep the null outside, as mapNotNull { it } or ?: does", i.param.Name, i.param.Name, i.name, i.name)
 		}
 	}
 	if len(e.errs) > 0 {
@@ -137,6 +146,7 @@ type emitter struct {
 	bound    map[string]bool           // the Kogo packages that Go implements: the prelude's
 	chained  map[*check.TypeDecl]bool  // the data classes that get a chain: see chains
 	nullable map[*check.TypeParam]bool // the type parameters used as T?
+	flows    [][2]*check.TypeParam     // a type parameter, and one it is given as a type argument for
 	scanned  map[*check.Func]bool      // the funs whose signatures are read for that
 	either   *check.TypeDecl           // the core's Either
 	insts    []inst
@@ -171,6 +181,7 @@ type raise struct {
 // stands for.
 type inst struct {
 	param *check.TypeParam
+	name  string // the fun or type that declares it
 	file  *syntax.File
 	at    syntax.Node
 }

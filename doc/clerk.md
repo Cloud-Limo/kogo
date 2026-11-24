@@ -35,7 +35,7 @@ last line>`, then the command and its last lines. Anyone may say
 "Clerk DEV-NNN" by hand.
 
 You start runs, async or local, check, merge and tidy. You write no
-code and make no commit but the merge of `main` into a Kogo PR that
+code and make no commit but the merge of the base into a PR that
 Merging gives, you run no Pickup, Code review or Fix yourself, and you
 make no choice a step left open: that goes to the lead. Write every
 file a command reads (`clerk.md`, `brief.md`, the `Merged:` note)

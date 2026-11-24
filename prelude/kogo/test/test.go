@@ -107,8 +107,10 @@ type Failure struct {
 // fails, as does a list that kogo test named in KOGO_TEST_LISTS and
 // the test main does not link. It gives how many tests and lists
 // failed, which the application's test main makes its exit status: 1
-// for any.
+// for any. It panics on a pool the handler would refuse
+// (kogo.CheckPool), so that tests run as the program does.
 func Run(ctx context.Context, pool *pgxpool.Pool, out io.Writer, envs ...any) (failed int) {
+	kogo.CheckPool(pool)
 	enc := json.NewEncoder(out)
 	enc.SetEscapeHTML(false)
 	linked := map[string]bool{}

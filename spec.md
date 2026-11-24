@@ -1879,6 +1879,64 @@ application chooses.
   no bug: neither it nor a database that is down is answered or
   logged as a panic.
 
+**Nothing a caller can cause by what it sends is a panic.** A panic
+is a bug of Kogo's or of the program's: it is answered 500 and logged
+with its trace, so one a caller could cause at will would fill the
+log and bury the real faults. What a caller can send wrongly is
+answered so:
+
+- a body that does not read as the input, a `String` that holds
+  U+0000 among it (15.4): the reader's 400; one past the limit, 413;
+- a header the program reads that is not UTF-8: 400;
+- a name no operation has: 404; another method than `POST`: 405;
+- no session, a forged or stale cookie, an Origin or a token missing
+  or wrong, a header the list needs missing or naming nothing (a
+  storefront there is none of): the check's 403 with its words, or
+  a gate's refusal;
+- anything else wrong in an input that reads, as an id no row has:
+  the operation's refusal in words.
+
+An operation, a gate or a check that panics on what a caller sent,
+as `querySingle` does on an id the caller chose, has a bug: it
+refuses instead, with `ensure` or `?: raise`.
+
+Where Go's `net/http` would decide, the handler (`prelude/kogo/rpc`)
+states it, and the test named holds it, by its package:
+
+| What | Go would | Kogo states | Test |
+| --- | --- | --- | --- |
+| A request's time | set no limit | The request's limit, on all it waits on; past it 503 | `rpc.TestDeadline` |
+| A body's length | read any | The list's limit; past it 413 (15.4) | `rpc.TestLimits` |
+| A client that leaves | end the context; the driver gives an error | 499, the served line alone | `rpc.TestDeadline` |
+| A database that is down, or ended the connection | give the driver's error | 503 with the request's id, one `database` line, no trace | `rpc.TestDeadline` |
+| A panic | log it in the server's own words and close the connection unanswered | 500 with the request's id, one `panic` line with its trace; the process lives | `rpc.TestHandler` |
+| A method | serve any | `POST` alone; another is 405, with `Allow: POST` | `rpc.TestHandler` |
+| An answer's type | guess it from the first bytes | `application/json` for `ok` and `refused`, `text/plain; charset=utf-8` for any other status | `rpc.TestHandler` |
+| Reading the input | match a key in any case, take a duplicate, skip an unknown key, read a number as a `float64` | The strict reader of 15.4: 400 | `rpc.TestStrict`, `rpc.TestHandler` |
+| Writing a string | escape `<`, `>`, `&`, U+2028 and U+2029 | As Kotlin writes it (15.4) | `rpc.TestQuote` |
+| A header's value | give its bytes | One the program reads that is not UTF-8 is 400, naming the header | `rpc.TestLimits` |
+| `Host` | keep it out of the headers | `request.header("Host")` gives it | `rpc.TestHandler` |
+| A cookie | drop one HTTP cannot carry, with a line in its own log; write no `Max-Age` for 0 | A panic, as for one a browser drops; `maxAgeSeconds` of 0 or less ends the cookie, `Max-Age=0` | `rpc.TestHandler`, `cmd/kogo.TestEmittedGoRuns` |
+
+Where the driver, pgx, or its pool would decide, the database handle
+(`prelude/kogo/db.go`) states it, or requires it of the pool, which
+the application makes and hands over. `NewHandler`, `NewCalls` and
+`test.Run` check the pool, and one that fails a requirement stops
+the start with a panic that names the setting. The test named holds
+each row.
+
+| What | pgx would | Kogo states | Test |
+| --- | --- | --- | --- |
+| The isolation | take the database's default | SERIALIZABLE or READ COMMITTED as 15.3 says; SERIALIZABLE for a test (16.2) | `rpc.TestHandler`, `kogo.TestRolledBackIsSerializable` |
+| A conflict | give the error | A rerun as 15.3 says; `db.tx` at READ COMMITTED runs once | `rpc.TestHandler`, `kogo.TestPlainTxRunsOnce` |
+| The pause before a rerun | have none | Random, to 5 ms after the first conflict and 5 ms more after each, to 50; the request's limit ends it | `rpc.TestHandler` |
+| A wait for a connection | set no limit | The request's limit | `rpc.TestDeadline` |
+| An empty `List` sent | send Go's nil slice as `NULL` | An empty array | `emit.TestValues` |
+| A value Postgres sends | read what it can | The subset of 10.4; outside it a refusal or a panic that names the limit | `emit.TestShapes`, `emit.TestLimits` |
+| The session's time zone | leave the role's or the database's, which `now()::date`, `date_trunc` or a cast to text reads | UTC, required: the pool sets the run-time parameter `timezone`, in any case, to `UTC` | `kogo.TestCheckPool`, `rpc.TestPool`, `test.TestRunChecksPool` |
+| A connection's longest life | close it after an hour, or never for 0 | Required above 0: a connection keeps the types it was told of (10.4) until it closes | `kogo.TestCheckPool` |
+| A connection's idle time, the health check | close one idle 30 minutes, check each minute, and ping one idle over a second before handing it out | Kept, nothing required: a connection the pool closes costs a new one; one the database ended is a 503 | `rpc.TestDeadline` |
+
 ### 15.6 TypeScript
 
 `kogo ts <dir> <out>` checks the program as `kogo check` does and,

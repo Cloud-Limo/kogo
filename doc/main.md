@@ -240,6 +240,7 @@ func open(ctx context.Context, c Config) (*pgxpool.Pool, error) {
 	}
 	pc.ConnConfig.User, pc.ConnConfig.Password = c.DbConfig.User, c.DbConfig.Password
 	pc.MaxConns = c.DbConfig.MaximumPoolSize
+	pc.ConnConfig.RuntimeParams["timezone"] = "UTC" // the handler requires it (spec.md 15.5)
 	pool, err := pgxpool.NewWithConfig(ctx, pc)
 	if err == nil {
 		err = pool.Ping(ctx) // a database that is down fails the start, not the first request
@@ -394,7 +395,8 @@ days after a deploy). **Never** means no test sees it.
 | | | | no limit on an answer's length, or on a call's time | start: `khttp.New` requires `MaxAnswer` (Q2) and `Timeout` |
 | [2] the environment | 3 | a handle: a step | a step left out, misplaced or misnamed | build (Q13) |
 | | | | `app.Env{}` in place of the chain | never: it compiles. A reviewer holds `main` to the chain; nothing checks it |
-| [3] the pool | 13 | nothing | a URL pgx cannot read; a database that is down | start (`Ping`) |
+| [3] the pool | 14 | nothing | a URL pgx cannot read; a database that is down | start (`Ping`) |
+| | | | no `timezone` of `UTC`, or a `MaxConnLifetime` of 0 | start: `rpc.NewHandler` names the setting (spec 15.5) |
 | [4] the lists at their paths | 10 | a list: ⅓ | a path that does not match nginx's or the TypeScript client's | use: 404 |
 | | | | a list left out | use: 404; nothing else, since a list's TypeScript still compiles |
 | [4] Origin and CSRF | 0 | nothing: the check is the list's, in Kogo | a list that names no check mounted | build (Q4) |

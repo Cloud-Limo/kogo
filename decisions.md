@@ -4930,6 +4930,37 @@ again (spec 10). It supersedes DEV-1194's entries on the `offset 0` layer and th
   in `kogo.time`, about 110 code / 150 tests, which make Go's a third copy of the rules
   beside the JVM's and Postgres's. Reopen if a port has no database beside it.
 
+## The tables of the handler and the database handle (DEV-1155), 24 Nov 2026
+
+DEV-1148's sitting, piece 2, moved the rule on Go's defaults to `doc/design.md` and asked
+for the two tables in spec 15.5; the new rows were the agent's to choose.
+
+- **Kogo requires of the pool, and sets nothing on it**: the lead's ruling on DEV-1138
+  (24 Nov 2026) that the pool is the application's to make. `kogo.CheckPool` panics,
+  naming the setting, and `NewHandler`, `NewCalls` and `test.Run` call it at start, so
+  a test runs on a pool the server would take. Not taken: the prelude setting what it
+  requires on the pool it is handed, which changes what the application made.
+- **The session's time zone is required to be UTC, read from the pool's config**: every
+  key that is `timezone` in any case, as Postgres reads it, must be `UTC`, so a role's
+  or a database's default does not meet it. Not taken: any zone, so long as one is
+  stated; asking a connection at start, which tells nothing of the pool's next one.
+- **A connection's longest life is required above 0; its idle time and the health check
+  are pgxpool's, with nothing required.** A connection keeps the OIDs of the types it
+  was told of (`Tx_Known`) until it closes, so one that never closed would keep failing
+  on a type a migration made again. Not taken: a ceiling on the life; requiring
+  pgxpool's own `ShouldPing`, since without it a dead connection is a 503, not a wrong
+  answer.
+- **The pause before a rerun is held by a ceiling on reruns**: a request that conflicts
+  every time reruns at most 20 times in 50 ms (575 with no pause, tried). Not taken:
+  a clock handed to `InTx`, which `doc/remains.md` still lists.
+- **`doc/remains.md` keeps the half of its line on the clock**: the handler still reads
+  the system clock for its limit and the pause, and nothing here changes that.
+- **The test database's default zone is `Pacific/Chatham`, not UTC** (`mise run testdb`;
+  the Ruling on PR 174): a test that leans on the server's zone then fails on every
+  machine, not only on one whose zone differs, and a non-whole-hour offset shows in any
+  time's text. A test that reads times asks its session for UTC, as `testURL()` does.
+  Not taken: UTC, which hides such a test until it meets another server.
+
 ## decisions.md merges as a union (DEV-1200), 24 Nov 2026
 
 - **`decisions.md merge=union`**, and no other file (Greg): git reads it from the branch

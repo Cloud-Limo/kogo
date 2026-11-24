@@ -34,6 +34,29 @@ type Db struct {
 // the request that the Db serves.
 func NewDb(ctx context.Context, pool *pgxpool.Pool) Db { return Db{ctx, pool} }
 
+// CheckPool panics, naming the setting, where pool is not as Kogo
+// requires of the pool an application makes and hands over (spec.md
+// 15.5, the database handle): every connection in UTC, and each
+// closed past a longest life. The handler and the test runner check
+// it at start.
+func CheckPool(pool *pgxpool.Pool) {
+	c := pool.Config()
+	utc := false // Postgres reads the key in any case, pgx keeps it as written
+	for k, v := range c.ConnConfig.RuntimeParams {
+		if strings.EqualFold(k, "timezone") {
+			utc = strings.EqualFold(v, "UTC")
+			if !utc {
+				break
+			}
+		}
+	}
+	if !utc {
+		panic(`the pool does not set timezone to UTC, which Kogo requires: set ConnConfig.RuntimeParams["timezone"] = "UTC", and no other key that is timezone in another case (spec.md 15.5)`)
+	} else if c.MaxConnLifetime <= 0 {
+		panic("the pool's MaxConnLifetime is not above 0, so a connection lives for ever: leave pgxpool's hour or set another (spec.md 15.5)")
+	}
+}
+
 // A Tx is an open transaction.
 type Tx struct {
 	ctx context.Context

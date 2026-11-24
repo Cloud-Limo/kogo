@@ -1,6 +1,7 @@
 package emit
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
@@ -140,11 +141,15 @@ fun amountNull(db: Db): String? = db.tx { tx -> back(tx, tx.querySingle<Held>(sq
 fun amountDomain(db: Db): String? = db.tx { tx -> back(tx, tx.querySingle<Held>(sql"select (null, 'NZD')::d_amount as v").v) }
 `
 
+// The session is in UTC, as the emitted program's pool is (spec.md
+// 15.5), so the text Postgres makes of a timestamptz is the same on
+// both sides whatever the server's default zone.
 func testURL() string {
-	if url := os.Getenv("KOGO_TEST_DATABASE_URL"); url != "" {
-		return url
+	url := cmp.Or(os.Getenv("KOGO_TEST_DATABASE_URL"), "postgres://kogo:kogo@127.0.0.1/kogo_test")
+	if !strings.Contains(url, "://") {
+		return url + " timezone=UTC"
 	}
-	return "postgres://kogo:kogo@127.0.0.1/kogo_test"
+	return url + map[bool]string{true: "&", false: "?"}[strings.Contains(url, "?")] + "timezone=UTC"
 }
 
 func calls(cases [][2]string) (calls []string) {

@@ -315,6 +315,7 @@ func TestHandler(t *testing.T) {
 	for _, c := range []struct{ method, name, body, key, want string }{
 		{"GET", "add", ``, "Allow", "POST"},
 		{"POST", "add", `{"name":"refused"}`, "Content-Type", "application/json"},
+		{"POST", "who", ``, "Content-Type", "application/json"},
 		{"POST", "add", `check forged`, "Content-Type", "text/plain; charset=utf-8"},
 	} {
 		if post(c.method, c.name, c.body); header.Get(c.key) != c.want {
@@ -415,10 +416,14 @@ func TestHandler(t *testing.T) {
 	if len(readOnly) != 4 || !readOnly["INSERT"] || !readOnly["UPDATE"] || !readOnly["SELECT"] || !readOnly["nextval()"] {
 		t.Errorf("a check that writes, or a gate that writes, locks or counts, is not refused by Postgres: %v", readOnly)
 	}
-	if len(ids) != 47 || strings.Contains(log.String(), "secret") {
+	if len(ids) != 48 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
-	if reruns["race ok"] < 1 || reruns["heldRace ok"] < 1 || reruns["deadlocked 503"] < 1 || reruns["deadlockedPlain 503"] < 1 || reruns["add ok"] != 0 {
+	// Each rerun pauses first, so a request that conflicts every time
+	// reruns a few times in 50 ms, where with no pause it reruns
+	// hundreds.
+	if reruns["race ok"] < 1 || reruns["heldRace ok"] < 1 || reruns["deadlocked 503"] < 1 || reruns["deadlockedPlain 503"] < 1 || reruns["add ok"] != 0 ||
+		reruns["deadlocked 503"] > 20 || reruns["deadlockedPlain 503"] > 20 {
 		t.Errorf("reruns are counted as %v", reruns)
 	}
 }
@@ -675,4 +680,24 @@ func TestDeadline(t *testing.T) {
 	if got, want := strings.Join(got, ","), "served waits 499,ERROR database cut false,ERROR database crashed false,ERROR database who false"; got != want {
 		t.Errorf("the log is %s, want %s:\n%s", got, want, log.String())
 	}
+}
+
+// The handler refuses at start a pool that is not as Kogo requires,
+// naming the setting (kogo.CheckPool), before anything connects.
+func TestPool(t *testing.T) {
+	cfg, err := pgxpool.ParseConfig("postgres://kogo:kogo@127.0.0.1/kogo_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg) // it connects when first asked
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	defer func() {
+		if p := fmt.Sprint(recover()); !strings.Contains(p, "timezone") {
+			t.Errorf("a pool not in UTC is mounted, or refused with %s", p)
+		}
+	}()
+	NewHandler(table, pool, env{}, slog.New(slog.DiscardHandler))
 }

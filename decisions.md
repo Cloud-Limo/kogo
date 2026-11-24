@@ -3653,8 +3653,8 @@ Each entry: what was decided, why, and what would reopen it.
   13): a kept connection now idles until the service closes it, and a TLS handshake
   is bounded by the handle's `Timeout` alone.
 - **`Json` is its text**, read again at each call, so `raw()` is untouched and a value
-  of it prints as its text, and compares by it since DEV-1205. Not taken: a parsed tree, which is faster on an
-  answer read many times and loses the text.
+  of it prints as its text, and compares by it since DEV-1205. Not taken: a parsed
+  tree, which is faster on an answer read many times and loses the text.
 - **Section 13's sample binding is `Http.ask` and `perform`**, in place of an invented
   `Http.get` in a Go package `httpx`, which the real `Http` would contradict. The sample
   no longer shows `@go`; its bullet stays.
@@ -4987,12 +4987,12 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   `Http`, `Console`, `Clock`, `Request`, `Test`, `Raise`, and `Regex`, whose pattern is
   now unexported): Kotlin compares each by identity, so two different ones were quietly
   equal. A type with no fields (`Unit`) and a data class are not such a type. Not taken:
-  comparing unexported fields, which reaches pools, clients and functions. Reopens if
-  `kogo check` refuses `==` on a handle, as on a `Regex`.
+  comparing unexported fields, which reaches pools, clients and functions. It stays for
+  where check is blind, a `contains` or a `Set`'s keys.
 - **`==` and `!=` on a `Regex`, or on a value whose type holds one, are refused
   (`regex-equality`)**, by the lead's ruling, as a `ByteArray` is and through the same
   walk of the types, so the one inside a compared value costs nothing more. Not taken:
   keeping two of one pattern equal, which answers otherwise than Kotlin 2.4.21.
-- **`mise run kotlin` gains one case, `regexText`**: a `Regex`'s text, which is how
-  the message says to compare two. Nothing else this changes runs in Kotlin: `Json`,
-  `Field` and the handles are Kogo's own, and `Regex ==` is refused.
+- **`==` and `!=` on a handle, or on a value whose type holds one, are refused
+  (`handle-equality`)** by the same walk, by the lead's ruling on the Review. Not taken:
+  an issue of its own, three runs for six lines.

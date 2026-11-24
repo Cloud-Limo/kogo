@@ -1030,18 +1030,30 @@ func (c *checker) funcEquality(at syntax.Node, op string, x, y Type) {
 	for _, t := range []Type{x, y} {
 		where := holdsFunc(t, nil, map[*TypeDecl]bool{})
 		if where == "" {
-			// Nor is a ByteArray or a Regex, which Kotlin compares by identity.
+			// Nor is a ByteArray, a Regex or a handle, which Kotlin compares
+			// by identity; a handle's name is under kogo, after its package.
+			handle := "what it holds: compare the other properties, or what the handle answers"
 			for _, id := range [][3]string{
 				{"ByteArray", "bytes", "its bytes: compare the other properties, or what the bytes were made from"},
 				{"Regex", "regex", "its pattern: compare the patterns, as strings"},
+				{"Db", "handle", handle}, {"Tx", "handle", handle}, {"SerializableTx", "handle", handle},
+				{"Raise", "handle", handle}, {"http.Http", "handle", handle}, {"io.Console", "handle", handle},
+				{"time.Clock", "handle", handle}, {"rpc.Request", "handle", handle}, {"test.Test", "handle", handle},
 			} {
-				d := c.prelude(id[0])
+				pkg, name := "kogo", id[0]
+				if i := strings.LastIndexByte(id[0], '.'); i >= 0 {
+					pkg, name = "kogo."+id[0][:i], id[0][i+1:]
+				}
+				d := (*TypeDecl)(nil)
+				if p := c.pkgs[pkg]; p != nil {
+					d = p.types[name]
+				}
 				if where = holdsFunc(t, d, map[*TypeDecl]bool{}); where != "" {
-					held := ", and " + where + " holds a " + id[0]
+					held := ", and " + where + " holds a " + name
 					if where == "it" && named(nonNull(t)) == d {
 						held = ""
 					} else if where == "it" {
-						held = ", which holds a " + id[0]
+						held = ", which holds a " + name
 					}
 					c.errorf(at, id[1]+"-equality", "%s compares a %s%s, which Kotlin compares by identity, not by "+id[2], op, t, held)
 					return

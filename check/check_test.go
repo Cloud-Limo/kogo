@@ -574,6 +574,17 @@ func TestRegexEquality(t *testing.T) {
 	})
 }
 
+// Nor is a handle, which Kotlin compares by identity (spec.md 3).
+func TestHandleEquality(t *testing.T) {
+	env := "data class Env(val name: String, val clock: Clock)\n"
+	clock := "\n---\npackage kogo.time\nexternal class Clock"
+	passes(t, "fun f(db: Db?): Boolean = db == null")
+	refused(t, [][3]string{
+		{"fun f(a: Db, b: Db): Boolean = a ‸== b", "handle-equality", "== compares a Db, which Kotlin compares by identity, not by what it holds: compare the other properties"},
+		{"import kogo.time.Clock\n" + env + "fun f(a: Env, b: Env): Boolean = a ‸!= b" + clock, "handle-equality", "!= compares a Env, and Env's property clock holds a Clock"},
+	})
+}
+
 // Section 4: absence and narrowing.
 func TestNarrowing(t *testing.T) {
 	passes(t,

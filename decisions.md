@@ -4960,3 +4960,10 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   machine, not only on one whose zone differs, and a non-whole-hour offset shows in any
   time's text. A test that reads times asks its session for UTC, as `testURL()` does.
   Not taken: UTC, which hides such a test until it meets another server.
+
+## decisions.md merges as a union (DEV-1200), 24 Nov 2026
+
+- **`decisions.md merge=union`**, and no other file (Greg): git reads it from the branch
+  merged into, so a PR opened before this lands conflicts once more; GitHub's own merge
+  does not read it, which does not matter, since `main` is merged in the worktree.
+  Reopens if two kept versions of one rewritten entry reach `main`.

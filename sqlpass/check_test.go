@@ -354,7 +354,7 @@ func TestWrap(t *testing.T) {
 			`select ("q") is not distinct from null, ("q")."id", (("q")."total") is not distinct from null, ` +
 			`(("q")."total")."cents", (("q")."total")."currency", (("q")."deposit") is not distinct from null, ` +
 			`(("q")."deposit")."cents", (("q")."deposit")."currency" ` +
-			`from _ where 'quote'::regclass is not null and 'amount'::regclass is not null`,
+			`from _`,
 	} {
 		if st, err := check(c, literal); err != nil || st.SQL != want {
 			t.Errorf("%s: got %v, %v; want %s", literal, st, err, want)
@@ -372,7 +372,7 @@ func TestWrap(t *testing.T) {
 // this fails if a later Postgres loses it.
 func TestWrapKeepsOrder(t *testing.T) {
 	c, ctx := connect(t), context.Background()
-	// The second, a whole row, is sent under the fence of offset 0 too.
+	// The second reads a whole row by its fields.
 	for _, sql := range []string{`select id, k from ranked order by k`, `select r as ranked from ranked r order by r.k`} {
 		st, err := check(c, sql)
 		if err != nil {

@@ -4,3 +4,8 @@ gitleaks = "8.30.1"
 go = "1.27.4"
 java = "temurin-21.0.12.1+1.0.LTS"
 kotlin = { version = "2.4.21", asset_pattern = "kotlin-compiler-*.zip", bin_path = "kotlinc/bin" }
+
+# The tests' database: kogo_test_NNN in a worktree kogo-dev-NNN, else
+# kogo_test. mise-tasks/testdb takes the name from here.
+[env]
+KOGO_TEST_DATABASE_URL = 'postgres://kogo:kogo@127.0.0.1/kogo_test{% set dir = config_root | basename %}{% if dir is matching(pat="^kogo-dev-[0-9]+$") %}_{{ dir | trim_start_matches(pat="kogo-dev-") }}{% endif %}'

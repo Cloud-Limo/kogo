@@ -5,6 +5,7 @@ package rpc
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	khttp "github.com/Cloud-Limo/kogo/prelude/kogo/http"
 	"github.com/Cloud-Limo/kogo/rt"
 )
 
@@ -344,10 +346,15 @@ func newServer[Env any](check func(kogo.Tx, Env, Request) kogo.Either[string, rt
 // ServeHTTP gives each request an id, before any rerun, and logs one
 // line for it with its outcome, its reruns and its time, one more
 // for a database that is down or cut off, with the driver's error,
-// and one for a panic, with its message and trace. It logs no input,
-// answer or refusal.
+// or for a service that did not answer (khttp.Watch), and one for a
+// panic, with its message and trace. It logs no input, answer or
+// refusal.
 func (h *Handler[Env]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimPrefix(r.URL.Path, "/")
+	// The body is read whole first, whatever the operation, since Go
+	// watches for a client that leaves only once it is: one that left
+	// during the check or a Unit operation is then 499 at once.
+	body, readErr := io.ReadAll(http.MaxBytesReader(w, r.Body, h.MaxBody))
 	res := h.run(r, name, func(op Operation[Env]) (any, result) {
 		input := reflect.ValueOf(rt.Unit{})
 		if r.Method != http.MethodPost {
@@ -356,7 +363,7 @@ func (h *Handler[Env]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else if op.input != input.Type() {
 			var err error
 			var tooLarge *http.MaxBytesError
-			if input, err = h.read.readBody(op.input, http.MaxBytesReader(w, r.Body, h.MaxBody)); errors.As(err, &tooLarge) {
+			if input, err = h.read.readBody(op.input, io.MultiReader(bytes.NewReader(body), errReader{readErr})); errors.As(err, &tooLarge) {
 				return nil, result{status: http.StatusRequestEntityTooLarge, text: fmt.Sprintf("%s: the input is past %d bytes", name, tooLarge.Limit)}
 			} else if err != nil {
 				return nil, result{status: http.StatusBadRequest, text: name + ": " + err.Error()}
@@ -380,6 +387,11 @@ func (h *Handler[Env]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write(res.answer.body)
 	}
 }
+
+// An errReader gives the error that ended the body's read, or io.EOF.
+type errReader struct{ err error }
+
+func (e errReader) Read([]byte) (int, error) { return 0, cmp.Or(e.err, io.EOF) }
 
 // statusLeft is the status of a request whose client left before it
 // was answered, which nobody reads: nginx's, so that its log and the
@@ -417,8 +429,10 @@ func (h *server[Env]) run(r *http.Request, name string, input func(Operation[Env
 	defer cancel()
 	r = r.WithContext(ctx)
 	ranOut := false
+	unanswered := khttp.Watch()
 	defer func() {
 		p := recover()
+		service, noAnswer := unanswered(p)
 		err, _ := p.(error)
 		var pg *pgconn.PgError
 		code := ""
@@ -437,6 +451,9 @@ func (h *server[Env]) run(r *http.Request, name string, input func(Operation[Env
 		case code == "57014" || strings.HasPrefix(code, "57P") || strings.HasPrefix(code, "08") || errors.Is(err, pgconn.ErrConnClosed) ||
 			errors.As(err, new(*pgconn.ConnectError)) || errors.As(err, new(net.Error)) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF):
 			log.Error("database", "error", err.Error())
+			res = result{status: http.StatusServiceUnavailable, text: "request " + id}
+		case noAnswer:
+			log.Error("service", "service", service.Service, "error", service.Why)
 			res = result{status: http.StatusServiceUnavailable, text: "request " + id}
 		default:
 			log.Error("panic", "message", fmt.Sprint(p), "trace", string(debug.Stack()))
@@ -522,7 +539,7 @@ func (f Failed) Error() string { return fmt.Sprintf("%d %s", f.Status, f.Text) }
 // String holding U+0000 or a header that is not UTF-8,
 // 404 for an operation not of the list, 499 where r's client left,
 // 500 with the request's id for a panic, 503 with it past the limit
-// or where the database is down.
+// or where the database or a service is down.
 func Call[Env, I, A any](c *Calls[Env], r *http.Request, op Op[Env, I, A], input I) (A, error) {
 	res := c.run(r, op.name, func(Operation[Env]) (any, result) {
 		if err := c.read.valid(reflect.ValueOf(&input).Elem(), "input"); err != nil {

@@ -61,7 +61,8 @@ DATABASE_URL=postgres://kogo:kogo@127.0.0.1/kogo_test bin/kogo-sql check example
 
 `kogo-sql check` prints each `sql"""` literal's signature, or its error, as one JSON
 object a line. It needs Postgres 18. `mise run testdb` creates the database the
-tests use; a test that runs statements does so in a schema of its own there.
+tests use, `kogo_test_NNN` in a directory `kogo-dev-NNN`, else `kogo_test`; a
+test that runs statements does so in a schema of its own there.
 
 Copyright 2026 Gregory Tod. Licensed under the Apache License,
 Version 2.0, as Kotlin is: see `LICENSE`.

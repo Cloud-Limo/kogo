@@ -51,7 +51,9 @@ constraints) is worth typing.
    promise where a truthful one exists (`String?`, `List<T?>`), unless
    the author asserts it with `"name!"`, and Kogo panics naming the
    limit only where no truthful type exists (an interval with months,
-   `infinity`, `24:00`). `spec.md` 10.4 lists the limits.
+   `infinity`, `24:00`). `spec.md` 10.4 lists the limits, and the one
+   exception to that line: a column a second outer join nulls, in a
+   nullable nested data class.
 5. **Go is a backend, not a source language.** Nobody reads the emitted
    Go, but line directives map it back to the source, written at the
    start of each line: `/*line ../../src/a.kg:26*/`, padded so that
@@ -122,7 +124,8 @@ asking Postgres to prepare it.
    arrays through the catalog.
 5. Decide nullability by section 10.5: non-null only for a plain
    reference to a `NOT NULL` column not on the nullable side of an outer
-   join, which the pass tells apart from one nullable in its table
+   join, which the pass tells apart from one that may be null where the
+   join finds a row
    (the class that holds it is absent where it is null); `as "name!"`
    and `as "name?"` override.
 6. Hand the signature to the checker, whose facts the emitter writes

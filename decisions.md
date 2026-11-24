@@ -2082,8 +2082,8 @@ Each entry: what was decided, why, and what would reopen it.
   `legal_name`, compared exactly; a quoted mixed-case alias fills nothing. Of two columns
   with one name, the second fills nothing and is reported.
 - **Inside a nullable nested data class, a column null only through its outer join fills
-  a property that may not be null** (spec 10.3), and one nullable in its table fills only
-  a `T?`. Corrected by Greg's ruling of 24 Nov 2026 (DEV-1198, built in DEV-1208): this
+  a property that may not be null** (spec 10.3), and any other column that may be null
+  fills only a `T?`. Corrected by Greg's ruling of 24 Nov 2026 (DEV-1198, built in DEV-1208): this
   first said any column that may be null filled such a property, and accepted the hole
   of a row where only some of them are null.
 - **An enum maps by its set of constants**, in any order, whatever either side calls the
@@ -4876,3 +4876,13 @@ override are corrected in place above.
 - **The line**, spec 10.4 and `doc/design.md` principle 4: `kogo check` refuses a type
   Postgres does not promise where a truthful one exists, unless the author asserts it
   with `"name!"`, and panics naming the limit only where none does.
+- **The one exception to the line: a column a second outer join nulls**, in a nullable
+  nested data class, fills a property that may not be null and panics, naming the column,
+  where the class's join finds a row and the second none (the lead's ruling on the Code
+  review, 24 Nov 2026; spec 10.4 lists it). The pass's `Joined` says null through some
+  outer join, not through the class's. Not taken here: carrying the joins that null each
+  column and refusing a class whose columns differ in them, which is new analysis in the
+  SQL pass and its own issue. That refusal ends this exception.
+- **`as "name?"` clears `Joined`** (the Code review's fix): the author's "may be null" is
+  not the join's, so such a column neither fills a property that may not be null in a
+  nullable class nor tells the class's absence.

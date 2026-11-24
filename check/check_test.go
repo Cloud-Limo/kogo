@@ -959,16 +959,16 @@ external class Instant`,
 		{"fun f(tx: Tx): List<String> = tx.querySingle<List<String>>(‸sql\" -> tags: List<String>\")", "sql-nullable",
 			"column tags is an array, whose elements Postgres never promises are not null, and fills the result, a List<String>: make that a List<String?>, and drop the nulls with filterNotNull() or refuse them with requireNotNull"},
 		{"data class Row(val tags: List<String>?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> tags: List<String>?\")", "sql-nullable",
-			"column tags is an array, whose elements Postgres never promises are not null, and fills Row.tags, a List<String>?: make that a List<String?>"},
+			"column tags is an array, whose elements Postgres never promises are not null, and fills Row.tags, a List<String>?: make that a List<String?>?,"},
 		{"data class T(val id: Uuid, val tags: List<Long>)\ndata class Row(val t: T?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> t_id: Uuid??, t_tags: List<Long>??\")", "sql-nullable",
 			"column t_tags is an array, whose elements Postgres never promises are not null, and fills T.tags, a List<Long>: make that a List<Long?>"},
 		{"data class S(val tags: List<String>?)\ndata class Row(val s: S)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> s: tag_set(tags: List<String>?)\")", "sql-nullable",
-			"field tags of column s is an array, whose elements Postgres never promises are not null, and fills S.tags, a List<String>?: make that a List<String?>"},
+			"field tags of column s is an array, whose elements Postgres never promises are not null, and fills S.tags, a List<String>?: make that a List<String?>?,"},
 		// Inside a nullable data class, a column null in its table fills
 		// only a T?, and the class needs a column null only through the
 		// join in a property that is not nullable.
 		{"data class T(val id: Uuid, val slug: String)\ndata class Row(val tenant: T?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> tenant_id: Uuid??, tenant_slug: String?\")", "sql-nullable",
-			`column tenant_slug may be null in its table, and fills T.slug, a String, in a nullable data class that is null where its outer join finds no row: make that a String?, or if the column is never null, name it as "tenant_slug!"`},
+			`column tenant_slug may be null even where its outer join finds a row, and fills T.slug, a String, in a nullable data class that is null where that join finds none: make that a String?, or if the column is never null, name it as "tenant_slug!"`},
 		{"data class T(val id: Uuid?, val abn: String?)\ndata class Row(val tenant: T?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> tenant_id: Uuid??, tenant_abn: String?\")", "sql-absent",
 			"Row.tenant, a T?, has no property that is not nullable filled by a column null only through an outer join, so a row of nulls would read as no T: " +
 				"select a NOT NULL column of the joined table for one, as in t.id as tenant_id, or the table's whole row, as in select t as tenant"},

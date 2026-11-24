@@ -197,9 +197,10 @@ func TestJoined(t *testing.T) {
 		`select b.id, t.id as tenant_id, c.abn, coalesce(t.slug::text, '') as slug, t as tenant, o.n
 			from business b left join tenant t on t.business_id = b.id left join business c on c.id = b.id
 			left join (select business_id, count(*) as n from tenant group by business_id) o on o.business_id = b.id`: "tenant_id tenant n",
-		`select legal_name from business group by rollup (legal_name)`:                                "",
-		`insert into person (id, name, email) values ($id, $name, $email) returning old.id as old_id`: "",
-		`select g.person_id from business b full join admin_grant g on g.business_id = b.id`:          "person_id",
+		`select t.id as "tenant_id?", t.id as tid from business b left join tenant t on t.business_id = b.id`: "tid",
+		`select legal_name from business group by rollup (legal_name)`:                                        "",
+		`insert into person (id, name, email) values ($id, $name, $email) returning old.id as old_id`:         "",
+		`select g.person_id from business b full join admin_grant g on g.business_id = b.id`:                  "person_id",
 	} {
 		st, err := check(c, literal)
 		if err != nil {

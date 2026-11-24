@@ -781,8 +781,8 @@ column.
   A nullable nested data class, on the absent side of an outer join, is
   told by its columns that are null only through the join: a `NOT NULL`
   column of the joined table, or its whole row. Such a column fills a
-  property of it that may not be null; a column that may be null in its
-  table fills only a `T?` there, as a field of a whole row does (10.5).
+  property of it that may not be null; any other column that may be
+  null fills only a `T?` there, as a field of a whole row does (10.5).
   The class must have at least one property that is not nullable filled
   by such a column, in itself or in a data class it holds that is not
   nullable, and `kogo check` refuses one that has none: select one, as
@@ -879,7 +879,8 @@ panic that names the limit (section 8). It never gives another value.
 `kogo check` refuses a type Postgres does not promise where a truthful
 one exists (`String?`, `List<T?>`), unless the author asserts it with
 `"name!"` (10.5), and Kogo panics naming the limit only where no
-truthful type exists. The limits, with those above:
+truthful type exists, with one exception, the last limit below. The
+limits, with those above:
 
 - A type that is not in the table, an array of a composite type or of a
   domain over an array, a `record`, an enum with a label no constant
@@ -902,6 +903,11 @@ truthful type exists. The limits, with those above:
 - A count of more than 2,147,483,647 rows from `tx.execute`, whose
   result is an `Int`: a panic once the statement has run, which rolls
   the transaction back.
+- In a nullable nested data class, a column that a second outer join
+  can null, where the class's own join finds a row: it fills a property
+  that may not be null, and a null there is a panic when it is read
+  that names the column. `kogo check` does not yet tell one outer join
+  from another; this is the one exception to the line above.
 
 An array of a domain, and a domain over an array, are read as the array
 of the base type is.

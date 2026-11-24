@@ -200,7 +200,7 @@ func dataClass(t Type) *Named {
 // lead to d from R. Inside a nullable data class, absent, a column
 // null only through an outer join fills a property that may not be
 // null, since the class is null where those columns are; one that
-// may be null in its table does not. A nullable data class needs a
+// may be null even where the join finds a row does not. A nullable data class needs a
 // property that is not nullable filled by such a column, which joined
 // says d has, in itself or in a data class it holds that is not
 // nullable. missed holds the data classes that had no column at all.
@@ -284,11 +284,16 @@ func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent boo
 		c.errorf(lit, "sql-column-type", "%s is a %s, and fills %s, a %s: make that a %s%s",
 			subject, kogoName(col.Type), what, t, kogoName(col.Type), cast)
 	case col.Type.List && !nullableElement(t):
-		elem := nonNull(t).(*Named).Args[0]
+		list := *nonNull(t).(*Named)
+		list.Args = []Type{nullable(list.Args[0])}
+		want := Type(&list)
+		if _, ok := t.(*Nullable); ok {
+			want = nullable(want)
+		}
 		c.errorf(lit, "sql-nullable", "%s is an array, whose elements Postgres never promises are not null, and fills %s, a %s: "+
-			"make that a List<%s?>, and drop the nulls with filterNotNull() or refuse them with requireNotNull", subject, what, t, elem)
+			"make that a %s, and drop the nulls with filterNotNull() or refuse them with requireNotNull", subject, what, t, want)
 	case col.Nullable && !null && absent && !col.Joined:
-		c.errorf(lit, "sql-nullable", "%s may be null in its table, and fills %s, a %s, in a nullable data class that is null where its outer join finds no row: make that a %s?%s",
+		c.errorf(lit, "sql-nullable", "%s may be null even where its outer join finds a row, and fills %s, a %s, in a nullable data class that is null where that join finds none: make that a %s?%s",
 			subject, what, t, t, assert)
 	case col.Nullable && !null && !absent:
 		c.errorf(lit, "sql-nullable", "%s may be null, and fills %s, a %s: make that a %s?%s", subject, what, t, t, assert)

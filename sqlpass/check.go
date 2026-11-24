@@ -45,7 +45,8 @@ func (t Type) String() string {
 // A Column is one result column. Joined is whether it is null only
 // through an outer join: it would be non-null by spec.md 10.5 were the
 // join inner, as a NOT NULL column of the joined table is, and one
-// that may be null in its table is not.
+// that may be null even where the join finds a row is not; nor is one
+// the author names "name?".
 type Column struct {
 	Name     string
 	Type     Type
@@ -236,6 +237,7 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 		// "?column?" is Postgres's name for an unnamed column, not an override.
 		if n := len(col.Name) - 1; n > 0 && (col.Name[n] == '!' || col.Name[n] == '?') && col.Name != "?column?" {
 			col.Name, col.Nullable = col.Name[:n], col.Name[n] == '?'
+			col.Joined = col.Joined && !col.Nullable // "name?": the author's "may be null", not the join's
 		}
 		st.Columns = append(st.Columns, col)
 	}

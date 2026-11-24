@@ -48,12 +48,15 @@ constraints) is worth typing.
    send. Outside it Kogo refuses: at `kogo check` where the catalog or
    the statement tells, else by a panic that names the limit. It never
    gives another value. `kogo check` refuses a type Postgres does not
-   promise where a truthful one exists (`String?`, `List<T?>`), unless
-   the author asserts it with `"name!"`, and Kogo panics naming the
-   limit only where no truthful type exists (an interval with months,
-   `infinity`, `24:00`). `spec.md` 10.4 lists the limits, and the one
-   exception to that line: a column a second outer join nulls, in a
-   nullable nested data class.
+   promise where a truthful one exists (`String?`), unless the author
+   asserts it with `"name!"`, and Kogo panics naming the limit only
+   where no truthful type exists (an interval with months, `infinity`,
+   `24:00`). An array's elements are the exception: Postgres promises
+   nothing of them either way, so `List<T>` is the author's assertion,
+   held by a panic that names the column. `spec.md` 10.4 lists the
+   limits, and the other exception, which `kogo check` cannot yet
+   tell: a column a second outer join nulls, in a nullable nested data
+   class.
 5. **Go is a backend, not a source language.** Nobody reads the emitted
    Go, but line directives map it back to the source, written at the
    start of each line: `/*line ../../src/a.kg:26*/`, padded so that
@@ -285,9 +288,8 @@ to and from the driver's. A column of a composite type is sent as a
 column that says whether it is null and one for each field, by name,
 so no composite value reaches the driver. An array type Postgres does
 not ship is read once the connection's driver has been told of it.
-An array is read by the prelude's `Array`, as the `List<T?>` that
-`kogo check` asks for, and refuses an array of more than one dimension
-(principle 4). A nullable nested data class filled by prefix is null
+An array is read by the prelude's `Array`, which refuses what a `List`
+cannot hold (principle 4). A nullable nested data class filled by prefix is null
 where its columns null only through the outer join are.
 `db.tx` begins, commits and rolls back around its block, and
 `tx.atomically` is a savepoint; whatever Postgres refuses is a panic,

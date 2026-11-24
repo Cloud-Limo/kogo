@@ -814,11 +814,6 @@ column.
   `coalesce(n.text, '') as note_text` beside `n.id as note_id` reads as
   no note where there is none. A column asserted with `"name!"` that is
   null where the class is there panics (section 8).
-- An array column fills only a `List<T?>`, wherever it fills a list:
-  the result, a property, a property of a nested data class, a field of
-  a composite type. Postgres says of no array that its elements are not
-  null; read `List<T?>`, and drop the nulls with `filterNotNull()` or
-  refuse them with `requireNotNull`. A parameter may be a `List<T>`.
 - A property that is a data class may instead be filled by the one column
   of its name, of a composite type (10.4). A table's name or alias on its
   own is its whole row, so whole rows are read from a join as
@@ -852,7 +847,7 @@ column.
 | `interval` | `Duration` |
 | `bytea` | `ByteArray` |
 | an enum type | the enum of the same constants in `schema.kg` |
-| `T[]` | `List<T?>`; a parameter `List<T>` too |
+| `T[]` | `List<T>`, or `List<T?>` |
 | a domain | its base type's mapping |
 | a composite type | a data class |
 
@@ -900,9 +895,11 @@ Kogo reads a subset of what Postgres can send, and outside it refuses:
 at `kogo check` where the catalog or the statement tells, else by a
 panic that names the limit (section 8). It never gives another value.
 `kogo check` refuses a type Postgres does not promise where a truthful
-one exists (`String?`, `List<T?>`), unless the author asserts it with
-`"name!"` (10.5), and Kogo panics naming the limit only where no
-truthful type exists, with one exception, the last limit below. The
+one exists (`String?`), unless the author asserts it with `"name!"`
+(10.5), and Kogo panics naming the limit only where no truthful type
+exists. An array's elements are the exception: there Postgres promises
+nothing either way, so the author's `List<T>` is the assertion. The
+last limit below is the other, one `kogo check` cannot yet tell. The
 limits, with those above:
 
 - A type that is not in the table, an array of a composite type or of a
@@ -914,9 +911,12 @@ limits, with those above:
   Postgres's `integer[]` does not say how many dimensions a value has,
   and a `List` has one. A lower bound other than 1 is not kept, which
   loses nothing a `List` has.
-- An array read into a `List<T>`: `kogo check`, since Postgres says of
-  no array that its elements are not null, and an `array_agg` over an
-  outer join gives `{NULL}` for a row with none (10.3).
+- A `NULL` element read into a `List<T>`: a panic when it is read, which
+  names the column. Postgres says nothing of an array's elements, so the
+  author does: `List<T>` asserts that none is null and is held by this
+  panic, as `"name!"` is for a column (10.5); `List<T?>` takes them.
+  Write `List<T?>` where an element may be null, as in an `array_agg`
+  over an outer join, which gives `{NULL}` for a row with none.
 - `infinity` in a `timestamptz` or a `date`, `24:00` in a `time`, an
   `interval` with months: a panic when it is read.
 - A `String` that holds U+0000, alone or in a `List`: a panic when it is
@@ -930,7 +930,7 @@ limits, with those above:
   can null, where the class's own join finds a row: it fills a property
   that may not be null, and a null there is a panic when it is read
   that names the column. `kogo check` does not yet tell one outer join
-  from another; this is the one exception to the line above.
+  from another.
 
 An array of a domain, and a domain over an array, are read as the array
 of the base type is.
@@ -963,7 +963,8 @@ of the base type is.
 - A non-null column may fill a `T?` property. A nullable column filling a
   `T` property is a compile error, but for one null only through an
   outer join inside a nullable nested data class, which the class's
-  absence covers (10.3). An array's elements are nullable (10.4).
+  absence covers (10.3). An array's elements are the author's to
+  type (10.4).
 - A parameter may always be `T?`; it is sent as SQL `NULL`.
 
 ### 10.6 Idioms that replace a query builder

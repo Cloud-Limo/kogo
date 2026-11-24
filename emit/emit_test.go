@@ -1110,7 +1110,7 @@ fun joined(ns: List<Long>): List<String> =
 func TestRefused(t *testing.T) {
 	for _, c := range [][3]string{
 		{"enum class Kind { in_house, outside }\nfun f(tx: Tx, kinds: List<Kind>): Int = tx.execute(sql\"delete from invite where kind = any($kinds)\")", "2:93: not-yet-emitted", "a parameter that is a list of an enum"},
-		{"enum class Kind { in_house, outside }\nfun f(tx: Tx): List<Kind?>? = tx.querySingle<List<Kind?>?>(sql\"select array_agg(kind) as kinds from invite\")", "2:31: not-yet-emitted", "column kinds, which holds a list of an enum,"},
+		{"enum class Kind { in_house, outside }\nfun f(tx: Tx): List<Kind>? = tx.querySingle<List<Kind>?>(sql\"select array_agg(kind) as kinds from invite\")", "2:30: not-yet-emitted", "column kinds, which holds a list of an enum,"},
 		{"fun f(x: Int?): Int? = x.takeIf { true }", "1:24: not-yet-emitted", "a nullable type argument for T, which is used as T?"},
 		{"fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallback\nfun g(): Long? = firstOr(listOf<Long?>(null), 5L)", "2:18: not-yet-emitted", "used as T? in firstOr or a fun it calls, is not emitted yet: pass firstOr a type that is not nullable"},
 		{"fun <U> via(items: List<U>): Boolean = first(items)\nfun <T> first(items: List<T>): Boolean = items.firstOrNull() == null\nfun g(): Boolean = via(listOf<Long?>(null))", "3:20: not-yet-emitted", "used as U? in via or a fun it calls"},

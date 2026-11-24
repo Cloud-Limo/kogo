@@ -2090,9 +2090,8 @@ Each entry: what was decided, why, and what would reopen it.
   first said any column that may be null filled such a property, and accepted the hole
   of a row where only some of them are null.
 - **An enum maps by its set of constants**, in any order, whatever either side calls the
-  type. An array column fills only a `List<T?>`, since Postgres does not say whether an
-  array holds a null; a parameter may be a `List<T>`. Corrected by Greg's ruling of 24 Nov
-  2026 (DEV-1198, built in DEV-1208): this first took `T` or `T?` for a column too.
+  type. A list's elements may be `T` or `T?`, since Postgres does not say whether an array
+  holds a null.
 - **`db.tx` is two declarations in `check/core.kg`**, one with a plain block and one whose
   block is a raise scope, and the checker keeps the second exactly where the enclosing fun
   returns an `Either<E, ...>`, settling `E` from it (spec 10.7). So `val r = db.tx { ... }`
@@ -4626,12 +4625,17 @@ limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
   dimensions, not its column. The statement could only be asked by reading SQL. Not
   taken: a `List<List<T>>`, which the type cannot promise either. A lower bound is
   dropped, as before: a `List` has none.
-- **An array column fills only a `List<T?>`** (finding 7), corrected in place by Greg's
-  ruling of 24 Nov 2026 (DEV-1198, built in DEV-1208): this first read a `List<T>` too
-  and panicked on a `NULL` element, naming the column, and left `kogo check` taking only
-  `List<T?>` to Greg.
-- **Every array is read as its elements' `T?`** (`kogo.Array`). Its copy into a
-  `List<T>` went with DEV-1208.
+- **A `NULL` element read into a `List<T>` is a panic that names the column and the
+  element** (finding 7), not the driver's `cannot scan NULL into *int32`. The catalog
+  never says an array's elements are not null. Not taken: `kogo check` taking only
+  `List<T?>` for an array, the strict reading of the sentence, since the catalog does
+  tell that the column is an array: it changes what every `List<String>` over a
+  `text[]` means, a change to the language, and so Greg's. Reopen with that ruling.
+  Greg ruled it so on 24 Nov 2026 and took it back the same day (DEV-1208, below).
+- **Every array is read as its elements' `T?` and a `List<T>` copied from it**
+  (`kogo.Array`), an allocation an element more than before. Not taken: reading a
+  `List<T>` straight and matching the driver's error text for a null, which the
+  driver's next release may reword.
 - **`execute`'s count past an `Int` is a panic once the statement has run** (finding 5),
   so the transaction rolls back. Not taken: a `Long`, which changes 10.2 and every
   caller; the largest `Int`, which is another value.
@@ -4894,14 +4898,23 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
 
 ## Reads take only the types Postgres promises (DEV-1208), 24 Nov 2026
 
-Greg's rulings 3, 4 and 6 and the line at DEV-1198's guide, and his answer to the lead
-after it, built here; the entries of DEV-827, DEV-832 and DEV-1153 they
-override are corrected in place above.
+Greg's rulings 3 and 6 and the line at DEV-1198's guide, and his answer to the lead
+after it, built here; the entries of DEV-827 and DEV-832 they override are corrected in
+place above. His ruling 4 there, an array column filling only a `List<T?>`, he took back
+on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` stand.
 
-- **An array column fills only a `List<T?>`**, wherever it fills a list: the result, a
-  property, a nested class's, a field of a composite type. A parameter is untouched.
-  `kogo.Array`'s copy into a `List<T>` and its panic on a null element go. Not taken:
-  reading a `not null` domain as the element's type; reopen when a schema uses one.
+- **An array column fills `List<T>` or `List<T?>`, as before** (Greg's Ruling on PR 184,
+  24 Nov 2026, overriding his ruling 4 of the same day, which was made on "no cusoon2
+  `.kg` file reads an array"; the port reads three). For a column, three things can say
+  it is not null: Postgres (`not null`), the SQL (`coalesce`, `count`, `exists`) and the
+  author (`"name!"`). For an array's elements none of the first two exists, so the author
+  does: `List<T>` asserts that none is null and is held by a panic at the read that names
+  the column, as `"name!"` is for a column; `List<T?>` takes them. Not taken: only
+  `List<T?>`, a rule no author could ever satisfy, since a column the program fills from
+  a `List<Uuid>` parameter, or an `array_agg` whose SQL filters its nulls, would still
+  read as `List<Uuid?>`, and the check would move into hand-written code at each use;
+  carrying the nullability of `array_agg`'s argument into the elements, which would also
+  have to recognise the `filter` that mends it, and that is the SQL pass typing SQL.
 - **Inside a nullable nested data class filled by prefix, a property that may not be null
   takes only a column null only through the outer join**: one non-null were the join
   inner. The SQL pass tells it by `varnullingrels`: a nulling by a join's range table
@@ -4919,9 +4932,15 @@ override are corrected in place above.
   of a hole is "we do something stupid or bad and never notice". A column of a `T?`
   property null only through the join counts too.
 - **The line**, spec 10.4 and `doc/design.md` principle 4: `kogo check` refuses a type
-  Postgres does not promise where a truthful one exists, unless the author asserts it
-  with `"name!"`, and panics naming the limit only where none does.
-- **The one exception to the line: a column a second outer join nulls**, in a nullable
+  Postgres does not promise where a truthful one exists (`String?`), unless the author
+  asserts it with `"name!"`, and panics naming the limit only where none does. An
+  array's elements are its exception, named there: Postgres promises nothing of them
+  either way, so `List<T>` is the author's assertion (the Ruling above). The agent's,
+  in the Fix of 24 Nov 2026: the Ruling calls the array the line's one exception, and
+  the second outer join below stays one too, so both are named, the array as where
+  Postgres promises nothing and the join as what `kogo check` cannot yet tell. Not
+  taken: dropping the join's, which the earlier Ruling kept.
+- **The other exception to the line: a column a second outer join nulls**, in a nullable
   nested data class, fills a property that may not be null and panics, naming the column,
   where the class's join finds a row and the second none (the lead's ruling on the Code
   review, 24 Nov 2026; spec 10.4 lists it). The pass's `Joined` says null through some

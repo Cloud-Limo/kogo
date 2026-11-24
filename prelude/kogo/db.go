@@ -326,8 +326,7 @@ func affected(rows int64) int32 {
 }
 
 // An Array is where an array is read to: each element as a T?, since
-// Postgres says of no array that its elements are not null, and kogo
-// check takes no other List for one (spec.md 10.4). Kogo
+// Postgres says of no array that its elements are not null. Kogo
 // reads one dimension (spec.md 10.4): an array of more is a panic,
 // never the flat List the driver would make of it.
 type Array[T any] struct{ elems *List[*T] }
@@ -352,6 +351,22 @@ func (a *Array[T]) ScanIndexType() any  { return new(*T) }
 
 // Nullable gives what was read as a List<T?>, or null for a NULL.
 func (a *Array[T]) Nullable() *List[*T] { return a.elems }
+
+// List gives what was read as a List<T>, or null for a NULL. A NULL
+// element is a panic that names the column.
+func (a *Array[T]) List(column string) *List[T] {
+	if a.elems == nil {
+		return nil
+	}
+	list := make(List[T], len(*a.elems))
+	for i, e := range *a.elems {
+		if e == nil {
+			panic(fmt.Sprintf("column %s holds an array whose element %d is NULL, and fills a List whose elements are not nullable (spec.md 10.4): read it as a List<T?>, or keep the nulls out in the statement", column, i))
+		}
+		list[i] = *e
+	}
+	return &list
+}
 
 // NotNull gives the value of a column that the row's type says is not
 // null where Postgres could not: one named "name!", or one of a

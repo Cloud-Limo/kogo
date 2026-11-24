@@ -976,7 +976,7 @@ fun f(tx: Tx): List<Listing> = tx.query<Listing>(sql" -> business: business(id: 
 		`import kogo.time.Instant
 enum class Kind { b, a }
 typealias Cents = Long
-data class P(val ids: List<Uuid?>, val kind: Kind, val at: Instant)
+data class P(val ids: List<Uuid>, val kind: Kind, val at: Instant)
 fun f(tx: Tx, kind: Kind?, ids: List<Uuid?>, p: P, active: Boolean?, total: Cents): List<P> =
     tx.query<P>(sql"$active: Boolean, $kind: K{a b}, $ids: List<Uuid>, ${p.ids}: List<Uuid>, $total: Long, $active -> ids: List<Uuid>, kind: K{a b}, at: Instant")
 ---
@@ -1002,21 +1002,12 @@ external class Instant`,
 		{"data class Row(val kind: String)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> kind: K{in-house x.y}\")", "sql-column-type",
 			`enum with labels "in-house", "x.y", which cannot name a constant (spec.md 10.4), and so has no Kogo type: rename them in Postgres, or cast`},
 		{"fun f(tx: Tx): List<String> = tx.querySingle<List<String>>(‸sql\" -> kinds: List<K{a in}>\")", "sql-column-type",
-			`enum with label "in", which cannot name a constant (spec.md 10.4), and so has no Kogo type: rename it in Postgres, or cast the column to text[] and read it as a List<String?>`},
+			`enum with label "in", which cannot name a constant (spec.md 10.4), and so has no Kogo type: rename it in Postgres, or cast the column to text[] and read it as a List<String>`},
 		{"enum class Kind { a }\nfun f(tx: Tx): Kind = tx.querySingle<Kind>(‸sql\" -> kind: K{a _}\")", "sql-column-type",
 			`enum with label "_", which cannot name a constant`},
 		{"data class Row(val abn: String)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> abn: String?\")", "sql-nullable",
 			`column abn may be null, and fills Row.abn, a String: make that a String?, or if the column is never null, name it as "abn!"`},
 		{"fun f(tx: Tx): String = tx.querySingle<String>(‸sql\" -> abn: String?\")", "sql-nullable", "fills the result, a String: make that a String?"},
-		// An array fills only a List<T?>, wherever it fills a list.
-		{"fun f(tx: Tx): List<String> = tx.querySingle<List<String>>(‸sql\" -> tags: List<String>\")", "sql-nullable",
-			"column tags is an array, whose elements Postgres never promises are not null, and fills the result, a List<String>: make that a List<String?>, and drop the nulls with filterNotNull() or refuse them with requireNotNull"},
-		{"data class Row(val tags: List<String>?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> tags: List<String>?\")", "sql-nullable",
-			"column tags is an array, whose elements Postgres never promises are not null, and fills Row.tags, a List<String>?: make that a List<String?>?,"},
-		{"data class T(val id: Uuid, val tags: List<Long>)\ndata class Row(val t: T?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> t_id: Uuid??, t_tags: List<Long>??\")", "sql-nullable",
-			"column t_tags is an array, whose elements Postgres never promises are not null, and fills T.tags, a List<Long>: make that a List<Long?>"},
-		{"data class S(val tags: List<String>?)\ndata class Row(val s: S)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> s: tag_set(tags: List<String>?)\")", "sql-nullable",
-			"field tags of column s is an array, whose elements Postgres never promises are not null, and fills S.tags, a List<String>?: make that a List<String?>?,"},
 		// Inside a nullable data class, a column null in its table fills
 		// only a T?, and the class needs a column null only through the
 		// join in a property that is not nullable.

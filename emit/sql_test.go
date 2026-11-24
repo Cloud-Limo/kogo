@@ -205,8 +205,8 @@ fun largest(db: Db, over: Long): Long = db.tx { tx ->
     tx.querySingle<Long>(sql"""select max((total).cents) as "m!" from quote where (total).cents > $over""")
 }
 
-fun noNames(db: Db): List<String?> = db.tx { tx ->
-    tx.querySingle<List<String?>>(sql"""select array_agg(name) as "names!" from person where false""")
+fun noNames(db: Db): List<String> = db.tx { tx ->
+    tx.querySingle<List<String>>(sql"""select array_agg(name) as "names!" from person where false""")
 }
 
 data class Price(val cents: Long?)
@@ -268,7 +268,7 @@ enum class Kind { in_house, outside }
 data class Every(
     val flag: Boolean, val small: Int, val big: Long, val ratio: Double, val amount: Decimal, val body: String,
     val folded: String, val code: String, val id: Uuid, val at: Instant, val day: LocalDate, val clock: LocalTime,
-    val span: Duration, val kind: Kind, val tags: List<String?>, val share: Int, val note: String?, val pending: String?,
+    val span: Duration, val kind: Kind, val tags: List<String>, val share: Int, val note: String?, val pending: String?,
 )
 
 fun everything(db: Db): List<Every> = db.tx { tx -> tx.query<Every>(sql"select * from every_type") }
@@ -293,11 +293,11 @@ fun untagged(db: Db): Int = db.tx { tx ->
     tx.execute(sql"update every_type set tags = $none")
 }
 
-fun tags(db: Db): List<List<String?>> = db.tx { tx -> tx.query<List<String?>>(sql"select tags from every_type") }
+fun tags(db: Db): List<List<String>> = db.tx { tx -> tx.query<List<String>>(sql"select tags from every_type") }
 
 // A zero keeps its scale, alone and in a list.
 fun zero(db: Db): Decimal = db.tx { tx -> tx.querySingle<Decimal>(sql"""select 0.00::numeric(4, 2) as "z!" """) }
-fun zeros(db: Db): List<Decimal?> = db.tx { tx -> tx.querySingle<List<Decimal?>>(sql"""select array[0.00, 0, 1.50] as "z!" """) }
+fun zeros(db: Db): List<Decimal> = db.tx { tx -> tx.querySingle<List<Decimal>>(sql"""select array[0.00, 0, 1.50] as "z!" """) }
 `)
 }
 

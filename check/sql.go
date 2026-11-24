@@ -275,11 +275,10 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 }
 
 // column checks that a column, or a field of column of, can fill a
-// property, or the result, of type t: its type maps to t's, an array
-// fills a list whose elements are nullable, and it is not null unless
-// t is a T? or the column lies in a nullable data class, absent, and
-// is null only through an outer join (spec.md 10.3 to 10.5). A
-// composite type fills a data class field by field.
+// property, or the result, of type t: its type maps to t's, and it
+// is not null unless t is a T? or the column lies in a nullable data
+// class, absent, and is null only through an outer join (spec.md 10.3
+// to 10.5). A composite type fills a data class field by field.
 func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent absence, what, of string) {
 	_, null := t.(*Nullable)
 	n := dataClass(t)
@@ -296,7 +295,7 @@ func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent abs
 		labels := unnamed(col.Type)
 		fix := "rename " + them(labels) + " in Postgres"
 		if of == "" && col.Type.List {
-			fix += ", or cast the column to text[] and read it as a List<String?>"
+			fix += ", or cast the column to text[] and read it as a List<String>"
 		} else if of == "" {
 			fix += ", or cast the column to text and read it as a String"
 		}
@@ -307,15 +306,6 @@ func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent abs
 	case col.Type.Fields == nil && !c.maps(nonNull(t), col.Type):
 		c.errorf(lit, "sql-column-type", "%s is a %s, and fills %s, a %s: make that a %s%s",
 			subject, kogoName(col.Type), what, t, kogoName(col.Type), cast)
-	case col.Type.List && !nullableElement(t):
-		list := *nonNull(t).(*Named)
-		list.Args = []Type{nullable(list.Args[0])}
-		want := Type(&list)
-		if _, ok := t.(*Nullable); ok {
-			want = nullable(want)
-		}
-		c.errorf(lit, "sql-nullable", "%s is an array, whose elements Postgres never promises are not null, and fills %s, a %s: "+
-			"make that a %s, and drop the nulls with filterNotNull() or refuse them with requireNotNull", subject, what, t, want)
 	case col.Nullable && !null && absent == alone:
 		// the class is refused whole, by sql-absent, which says what to write
 	case col.Nullable && !null && absent == outer && !col.Joined:
@@ -366,8 +356,7 @@ func (c *checker) fields(lit *syntax.SQL, col sqlpass.Column, d *Named) {
 
 // maps reports whether a Postgres type maps to the Kogo type t, which
 // is not a T? (spec.md 10.4). An enum maps by its constants; a list's
-// elements may be T or T?, as a parameter's may: column asks a column
-// of T?.
+// elements may be null.
 func (c *checker) maps(t Type, pt sqlpass.Type) bool {
 	n, ok := t.(*Named)
 	switch {
@@ -391,16 +380,6 @@ func (c *checker) maps(t Type, pt sqlpass.Type) bool {
 		home = "kogo.time"
 	}
 	return n.Decl.Name == pt.Name && n.Decl.Pkg == home && (n.Decl.Kind == "builtin" || n.Decl.Kind == "external class")
-}
-
-// nullableElement reports whether t, or t?, is a List whose elements
-// are nullable.
-func nullableElement(t Type) bool {
-	if n, ok := nonNull(t).(*Named); ok && len(n.Args) == 1 {
-		_, null := n.Args[0].(*Nullable)
-		return null || n.Args[0] == unknown
-	}
-	return t == unknown
 }
 
 // enumClass gives the enum class that t, or t?, names, or nil.

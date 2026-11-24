@@ -70,7 +70,6 @@ func (c *checker) constant(d *syntax.ValDecl, t Type) {
 // exposed refuses a type narrower than a declaration that shows it:
 // a private type in a public fun's parameter, say.
 func (c *checker) exposed(at syntax.Node, v vis, t Type) {
-	rank := map[string]int{"": 0, "internal": 1, "private": 2}
 	switch t := t.(type) {
 	case *Nullable:
 		c.exposed(at, v, t.Elem)
@@ -79,7 +78,7 @@ func (c *checker) exposed(at syntax.Node, v vis, t Type) {
 			c.exposed(at, v, p)
 		}
 	case *Named:
-		if rank[t.Decl.visibility] > rank[v.visibility] && c.visible(t.Decl.vis) {
+		if narrower(t.Decl.visibility, v.visibility) && c.visible(t.Decl.vis) {
 			c.errorf(at, "exposed", "%s is %s and what shows it here is %s, which kotlinc refuses: make it %s too, or %s wider", t.Decl.Name, t.Decl.visibility, cmp.Or(v.visibility, "public"), t.Decl.visibility, t.Decl.Name)
 			return
 		}
@@ -87,6 +86,12 @@ func (c *checker) exposed(at syntax.Node, v vis, t Type) {
 			c.exposed(at, v, a)
 		}
 	}
+}
+
+// narrower reports whether visibility a is narrower than b.
+func narrower(a, b string) bool {
+	rank := map[string]int{"": 0, "internal": 1, "private": 2}
+	return rank[a] > rank[b]
 }
 
 // shows refuses a type in f's signature narrower than v.
@@ -141,8 +146,11 @@ func (c *checker) twice(td *TypeDecl) {
 func (c *checker) inferredCycles() {
 	inferred := func(o Object) bool {
 		f, ok := o.(*Func)
+		if !ok {
+			return false
+		}
 		d, _ := f.Decl.(*syntax.FunDecl)
-		return ok && d != nil && d.Expr != nil && d.Result == nil
+		return d != nil && d.Expr != nil && d.Result == nil
 	}
 	for _, f := range c.info.Funcs {
 		if !inferred(f) {

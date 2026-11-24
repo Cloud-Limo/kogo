@@ -4680,13 +4680,15 @@ The lead ruled form 11 (narrowly) and finding 4 (refused); the agent's, for the 
   receiver, `val ()`, `x < (... > ...)`, a lambda on the line after a call, a `when`
   branch with no condition, `&&` in `when (x)`, an empty `when`); the rest is the
   checker's. `when-branch` serves every `when` form, `duplicate` every name twice.
-- **Overloads are compared as the JVM erases them, at the declaration**: type arguments,
-  a `?` but on `Int`, `Long`, `Double`, `Boolean` and `Char`, and the types inside a
-  function type are dropped. One rule holds DEV-1143's `erased.kg` and `lambda.kg` and
-  DEV-1181's `T?` against `T`; `lambda.kg` is refused at its second fun where kotlinc
-  refuses the call. For the program alone: the prelude's `sumOf` is Kotlin's own
-  library's. Two files of one package meet, where the JVM's clash is within one file.
-  Not taken: refusing the call, which leaves a pair no call may ever use.
+- **Overloads of one file are compared as the JVM erases them, the result included**:
+  type arguments, a `?` but on `Int`, `Long`, `Double`, `Boolean` and `Char`, and the
+  types inside a function type are dropped. Each file is its own JVM class, so two files
+  never clash, and kotlinc takes `f(xs: List<Int>): Int` beside `f(xs: List<String>):
+  String`. For the program alone: the prelude's `sumOf` is Kotlin's own library's. A `?`
+  on a type parameter is dropped across files too, as kotlinc refuses `T?` against `T`
+  wherever they are. `lambda.kg`'s pair, which differs in its results, is refused at
+  its call, as kotlinc refuses it: a lambda chooses only among the prelude's funs.
+  Not taken: comparing across files, which refuses what kotlinc takes.
 - **`import own.Name as Other` is refused at the import**, where Kotlin refuses a later
   use of `Name`. Not taken: hiding `Name` in the file, a new rule of scope for one form.
 - **An empty `when` is refused whatever its subject**; Kotlin refuses it only where it
@@ -4700,7 +4702,8 @@ The lead ruled form 11 (narrowly) and finding 4 (refused); the agent's, for the 
   parameter's, a constant's and a property's name**, and stays where Kotlin takes it: a
   destructuring's part and a lambda's parameter.
 - **A const val is a number, a `Boolean`, a `Char` or a `String`, not nullable, made of
-  literals, operators, templates and other const vals.** A private type may not show in
+  literals, operators, templates and other const vals.** kotlinc takes some calls on
+  constants too, `1.toLong()`; Kogo refuses them: write `1L`. A private type may not show in
   a fun's or a member's signature, a data class's property or a val's type wider than it;
   a supertype and a typealias are not checked, as no file of the hunt needed them.
 - **An interface may not declare `toString()` or `hashCode()`** with no parameter;

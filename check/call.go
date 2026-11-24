@@ -366,8 +366,9 @@ func (c *checker) resolve(at, where syntax.Node, name string, cands []*Func, rec
 			}
 		}
 		left = slices.DeleteFunc(left, func(k candidate) bool { return !c.accepts(k, typed) })
-		if len(left) > 1 {
-			left = c.byLambda(left, typed)
+		prelude := func(k candidate) bool { return k.f.Pkg == "kogo" || strings.HasPrefix(k.f.Pkg, "kogo.") }
+		if len(left) > 1 && !slices.ContainsFunc(left, func(k candidate) bool { return !prelude(k) }) {
+			left = c.byLambda(left, typed) // only the prelude's, as only Kotlin's library (spec.md 5.2)
 		}
 	}
 	sigs := func(fs []*Func) string { // for the errors only
@@ -712,6 +713,9 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 	if f.Kind == Copy {
 		c.builds(where, f.Owner)
 	} else {
+		if f.Kind == ToString {
+			c.functionText(where, subst(f.Receiver, b), "in toString()")
+		}
 		c.demand(where, f.Name, f.vis)
 	}
 	c.acts(where, f)

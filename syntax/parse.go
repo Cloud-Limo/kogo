@@ -981,9 +981,10 @@ func (p *parser) binary(min int) Expr {
 }
 
 // typeArgsRead refuses x < (... > ...), which kotlinc reads as type
-// arguments: a > (not >=) before the ( after the < closes.
+// arguments: a > (not >=) before the ( after the < closes, other
+// than one that closes a < inside, as listOf<Int>( has.
 func (p *parser) typeArgsRead(lt Pos) {
-	depth := 0
+	depth, angles := 0, 0
 	for n := 0; p.peek(n).kind != tEOF; n++ {
 		switch t := p.peek(n); t.text {
 		case "(":
@@ -992,8 +993,12 @@ func (p *parser) typeArgsRead(lt Pos) {
 			if depth--; depth == 0 {
 				return
 			}
+		case "<":
+			angles++
 		case ">":
-			if t.kind == tOp {
+			if angles > 0 {
+				angles--
+			} else if t.kind == tOp {
 				p.fail(lt, "less-than", "kotlinc reads this < and the > after it as type arguments: name the right side first, val y = (...), and compare with it")
 			}
 		}

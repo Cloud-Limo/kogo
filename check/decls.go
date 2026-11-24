@@ -547,14 +547,15 @@ func (c *checker) overloads() {
 			}
 			if e, _ := shape(f, true); f.Pkg != "kogo" && !strings.HasPrefix(f.Pkg, "kogo.") {
 				// As the JVM has them (spec.md 5.2), which kotlinc refuses.
+				// Each file is its own JVM class, so two files never clash.
 				i := slices.IndexFunc(erased[e], func(g *Func) bool {
 					s2, _ := shape(g, false)
-					return s2 != s && (f.file == g.file || f.visibility != "private" || g.visibility != "private")
+					return s2 != s && f.file == g.file
 				})
 				erased[e] = append(erased[e], f)
 				if i >= 0 {
 					c.file = f.file
-					c.errorf(f.Decl, "duplicate", "%s has these parameter types once their type arguments and ? are dropped, as Kotlin compiles them, and kotlinc refuses the two: rename one", describe(erased[e][i], nil))
+					c.errorf(f.Decl, "duplicate", "%s, in this file, has these parameter types and result once their type arguments and ? are dropped, as Kotlin compiles them, and kotlinc refuses the two: rename one", describe(erased[e][i], nil))
 					continue
 				}
 			}
@@ -589,8 +590,10 @@ func byName(fs []*Func) map[string][]*Func {
 
 // shape gives what tells two functions of one name apart: whether
 // they are vals, their receiver and parameter types, each declared
-// type by its identity and each type parameter by its first use.
-// ok is false when one of those types failed to read.
+// type by its identity and each type parameter by its first use,
+// a ? on one dropped. erase gives them as the JVM has them, with the
+// result, type arguments and most ? dropped (spec.md 5.2). ok is
+// false when one of those types failed to read.
 func shape(f *Func, erase bool) (s string, ok bool) {
 	var b strings.Builder
 	used := map[*TypeParam]int{}
@@ -611,6 +614,10 @@ func shape(f *Func, erase bool) (s string, ok bool) {
 			fmt.Fprint(&b, "#", n)
 		case *Nullable:
 			put(t.Elem)
+			// kotlinc tells no T? from T, file or none.
+			if _, tp := t.Elem.(*TypeParam); tp {
+				return
+			}
 			if n, ok := t.Elem.(*Named); !erase || ok && primitive[n.Decl.Name] {
 				b.WriteString("?")
 			}
@@ -652,6 +659,10 @@ func shape(f *Func, erase bool) (s string, ok bool) {
 	for _, p := range f.Params {
 		b.WriteString(", ")
 		put(p.Type)
+	}
+	if erase && f.Result != nil { // the JVM's signature holds the result
+		b.WriteString(" : ")
+		put(f.Result)
 	}
 	return b.String(), ok
 }
@@ -816,10 +827,16 @@ func (c *checker) class(td *TypeDecl) {
 			c.errorf(d, "nested-type", "%s is not a variant of %s, and only its variants are nested in it (spec.md 3.2): add : %s, or declare %s at the top level", td.Name, o.Name, o.Name, d.Name)
 		}
 	}
+	shown := td.vis // a variant is seen no wider than its sealed interface
+	for _, s := range td.Supers {
+		if s.Decl.Kind == "sealed interface" && narrower(s.Decl.visibility, shown.visibility) {
+			shown = s.Decl.vis
+		}
+	}
 	for _, p := range d.Params {
 		v := &Var{Kind: Property, Name: p.Name, Type: c.typ(p.Type), Owner: td, Decl: p}
 		v.markers = c.marks(syntax.Modifiers{Annotations: p.Marks})
-		c.exposed(p, td.vis, v.Type)
+		c.exposed(p, shown, v.Type)
 		td.Props = append(td.Props, v)
 		c.info.Vars[p] = []*Var{v}
 	}
@@ -851,7 +868,7 @@ func (c *checker) class(td *TypeDecl) {
 			v := &Var{Kind: Property, Name: m.Name, Type: c.declared(m), Owner: td, Decl: m}
 			v.markers = c.marks(m.Mods)
 			c.interfaceMember(m, m.Mods, m.Name, -1)
-			c.exposed(m, td.vis, v.Type)
+			c.exposed(m, shown, v.Type)
 			variance(m, v.Type, true, m.Name)
 			td.Props = append(td.Props, v)
 			c.info.Vars[m] = []*Var{v}
@@ -878,7 +895,7 @@ func (c *checker) class(td *TypeDecl) {
 			}
 			c.info.Funcs[m] = f
 			c.signature(f, m, td)
-			c.shows(f, td.vis)
+			c.shows(f, shown)
 			for i, p := range f.Params {
 				variance(m.Params[i], p.Type, false, m.Name)
 			}

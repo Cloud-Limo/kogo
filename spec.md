@@ -139,8 +139,9 @@ subject with such a value. Comparing with `null` is allowed. Where the
 type does not show the function, behind a type parameter or an
 interface, the comparison panics once it reaches the function, and
 answers `false` where a part before it differs, `contains`, `distinct`
-and a `Set`'s or `Map`'s keys included. In a template a value whose type
-holds one, through the same types, is an error (`function-text`):
+and a `Set`'s or `Map`'s keys included. In a template or `toString()` a
+value whose type holds one, through the same types, is an error
+(`function-text`):
 Kotlin writes a function as its class and an identity that changes
 every run, so no program can rest on its text.
 
@@ -396,20 +397,22 @@ since no call could choose between them. So are two `fun`s of one name
 in an interface, and a `fun` named for a data class with its
 constructor's parameter types, reported at the `fun`. Parameter names,
 results, and the names and order of type parameters do not tell them
-apart; two `private` ones in different files do not meet. Nor do type
-arguments, a `?` but on a number, a `Boolean` or a `Char`, or the
-types inside a function type: the JVM holds two that differ only so as
-one signature, and kotlinc refuses them, so `f(xs: List<Int>)` beside
-`f(xs: List<Long>)`, `<A> f(a: A?)` beside `<B> f(b: B)` and
-`f(g: () -> Int)` beside `f(g: () -> String)` are errors in a
-program. Bindings with
+apart; two `private` ones in different files do not meet. Nor does a
+`?` on a type parameter, so `<A> f(a: A?)` beside `<B> f(b: B)` is an
+error. Within one file, nor do type arguments, a `?` but on a number,
+a `Boolean` or a `Char`, or the types inside a function type, unless
+the results differ the same way: the JVM holds two that differ only so
+as one signature, and kotlinc refuses them, so `f(xs: List<Int>): Int`
+beside `f(xs: List<Long>): Int` in one file is an error in a program,
+and in two files is not. Bindings with
 a receiver are one group across packages, whatever their visibility, as
 they are in scope everywhere.
 
 One exception: when the candidates left differ only in what one lambda
 parameter returns, as the prelude's `sumOf` does for `Int`, `Long` and
-`Double`, the lambda is read once and what it returns chooses. Only
-the prelude declares such funs, as only Kotlin's library does.
+`Double`, the lambda is read once and what it returns chooses. That is
+the prelude's alone, as kotlinc chooses so only in its library: the
+program's own pair is ambiguous at such a call.
 
 Where the receiver, the count and the names leave one candidate, each
 argument is read as that candidate's parameter wants it, so a whole-number literal

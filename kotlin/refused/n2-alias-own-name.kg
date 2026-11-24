@@ -1,0 +1,9 @@
+// kotlinc refuses line 9, kogo check line 5
+// An own-package name imported with as: in Kotlin the file no longer sees Money.
+package kt
+
+import kt.Money as Cents
+
+data class Money(val amount: Long)
+
+fun f(c: Cents): Money = c

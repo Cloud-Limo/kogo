@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// An enum constant declared twice.
+package refused
+
+enum class Side { left, left }

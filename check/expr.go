@@ -240,6 +240,8 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 		for _, p := range e.Parts {
 			if t := c.expr(p, nil); t != nil && named(nonNull(t)) == c.prelude("ByteArray") {
 				c.errorf(p, "bytes-text", "a %s in a template is written as Kotlin writes its identity, [B@ and a number that changes every run: write a name or a size kept beside it, or what the bytes were made from", t)
+			} else {
+				c.functionText(p, t, "in a template")
 			}
 		}
 		return tString
@@ -918,6 +920,8 @@ func (c *checker) when(e *syntax.When, want Type, used bool) Type {
 // and gives what it shows of the subject when it is a name.
 func (c *checker) cond(cond *syntax.Cond, st Type, subject *Var, covered map[string]bool) (holds, not facts) {
 	switch {
+	case st == nil && cond.Op == "is":
+		c.errorf(cond, "when-branch", "is tests a when's subject, and this when has none: write when (x) { is ... }, or the test whole, x is ...")
 	case st == nil:
 		c.value(cond.X, tBoolean)
 		return c.test(cond.X)
@@ -1049,6 +1053,20 @@ func (c *checker) funcEquality(at syntax.Node, op string, x, y Type) {
 		c.errorf(at, "function-equality", msg, op, t)
 		return
 	}
+}
+
+// functionText refuses the text of a value whose type holds a
+// function (spec.md 3), written in a template or by toString().
+func (c *checker) functionText(at syntax.Node, t Type, how string) {
+	where := holdsFunc(t, nil, map[*TypeDecl]bool{})
+	if where == "" {
+		return
+	}
+	held := ", and " + where + " holds one"
+	if where == "it" {
+		held = ""
+	}
+	c.errorf(at, "function-text", "a %s %s writes a function as Kotlin writes its class and an identity that changes every run%s: write a name kept beside it, or the other properties", t, how, held)
 }
 
 // holdsFunc names where a value of t holds a function (spec.md 3): a

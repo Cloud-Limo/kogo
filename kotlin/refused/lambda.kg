@@ -1,0 +1,9 @@
+// kotlinc refuses line 9
+// Two funs of the program's that differ only in what a lambda returns.
+package refused
+
+fun pick(f: () -> Int): Int = f()
+
+fun pick(f: () -> String): String = f()
+
+fun picked(): Int = pick { 1 }

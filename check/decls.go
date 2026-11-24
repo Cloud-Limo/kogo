@@ -41,9 +41,15 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 		if name := f.Package.Name; i >= len(prelude) && (name == "kogo" || strings.HasPrefix(name, "kogo.")) {
 			c.errorf(f.Package, "kogo-package", "package %s is the prelude's, and a program's package is not kogo or under it (spec.md 2): rename it", name)
 		}
+		if name := f.Package.Name; i >= len(prelude) && (name == "kotlin" || strings.HasPrefix(name, "kotlin.")) {
+			c.errorf(f.Package, "kogo-package", "package %s is Kotlin's standard library's, which kotlinc keeps for it: rename it", name)
+		}
 		for _, d := range f.Decls {
 			if i >= len(prelude) && external(d) {
 				c.errorf(d, "external", "only the prelude declares bindings (spec.md 13): give this a body in Kogo")
+			}
+			if i >= len(prelude) {
+				c.topLevel(d)
 			}
 			c.declare(d, "")
 		}
@@ -64,6 +70,7 @@ func Check(prelude, program []*syntax.File, sigs Signatures) (*Info, []*syntax.E
 		c.bodies[i]()
 	}
 	c.vals(program)
+	c.inferredCycles()
 	c.gateWrites(program)
 	slices.SortStableFunc(c.errs, func(a, b *syntax.Error) int {
 		return cmp.Or(cmp.Compare(order[a.File], order[b.File]), cmp.Compare(a.Line, b.Line), cmp.Compare(a.Column, b.Column))
@@ -312,6 +319,9 @@ func (c *checker) importAll(f *syntax.File) {
 			c.errorf(imp, "member-import", "%s is a member, in scope wherever a value of its receiver's type is: remove this import", name)
 		case from.named(name) == nil:
 			c.errorf(imp, "unknown-import", "package %s declares nothing named %s", from.name, name)
+		case from == c.pkg && imp.As != nil:
+			c.errorf(imp, "own-import", "%s is package %s's own, and in Kotlin a file that imports it as %s no longer sees it as %s: remove this import, and write %s", name, from.name, local, name, name)
+			c.imports[f][local] = renamed(from, name, local) // to say no more
 		case c.pkg.types[local] != nil || c.pkg.aliases[local] != nil || c.pkg.vals[local] != nil:
 			if from == c.pkg {
 				c.errorf(imp, "own-import", "%s is package %s's own, which needs no import: remove this import", local, from.name)
@@ -449,6 +459,7 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 		c.later(&c.sigs, func() {
 			f.markers = c.marks(d.Mods)
 			c.signature(f, d, nil)
+			c.shows(f, f.vis)
 			c.keepsOut(f, d)
 			c.later(&c.bodies, func() { c.body(f, d) })
 		})
@@ -476,12 +487,16 @@ func (c *checker) declare(d syntax.Decl, outer string) {
 			c.later(&c.sigs, func() {
 				g.markers = c.marks(d.Mods)
 				g.Type = c.declared(d)
+				c.exposed(d, g.vis, g.Type)
 				c.later(&c.bodies, func() {
 					c.owner = g
 					if d.Value != nil {
 						c.value(d.Value, g.Type)
 					} else if !d.Mods.External {
 						c.errorf(d, "val-type", "the val %s needs a value: val %s: %s = ...", d.Name, d.Name, g.Type)
+					}
+					if d.Mods.Const {
+						c.constant(d, g.Type)
 					}
 				})
 			})
@@ -524,11 +539,25 @@ func (c *checker) overloads() {
 		}
 	}
 	for _, fs := range groups {
-		seen := map[string][]*Func{}
+		seen, erased := map[string][]*Func{}, map[string][]*Func{}
 		for _, f := range fs {
-			s, ok := shape(f)
+			s, ok := shape(f, false)
 			if !ok {
 				continue
+			}
+			if e, _ := shape(f, true); f.Pkg != "kogo" && !strings.HasPrefix(f.Pkg, "kogo.") {
+				// As the JVM has them (spec.md 5.2), which kotlinc refuses.
+				// Each file is its own JVM class, so two files never clash.
+				i := slices.IndexFunc(erased[e], func(g *Func) bool {
+					s2, _ := shape(g, false)
+					return s2 != s && f.file == g.file
+				})
+				erased[e] = append(erased[e], f)
+				if i >= 0 {
+					c.file = f.file
+					c.errorf(f.Decl, "duplicate", "%s, in this file, has these parameter types and result once their type arguments and ? are dropped, as Kotlin compiles them, and kotlinc refuses the two: rename one", describe(erased[e][i], nil))
+					continue
+				}
 			}
 			i := slices.IndexFunc(seen[s], func(g *Func) bool {
 				return f.file == g.file || f.visibility != "private" || g.visibility != "private"
@@ -561,9 +590,11 @@ func byName(fs []*Func) map[string][]*Func {
 
 // shape gives what tells two functions of one name apart: whether
 // they are vals, their receiver and parameter types, each declared
-// type by its identity and each type parameter by its first use.
-// ok is false when one of those types failed to read.
-func shape(f *Func) (s string, ok bool) {
+// type by its identity and each type parameter by its first use,
+// a ? on one dropped. erase gives them as the JVM has them, with the
+// result, type arguments and most ? dropped (spec.md 5.2). ok is
+// false when one of those types failed to read.
+func shape(f *Func, erase bool) (s string, ok bool) {
 	var b strings.Builder
 	used := map[*TypeParam]int{}
 	ok = true
@@ -571,6 +602,10 @@ func shape(f *Func) (s string, ok bool) {
 	put = func(t Type) {
 		switch t := t.(type) {
 		case *TypeParam:
+			if erase {
+				b.WriteString("#")
+				return
+			}
 			n, found := used[t]
 			if !found {
 				n = len(used)
@@ -579,15 +614,29 @@ func shape(f *Func) (s string, ok bool) {
 			fmt.Fprint(&b, "#", n)
 		case *Nullable:
 			put(t.Elem)
-			b.WriteString("?")
+			// kotlinc tells no T? from T, file or none.
+			if _, tp := t.Elem.(*TypeParam); tp {
+				return
+			}
+			if n, ok := t.Elem.(*Named); !erase || ok && primitive[n.Decl.Name] {
+				b.WriteString("?")
+			}
 		case *Named:
 			fmt.Fprintf(&b, "%p<", t.Decl)
+			if erase {
+				b.WriteString(">")
+				return
+			}
 			for _, a := range t.Args {
 				put(a)
 				b.WriteString(",")
 			}
 			b.WriteString(">")
 		case *FuncType:
+			if erase {
+				fmt.Fprint(&b, "F", len(t.Params), t.Receiver != nil)
+				return
+			}
 			b.WriteString("(")
 			if t.Receiver != nil {
 				put(t.Receiver)
@@ -611,8 +660,15 @@ func shape(f *Func) (s string, ok bool) {
 		b.WriteString(", ")
 		put(p.Type)
 	}
+	if erase && f.Result != nil { // the JVM's signature holds the result
+		b.WriteString(" : ")
+		put(f.Result)
+	}
 	return b.String(), ok
 }
+
+// primitive names the types the JVM tells from their nullable forms.
+var primitive = map[string]bool{"Int": true, "Long": true, "Double": true, "Boolean": true, "Char": true}
 
 func (c *checker) addFunc(f *Func, receiver bool) {
 	c.info.Funcs[f.Decl] = f
@@ -643,6 +699,14 @@ func (c *checker) getter(f *Func, d *syntax.ValDecl) {
 	defer c.pop()
 	f.Receiver, f.Result = c.typ(d.Receiver), c.declared(d)
 	f.markers = c.marks(d.Mods)
+	for _, p := range f.TypeParams {
+		if !mentions(f.Receiver, p) {
+			c.errorf(d, "type-params", "%s is not in the receiver's type, which kotlinc refuses for a val's type parameter: use it there, or remove it", p.Name)
+		}
+	}
+	for _, t := range []Type{f.Receiver, f.Result} {
+		c.exposed(d, f.vis, t)
+	}
 	c.failing(d, f)
 	c.later(&c.bodies, func() {
 		c.owner = f
@@ -763,9 +827,16 @@ func (c *checker) class(td *TypeDecl) {
 			c.errorf(d, "nested-type", "%s is not a variant of %s, and only its variants are nested in it (spec.md 3.2): add : %s, or declare %s at the top level", td.Name, o.Name, o.Name, d.Name)
 		}
 	}
+	shown := td.vis // a variant is seen no wider than its sealed interface
+	for _, s := range td.Supers {
+		if s.Decl.Kind == "sealed interface" && narrower(s.Decl.visibility, shown.visibility) {
+			shown = s.Decl.vis
+		}
+	}
 	for _, p := range d.Params {
 		v := &Var{Kind: Property, Name: p.Name, Type: c.typ(p.Type), Owner: td, Decl: p}
 		v.markers = c.marks(syntax.Modifiers{Annotations: p.Marks})
+		c.exposed(p, shown, v.Type)
 		td.Props = append(td.Props, v)
 		c.info.Vars[p] = []*Var{v}
 	}
@@ -796,6 +867,8 @@ func (c *checker) class(td *TypeDecl) {
 			}
 			v := &Var{Kind: Property, Name: m.Name, Type: c.declared(m), Owner: td, Decl: m}
 			v.markers = c.marks(m.Mods)
+			c.interfaceMember(m, m.Mods, m.Name, -1)
+			c.exposed(m, shown, v.Type)
 			variance(m, v.Type, true, m.Name)
 			td.Props = append(td.Props, v)
 			c.info.Vars[m] = []*Var{v}
@@ -807,6 +880,7 @@ func (c *checker) class(td *TypeDecl) {
 			f.markers = c.marks(m.Mods)
 			if d.Kind == "interface" || d.Kind == "sealed interface" {
 				f.Kind = Method
+				c.interfaceMember(m, m.Mods, m.Name, len(m.Params))
 				if m.TypeParams != nil {
 					c.errorf(m, "interface-fun", "an interface's fun takes no type parameters (spec.md 3.4): make %s a top-level fun that takes the value", m.Name)
 				}
@@ -821,6 +895,7 @@ func (c *checker) class(td *TypeDecl) {
 			}
 			c.info.Funcs[m] = f
 			c.signature(f, m, td)
+			c.shows(f, shown)
 			for i, p := range f.Params {
 				variance(m.Params[i], p.Type, false, m.Name)
 			}
@@ -829,6 +904,7 @@ func (c *checker) class(td *TypeDecl) {
 			c.later(&c.bodies, func() { c.body(f, m) })
 		}
 	}
+	c.twice(td)
 	if d.Kind == "data class" || d.Kind == "data object" {
 		c.later(&c.bodies, func() { c.conform(td) })
 	}
@@ -1036,6 +1112,9 @@ func (c *checker) aliased(a *alias) Type {
 		c.enter(a.file, c.pkgs[a.Pkg])
 		c.open(a.params)
 		a.typ, a.state = c.typ(a.decl.Type), 2
+		if _, ok := nonNull(a.typ).(*TypeParam); ok {
+			c.errorf(a.decl.Type, "typealias", "a typealias names a class or a function type, and kotlinc refuses one that is its own type parameter: write the type itself where %s is written", a.decl.Name)
+		}
 	} else if a.state == 1 {
 		defer func(f *syntax.File) { c.file = f }(c.file)
 		c.file = a.file

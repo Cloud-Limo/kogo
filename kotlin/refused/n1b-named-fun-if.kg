@@ -1,0 +1,8 @@
+// kotlinc refuses line 6
+// A named fun as an if's branches.
+package kt
+
+fun f(c: Boolean): Int {
+    if (c) fun named() {} else fun other() {}
+    return 1
+}

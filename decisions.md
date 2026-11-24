@@ -2432,6 +2432,7 @@ Each entry: what was decided, why, and what would reopen it.
 - **The raising `db.tx` is `either` around the plain one**: the scope is made once, so a
   rerun raises on the same handle.
 - **The driver is told of a composite type on the connection that first reads one**
+  (*superseded 24 Nov 2026 by "A whole row is read by its fields' names" below*)
   (`Tx_Known`, called where a statement has a column of one). The types its fields are
   made of come with it. A `Db` is made from a pool that already exists, so there is no
   hook when a connection opens; the cost is a map lookup for each such statement. `citext`
@@ -2442,7 +2443,8 @@ Each entry: what was decided, why, and what would reopen it.
   own search path, tells the driver of it by schema and catalog name, and registers it
   under the written name too. Not taken: carrying the catalog name in `sqlpass.Type`,
   which would bind the type to the schema it was checked against.
-- **A connection knows a composite type by name until it closes.** A migration that drops
+- **A connection knows a composite type by name until it closes** (*superseded 24 Nov
+  2026 by "A whole row is read by its fields' names" below*). A migration that drops
   and makes again a type a running server reads leaves the old OID on each connection
   that read it, and those connections panic on it. Restart the server after such a
   migration. Reopen if migrations run under a live server.
@@ -4677,6 +4679,53 @@ The lead ruled the encoder changes, not the comparison; the agent's, for the res
 - **`http/json.go`'s `encode` is left as it is**: it writes to a third party, which
   compares no bytes, and still escapes U+2028 there.
 
+## What kotlinc refuses, `kogo check` refuses (DEV-1156), 24 Nov 2026
+
+The lead ruled form 11 (narrowly) and finding 4 (refused); the agent's, for the rest.
+
+- **`kotlin/refused/`, one form a file**: DEV-1143's `misplaced.kg`, `modifiers.kg` and
+  `twice.kg` each held two forms, so a refusal of one passed the file; each is two files
+  now. Not taken: a file per finding, which tests only the first refusal it meets.
+- **Both must refuse on a named line**, not merely somewhere, so a refusal of the wrong
+  thing fails. Where they place it apart (a call against a declaration, an import against
+  a use, a lambda against the return it spoils), the first line names both,
+  `// kotlinc refuses line N, kogo check line M`. Not taken: any error passing.
+- **A refusal syntax can see is the parser's** (`else` not last, `010`, a modifier twice,
+  a name declared twice in one list, `_`, a named `fun` as a body, `val <T>` with no
+  receiver, `val ()`, `x < (... > ...)`, a lambda on the line after a call, a `when`
+  branch with no condition, `&&` in `when (x)`, an empty `when`); the rest is the
+  checker's. `when-branch` serves every `when` form, `duplicate` every name twice.
+- **Overloads of one file are compared as the JVM erases them, the result included**:
+  type arguments, a `?` but on `Int`, `Long`, `Double`, `Boolean` and `Char`, and the
+  types inside a function type are dropped. Each file is its own JVM class, so two files
+  never clash, and kotlinc takes `f(xs: List<Int>): Int` beside `f(xs: List<String>):
+  String`. For the program alone: the prelude's `sumOf` is Kotlin's own library's. A `?`
+  on a type parameter is dropped across files too, as kotlinc refuses `T?` against `T`
+  wherever they are. `lambda.kg`'s pair, which differs in its results, is refused at
+  its call, as kotlinc refuses it: a lambda chooses only among the prelude's funs.
+  Not taken: comparing across files, which refuses what kotlinc takes.
+- **`import own.Name as Other` is refused at the import**, where Kotlin refuses a later
+  use of `Name`. Not taken: hiding `Name` in the file, a new rule of scope for one form.
+- **An empty `when` is refused whatever its subject**; Kotlin refuses it only where it
+  must be exhaustive, but it does nothing. Not taken: the sealed case alone.
+- **`name`, `ordinal` and `entries` as an enum's constant are refused**, `entries` too,
+  so emit's test row for `Kind_entries` in Go goes: the form never reaches `emit` now.
+- **A function in a template is refused through the types `==` looks through** (a data
+  class's property, a variant, a type argument), since finding 4's case is a data class
+  holding one. Not taken: a bare function alone.
+- **`_` is refused as a fun's, a val's, a parameter's, a loop's, a type's, a type
+  parameter's, a constant's and a property's name**, and stays where Kotlin takes it: a
+  destructuring's part and a lambda's parameter.
+- **A const val is a number, a `Boolean`, a `Char` or a `String`, not nullable, made of
+  literals, operators, templates and other const vals.** kotlinc takes some calls on
+  constants too, `1.toLong()`; Kogo refuses them: write `1L`. A private type may not show in
+  a fun's or a member's signature, a data class's property or a val's type wider than it;
+  a supertype and a typealias are not checked, as no file of the hunt needed them.
+- **An interface may not declare `toString()` or `hashCode()`** with no parameter;
+  `equals` is left, as Kogo has no `Any` to write its parameter with.
+
+Reopen any of these when a form refused here is one kotlinc takes in a port.
+
 ## The SQL pass's five faults from the stress run (DEV-1154), 24 Nov 2026
 
 The lead ruled finding 11; the agent's, for the rest.
@@ -4768,6 +4817,71 @@ limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
 - **A sentence each in spec 15 and `doc/gates.md`**, though neither said the gate's read
   is the first: each describes the savepoint, and the statement before it is now part of
   how the gate runs.
+
+## A whole row is read by its fields' names (DEV-1194), 24 Nov 2026
+
+Greg's ruling of 24 Nov 2026 on DEV-1168's research, which builds its proposal; the
+agent's where marked.
+
+- **A column of a composite type is sent as its fields, by the names `kogo check`
+  saw**, `("driver")."id", ("driver")."name"`, a nested composite the same way one
+  level down. No composite value reaches the driver, so it reads no field by position
+  and is told of no composite type: `Composite`, `Row` and the composite half of
+  `Tx_Known` go. This also mends an absent whole row with a `List` field, which
+  panicked. Not taken: loading the types again in each transaction, which still reads
+  by position; leaving it to the deploy's restart.
+- **Before a composite's fields, one column says whether it is null as a whole**,
+  `("driver") is not distinct from null`, for every composite, nullable or not. Not
+  taken: only where `kogo check` finds it nullable, which reads a null asserted with
+  `"name!"` as a row of nulls; null when every field is, the prefix form's rule, which
+  loses a row of nulls.
+- **A select with a composite column is wrapped once more, in `select * from (...) _
+  offset 0`**, so that Postgres does not fold it into the select of the fields and work
+  out a function or a subquery that gives a composite once for each field. Not taken:
+  only where the column is not a plain reference.
+- **The outer select tests `'<type>'::regclass is not null` for each composite type
+  read**, a table's row included: Postgres plans a prepared statement again when a
+  relation it names changes, and a type made with `create type` is otherwise none of
+  the statement's, so a held connection read a moved field's old place as null. The
+  test leans on Postgres's source (`setrefs.c`, "Check for regclass reference"), not its
+  documentation, and `TestMovedFields` guards it. Not taken: leaving types made with
+  `create type` to the restart. `regclass` finds a relation, so an index named as the
+  type in an earlier schema of the search path would be named instead.
+- **Up to 15 to 40 µs more planning on a call Postgres plans afresh is accepted**, for
+  a read of a whole row of 24 fields, on top of the wrap's 20 µs (DEV-1167); reads of
+  many rows come out faster through the driver (DEV-1168, point 6).
+- **One emitted shape for a composite, nullable or not**: the data class is built only
+  where the null column says it is there, under `kogo.NotNull` where its property is
+  not nullable. Not taken: a plainer shape where it is always there.
+- **Every field is read as a pointer** (the agent's, where DEV-1168's sketch read one as
+  a pointer only where the whole may be null), so a null whole row in a property that
+  is not nullable, asserted with `"name!"`, still panics naming the column, as before,
+  and not with the driver's `null is not a Uuid`. It costs a `kogo.NotNull` for each
+  field that is not nullable.
+- **`Tx_Known` stays for an array type Postgres does not ship** (the agent's: DEV-1153
+  gave it that work after DEV-1168 ran), and is now told of such an array where it is a
+  field's, since the field comes as a column of its own.
+- **The check of the wrap compares each column's type only where it is the
+  statement's** (the agent's): the null column and the fields are compared by name,
+  since the SQL pass keeps no field's oid.
+
+## U+0000 in a string on the wire is a 400 (DEV-1192), 24 Nov 2026
+
+- **The reader refuses a `String` that holds U+0000**, wherever it stands in the input,
+  as the lead ruled on DEV-1153 under Greg's rule that nothing a caller can cause is a
+  500. The refusal is at the plain `String` alone: an enum or a `Uuid` that holds one is
+  already refused as not one of its names or not a `Uuid`. Not taken: refusing only a
+  string an operation sends to Postgres, which the reader cannot know.
+- **Settings are refused too**: they are read by the same reader (15.4), so a setting
+  holding U+0000 stops the start, naming the key. Not taken: a reader with a flag to let
+  them through, a line for a case no one has.
+- **`rpc.Call` refuses it too**, with the reader's message from one constant: a route in
+  Go's `main` reads a caller's body and calls an operation without the reader, and Greg's
+  rule covers every operation. Not taken: leaving routes to check their own input.
+- **One message for inputs and settings**: "holds U+0000, which no input or setting may:
+  leave it out", since a setting is not on the wire. Not taken: a message per case.
+- **Spec 10.4's line stays**: a `String` the program makes that holds U+0000 is still a
+  panic when it is sent; an input can no longer bring one.
 
 ## The tables of the handler and the database handle (DEV-1155), 24 Nov 2026
 

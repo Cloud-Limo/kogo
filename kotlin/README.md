@@ -1,9 +1,11 @@
 # The check against Kotlin
 
-`mise run kotlin` tests two sentences of `doc/design.md`, principle 3:
-text valid in both languages means the same in both, and each of
-Kogo's own forms is refused by kotlinc. It needs a JVM
-and is not part of `go test ./...`.
+`mise run kotlin` tests the subset of `doc/design.md`, principle 3, in
+each direction. Where both languages accept a program, `builtins/`
+checks that it means the same in both; where kotlinc refuses one,
+`refused/` checks that `kogo check` refuses it too. `deviations/`
+checks the one way out of the subset, Kogo's own forms, which kotlinc
+must refuse. It needs a JVM and is not part of `go test ./...`.
 
 - `builtins/*.kg` is the shared source: Kogo, and Kotlin unchanged
   (kotlinc is given the same bytes under a `.kt` name, `time.kt`,
@@ -34,6 +36,12 @@ and is not part of `go test ./...`.
   its first line names, `// kotlinc refuses line N`, so no Kotlin
   habit applies to one unnoticed (principle 3). A new deviation adds
   a file.
+
+- `refused/*.kg` are forms kotlinc refuses that `kogo check` once
+  passed (spec 1), one file each, each its own package. Both must
+  refuse it on the line its first line names, `// kotlinc refuses
+  line N`, or, where the two place the fault apart, `// kotlinc
+  refuses line N, kogo check line M`. A form found later adds a file.
 
 To cover a function, add a branch: the generator reads the names from
 the source. Everything written is under `kotlin/_work`.

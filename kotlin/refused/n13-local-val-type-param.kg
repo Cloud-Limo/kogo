@@ -1,0 +1,8 @@
+// kotlinc refuses line 6
+// A local val with type parameters.
+package kt
+
+fun f(): Int {
+    val <T> x = 1
+    return x
+}

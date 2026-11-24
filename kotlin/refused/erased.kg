@@ -1,0 +1,7 @@
+// kotlinc refuses line 7
+// Two funs that differ only in a parameter's type argument: on the JVM they are one signature.
+package refused
+
+fun count(xs: List<Int>): Int = xs.size
+
+fun count(xs: List<Long>): Int = xs.size + 1

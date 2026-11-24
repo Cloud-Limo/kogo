@@ -163,3 +163,6 @@ create domain d_citext as citext; create domain d_varchar as varchar; create dom
 create domain d_timestamptz as timestamptz; create domain d_date as date; create domain d_time as time;
 create domain d_interval as interval; create domain d_bytea as bytea; create domain d_kind as invite_kind;
 create domain d_tags as text[]; create domain d_amount as amount;
+
+-- A composite type with a field of an array type Postgres does not ship.
+create type tag_set as (tags d_tags, names d_text[]);

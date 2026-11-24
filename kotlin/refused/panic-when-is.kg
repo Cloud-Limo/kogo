@@ -1,0 +1,9 @@
+// kotlinc refuses line 7
+// is in a when with no subject (it made kogo check panic).
+package kt
+
+fun f(): Int =
+    when {
+        is Int -> 33
+        else -> 34
+    }

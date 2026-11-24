@@ -1,0 +1,8 @@
+// kotlinc refuses line 6
+// An else that is not a when's last branch: Go's default would run last.
+package refused
+
+fun f(n: Int): String = when (n) {
+    else -> "else"
+    1 -> "one"
+}

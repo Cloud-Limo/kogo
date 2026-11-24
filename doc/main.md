@@ -479,12 +479,12 @@ typed value beside the table (`routes.Logout_op`, of `rpc.Op[Env, I,
 A]`; a checked list's operations have none, so a route that names one
 does not compile), and `rpc.Call(h, r, op,
 input I) (A, error)` runs it through a handler `main` does not mount,
-checking the input's enums against their entries as the strict reader
-does. A renamed property or a removed operation is a compile error,
-and the chain (Q13) makes one for a property added. Hand-written Go
-then names emitted Go, so the emitter's naming rule reaches `main`; it
-already names `app.Env` and each table. About 10 lines of emitter, 25
-of `rpc` and 50 of tests.
+checking the input's enums against their entries, and its `String`s
+for U+0000, as the strict reader does. A renamed property or a
+removed operation is a compile error, and the chain (Q13) makes one
+for a property added. Hand-written Go then names emitted Go, so the
+emitter's naming rule reaches `main`; it already names `app.Env` and
+each table. About 10 lines of emitter, 25 of `rpc` and 50 of tests.
 
 Not taken was a, by wire name with JSON in and out
 (`calls.Call(r, "recordDeliveryFailure", body)`): a renamed property,

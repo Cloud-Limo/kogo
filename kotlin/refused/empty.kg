@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// A data class with no property.
+package refused
+
+data class Nothings()

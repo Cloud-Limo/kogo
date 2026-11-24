@@ -1857,19 +1857,8 @@ Each entry: what was decided, why, and what would reopen it.
   two values, as a string template would evaluate it. Since DEV-827 the parser tells the pass
   where each parameter lies, so `${...}` holds any expression. There is no way to write the text `$name`, and so no tagged dollar
   quoting.
-- **The emitted Go is a shape for the emitter to replace.** (Replaced by DEV-832, which
-  removed `sqlpass.Emit` and `kogo-sql emit`; see its section below.) One function per literal over a
-  `pgx.Tx`, returning `([]Row, error)` or the rows affected, named `Q<path>L<line>C<column>`
-  with `_2`, `_3` added when two paths map to one Go name. The row count rules of the five
-  calls and turning an error into a panic belong to the emitter, which knows the call. Every
-  scalar parameter is a pointer, since without the checker nothing says which arguments are
-  `T?`. `Uuid` is `[16]byte`, `Decimal`, `LocalDate`, `LocalTime` and `Duration` are pgx's
-  `pgtype` structs and an enum is a `string`, until the prelude has types. Not handled: an
-  array of an enum or of `citext`, which pgx must be taught per connection.
 - **An enum's Kogo name is its Postgres name in PascalCase** (`invite_kind` is `InviteKind`) in
   a signature. The spec matches enums by their constants; the checker will do that.
-- **Layout.** Module path `kogo` until there is a remote to name it after. `sqlpass` is the
-  pass; `cmd/kogo-sql` is the command, and since DEV-819 finds literals through the parser.
 - **Errors** are one JSON object a line with a code such as `sql-rejected`; the command exits
   0 when all pass, 1 when a literal fails and 2 when it could not run. Postgres's message is
   kept, with its detail, hint and SQLSTATE, and `$1` spelt as the literal spells it.
@@ -1994,9 +1983,6 @@ Each entry: what was decided, why, and what would reopen it.
 - **The tree marks a trailing lambda** (`Arg.Trailing`): it fills the last parameter, where
   a lambda inside the parentheses fills the next one, and the two differ when a default is
   skipped.
-- **Sections 9 to 11 are named, not checked**: `Either`, `Raise`, `Tx`, `Db`, the forms of
-  section 9, a sql literal and a marker each give `not-yet-checked`. DEV-826 and DEV-827
-  replaced that.
 - **A file that does not parse stops `kogo check`**: its syntax error is reported, the
   other files are parsed, and none is checked. Checked without its declarations, the
   others show false errors, each naming something that is declared. Not taken: checking
@@ -2126,9 +2112,6 @@ Each entry: what was decided, why, and what would reopen it.
   `execute(sql"...")` is refused with a fix naming `this.execute`. No example or port calls
   one on an implicit receiver, and taking it would have the checker and the emitter both
   find that receiver. Reopen if a port writes helpers as funs on `Tx`.
-- **The examples changed to pass**: 12, 13 and 16 import `kogo.time.Instant` (spec 2), and
-  19 is `package example.markers`, since 12 also declares `Business`. The prelude gained
-  `Uuid`, `newId`, `List.size` and `check`, which they use.
 
 ## Taken building the emitter's first slice (DEV-830), not yet discussed
 
@@ -2242,9 +2225,6 @@ Each entry: what was decided, why, and what would reopen it.
     checker refuses them (see "Agreed with Greg").
 - **A marker is written nowhere** (spec 11): the checker has enforced it, and it does
   nothing at run time, so a program with markers is emitted, not refused.
-- **Not handled**: nothing left of the first list. A literal outside its type's range
-  and two top-level vals that read each other are refused by the checker since DEV-846,
-  and two Kogo packages that import each other since DEV-844 (see "Agreed with Greg").
 - **`lowercase()` is Go's `strings.ToLower`**, stated in spec 12 as a corner where the
   prelude differs (principle 3): matching `İ` and a final sigma means Java's case tables,
   and no ported module depends on them. `uppercase()` is not in the prelude yet, so it
@@ -2261,9 +2241,6 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken making `Either` the only spelling (DEV-833), not yet discussed
 
-- **Example 08 is deleted and the gap left.** Renumbering 09 to 21 would rename thirteen
-  files that the tests, the parser's tree and open branches name; a gap costs nothing.
-  Reopen when the examples are next reorganized.
 - **The refusals' codes**: `raise-receiver` for `Raise<E>` written anywhere in a program,
   reported at the type, so at the receiver of a fun; `kotlin-context` from the parser for
   any `context(...)` before a declaration or a local fun, since Kogo has no context
@@ -2382,10 +2359,6 @@ Each entry: what was decided, why, and what would reopen it.
 - **New codes `sql-field-missing` and `sql-field-unused`**. A field's type and
   nullability keep `sql-column-type` and `sql-nullable`, said of "field f of column c",
   without the cast or `"name!"` fix, which Postgres has not for a field.
-- **Not done: reading a composite at run time.** DEV-832 is not done, so the issue leaves
-  it out; `sqlpass.Emit` refuses a composite column, as `kogo-sql emit` then does with
-  `sql-emit`, rather than write Go that does not build. (DEV-832 reads one, and removed
-  both.)
 
 ## Taken emitting SQL and transactions (DEV-832), not yet discussed
 
@@ -2502,16 +2475,10 @@ Each entry: what was decided, why, and what would reopen it.
   one-element `plus` waits for a call; `coerceAtLeast` and `coerceAtMost` are on `Long`
   only. `Set<out T>.contains(element: T)` takes a `T`, as Kotlin's does by
   `@UnsafeVariance`.
-- **Three more than the issue listed, because the ledger calls them**: `list[i]`
-  (`List.get`), `Int.toLong()` and `LocalDate.plusDays`, each in section 12.
 - **A `for` over a `Set` is still refused by the emitter**, as before; no call needs it.
 
 ## Taken growing the prelude for the stage-1 ports (DEV-828), not yet discussed
 
-- **The ports are checked as copies, beside the originals**: `~/kogo-stage1/<port>/checked/`
-  holds round 1's files, corrected where a rule of the spec changed, and `missing_*.kg`, the
-  declarations they refer to and do not hold, with stand-in bodies (a program may not
-  write `external`). `round1/` is left as written, so a diff shows what each change cost.
 - **`trim(char: Char)` takes one character**, where Kotlin's takes `vararg chars`. With
   `vararg`, `trim()` fits both declarations and the checker ranks neither, where Kotlin
   prefers the one without `vararg`; a second character is refused, never misread. Reopen
@@ -2705,17 +2672,10 @@ Each entry: what was decided, why, and what would reopen it.
   itself (`dev-852-kogo-ts`) would be missed by a run sent to review or fix it. Not taken:
   short names with the wrapper searching for `dev-NNN-*`, which is more code in cusoon2 for
   shorter names nobody types. Reopen if the long names get in the way.
-- **Handoff and Review comments go on the PR as well as the issue.** A run has no Linear
-  access and is shown none of the issue's earlier comments; the PR is the one place both a
-  run and a Zed session can read. Reopen if runs are given the issue's comments.
 - **A Question without a Ruling stops the merge, not the fixes.** Fix makes the fixes,
   pushes, and lists the Question under Open in its `Fixed:` comment; the lead does not merge
   while anything is Open. Not taken: refusing to start, which loses the fixes for one open
   point; merging and filing the Question, which merges what the review doubted.
-- **The lead removes worktrees and deletes merged branches.** It merges, so it removes them
-  then, and at Starting any left behind. `git push origin --delete`, not `gh pr merge
-  --delete-branch`, which tries to check out `main` in the worktree and fails because
-  `~/Dev/kogo` holds it.
 - **The lead does not commit.** Its decisions reach the repository through the issue or the
   PR they belong to, so every change has had a Code review; the merge it makes is of such a
   PR. Reopen if that makes small corrections slow.
@@ -2815,9 +2775,6 @@ Each entry: what was decided, why, and what would reopen it.
 - **`list[i]` outside the list is fixed here too** (`Index 5 out of bounds for length 3`,
   the JVM's message for `listOf(...)[5]`), one unsigned comparison in `List_Get`. Not taken:
   filing it apart, for a change of three lines.
-- **`single()` is not added**: section 8 and the stdlib list name it, but the prelude has
-  no `single` at all, so there is no message to correct; adding it is a feature, left to be
-  filed. Not taken: adding it here. (DEV-873 adds it.)
 
 ## Taken adding `single()` and the list ends (DEV-873), not yet discussed
 
@@ -2828,13 +2785,6 @@ Each entry: what was decided, why, and what would reopen it.
   a copy, which matches `firstOrNull`'s reason only if something writes through a list.
 - **`substring(start)` is `substring(start, length)`**, so both give the same message, as
   Kotlin's do (`Range [4, 3)` for `"abc".substring(4)`).
-
-## Taken adding `Uuid.parse` (DEV-881), not yet discussed
-
-- **`Uuid.parse` reads what the wire reads, and the wire calls it**: 36 characters, hyphens
-  at 8, 13, 18 and 23, hex of either case. It is stricter than Java's `UUID.fromString`,
-  which takes short groups (`1-2-3-4-5`). `Uuid` is Kogo's own, so nothing holds it to
-  Java's. Reopen if a port's comparison depends on a text Java reads and this does not.
 
 ## Refusing a marked data class as an input (DEV-890), agreed with Greg 16 Nov 2026
 
@@ -3183,12 +3133,6 @@ Each entry: what was decided, why, and what would reopen it.
   the shared source's package, names it and its extension functions as the prelude does, since Kogo
   imports neither and Kotlin has no default import to add. Not taken: a Kotlin `Either`
   written here, which would test Kogo against itself; a Gradle build.
-- **The time cases keep to known zones and to dates a million days inside `LocalDate`'s
-  range**, as three differences found there are left to a fix of their own: an unknown
-  zone's message, `plusDays`' message past the range, and `atZone` past year
-  ±999,999,999, where Kogo gives a date and Java throws. Not taken: listing them in
-  `kept`, which holds only the differences `spec.md` states. DEV-952 fixes them and
-  widens the cases.
 - **`Clock.now` has no case**: its value is the time of the run, and the prelude gives no
   way to build a fixed `Clock`. `Uuid.parseOrNull`, `atStartOfDay` and `toInstant` are
   DEV-952's (corrected: this line left them to DEV-932, which added none).
@@ -3281,28 +3225,12 @@ Each entry: what was decided, why, and what would reopen it.
   must name something. Not taken: leaving the shape to the Origin check's issue (roadmap
   row 4), which would let any fun stand there until then. That it only reads is not
   checked.
-- **A gate takes a `Tx`** until `SerializableTx` is built (roadmap row 5), and a `Db` is
-  refused. **A proof is any type** until a proof's rules are (row 6), and gated work and
-  a step take the very type the gate gives, not one it fits.
-- **A gate's proof is not a `Tx`, a `Db` or a `Request`** (Review 1 of PR 88): gated work
-  takes none of them, and a proof of that type would hand it one. Refused under `gate`, the
-  gate's code, since the gate gives it. This is the one proof rule before row 6. Not
-  taken: refusing it at the work's second parameter, where the same type is fine for an
-  ungated operation's first.
-- **A step returns `Either<String, Unit>`** as well as taking the gate's proof and the
-  operation's input, since `doc/gates.md` hands its answer to nothing. Not taken: the
-  proof and the input alone, which the issue named. That it is an `action fun` is row 7's.
 - **A gate that reads an input stands in one row of a list**: the second row to name it
   is refused. Counted for each list, since a fun may stand in more than one. Not taken:
   allowing it where the rows' inputs are one type, which the design does not have.
 - **One table of roles drives the shapes** (`check/api.go`, `role`), as `doc/lists.md`
   asks, with one error code a role: `operation`, `gate`, `check-shape`, `step`. An
   ungated operation's messages now say "an ungated operation".
-- **`kogo emit` refuses a check and a gated row** (`not-yet-emitted`) until the server
-  runs them (row 3), and `kogo ts` writes a gated operation's types as any other's. So
-  `examples/24_gates.kg` is parsed and checked by the tests and left out of the emitted
-  program, whose test asserts the refusal. Not taken: emitting the table without the
-  check or the gate, which would serve the work with nothing before it.
 
 ## Taken answering an ungated operation with `Reply` and cookies (DEV-963), not yet discussed
 
@@ -3332,12 +3260,6 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken building `action fun` (DEV-962), not yet discussed
 
-- **`Console.println` and `print` are actions; `Console.readln` and `Clock.now` are
-  lookups.** The issue asks that an existing binding carry its kind, and an `action fun`
-  must call an action, so an example needs one in the prelude before `kogo.http` (row 9).
-  Printing cannot be rolled back and happens twice when run twice. No example or test
-  printed before. Not taken: no action until row 9, which leaves no example that checks.
-  Reopen if a command that prints inside a transaction is wanted.
 - **The kind is a word before `fun`, in either order with `external`**, since the parser
   reads modifiers in any order: `doc/work.md` writes both `action external fun` and
   `external lookup fun`. Nothing reads `lookup` yet; the printed table will. (`lookup`
@@ -3347,18 +3269,11 @@ Each entry: what was decided, why, and what would reopen it.
   class says one, which would mark `List.map`.
 - **"In a transaction" is "in a block handed a `Tx`"** (`action-in-tx`), which is
   `db.tx`'s block and any other the prelude gains. Not taken: knowing `db.tx` by name.
-- **A step that is not an `action fun` is refused under `step`**, the role's one code, and
-  only where its shape otherwise fits, so one fault gives one error.
 - **The word stays true is `idle-action`; a `::` reference, a member and a kept lambda
   are `action-kept`.** A local fun cannot be an `action fun`: a call in one is
   `unmarked-action`, whose message says to move the call into the action fun around it
   (review of PR 90), and `action fun` in a body is the parser's error. Not taken: letting
   a local fun be one, which nothing needs.
-- **Left to row 6 (a proof's rules)**: that an `action fun` takes a proof only as a step
-  or as gated work that runs wholly outside, and `outside-passes-proof`.
-- **Serving a gated `action fun` with no transaction was left to DEV-961**, and so was
-  refusing a row with both `after` and an `action fun` as its work (Ruling on PR 90): both
-  are under "Serving a gated row" above.
 - **Printing is an action** (Greg, 19 Nov 2026, answer (a) to the Ruling on PR 90's
   question): `Console.println` and `print` stay actions, as built. Not taken: (b) printing
   is neither kind. Reopens when logging is designed, with its own handle rather than
@@ -3392,12 +3307,6 @@ Each entry: what was decided, why, and what would reopen it.
   offers taking a `SerializableTx` too, the change to make in a gate on a `Tx`.
 - **Not done here: the printed table's `runs serializable` / `runs plain` line**, which
   waits for the printed table.
-- **Open: a `kogo test` block is handed a `Tx`**, so a test cannot call a fun that takes
-  a `SerializableTx`. The Review on PR 93 leans to `RolledBack` opening at SERIALIZABLE
-  and handing a `SerializableTx`; it is Greg's, brought to him before roadmap row 13. Not
-  taken now (the lead, 19 Nov 2026): building that here, which changes what a test may
-  call without his word. Settled since (DEV-969, above under Agreed with Greg): a test's
-  block is handed a `SerializableTx`.
 
 ## Taken serving a list's Origin and CSRF check (DEV-964), not yet discussed
 
@@ -3456,37 +3365,6 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken holding a proof's rules (DEV-976), not yet discussed
 
-- **The checker knows a proof by its shape**: a data class whose constructor is marked and
-  which has a marked property that is a `Tx` or a `SerializableTx`, or an interface that
-  declares such a `val` (`doc/gates.md`'s `OnBooking`). Not taken: by role, whatever type a
-  gate gives, which misses the proofs no gate gives (`AtTenant`, a new row's, an interface)
-  and the model's files, where the two rules on the transaction are read; a marked `Tx`
-  alone, which the design does not call a proof.
-- **A gate that gives a transaction gives a proof** (Greg's choice C, 20 Nov 2026, DEV-982):
-  a `P` that holds a `Tx` or a `SerializableTx` anywhere but as a proof's own marked one
-  is `gate-proof`, said once per gate, at its first row; a `P` of facts alone stays a
-  plain data class. Not taken: A, every gate gives a proof, which makes every gated
-  program carry a marker and an opt-in for facts that need none; B, as before, where a
-  port that forgets the marker gets no rules and no error, PR 91's 500 included.
-- **"Holds" has no limit** (the lead's Ruling on PR 99, 20 Nov 2026): `heldTx` walks every
-  named type, its type arguments (`List<Plain>`, `Box<Tx>`, `Map<String, Tx>`), a sealed
-  interface's variants, a function type's result and nullables, at any depth, and does
-  not stop at a proof: it skips only the proof's own marked transaction. So a proof's
-  second, unmarked `Tx` (`Two(val other: Tx, @property:M val tx: Tx)`) and a plain class
-  inside a proof are refused too, since each hands work a transaction no rule holds,
-  the same hole by another door. A `P` that holds a `List` of proofs passes. This
-  reverses PR 99's first cut, which stopped at a proof and at type arguments. The error
-  names the type that holds the transaction, and says to mark an interface's `val`, a
-  data class's constructor and transaction, or take a proof's second one out. Not
-  taken: refusing in an `action fun` any `Tx` it did not open, which closes doors a gate
-  cannot see but is a rule on actions, not C. Reopen: a port whose gate must hand on a
-  transaction in a shape this refuses.
-- **`examples/24_gates.kg` moved to C**: `OpenInvoice` is a proof marked `@DeskOnly`, and
-  `statusOf` and `unpaid` take a narrower proof, `AtDesk`, of the transaction alone, from
-  a gate `atDesk` that calls `clerk` and binds its answer. Not taken: binding
-  `${clerk.address}` in their statements, which would scope by nothing the SQL needs.
-  `clerk` now gives `Clerk(address)`, facts alone, to `testPrinter`, the action fun that
-  reads only facts: C's lighter half, shown.
 - **A marked property is built here** (spec 11): a marker on a data class's property was a
   syntax error, and an interface's marked `val` was read and not held. Both are now
   marked, and read only in a file that opts in, by name or by destructuring. The proof
@@ -3506,32 +3384,6 @@ Each entry: what was decided, why, and what would reopen it.
   refuses `val (id, _) = held` in a file that does not opt in to the marker of the second
   property, so skipping the opt-in would accept what Kotlin refuses. Not taken: the
   Review's whole Fix. Reopen: a later kotlinc accepts it.
-- **A statement on the transaction of a proof with no name binds nothing** (Fix 3):
-  `xs.first().tx.execute(sql"${id}")` matched the bare `id` of `this`. It is
-  `unbound-statement`, with "keep the proof in a val" to do.
-- **A block that takes or gives a proof counts as passing one** from a fun that runs
-  outside (Fix 4), whatever fun it is handed to, the prelude's included. Not taken:
-  following the block into the fun that calls it.
-- **Not seen by `action-proof`: a proof held in a list or in a plain data class**, as
-  `xs: List<Held>` or `Box(val held: Held)`. Only a file that opts in can make one: a
-  step or work that runs outside cannot, since building either passes the proof.
-- **The codes** are the design's `proof-tx-escapes` and `outside-passes-proof`, and two it
-  did not name: `unbound-statement` and `action-proof`; DEV-982 adds `gate-proof`.
-- **"Written directly" is `proof.fact` or a property under it**, `${held.business.id}`,
-  spelt on the same name as the receiver. Not taken: `proof.fact` alone, which refuses a
-  proof that keeps its row as a data class, as spec 11's `HeldBusiness` does.
-- **A statement on a proof's transaction in a fun that runs outside is refused too**, under
-  `outside-passes-proof`: the design says SQL in a step is the checker's error, and in a
-  file that opts in nothing else refused it. Not taken: leaving it to the marker, which
-  holds only the operations' files.
-- **Passing counts a receiver, and a proof of any type**, `booking.tenant` included. Only
-  an `action fun` that takes a proof is held to it, as the issue says. Not taken: every
-  `action fun` outside a `db.tx` block, which no case needs.
-- **`copy` fills a proof's transaction as its constructor does** (spec 11 holds a copy to
-  the constructor's marker), and destructuring a proof down to its transaction is
-  `proof-tx-escapes`.
-- **The rules are 15.7, after TypeScript**, so that no section is renumbered under the
-  messages that cite them.
 
 ## Taken building `kogo.http` (DEV-978), not yet discussed
 
@@ -3876,34 +3728,8 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   fixed inputs per case, which the edges and random cases would not
   vary.
 
-## A statement need not bind its proof (DEV-1029), 20 Nov 2026
-
-- **The rule that a statement binds something of its proof leaves the
-  language** (Greg, 20 Nov 2026: the survey's Q1 b): spec 15.7's first
-  rule, the checker's `unbound-statement` and its cases go, and nothing
-  takes their place. The survey of cusoon2's checks (cusoon2's
-  `doc/plans/checks-survey.md`, Q1) ran it against 82 gated
-  operations: in 27 the proof has nothing to bind and in 16 more only
-  the caller's id, and since the port's one `Model` carries the
-  transaction, no proof of the port is held to it. Proofs, their
-  marked transaction, `proof-tx-escapes` and `outside-passes-proof`
-  stay. The refused cases removed with it are this decision's, not a
-  loosening; one turned round holds that a statement on a proof's
-  transaction that binds nothing of the proof passes. Not taken: a,
-  the rule kept and the port's `Model` exempt. `@BindsTenant`'s
-  planned check (`doc/gates.md`, "The gate binds the tenant") was to
-  be built on this rule; whether it gets one of its own is open, the
-  lead's, and comes up in DEV-945. Reopen with a port whose proofs
-  each hold their transaction and their rows.
-
 ## The guide (DEV-1036), 21 Nov 2026
 
-- **`doc/guide.md` is the draft Greg read, unchanged** (Greg, 21 Nov
-  2026): the form the DEV-1035 session fell into, taken as it stands
-  and wrapped as `doc/lead.md` is. Not taken: rewording it on the way
-  in. Reopen when it has been used twice more, as it says.
-  *Superseded 22 Nov 2026 by "The guide is revised with Greg at the
-  end of a sitting that chafed" (DEV-1075) below.*
 - **"Guide DEV-NNN" is said in the repository the design is about**
   (the lead, 21 Nov 2026), as the draft and the Workflow line have it:
   a guide checks the design against that repository's code and commits

@@ -1,0 +1,10 @@
+// kotlinc refuses line 8
+// A lambda on the line after a call, which kotlinc takes as the call's trailing lambda.
+package kt
+
+fun f(): (() -> Unit) -> () -> Int {
+    return { l1 ->
+        l1()
+        { 3 }
+    }
+}

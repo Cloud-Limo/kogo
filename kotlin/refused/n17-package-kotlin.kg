@@ -1,0 +1,5 @@
+// kotlinc refuses line 3
+// package kotlin, which is the standard library's.
+package kotlin
+
+fun f(): Int = 1

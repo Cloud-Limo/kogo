@@ -72,6 +72,7 @@ func TestSection14(t *testing.T) {
 func TestFaults(t *testing.T) {
 	for _, c := range []struct{ src, code, message string }{
 		{"val s = ‸sql\"select 1\"", "sql-placement", "only the argument of tx.query<R>"},
+		{"enum class Kind { ‸entries, b }", "duplicate", "every enum has entries already"},
 		{"‸action val x = 1", "syntax", "action goes before fun, and before nothing else"},
 		{"‸lookup fun g(): Boolean = true", "syntax", "lookup is no word of Kogo's before fun: leave it out"},
 		{"external ‸lookup fun g(): Boolean", "syntax", "lookup is no word of Kogo's before fun: leave it out"},

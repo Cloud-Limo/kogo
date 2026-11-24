@@ -1,0 +1,11 @@
+// kotlinc refuses line 8
+// A when branch with no condition.
+package kt
+
+fun f(n: Int): String {
+    when (n) {
+        0 -> return "zero"
+        -> return "empty"
+        else -> return "else"
+    }
+}

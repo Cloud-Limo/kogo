@@ -1,0 +1,11 @@
+// kotlinc refuses line 8
+// An empty when over a sealed interface with no variant.
+package kt
+
+sealed interface Nothing2
+
+fun f(x: Nothing2): Int {
+    when (x) {
+    }
+    return 1
+}

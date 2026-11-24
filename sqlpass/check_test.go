@@ -349,6 +349,12 @@ func TestWrap(t *testing.T) {
 		"select slug from tenant; -- by slug": `select "slug" from (select slug from tenant` + "\n) _",
 		`merge into account a using (values (1)) v(id) on a.id = v.id when matched then delete returning a.id`: `with _ as (merge into account a ` +
 			"using (values (1)) v(id) on a.id = v.id when matched then delete returning a.id\n) select \"id\" from _",
+		// A whole row in a write's returning, with a composite inside it.
+		`update quote q set deposit = null where false returning q`: "with _ as (update quote q set deposit = null where false returning q\n) " +
+			`select ("q") is not distinct from null, ("q")."id", (("q")."total") is not distinct from null, ` +
+			`(("q")."total")."cents", (("q")."total")."currency", (("q")."deposit") is not distinct from null, ` +
+			`(("q")."deposit")."cents", (("q")."deposit")."currency" ` +
+			`from _ where 'quote'::regclass is not null and 'amount'::regclass is not null`,
 	} {
 		if st, err := check(c, literal); err != nil || st.SQL != want {
 			t.Errorf("%s: got %v, %v; want %s", literal, st, err, want)

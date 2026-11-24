@@ -4677,6 +4677,82 @@ The lead ruled the encoder changes, not the comparison; the agent's, for the res
 - **`http/json.go`'s `encode` is left as it is**: it writes to a third party, which
   compares no bytes, and still escapes U+2028 there.
 
+## The SQL pass's five faults from the stress run (DEV-1154), 24 Nov 2026
+
+The lead ruled finding 11; the agent's, for the rest.
+
+- **Each `$name` is checked where it is written**, by the byte offset of each `PARAM`
+  in Postgres's tree against where the rewrite put it, and no SQL text is read. Not taken:
+  a scan of the literal for quotes, which re-implements Postgres's lexer. A cast moves an
+  untyped `PARAM`'s location to the cast's start (`cast(` or `text(`), so each location
+  claims the first unclaimed `$name` of its number at or after it, and one left over is
+  refused. Not taken: matching offsets exactly, which refused `cast($x as int)`. A `$x`
+  in a comment inside a cast, `cast(/* $x */ $x as int)`, is refused at the real `$x`.
+- **A syntax error at a parameter gets the hint for a `$` as text**, since a dollar
+  quote's tag, `$q$`, reads as one: told by the error's offset being a parameter's. Not
+  taken: telling a dollar quote from the text, which is more reading of SQL text. A real
+  syntax error there gets the hint too, beside Postgres's own message.
+- **A whole row's field under a `NOT NULL ... NO INHERIT` is nullable even after
+  `only`**: a composite type is read once per type, not per reference. Not taken: a type
+  per reference. A column named after `only` keeps its `NOT NULL`.
+- **Only an `instead` rule makes `returning` nullable**: Postgres keeps the statement's
+  own `returning` under an `also` rule. Every column of a statement done instead by a rule
+  is nullable, whatever the rule's `returning` says. Not taken: reading the rule's tree.
+- **42P08 gets 42P18's hint whatever its cause**: the other case, types deduced that
+  disagree, is mended by the same cast. Not taken: telling them apart by the message.
+
+## Kogo reads a subset of Postgres's values (DEV-1153), 24 Nov 2026
+
+Greg's ruling at DEV-1148's sitting, piece 1b: outside the subset Kogo refuses, at
+`kogo check` where the catalog or the statement tells, else by a panic that names the
+limit, and never gives another value (`doc/design.md`, principle 4; spec 10.4 lists the
+limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
+
+- **An array of more than one dimension is a panic when it is read** (finding 4). The
+  catalog cannot tell: `integer[]` and `integer[][]` are one type, and a value has its
+  dimensions, not its column. The statement could only be asked by reading SQL. Not
+  taken: a `List<List<T>>`, which the type cannot promise either. A lower bound is
+  dropped, as before: a `List` has none.
+- **A `NULL` element read into a `List<T>` is a panic that names the column and the
+  element** (finding 7), not the driver's `cannot scan NULL into *int32`. The catalog
+  never says an array's elements are not null. Not taken: `kogo check` taking only
+  `List<T?>` for an array, the strict reading of the sentence, since the catalog does
+  tell that the column is an array: it changes what every `List<String>` over a
+  `text[]` means, a change to the language, and so Greg's. Reopen with that ruling.
+- **Every array is read as its elements' `T?` and a `List<T>` copied from it**
+  (`kogo.Array`), an allocation an element more than before. Not taken: reading a
+  `List<T>` straight and matching the driver's error text for a null, which the
+  driver's next release may reword.
+- **`execute`'s count past an `Int` is a panic once the statement has run** (finding 5),
+  so the transaction rolls back. Not taken: a `Long`, which changes 10.2 and every
+  caller; the largest `Int`, which is another value.
+- **A `String` holding U+0000 is a panic when it is bound, alone or in a `List`**
+  (finding 6), in Kogo's words and before Postgres is asked. Neither the catalog nor the
+  statement knows a value. Not taken: a 400 where the wire reads it (spec 15.4), which
+  narrows what a `String` on the wire may hold for an operation that never sends it to
+  Postgres: a change to the wire, left to Greg. Until then a caller can still cause the
+  500. Not taken: dropping the character, which is another value.
+- **The driver is told of every array type Postgres does not ship** (finding 8): one of
+  a domain, a domain over an array, `citext[]`. `sqlpass.Type.Array` holds Postgres's
+  name for it, set unless the type is in `pg_catalog` with an oid below 16384, Postgres's
+  `FirstNormalObjectId`: `information_schema`'s domains, such as `cardinal_number`, are
+  made by initdb below it, and their arrays are not the driver's. The emitter hands it
+  to `Tx_Known`, which now takes any type's name, for a column and for a parameter
+  alike. Not taken: the oid alone, which misses `cardinal_number[]`; asking the catalog
+  whether the element is a domain, which misses a domain over an array; telling the driver at
+  the read from the row's description, by when the result's format is already asked for.
+- **An array of a domain over an array is `sql-unmapped-type`**: it is a list of lists,
+  the catalog tells, and it was typed `List<T>` and could not be read. Found by a probe
+  while the test's table was built, not by DEV-1144, as was a `List` sent to a parameter
+  of a domain's array type, which the driver could not send.
+- **The standing test (`emit`'s `TestShapes`) sends each value back** and compares the
+  text Postgres makes of what came back with the text it makes of the value: Kogo's
+  `toString()` is Kotlin's and not Postgres's, so the two texts cannot be compared
+  directly. A fault that reads and sends wrongly alike would pass; `TestValues` holds
+  Kogo's text for one value of each type. A composite type is no parameter, so its three
+  cells are written by hand and send its fields back; its lists, and an enum's, are
+  cells that must be refused. The table's domains are in `testdata/schema.sql`.
+
 ## A gated transaction stays in the serialization checks (DEV-1151), 24 Nov 2026
 
 - **`reading` runs `select 1` before the gate's savepoint**, as DEV-1145 tried on a copy:

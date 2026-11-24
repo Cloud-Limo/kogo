@@ -14,31 +14,40 @@ import (
 // sql writes one of the five calls of spec.md 10.2 as a call of the
 // prelude's Go: the Tx, the statement as Postgres takes it, and what
 // each of its parameters binds, in the order written. A call that
-// reads rows also passes a function that reads one, and where a
-// column is of a composite type, a Tx whose driver knows the type.
+// reads rows also passes a function that reads one. Where a column
+// is of a composite type, or a column or a parameter of an array type
+// that Postgres does not ship, the Tx is one whose driver knows the
+// type.
 func (e *emitter) sql(x *syntax.Call) string {
 	sel := x.Fun.(*syntax.Select)
 	q := e.info.SQL[x.Args[0].Value.(*syntax.SQL)]
 	kogo := e.use(preludePath + "kogo")
 	args := []string{e.expr(sel.X), strconv.Quote(q.Stmt.SQL)}
+	var known []string // the types the driver must be told of
 	for i, p := range q.Stmt.Params {
 		if enums(p.Type) {
 			e.notYet(q.Args[i], "a parameter that is a list of an enum", "cast it in the statement, as $name::text[]::enum_type[], and pass a List<String> of the constants' names")
 		}
+		if p.Type.Array != "" {
+			known = append(known, strconv.Quote(p.Type.Array))
+		}
 	}
 	if q.Row != nil {
-		var composites []string
 		for _, c := range q.Stmt.Columns {
 			if enums(c.Type) {
 				e.notYet(x, "column "+c.Name+", which holds a list of an enum,", "cast the list in the statement, as kinds::text[], and read a List<String>")
 			}
 			if c.Type.Fields != nil {
-				composites = append(composites, strconv.Quote(c.Type.Name))
+				known = append(known, strconv.Quote(c.Type.Name))
+			} else if c.Type.Array != "" {
+				known = append(known, strconv.Quote(c.Type.Array))
 			}
 		}
-		if composites != nil {
-			args[0] = fmt.Sprintf("%s.Tx_Known(%s, %s)", kogo, args[0], strings.Join(composites, ", "))
-		}
+	}
+	if known != nil {
+		args[0] = fmt.Sprintf("%s.Tx_Known(%s, %s)", kogo, args[0], strings.Join(known, ", "))
+	}
+	if q.Row != nil {
 		row := e.info.Types[x] // R, or queryOne's R?
 		if sel.Name == "query" {
 			row = q.Row
@@ -109,12 +118,13 @@ func (e *emitter) fill(q *check.Query, t check.Type, path []int, absent bool, de
 // column declares what one column, or one field of a composite type,
 // is scanned into, and sets dest to point there. It gives the Go of
 // its value as the type t, and a test for null where it may be null.
-// A column that t or absent lets be null is read as a pointer, and so
-// is a list, which the driver reads from a null as an empty one; any
-// other is read as it is, and the driver refuses a null, as one in a
-// column named "name!" (spec.md 10.5). A composite type is read field
-// by field, in Postgres's order, into the properties of their names:
-// null as a whole, and never absent field by field.
+// A column that t or absent lets be null is read as a pointer; a list
+// is read by the prelude's Array, which refuses what a List cannot
+// hold, and is null for a NULL; any other is read as it is, and the
+// driver refuses a null, as one in a column named "name!" (spec.md
+// 10.5). A composite type is read field by field, in Postgres's
+// order, into the properties of their names: null as a whole, and
+// never absent field by field.
 func (e *emitter) column(name string, ct sqlpass.Type, t check.Type, absent bool, dest *string) (code string, nulls []string) {
 	kogo := e.use(preludePath + "kogo")
 	elem, null := bare(t)
@@ -132,7 +142,14 @@ func (e *emitter) column(name string, ct sqlpass.Type, t check.Type, absent bool
 		}
 		*dest = fmt.Sprintf("%s.Composite{Null: &%s, Fields: []any{%s}}", kogo, v, strings.Join(fields, ", "))
 		code, nulls = fmt.Sprintf("%s.Row(%s, %s{%s})", kogo, v, e.typ(d), strings.Join(props, ", ")), []string{v}
-	case null || absent || ct.List:
+	case ct.List:
+		of, nullable := bare(elem.(*check.Named).Args[0])
+		e.w("var %s %s.Array[%s]", v, kogo, e.typ(of))
+		*dest, code, nulls = "&"+v, fmt.Sprintf("%s.List(%q)", v, name), []string{v + ".Nullable() == nil"}
+		if nullable {
+			code = v + ".Nullable()"
+		}
+	case null || absent:
 		e.w("var %s *%s", v, e.typ(elem))
 		*dest, code, nulls = "&"+v, v, []string{v + " == nil"}
 	default:

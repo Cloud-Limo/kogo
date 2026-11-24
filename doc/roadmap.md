@@ -146,7 +146,7 @@ issue where there is one.
 | 13l | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13l's: ~1,600 / 850) | cusoon2 PR 1597, 1600, 1603, 1604, 1605, 1608 |
 | 18 | cusoon2 | Kotlin first: ten keys move into `settings`; `deployment.goPort` | ~60 / 50 | no, DEV-1124 |
 | 19 | cusoon2 | The ops site's Go `main` | 150 / 80 | no, DEV-1125 |
-| 20 | cusoon2 | Serve the ops site from Go | | no |
+| 20 | cusoon2 | Serve the ops site from Go; waits on DEV-1139 (the second stress of the Go `main`) and DEV-1162 (the trial of generated worlds) | | no |
 
 `sendInvite` compares with its `outbound_message` rows forgiven as
 owed until the port queues the invite's email (DEV-885), so "the 21
@@ -171,7 +171,7 @@ the rest are estimates.
 | Area | Size |
 | --- | --- |
 | The `commands` list, then the ten `--op` commands | 350 / 180 |
-| The work list and the runner | 750 / 600 |
+| The work list and the runner | about 1,050 / 960 (DEV-1141's sketch) |
 | Mail: templates, outbox, bounces | 1,345 / 415 in the port, 295 / 260 in the prelude |
 | PDF: our own small writer (about 380 Go and font data) and the layouts | 1,610 / 640, the tests holding a comparison harness of about 200 |
 | The daemon's 16 queues, Stripe's two among them (245 / 200) | 1,400 / 600 |
@@ -180,6 +180,9 @@ the rest are estimates.
 | A paged list (not designed) | |
 | The booker's 70 operations: all in Kotlin RPC since GraphQL left cusoon2 (DEV-893's first step, cusoon2 PR 1557); its second step, the port, is sliced when this row is reached | 4,500 / 2,000 |
 | Translating cusoon2's tests into the test form, area by area | |
+
+Each row here that deletes Kotlin names its research runs when it is
+next.
 
 ### 3. Operator money
 

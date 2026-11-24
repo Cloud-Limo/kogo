@@ -153,3 +153,13 @@ create table account (
 
 -- Rows enough for a parallel plan, their keys out of their order.
 create table ranked as select n as id, n * 7919 % 5003 as k from generate_series(1, 5000) n;
+
+-- A domain over each scalar type of spec.md 10.4, an enum, an array and
+-- a composite type, for the table of emit's TestShapes: a type is read
+-- alone, in an array and through its domain.
+create domain d_bool as boolean; create domain d_int as integer; create domain d_long as bigint;
+create domain d_double as double precision; create domain d_numeric as numeric(10, 2); create domain d_text as text;
+create domain d_citext as citext; create domain d_varchar as varchar; create domain d_uuid as uuid;
+create domain d_timestamptz as timestamptz; create domain d_date as date; create domain d_time as time;
+create domain d_interval as interval; create domain d_bytea as bytea; create domain d_kind as invite_kind;
+create domain d_tags as text[]; create domain d_amount as amount;

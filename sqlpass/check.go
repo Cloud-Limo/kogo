@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -20,6 +21,7 @@ type Type struct {
 	Labels []string // an enum's, in Postgres's order
 	Fields []Column // a composite type's, in Postgres's order; nil for any other type
 	List   bool
+	Array  string // for a list whose array type Postgres does not ship, as one of a domain: Postgres's name for it
 }
 
 func (t Type) String() string {
@@ -70,7 +72,12 @@ type Checker struct {
 	conn    *pgx.Conn
 	tree    string // the parse tree of the statement last prepared
 	types   map[uint32]Type
-	columns map[[2]int]bool // whether (table, column) is NOT NULL
+	columns map[columnKey]bool // whether a column is NOT NULL
+}
+
+type columnKey struct {
+	table, column int
+	inherited     bool
 }
 
 // Connect opens the development database named by a connection string;
@@ -80,7 +87,7 @@ func Connect(ctx context.Context, connString string) (*Checker, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Checker{types: map[uint32]Type{}, columns: map[[2]int]bool{}}
+	c := &Checker{types: map[uint32]Type{}, columns: map[columnKey]bool{}}
 	cfg.OnNotice = func(_ *pgconn.PgConn, n *pgconn.Notice) {
 		if n.Message == "parse tree:" {
 			c.tree = n.Detail
@@ -130,7 +137,12 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 	sd, untyped, err := c.prepare(ctx, sql, len(params))
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
-		return nil, rejected(pgErr, sql, params, edits)
+		fault := rejected(pgErr, sql, params, edits)
+		// a syntax error at a parameter: a dollar quote's tag reads as one
+		if pgErr.Code == "42601" && slices.ContainsFunc(spans, func(s Span) bool { return s.Start == fault.Offset }) {
+			fault.Message += "; " + dollarText
+		}
+		return nil, fault
 	} else if err != nil {
 		return nil, err
 	}
@@ -139,12 +151,27 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 		return nil, errors.New("Postgres sent no parse tree for the statement, so what can be null is unknown: " +
 			"connect to it directly, since a pooler can drop the session's debug_print_parse and client_min_messages")
 	}
-	seen := map[int]bool{}
-	query.params(seen)
-	for i, p := range params {
-		if !seen[i+1] {
-			return nil, &Error{p.Offset, "sql-parameter-syntax", fmt.Sprintf(
-				"Postgres does not see %s as a parameter: it is inside a quoted string or a comment", spelling(p))}
+	// Each $name or ${expr} must be a parameter where it is written: a
+	// name written twice is one parameter, so one inside a quoted string
+	// would otherwise be hidden by the other. A cast moves a parameter's
+	// location to its own start, so each location claims the first
+	// unclaimed edit of its number at or after it.
+	at := map[int]int{}
+	query.params(at)
+	claimed := make([]bool, len(edits))
+	for _, loc := range slices.Sorted(maps.Keys(at)) {
+		for i, e := range edits {
+			if !claimed[i] && e.n == at[loc] && e.at >= loc {
+				claimed[i] = true
+				break
+			}
+		}
+	}
+	for i := range edits {
+		if !claimed[i] {
+			return nil, &Error{spans[i].Start, "sql-parameter-syntax", fmt.Sprintf(
+				"Postgres does not see %s as a parameter: it is inside a quoted string or a comment; %s",
+				literal[spans[i].Start:spans[i].End], dollarText)}
 		}
 	}
 	if untyped != nil {
@@ -178,6 +205,11 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 		return st, nil
 	}
 	exprs := outputs(query)
+	if ruled, err := c.ruled(ctx, query); err != nil {
+		return nil, err
+	} else if ruled {
+		exprs = nil // the rule's own returning replaces the statement's
+	}
 	for i, f := range sd.Fields {
 		col := Column{Name: f.Name, Nullable: true}
 		if col.Type, err = c.typeOf(ctx, f.DataTypeOID); err != nil {
@@ -259,6 +291,21 @@ func (c *Checker) wrap(ctx context.Context, st *Statement, query *node, sd *pgco
 	return nil
 }
 
+// ruled reports whether an insert, update or delete is done instead by
+// a rule of its table, whose returning, if any, replaces the
+// statement's: the tree Postgres logs is the statement before its
+// rules are applied. Postgres numbers commands and rules alike.
+func (c *Checker) ruled(ctx context.Context, query *node) (bool, error) {
+	cmd, rtable, no := query.num("commandType"), query.field("rtable").items(), query.num("resultRelation")
+	if cmd <= cmdSelect || cmd > cmdDelete || no < 1 || no > len(rtable) {
+		return false, nil
+	}
+	var ruled bool
+	err := c.conn.QueryRow(ctx, `select exists (select from pg_rewrite
+		where ev_class = $1 and ev_type = $2::"char" and is_instead)`, uint32(rtable[no-1].num("relid")), strconv.Itoa(cmd)).Scan(&ruled)
+	return ruled, err
+}
+
 // tables gives the tables and views the tree lists, with what the
 // statement needs of each: Postgres's own answer, read and not worked
 // out. A function the statement calls is not in the tree, so what it
@@ -336,7 +383,9 @@ func rejected(e *pgconn.PgError, sql string, params []Param, edits []edit) *Erro
 		}
 	}
 	code := "sql-rejected"
-	if e.Code == "42P18" { // indeterminate datatype
+	// indeterminate or inconsistent datatype: Postgres says the second
+	// of `$x is null or id = $x`, where it types $x before it is cast
+	if e.Code == "42P18" || e.Code == "42P08" {
 		code, msg = "sql-untyped-parameter", msg+": write a cast after it, as in $name::boolean"
 	}
 	at, chars := 0, 0 // Position counts characters from 1; 0 means Postgres gave none
@@ -410,8 +459,10 @@ func (c *Checker) typeOf(ctx context.Context, oid uint32) (Type, error) {
 	}
 	var name, kind, category, display string
 	var base, elem, relid uint32
+	var shipped bool
 	err := c.conn.QueryRow(ctx, `select typname, typtype::text, typcategory::text, typbasetype, typelem, typrelid,
-		format_type(oid, null) from pg_type where oid = $1`, oid).Scan(&name, &kind, &category, &base, &elem, &relid, &display)
+		format_type(oid, null), oid < 16384 and typnamespace = 'pg_catalog'::regnamespace
+		from pg_type where oid = $1`, oid).Scan(&name, &kind, &category, &base, &elem, &relid, &display, &shipped)
 	if err != nil {
 		return Type{}, err
 	}
@@ -421,6 +472,9 @@ func (c *Checker) typeOf(ctx context.Context, oid uint32) (Type, error) {
 		t, err = c.typeOf(ctx, base)
 	case category == "A":
 		t, err = c.typeOf(ctx, elem)
+		if t.List { // an array of a domain over an array: a list of lists
+			err = noKogoType(display)
+		}
 		t.List = true
 		// An array of rows, a list of data classes, is not yet mapped,
 		// and is named as itself, not as its element.
@@ -442,6 +496,13 @@ func (c *Checker) typeOf(ctx context.Context, oid uint32) (Type, error) {
 	if err != nil {
 		return Type{}, err
 	}
+	// The driver knows the arrays of pg_catalog that initdb makes,
+	// whose oids are below 16384, its FirstNormalObjectId; it reads any
+	// other, an array of a domain, a domain over an array, or one of
+	// information_schema's domains, once told of it by name.
+	if t.Array = ""; t.List && !shipped {
+		t.Array = display
+	}
 	c.types[oid] = t
 	return t, nil
 }
@@ -449,10 +510,11 @@ func (c *Checker) typeOf(ctx context.Context, oid uint32) (Type, error) {
 // composite reads the fields of a composite type, whose relation is
 // relid: a table's row type, whose fields are NOT NULL where its
 // columns are, or one made with create type, which Postgres cannot
-// declare NOT NULL. A field's own fields may all be null, since no
+// declare NOT NULL. A whole row may be a child table's, so a NOT NULL
+// that is NO INHERIT does not hold for its field. A field's own fields may all be null, since no
 // table's constraint covers a value stored in a field.
 func (c *Checker) composite(ctx context.Context, relid uint32, display string) (Type, error) {
-	rows, _ := c.conn.Query(ctx, `select a.attname::text, a.atttypid, `+validNotNull+` from pg_attribute a
+	rows, _ := c.conn.Query(ctx, `select a.attname::text, a.atttypid, `+validNotNull("true")+` from pg_attribute a
 		where a.attrelid = $1 and a.attnum > 0 and not a.attisdropped order by a.attnum`, relid)
 	type attribute struct {
 		Name    string
@@ -507,21 +569,28 @@ func pascal(s string) string {
 }
 
 // validNotNull is whether the column of pg_attribute a has a validated
-// NOT NULL constraint. Postgres 18 also sets attnotnull for one NOT VALID.
-const validNotNull = `a.attnotnull and not exists (
+// NOT NULL constraint that holds where inherited says, a SQL boolean
+// that is whether the reference reads child tables too. Postgres 18
+// also sets attnotnull for one NOT VALID, and for one NO INHERIT,
+// which a child's rows need not keep.
+func validNotNull(inherited string) string {
+	return `a.attnotnull and not exists (
 	select from pg_constraint k
-	where k.conrelid = a.attrelid and k.contype = 'n' and k.conkey = array[a.attnum] and not k.convalidated)`
+	where k.conrelid = a.attrelid and k.contype = 'n' and k.conkey = array[a.attnum]
+		and (not k.convalidated or k.connoinherit and ` + inherited + `))`
+}
 
 // columnNotNull reports whether a table's column has a validated NOT
-// NULL constraint.
-func (c *Checker) columnNotNull(ctx context.Context, table, column int) (bool, error) {
-	key := [2]int{table, column}
+// NULL constraint, for a reference that reads its child tables too
+// where inherited says, as all but `only` do.
+func (c *Checker) columnNotNull(ctx context.Context, table, column int, inherited bool) (bool, error) {
+	key := columnKey{table, column, inherited}
 	if v, ok := c.columns[key]; ok {
 		return v, nil
 	}
 	var v bool
-	err := c.conn.QueryRow(ctx, `select `+validNotNull+` from pg_attribute a
-		where a.attrelid = $1 and a.attnum = $2`, uint32(table), int16(column)).Scan(&v)
+	err := c.conn.QueryRow(ctx, `select `+validNotNull("$3")+` from pg_attribute a
+		where a.attrelid = $1 and a.attnum = $2`, uint32(table), int16(column), inherited).Scan(&v)
 	if err != nil {
 		return false, err
 	}

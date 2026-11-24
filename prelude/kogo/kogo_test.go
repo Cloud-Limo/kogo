@@ -682,3 +682,18 @@ func TestListCorners(t *testing.T) {
 	}()
 	List_SortedBy(ListOf[int32](1, 2), func(x int32) List[int32] { return ListOf(x) })
 }
+
+// execute gives an Int, and Postgres counts rows in 64 bits: a count
+// past an Int is a panic that says so, never the Int its low bits
+// make, which for 2,200,000,000 rows was -2094967296 (spec.md 10.4).
+func TestAffectedPastInt(t *testing.T) {
+	if got := affected(math.MaxInt32); got != math.MaxInt32 {
+		t.Errorf("got %d", got)
+	}
+	defer func() {
+		if p, want := recover(), "execute changed 2200000000 rows, more than the Int it gives can hold (spec.md 10.4)"; p != want {
+			t.Errorf(" got %v\nwant %s", p, want)
+		}
+	}()
+	affected(2_200_000_000)
+}

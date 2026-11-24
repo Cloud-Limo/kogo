@@ -2,6 +2,7 @@ package kogo
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"os"
 	"regexp"
@@ -696,4 +697,36 @@ func TestAffectedPastInt(t *testing.T) {
 		}
 	}()
 	affected(2_200_000_000)
+}
+
+// A pool is refused, naming the setting, unless every connection is
+// in UTC and has a longest life (spec.md 15.5, the database handle).
+func TestCheckPool(t *testing.T) {
+	for _, c := range []struct {
+		edit func(*pgxpool.Config)
+		want string
+	}{
+		{func(*pgxpool.Config) {}, "<nil>"},
+		{func(c *pgxpool.Config) { delete(c.ConnConfig.RuntimeParams, "timezone") }, `the pool does not set timezone to UTC`},
+		{func(c *pgxpool.Config) { c.ConnConfig.RuntimeParams["timezone"] = "Pacific/Chatham" }, `the pool does not set timezone to UTC`},
+		{func(c *pgxpool.Config) {
+			delete(c.ConnConfig.RuntimeParams, "timezone")
+			c.ConnConfig.RuntimeParams["TimeZone"] = "UTC"
+		}, "<nil>"},
+		{func(c *pgxpool.Config) { c.ConnConfig.RuntimeParams["TimeZone"] = "Pacific/Chatham" }, `the pool does not set timezone to UTC`},
+		{func(c *pgxpool.Config) { c.MaxConnLifetime = 0 }, "the pool's MaxConnLifetime is not above 0"},
+	} {
+		cfg := must(pgxpool.ParseConfig("postgres://kogo:kogo@127.0.0.1/kogo_test?timezone=UTC"))
+		c.edit(cfg)
+		pool := must(pgxpool.NewWithConfig(context.Background(), cfg)) // it connects when first asked
+		func() {
+			defer func() {
+				if p := fmt.Sprint(recover()); !strings.HasPrefix(p, c.want) {
+					t.Errorf("CheckPool says %s, want %s", p, c.want)
+				}
+			}()
+			CheckPool(pool)
+		}()
+		pool.Close()
+	}
 }

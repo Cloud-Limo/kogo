@@ -409,8 +409,16 @@ commit it matches.
 - Lower `Either`, `bind`, `raise` and `Raise<E>` to one internal notion
   of a fallible function, so the surface can change later.
 - Define Kogo's own semantics for numbers, equality, collection order
-  and absence; never inherit Go's by accident. A binding's behaviour
-  is Kogo's too: the spec states it, and where Go has a default the
-  spec does not state, the binding turns it off and a test shows it.
+  and absence; never inherit Go's by accident.
+- **What Go would decide, Kogo states.** All Go in the prelude, a
+  binding, the handler and the database handle alike, does what the
+  spec states. Where Go, the driver or its pool has a default that
+  reaches a caller, a statement or the network, the spec has a row
+  saying what Kogo does, the default kept or another, and a test
+  holds the row. A setting of what the application makes and hands
+  over, as its pool, is a requirement, checked at start with a
+  message that names it. The tables are in spec 12 (`kogo.http`,
+  `kogo.mail`) and 15.5 (the handler, the database handle); an
+  application's `main` is its own (`doc/main.md`).
 - Bindings wrap Go libraries; they are declarations and compile to
   nothing.

@@ -320,7 +320,8 @@ type server[Env any] struct {
 
 // NewHandler serves t over pool with env, and logs to log. Its Limit
 // is 90 seconds and its MaxBody 64 KiB. It panics if t has no check,
-// or lacks an enum's entries that an input reaches.
+// or lacks an enum's entries that an input reaches, or on a pool
+// kogo.CheckPool refuses.
 func NewHandler[Env any](t Table[Env], pool *pgxpool.Pool, env Env, log *slog.Logger) *Handler[Env] {
 	if t.Check == nil {
 		panic("the table has no check: a list that a browser calls names one, api name checkedBy check")
@@ -329,6 +330,9 @@ func NewHandler[Env any](t Table[Env], pool *pgxpool.Pool, env Env, log *slog.Lo
 }
 
 func newServer[Env any](check func(kogo.Tx, Env, Request) kogo.Either[string, rt.Unit], ops []Operation[Env], enums []any, pool *pgxpool.Pool, env Env, log *slog.Logger) *server[Env] {
+	if pool != nil {
+		kogo.CheckPool(pool)
+	}
 	h := &server[Env]{90 * time.Second, check, map[string]Operation[Env]{}, newReader(enums), pool, env, log}
 	for _, op := range ops {
 		h.read.check(op.input, map[reflect.Type]bool{})

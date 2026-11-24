@@ -237,8 +237,8 @@ func TestStrings(t *testing.T) {
 }
 
 func TestPath(t *testing.T) {
-	want(t, "an id", Action_String_String_String_String("POST", "/v1/things/", "a/b?c d", "/parts").path, "/v1/things/a%2Fb%3Fc%20d/parts")
-	want(t, "an id last", Lookup_String_String_String("GET", "/v1/things/", "id_1").path, "/v1/things/id_1")
+	want(t, "an id", Action_String_String_String_String("POST", "/v1/things/", "a/b?c d", "/parts").Path, "/v1/things/a%2Fb%3Fc%20d/parts")
+	want(t, "an id last", Lookup_String_String_String("GET", "/v1/things/", "id_1").Path, "/v1/things/id_1")
 	panics(t, `the path before an id ends in /: "/v1/things"`, func() { Lookup_String_String_String("GET", "/v1/things", "id_1") })
 	panics(t, `the path after an id begins with /: "parts"`, func() { Action_String_String_String_String("POST", "/v1/things/", "id_1", "parts") })
 	panics(t, `the path after an id begins with /: ""`, func() { Action_String_String_String_String("POST", "/v1/things/", "id_1", "") })
@@ -439,4 +439,32 @@ func TestNewRefuses(t *testing.T) {
 			t.Errorf("New(%+v) gave no error", s)
 		}
 	}
+}
+
+// == compares what a value holds: a Json its text, alone, in a list
+// and in a data class; a Field and an endpoint what they were made
+// of. A handle panics, as Kotlin compares one by identity.
+func TestEqual(t *testing.T) {
+	a, b := Json_Parse(`{"a":1}`), Json_Parse(`{"a":2}`)
+	for _, c := range []struct {
+		what string
+		x, y any
+		want bool
+	}{
+		{"two texts", *a, *b, false},
+		{"one text", *a, *Json_Parse(`{"a":1}`), true},
+		{"in a list", kogo.ListOf(*a), kogo.ListOf(*b), false},
+		{"refused", HttpFailure_Refused{Status: 402, Body: a}, HttpFailure_Refused{Status: 402, Body: b}, false},
+		{"two fields", Field_String_String("a", "1"), Field_String_String("a", "2"), false},
+		{"a string and a number", Field_String_String("a", "1"), Field_String_Long("a", 1), false},
+		{"one field", Group("g", kogo.ListOf(Field_String_Json("a", *a))), Group("g", kogo.ListOf(Field_String_Json("a", *a))), true},
+		{"two lookups", Lookup_String_String("GET", "/a"), Lookup_String_String("GET", "/b"), false},
+		{"one action", Action_String_String("POST", "/a"), Action_String_String("POST", "/a"), true},
+	} {
+		if got := rt.Equal(c.x, c.y); got != c.want {
+			t.Errorf("%s: == is %v, want %v", c.what, got, c.want)
+		}
+	}
+	h, _ := serve(t, Service{}, answer(200, "{}"))
+	panics(t, "a Http cannot be compared: Kotlin compares it by identity, not by what it holds", func() { rt.Equal(h, h) })
 }

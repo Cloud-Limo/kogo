@@ -128,6 +128,12 @@ Equality `==` is structural for every type. There is no `===`. One of
 its two sides must fit where the other's type is wanted (section 5.1),
 `?` aside, so `x == null` passes and `Int == Long` and `String == Int`
 are errors.
+A handle of the prelude's (`Db`, `Tx`, `SerializableTx`, `Http`,
+`Console`, `Clock`, `Request`, `Test`, `Raise`) and a `Regex` are the
+exception: Kotlin compares each by identity, so `==` on one, or on a
+value whose type holds one, is an error where check sees it
+(`handle-equality`, `regex-equality`), as for a `ByteArray` below, and
+panics where it does not (section 14).
 
 A value that holds a function is not compared, though Kotlin compares
 functions by reference. `==` and `!=` are an error where either side's
@@ -661,6 +667,20 @@ Outside a raise scope these forms are errors: wrap the code in
   an error that says to rename the member. `this.raise(...)` on such a
   member is the same error, since in Kotlin `this` inside `either { }`
   is the raise scope.
+- So, in an extension or a data class's fun, inside a raise scope's
+  block or a local fun there, a `this` whose text Kotlin reads as the
+  raise scope is a compile error (`raise-this`): it would mean the
+  receiver here and the raise scope in Kotlin. That is a `this` that
+  stands as a value, `"I am $this"`, and a call the raise scope takes
+  as well, on `this` or on no receiver: `toString()` and an extension
+  on a type parameter, `this.let { "$it" }`, `also`, `takeIf`,
+  `right`, `left`. Name the receiver in a `val` before the block,
+  `val acct = this`, and use the `val`. A member read through it,
+  `this.name`, stays: kotlinc refuses it, so nothing differs.
+
+  ```
+  acct.kg:5:60 raise-this: in Kotlin this inside either { } or db.tx { } is the raise scope, not this Acct: name it in a val before the block, as val acct = this, and use that (spec.md 9)
+  ```
 - `either`'s `E` is settled as section 5.1 says, before its block is
   read: by the type wanted, or written, `either<String, Int> { ... }`.
 - A program does not write `Raise<E>`. The forms' signatures are the
@@ -974,11 +994,13 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
   that `E`, and `db.tx` then gives an `Either<E, A>` of the block's value
   `A`, wherever it is written; elsewhere it gives the block's value. It
   commits when the block finishes, and rolls back on a failure or a
-  panic. It is not rerun: a deadlock in it is a panic.
+  panic. It reruns the block from the start on a deadlock, as a
+  server's `Tx` (15.3) is, and on nothing else.
 - `db.tx(serializable = true) { ... }` runs at SERIALIZABLE and reruns the
-  block from the start on a serialization failure or deadlock, after a
-  short random pause, so the block must have no effect outside the
-  transaction.
+  block from the start on a serialization failure or deadlock.
+- A rerun comes after a short random pause, and either form may rerun,
+  so the block must have no effect outside the transaction
+  (`action-in-tx`, section 7).
 - The transaction ends with the block, so the block answers nothing
   that holds one (`tx-escapes`, 15.7): not the `Tx`, and not a value
   with one in a property. It answers the facts the lines after it
@@ -1120,7 +1142,14 @@ no import;
 `associateBy`, `associate`, `toSet`, `toList`, `joinToString`,
 `forEach`, `keys`, `values`, `listOfNotNull`. A `Map` and a `Set`
 iterate in insertion order and compare keys as `==` does, by value, so
-any type may be a key.
+any type may be a key. A key that is a `String`, an `Int`, a `Long`, a
+`Boolean`, a `Uuid` or an enum is found at once. A key of any other
+type, a `T?` among them, is found by walking the keys: a lookup costs
+the size of the collection and building one its square, so think hard
+before keying a large `Set` or `Map` (or a `distinctBy`, `groupBy` or
+`associateBy`) by anything else. `==` of two `Set`s or two `Map`s walks
+whatever the kind of key, so comparing two large ones costs the product
+of their sizes. This may be mended; nothing promises it.
 
 There are no mutable collections, sequences or arrays. Build a list with
 `map`/`filter`/`+`, or accumulate into a local `var` of an immutable list.
@@ -1522,6 +1551,8 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `suspend`, coroutines, `Flow`, threads | plain blocking code |
 | `Sequence`, `generateSequence`, `MutableList`, arrays | a `while` loop with a local `var`, or the list functions |
 | `bytes[i]`, `bytes.size`, `byteArrayOf(...)`, `a == b` on a `ByteArray` | none: a `ByteArray` is carried, and a binding reads it (section 3) |
+| `a == b` on a `Regex`, or on a value that holds one (`regex-equality`), which Kotlin compares by identity | compare the patterns, as strings; where check cannot see one, `==` panics (section 3) |
+| `a == b` on a handle (`Db`, `Clock`, ...), or on a value that holds one (`handle-equality`), which Kotlin compares by identity | compare the other properties; where check cannot see one, `==` panics (section 3) |
 | `java.time.*`, `java.util.UUID`, `BigDecimal` | `kogo.time.*`, `Uuid`, `Decimal` |
 | `kotlin.test.*` | `kogo.test.*` |
 | `BigDecimal.valueOf(x).stripTrailingZeros().toPlainString()` | `plain(x)`, from `kogo.text`, not `Decimal` |
@@ -1770,8 +1801,8 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   panic rolls it back (section 8). On a serialization failure or a
   deadlock, which at READ COMMITTED is a deadlock alone, the server
   rolls back and calls the operation again from the start, so it must
-  have no effect outside the transaction, as the block of
-  `db.tx(serializable = true)` must not (10.7).
+  have no effect outside the transaction, as the block of `db.tx`
+  must not (10.7).
 - An operation that takes a `Db` runs in no transaction and opens its
   own with `db.tx` (10.7). Each ends with its block, which answers
   facts and nothing that holds a transaction (15.7). Write one where
@@ -1817,8 +1848,10 @@ Inputs and answers are JSON.
 - `Unit` stands only as the whole input or the whole answer.
 - A data class on the wire has no type parameters.
 - An input that is or holds a data class whose constructor is marked
-  (11) is a compile error: take the id in the input and make the value
-  with the function that checks it. An answer may hold one.
+  (11), private or internal (2) is a compile error, since a caller
+  would make what the program lets only its own code make: take the id
+  in the input and make the value with the function that checks it. An
+  answer may hold one.
 - Two wire types of one name in one list are a compile error, and so
   is one named `Outcome`, the answer's own type in TypeScript, or one
   named as its list's interface (15.6), `Ops` in `api ops`.
@@ -1957,7 +1990,7 @@ each row.
 | What | pgx would | Kogo states | Test |
 | --- | --- | --- | --- |
 | The isolation | take the database's default | SERIALIZABLE or READ COMMITTED as 15.3 says; SERIALIZABLE for a test (16.2) | `rpc.TestHandler`, `kogo.TestRolledBackIsSerializable` |
-| A conflict | give the error | A rerun as 15.3 says; `db.tx` at READ COMMITTED runs once | `rpc.TestHandler`, `kogo.TestPlainTxRunsOnce` |
+| A conflict | give the error | A rerun as 15.3 says; `db.tx` at READ COMMITTED reruns on a deadlock alone | `rpc.TestHandler`, `kogo.TestPlainTxRerunsDeadlock` |
 | The pause before a rerun | have none | Random, to 5 ms after the first conflict and 5 ms more after each, to 50; the request's limit ends it | `rpc.TestHandler` |
 | A wait for a connection | set no limit | The request's limit | `rpc.TestDeadline` |
 | An empty `List` sent | send Go's nil slice as `NULL` | An empty array | `emit.TestValues` |

@@ -12,7 +12,9 @@ import (
 // kogo:"Name", or kogo:"Name,object" for a data object, and whose
 // other fields are tagged with their property's name. A type that Go
 // implements is compared by its exported fields, unless it embeds
-// Unordered, and has a String method for its text.
+// Unordered, and has a String method for its text. One with fields
+// and none exported, a handle or a Regex, is compared by identity in
+// Kotlin and panics here: no two of them are quietly equal.
 
 // Unordered, embedded in a collection that Go implements, has == compare
 // the collection's Keys, each held once, regardless of order. Only a
@@ -31,10 +33,11 @@ type unordered interface {
 // is nil, a T? holding a value is equal to that T, lists and data
 // classes are compared part by part, sets regardless of order, and a
 // Double as Kotlin's equals compares it, so NaN is equal to NaN and
-// 0.0 is not equal to -0.0. A function or a ByteArray panics, as
-// Kotlin compares neither by what it holds: the checker refuses ==
-// where it sees one, and cannot see one behind a type parameter or in
-// a contains, an in, or a Set's or a Map's keys.
+// 0.0 is not equal to -0.0. A function, a ByteArray, a Regex or a
+// handle panics, as Kotlin compares none by what it holds: the checker
+// refuses == where it sees one of the first three, and cannot see one
+// behind a type parameter or in a contains, an in, or a Set's or a
+// Map's keys.
 func Equal(a, b any) bool { return equal(reflect.ValueOf(a), reflect.ValueOf(b)) }
 
 // EqualDouble is a == b for two Double? values as Kotlin compares
@@ -127,10 +130,17 @@ func equal(a, b reflect.Value) bool {
 		if x, ok := a.Interface().(unordered); ok {
 			return sameKeys(x.Keys(), b.Interface().(unordered).Keys())
 		}
+		held := a.NumField() == 0 || a.Type().Field(0).Tag.Get("kogo") != ""
 		for i := range a.NumField() {
-			if a.Type().Field(i).IsExported() && !equal(a.Field(i), b.Field(i)) {
-				return false
+			if a.Type().Field(i).IsExported() {
+				held = true
+				if !equal(a.Field(i), b.Field(i)) {
+					return false
+				}
 			}
+		}
+		if !held {
+			panic("a " + strings.TrimPrefix(origin(a.Type()), a.Type().PkgPath()+".") + " cannot be compared: Kotlin compares it by identity, not by what it holds")
 		}
 		return true
 	}

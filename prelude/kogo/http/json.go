@@ -10,13 +10,13 @@ import (
 
 // A Json is one JSON object, kept as the text it came as. A read
 // gives nil where the key is absent, is JSON's null or holds another
-// type.
-type Json struct{ raw string }
+// type. == compares the text, which is exported for rt to reach.
+type Json struct{ Text string }
 
-func (j Json) String() string { return j.raw }
+func (j Json) String() string { return j.Text }
 
 // Json_Raw is the object as JSON text, untouched.
-func Json_Raw(this Json) string { return this.raw }
+func Json_Raw(this Json) string { return this.Text }
 
 // Json_Parse is text as a Json, or nil when it is not one JSON
 // object.
@@ -44,7 +44,7 @@ func encode(v any) []byte {
 // read as a number, nor a number as a string.
 func read[T any](j Json, key string) *T {
 	var members map[string]json.RawMessage
-	if json.Unmarshal([]byte(j.raw), &members) != nil {
+	if json.Unmarshal([]byte(j.Text), &members) != nil {
 		return nil
 	}
 	var v *T

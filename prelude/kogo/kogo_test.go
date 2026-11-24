@@ -84,8 +84,8 @@ func TestAsKotlin(t *testing.T) {
 		}
 	}
 	re := Regex_String("[0-9]{2}|a")
-	if !Regex_Matches(re, "12") || Regex_Matches(re, "123") || Regex_Matches(re, "ab") || !rt.Equal(re, Regex_String("[0-9]{2}|a")) {
-		t.Error("matches is of the whole input, and two of one pattern are equal")
+	if !Regex_Matches(re, "12") || Regex_Matches(re, "123") || Regex_Matches(re, "ab") {
+		t.Error("matches is of the whole input")
 	}
 }
 
@@ -194,6 +194,55 @@ func TestSets(t *testing.T) {
 	}
 	if got := rt.ToString(SetOf[int32]()); got != "[]" {
 		t.Errorf("an empty set's text is %s", got)
+	}
+}
+
+type shade string
+
+type point struct{ X, Y int32 }
+
+// A key of a plain kind is found through a Go map and any other by
+// the walk, and each answers as the walk alone does: contains, get,
+// distinctBy and == of two sets.
+func TestSetKinds(t *testing.T) {
+	nan := math.NaN()
+	agrees(t, true, []string{"a", "b", "a", ""}, "c")
+	agrees(t, true, []int32{1, 2, 1, 0}, 3)
+	agrees(t, true, []int64{1, 2, 1, 0}, 3)
+	agrees(t, true, []bool{true, true}, false)
+	agrees(t, true, []Uuid{{1}, {2}, {1}}, Uuid{3})
+	agrees(t, true, []shade{"red", "blue", "red"}, "green")
+	agrees(t, false, []float64{nan, 0.0, math.Copysign(0, -1), nan, 1}, 2)
+	agrees(t, false, []point{{1, 2}, {2, 1}, {1, 2}}, point{2, 2})
+	agrees(t, false, []Decimal{"1.0", "1.00", "1.0"}, "2")
+}
+
+func agrees[K any](t *testing.T, mapped bool, keys []K, absent K) {
+	t.Helper()
+	var walk []K // the keys as the walk alone keeps them
+	for _, k := range keys {
+		if !slices.ContainsFunc(walk, func(x K) bool { return rt.Equal(x, k) }) {
+			walk = append(walk, k)
+		}
+	}
+	s := SetOf(keys...)
+	if (s.at != nil) != mapped {
+		t.Errorf("a set of %T is found through a map: %v", absent, s.at != nil)
+	}
+	m := List_GroupBy(keys, func(k K) K { return k })
+	if !rt.Equal(s.keys, walk) || !rt.Equal(m.keys, walk) || !rt.Equal(List_DistinctBy(keys, func(k K) K { return k }), walk) {
+		t.Errorf("%s holds %s, not the walk's %s", rt.ToString(keys), rt.ToString(s.keys), rt.ToString(walk))
+	}
+	for i, k := range walk {
+		if !Set_Contains(s, k) || len(*Map_Get(m, k)) != len(slices.DeleteFunc(slices.Clone(keys), func(x K) bool { return !rt.Equal(x, k) })) {
+			t.Errorf("%s: key %d, %s, is not found as the walk finds it", rt.ToString(keys), i, rt.ToString(k))
+		}
+	}
+	if Set_Contains(s, absent) || Map_Get(m, absent) != nil {
+		t.Errorf("%s holds %s", rt.ToString(keys), rt.ToString(absent))
+	}
+	if !rt.Equal(s, SetOf(List_Reversed(walk)...)) || rt.Equal(s, SetOf(walk[1:]...)) {
+		t.Errorf("%s == of two sets does not answer as the walk does", rt.ToString(keys))
 	}
 }
 
@@ -598,21 +647,31 @@ func TestOverloads(t *testing.T) {
 	}
 }
 
-// A plain db.tx is run once: a deadlock in it is a panic, not a rerun
-// (spec.md 10.7).
-func TestPlainTxRunsOnce(t *testing.T) {
+// A plain db.tx is rerun on a deadlock, as the server's Tx is, and on
+// no other conflict: a serialization failure in it is a panic (spec.md
+// 10.7).
+func TestPlainTxRerunsDeadlock(t *testing.T) {
 	ctx, pool := testPool(t)
+	db := NewDb(ctx, pool)
 	runs := 0
-	defer func() {
-		if p, _ := recover().(*pgconn.PgError); p == nil || p.Code != "40P01" || runs != 1 {
-			t.Errorf("a deadlock in a plain db.tx ran it %d times and panicked with %v", runs, p)
-		}
-	}()
-	Db_Tx_Boolean_TxToA(NewDb(ctx, pool), nil, func(Tx) rt.Unit {
-		if runs++; runs == 1 {
+	got := Db_Tx_Boolean_TxToA(db, nil, func(Tx) int {
+		if runs++; runs < 3 {
 			panic(&pgconn.PgError{Code: "40P01"})
 		}
-		return rt.Unit{}
+		return runs
+	})
+	if got != 3 {
+		t.Errorf("a plain db.tx deadlocked twice gave %d, want its third run's 3", got)
+	}
+	runs = 0
+	defer func() {
+		if p, _ := recover().(*pgconn.PgError); p == nil || p.Code != "40001" || runs != 1 {
+			t.Errorf("a serialization failure in a plain db.tx ran it %d times and panicked with %v", runs, p)
+		}
+	}()
+	Db_Tx_Boolean_TxToA(db, nil, func(Tx) rt.Unit {
+		runs++
+		panic(&pgconn.PgError{Code: "40001"})
 	})
 }
 
@@ -729,4 +788,16 @@ func TestCheckPool(t *testing.T) {
 		}()
 		pool.Close()
 	}
+}
+
+// == on a Regex panics where the checker cannot see one compared, as
+// in a list's contains: Kotlin compares two by identity, not pattern.
+func TestRegexEqual(t *testing.T) {
+	defer func() {
+		if p := recover(); p != "a Regex cannot be compared: Kotlin compares it by identity, not by what it holds" {
+			t.Errorf("== on two Regexes panics with %v", p)
+		}
+	}()
+	List_Contains(ListOf(Regex_String("a+")), Regex_String("a+"))
+	t.Error("== on two Regexes answers")
 }

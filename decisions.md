@@ -2017,7 +2017,10 @@ Each entry: what was decided, why, and what would reopen it.
   member is accepted by Kogo and refused by Kotlin, so it differs in nothing that both
   accept; nothing is done about it. A bare `this` passed as a value is the receiver in
   Kogo and the `Raise` in Kotlin, which accepts it only where a `Raise` is wanted, and no
-  program can write one since DEV-833. Reopen if a program can again.
+  program can write one since DEV-833. Reopen if a program can again. *Corrected 24 Nov
+  2026 (DEV-1209): Kotlin accepts a bare `this` wherever an `Any` is, a template or an
+  `Any` parameter, so `"I am $this"` was valid in both and printed differently; it is
+  refused now, as "A bare `this` inside a raise scope is refused" below says.*
 - **A lambda inside a raise scope is in it; a local fun is not** (spec 9). Kotlin allows
   both. The lambda is Arrow's habit (`ids.map { load(it).bind() }`), and the facts mark
   each such lambda as able to fail, so the emitter knows. A local fun's failures are read
@@ -2098,6 +2101,7 @@ Each entry: what was decided, why, and what would reopen it.
   any lambda is.
   `tx.atomically` is one plain declaration for the same reason. Not taken: choosing by the
   type wanted, which `val r = db.tx { }` does not state.
+  *Agreed with Greg 24 Nov 2026 (DEV-1198), kept as written.*
 - **Markers count only the file's opt-in** (spec 11). Kotlin also lets a marked declaration
   use another of the same marker, lets `@OptIn` sit on one declaration (Kogo's error there
   says to opt in on the file), and lets `copy` skip a marked constructor's opt-in. One rule,
@@ -2234,6 +2238,7 @@ Each entry: what was decided, why, and what would reopen it.
   and no ported module depends on them. `uppercase()` is not in the prelude yet, so it
   has no corner to state. *Superseded for `İ` 20 Nov 2026 by "`lowercase()` follows
   Kotlin for `İ`" (DEV-1009) below.*
+  *Agreed with Greg 24 Nov 2026 (DEV-1198), kept as written.*
 - **`lowercase()` follows Kotlin for `İ` (DEV-1009, 20 Nov 2026, the lead's call)**: it
   gives `i` and a combining dot (U+0069 U+0307), as Java's `toLowerCase(Locale.ROOT)`
   does, where Go gives a bare `i`. This reopens the decision above for that letter:
@@ -2242,6 +2247,7 @@ Each entry: what was decided, why, and what would reopen it.
   `strings.ToLower`. A final sigma stays the corner in spec 12: its rule reads the
   letters either side and no ported module depends on it. Not taken: following the sigma
   too, about 20 code / 15 test lines. Reopen the sigma when a port depends on it.
+  *Agreed with Greg 24 Nov 2026 (DEV-1198), kept as written.*
 
 ## Taken making `Either` the only spelling (DEV-833), not yet discussed
 
@@ -2394,12 +2400,14 @@ Each entry: what was decided, why, and what would reopen it.
   `LocalTime` is the nanoseconds since midnight and `Duration` seconds and nanoseconds, as
   java.time holds them, each writing itself as java.time does. They are declared with no
   members yet: nothing uses one, and the test of every type reads them from a row.
+  *Agreed with Greg 24 Nov 2026 (DEV-1198), kept as written.*
 - **An `interval` with months is a panic, and its day is 24 hours** (spec 10.4). A month
   has no length, and `java.time.Duration` counts a day as 24 hours. A `Duration` is sent
   as microseconds alone, so `ofDays(1)` is stored as `24:00:00`, which Postgres compares
   equal to `1 day` and adds to a timestamp across a clock change as 24 hours, as Kotlin
   would. `infinity` in a `timestamptz` or a `date` is a panic. Sub-microsecond digits are
   cut, not rounded, as the driver does. Reopen if a port stores calendar intervals.
+  *Agreed with Greg 24 Nov 2026 (DEV-1198), kept as written.*
 - **A panic from the database carries the driver's error unchanged**, so `db.tx` can tell
   a serialization failure by its code and a server can log Postgres's own message. A
   wrong row count panics with a text that holds the statement. `queryOne` and
@@ -2411,8 +2419,11 @@ Each entry: what was decided, why, and what would reopen it.
 - **`db.tx(serializable = true)` reruns without a limit**, as the spec says, on SQLSTATE
   40001 and 40P01 only, whether the block or the commit met it. Without `serializable`
   neither is rerun. Reopen with a limit if a workload livelocks.
+  *Superseded in part 24 Nov 2026 by "A plain `db.tx` reruns on a deadlock" (DEV-1209)
+  below: the plain form reruns on 40P01, also without a limit.*
 - **`tx.atomically` is the driver's nested transaction**, a savepoint, rolled back on any
   panic that leaves the block, a failure or a bug. The block keeps using the outer `Tx`.
+  *Agreed with Greg 24 Nov 2026 (DEV-1198), kept as written.*
 - **The raising `db.tx` is `either` around the plain one**: the scope is made once, so a
   rerun raises on the same handle.
 - **The driver is told of a composite type on the connection that first reads one**
@@ -2465,15 +2476,25 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken adding what the invoice ledger calls (DEV-841), not yet discussed
 
-- **A `Set` walks its keys to find one.** The one ordered implementation is a slice of
-  keys compared with `rt.Equal`, so a lookup costs the set's size and `setOf` its square.
-  A hash would need a second walk that agrees with `==` everywhere. Reopen when a set or
-  a map is big enough for the walk to show.
+- **A `Set` or a `Map` finds a key of a plain kind through a Go map, and walks for any
+  other** (corrected by DEV-1210; it first said every key was walked, to be reopened when a
+  set grew big enough to show, and DEV-1198's trial F4 showed it: 6.5 s for
+  `toSet().contains` over 20,000 ids). Greg ruled on 24 Nov 2026: a map for a `String`,
+  `Int`, `Long`, `Boolean`, `Uuid` or enum key, where Go's `==` is Kotlin's, the walk for
+  the rest, and a note in spec 12 that warns of it. An enum is taken as any named string
+  but `Decimal` (the other named strings, rpc's `Refused` and `notText`, are never a Kogo
+  key); a `Char` walks, being unnamed in the ruling. Not taken: a hash for every key, a
+  second walk that must agree with `==` everywhere, about 45 / 25 lines, where any
+  disagreement makes `contains` answer false for a key that is there. `==` of two sets or
+  maps still walks both; reopen that when a port compares two large ones, and the rest when
+  a large collection keyed by another kind is needed.
 - **`rt`'s `==` compares a Go type that embeds `rt.Unordered` by its `Keys()` regardless
   of order**, each key once. `rt` knows no prelude type by name, and `Unordered`'s
   unexported method means no data class can be taken for a set by a member's name; `Map`
   can give its entries the same way. Not taken: an exported `Elements() []any`, which a
-  member could match and which copied every key on every comparison.
+  member could match and which copied every key on every comparison. Any other Go type
+  is compared by its exported fields, and one with fields and none exported panics
+  (DEV-1205).
 - **One declaration where Kotlin has two or more.** `listOfNotNull(vararg elements: T?)`
   covers Kotlin's single-element overload; `List<T>.plus(elements: List<T>)` stands for
   Kotlin's `Collection<T>.plus(Iterable<T>)`, since Kogo has no `Iterable`, and the
@@ -3299,6 +3320,7 @@ Each entry: what was decided, why, and what would reopen it.
 - **A plain `db.tx` is run once at READ COMMITTED, and a deadlock in it is a panic, as
   before; a `Tx` the server opens is rerun on a deadlock** (`doc/gates.md`). Spec 10.7
   now says so of `db.tx`, and a test holds each. Not taken: rerunning a plain `db.tx`.
+  *Superseded 24 Nov 2026 by "A plain `db.tx` reruns on a deadlock" (DEV-1209) below.*
 - **A list's check takes a `Tx`, and a `SerializableTx` there is refused**: the server
   runs it read-only at the database's default and does not rerun it (DEV-964 owns
   `Handler.check`). Not taken: accepting one, which would let it read with no lock where
@@ -3324,6 +3346,7 @@ Each entry: what was decided, why, and what would reopen it.
   rest. Not taken: `sameSite` or `tokenMatches` in `kogo.rpc`, which would put one
   application's settings, table and cookie into the prelude. Reopen: a second
   application that writes the same check.
+  *Agreed with Greg 24 Nov 2026 (DEV-1198), kept as written.*
 - **The prelude gains `String.endsWith` and `List.contains`**, which `sameSite` and
   `isOurOrigin` call (`origin in settings.extraAllowedOrigins`). Both were in `spec.md`
   section 12 and not yet built; `contains` compares as `==` does. 7 / 6.
@@ -3508,8 +3531,8 @@ Each entry: what was decided, why, and what would reopen it.
   13): a kept connection now idles until the service closes it, and a TLS handshake
   is bounded by the handle's `Timeout` alone.
 - **`Json` is its text**, read again at each call, so `raw()` is untouched and a value
-  of it compares and prints as its text. Not taken: a parsed tree, which is faster on an
-  answer read many times and loses the text.
+  of it prints as its text, and compares by it since DEV-1205. Not taken: a parsed
+  tree, which is faster on an answer read many times and loses the text.
 - **Section 13's sample binding is `Http.ask` and `perform`**, in place of an invented
   `Http.get` in a Go package `httpx`, which the real `Http` would contradict. The sample
   no longer shows `@go`; its bullet stays.
@@ -3680,6 +3703,7 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
     a gate no port has, as cusoon2's requests take no locks and its gates are on a
     `SerializableTx`; roles or triggers, which are the application's schema. Reopen, and
     take the read, when a port has a gate on a `Tx` that calls a database function.
+    *Agreed with Greg 24 Nov 2026 (DEV-1198), kept as written.*
   - **A utility statement a gate reaches is refused**, by Postgres's own tag for it
     (`commandType` 6, its `utilityStmt`): its tree lists no table, so `truncate` and `lock
     table` passed, and read-only mode allows `lock table`. Nothing is lost: a gate binds a
@@ -3830,6 +3854,7 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   outside the block. Spec 15.7 says so. Not taken: following a
   transaction through lambdas and assignments, a walk of where each
   value goes that the ruling just took out.
+  *Agreed with Greg 24 Nov 2026 (DEV-1198), kept as written.*
 - **`action-proof` goes, and `action-tx` is not widened.** The rule
   said an `action fun` takes a proof only as a row's gated work;
   there is no proof to name. An `action fun` may declare a parameter
@@ -4822,6 +4847,26 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   Not taken: hand on every one. Reopens on a `spec.md` change that the lead or Greg
   would have stopped, merged with no hand-on.
 
+## == compares what a prelude value holds (DEV-1205), 24 Nov 2026
+
+- **A prelude type is compared by its exported fields, as before, and so `Json`'s text,
+  `Field`'s parts and an endpoint's method and path are exported**, and `Field`'s kind
+  is an `int32`, which `rt` reads. Not taken: a second hook beside `Unordered`, as an
+  `Equals` method, which each type would write and keep in step with its fields.
+- **A Go type with fields and none exported panics on `==`** (a handle: `Db`, `Tx`,
+  `Http`, `Console`, `Clock`, `Request`, `Test`, `Raise`, and `Regex`, whose pattern is
+  now unexported): Kotlin compares each by identity, so two different ones were quietly
+  equal. A type with no fields (`Unit`) and a data class are not such a type. Not taken:
+  comparing unexported fields, which reaches pools, clients and functions. It stays for
+  where check is blind, a `contains` or a `Set`'s keys.
+- **`==` and `!=` on a `Regex`, or on a value whose type holds one, are refused
+  (`regex-equality`)**, by the lead's ruling, as a `ByteArray` is and through the same
+  walk of the types, so the one inside a compared value costs nothing more. Not taken:
+  keeping two of one pattern equal, which answers otherwise than Kotlin 2.4.21.
+- **`==` and `!=` on a handle, or on a value whose type holds one, are refused
+  (`handle-equality`)** by the same walk, by the lead's ruling on the Review. Not taken:
+  an issue of its own, three runs for six lines.
+
 ## A client that leaves, and a service that does not answer (DEV-1196), 24 Nov 2026
 
 - **The body is read whole in `ServeHTTP`, before `run`**, whatever the operation, up
@@ -4886,3 +4931,45 @@ override are corrected in place above.
 - **`as "name?"` clears `Joined`** (the Code review's fix): the author's "may be null" is
   not the join's, so such a column neither fills a property that may not be null in a
   nullable class nor tells the class's absence.
+
+## Greg's rulings on DEV-1198: the wire, the deadlock, `this` (DEV-1209), 24 Nov 2026
+
+- **An operation's input refuses a data class whose constructor is private or internal**,
+  as it refuses a marked one (Greg, ruling 1 on DEV-1198): alone, nested or in a `List`,
+  wherever the input reaches it; an answer may hold one. The `wire` walk's case for a
+  marked constructor takes the other two, and its message names the wall; a constructor
+  both marked and private is named by its marker. No correct program takes such a class
+  from a caller, since the caller would make what only the program's own code makes.
+  Spec 15.4. It widens "Refusing a marked data class as an input" (DEV-890) and overrides
+  nothing. Reopen if a program must take, from a caller, a class whose constructor it
+  keeps from its own other files.
+- **A plain `db.tx` reruns on a deadlock**, 40P01 alone, as the server's `Tx` does (Greg,
+  ruling 2 on DEV-1198): an outside call before a plain `db.tx` that deadlocks would leave
+  a charge with no record. A serialization failure, which READ COMMITTED does not give,
+  is still a panic. `action-in-tx` already keeps an outside call out of the block, and
+  spec 10.7's sentence that a rerun block has no effect outside the transaction now
+  covers both forms. `kogo.TestPlainTxRunsOnce`, which held the panic, becomes
+  `TestPlainTxRerunsDeadlock`: a deadlock twice and then a value, and a serialization
+  failure run once. Not taken: rerunning on 40001 too, which the ruling did not ask.
+- **A bare `this` inside a raise scope is refused** (`raise-this`; Greg, the lead's note
+  of 24 Nov 2026 on DEV-1198, which replaces the guide's ruling 5): in an extension or a
+  data class's fun, a `this` that stands as a value inside `either { }` is Kotlin's
+  `Raise` and Kogo's receiver, and `"I am $this"` is valid in both. The message says to
+  name the receiver in a `val` before the block. `this.name` stays, kotlinc refusing it.
+  Decided here, beyond the ruling's words, and ruled by the lead on PR 185 as cases of
+  the ruling's reason, text valid in both that means something else in each: the block of
+  the raising `db.tx` is held the same, since it is a `Raise<E>.(Tx) -> A` in Kotlin as
+  `either`'s is, and the one check (the checker's raise scope) covers both; and a call
+  that Kotlin's `Raise` takes as well is refused, written on `this` or on no receiver:
+  `toString()` and an extension on a type parameter (`let`, `also`, `takeIf`, `right`,
+  `left`). kotlinc 2.4.21 with Arrow 2.2.3 prints `DefaultRaise@…` for `toString()` and
+  `let { "I am $it" }` inside `either { }`, unwritten receiver and all (run 24 Nov 2026).
+  The check is by what the call resolves to, not by its name, so a prelude extension on a
+  type parameter added later is held too.
+  A local fun inside the block is held too: it is not in the raise scope (spec 9), but
+  its `this` is the `Raise` in Kotlin (kotlinc 2.4.21 with Arrow 2.2.3 takes `fun g():
+  Raise<String> = this` there, run 24 Nov 2026). Not taken: holding `either { }` and a
+  bare `this` alone, which left `db.tx { "$this" }` and `this.let { "$it" }` answering
+  otherwise than Kotlin. When built, `examples/` held no `this` inside an
+  `either { }`, and the tests three, each a receiver (`this.raise`, `this.ensure`,
+  `this.ensureNotNull`).

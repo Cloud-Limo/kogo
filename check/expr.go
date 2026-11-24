@@ -341,11 +341,25 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 	panic("unreachable")
 }
 
+// raiseThisAt refuses a this that Kotlin reads as the raise scope
+// (spec.md 9).
+func (c *checker) raiseThisAt(e *syntax.Ident, t Type) {
+	name := t.String()
+	if n, ok := t.(*Named); ok {
+		name = n.Decl.Simple()
+	}
+	name = strings.ToLower(name[:1]) + name[1:]
+	c.errorf(e, "raise-this", "in Kotlin this inside either { } or db.tx { } is the raise scope, not this %s: name it in a val before the block, as val %s = this, and use that (spec.md 9)", t, name)
+}
+
 // ident reads a name: a local, a member of this, a top-level val, a
 // data object or Unit.
 func (c *checker) ident(e *syntax.Ident) Type {
 	switch o := c.scope.lookup(e.Name).(type) {
 	case *Var:
+		if e.Name == "this" && c.recv != e && c.raiseThis {
+			c.raiseThisAt(e, o.Type)
+		}
 		c.info.Uses[e] = o
 		t := c.typeOf(o)
 		if t != o.Type {
@@ -524,6 +538,7 @@ func (c *checker) sel(e *syntax.Select) Type {
 	if c.packaged(e) {
 		return unknown
 	}
+	c.recv = e.X
 	rt := c.expr(e.X, nil)
 	if rt == unknown {
 		return unknown
@@ -1030,17 +1045,34 @@ func (c *checker) funcEquality(at syntax.Node, op string, x, y Type) {
 	for _, t := range []Type{x, y} {
 		where := holdsFunc(t, nil, map[*TypeDecl]bool{})
 		if where == "" {
-			// Nor is a ByteArray, which Kotlin compares by identity.
-			bytes := c.prelude("ByteArray")
-			if where = holdsFunc(t, bytes, map[*TypeDecl]bool{}); where != "" {
-				held := ", and " + where + " holds a ByteArray"
-				if where == "it" && named(nonNull(t)) == bytes {
-					held = ""
-				} else if where == "it" {
-					held = ", which holds a ByteArray"
+			// Nor is a ByteArray, a Regex or a handle, which Kotlin compares
+			// by identity; a handle's name is under kogo, after its package.
+			handle := "what it holds: compare the other properties, or what the handle answers"
+			for _, id := range [][3]string{
+				{"ByteArray", "bytes", "its bytes: compare the other properties, or what the bytes were made from"},
+				{"Regex", "regex", "its pattern: compare the patterns, as strings"},
+				{"Db", "handle", handle}, {"Tx", "handle", handle}, {"SerializableTx", "handle", handle},
+				{"Raise", "handle", handle}, {"http.Http", "handle", handle}, {"io.Console", "handle", handle},
+				{"time.Clock", "handle", handle}, {"rpc.Request", "handle", handle}, {"test.Test", "handle", handle},
+			} {
+				pkg, name := "kogo", id[0]
+				if i := strings.LastIndexByte(id[0], '.'); i >= 0 {
+					pkg, name = "kogo."+id[0][:i], id[0][i+1:]
 				}
-				c.errorf(at, "bytes-equality", "%s compares a %s%s, which Kotlin compares by identity, not by its bytes: compare the other properties, or what the bytes were made from", op, t, held)
-				return
+				d := (*TypeDecl)(nil)
+				if p := c.pkgs[pkg]; p != nil {
+					d = p.types[name]
+				}
+				if where = holdsFunc(t, d, map[*TypeDecl]bool{}); where != "" {
+					held := ", and " + where + " holds a " + name
+					if where == "it" && named(nonNull(t)) == d {
+						held = ""
+					} else if where == "it" {
+						held = ", which holds a " + name
+					}
+					c.errorf(at, id[1]+"-equality", "%s compares a %s%s, which Kotlin compares by identity, not by "+id[2], op, t, held)
+					return
+				}
 			}
 			continue
 		}
@@ -1071,9 +1103,10 @@ func (c *checker) functionText(at syntax.Node, t Type, how string) {
 
 // holdsFunc names where a value of t holds a function (spec.md 3): a
 // declaration's property, "it" for t or a type argument itself, or ""
-// for nowhere; or, given the ByteArray's declaration, where it holds
-// one of those instead. A declaration is read unsubstituted, once, and its type
-// arguments apart, so a type that refers to itself ends.
+// for nowhere; or, given the ByteArray's or the Regex's declaration,
+// where it holds one of those instead. A declaration is read
+// unsubstituted, once, and its type arguments apart, so a type that
+// refers to itself ends.
 func holdsFunc(t Type, bytes *TypeDecl, seen map[*TypeDecl]bool) string {
 	switch t := t.(type) {
 	case *FuncType:

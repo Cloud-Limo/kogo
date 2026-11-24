@@ -36,8 +36,8 @@ func (c *checker) failing(at syntax.Node, f *Func) {
 // raiseBlock reads a lambda passed where a block with the receiver
 // Raise<E> is wanted: a raise scope for E.
 func (c *checker) raiseBlock(l *syntax.Lambda, receiver Type, params []Type, want Type) *FuncType {
-	defer func(e Type, n int) { c.raise, c.raiseDepth = e, n }(c.raise, c.raiseDepth)
-	c.raise, c.raiseDepth = c.raised(receiver), len(c.lambdas)
+	defer func(e Type, n int, b bool) { c.raise, c.raiseDepth, c.raiseThis = e, n, b }(c.raise, c.raiseDepth, c.raiseThis)
+	c.raise, c.raiseDepth, c.raiseThis = c.raised(receiver), len(c.lambdas), true
 	c.info.Fails[l] = c.raise
 	got := c.lambda(l, params, want)
 	got.Receiver = receiver

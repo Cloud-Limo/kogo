@@ -700,6 +700,11 @@ fun suppliersOf(tx: Tx, operatorId: ID): List<SupplierRow> =
   The value is sent to Postgres separately from the statement. A name
   written twice is one parameter; an expression is evaluated and bound
   each time it is written. `$1` is an error; any other `$` is SQL text.
+  Each `$name` and `${expr}` must be where Postgres reads a parameter:
+  one inside a quoted string, a comment or a dollar quote's tag is an
+  error, even where the same name is a parameter elsewhere. A `$` as
+  text before a name or a digit is written `chr(36)`, as in
+  `'in ' || chr(36) || 'AUD'`, or bound as a parameter holding it.
 - A statement that fits on one line may be written `sql"..."`. Neither
   form has escapes.
 - A `sql"""` literal may only appear as the argument of one of the five

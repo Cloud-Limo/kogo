@@ -27,9 +27,9 @@ type Param struct {
 // parser found it: literal[Start:End].
 type Span struct{ Start, End int }
 
-// An edit records one renumbering: the parameter is at sql[at:], and
+// An edit records one renumbering: parameter n is at sql[at:], and
 // the text after it lies shift bytes further on in the literal.
-type edit struct{ at, shift int }
+type edit struct{ at, shift, n int }
 
 // rewrite replaces each parameter with a numbered one. A name that
 // occurs twice is one parameter; an expression is one parameter per
@@ -43,7 +43,7 @@ func rewrite(literal string, spans []Span) (string, []Param, []edit, error) {
 	text := func(from, to int) error {
 		for i := from; i+1 < to; i++ {
 			if literal[i] == '$' && literal[i+1] >= '0' && literal[i+1] <= '9' {
-				return &Error{i, "sql-parameter-syntax", "a numbered parameter is not Kogo: write $name, the value to bind"}
+				return &Error{i, "sql-parameter-syntax", "a numbered parameter is not Kogo: write $name, the value to bind; " + dollarText}
 			}
 		}
 		sql.WriteString(literal[from:to])
@@ -65,7 +65,7 @@ func rewrite(literal string, spans []Span) (string, []Param, []edit, error) {
 		}
 		at := sql.Len()
 		fmt.Fprintf(&sql, "$%d", n)
-		edits = append(edits, edit{at, s.End - sql.Len()})
+		edits = append(edits, edit{at, s.End - sql.Len(), n})
 		prev = s.End
 	}
 	if err := text(prev, len(literal)); err != nil {
@@ -73,6 +73,11 @@ func rewrite(literal string, spans []Span) (string, []Param, []edit, error) {
 	}
 	return sql.String(), params, edits, nil
 }
+
+// dollarText says how to write a $ that is text, which Kogo refuses
+// where it reads as a parameter, a dollar quote's tag included.
+const dollarText = "to write a $ as text, bind the text as a parameter, or join chr(36) on, as in 'in ' || chr(36) || 'AUD', " +
+	"and write a dollar-quoted string as a quoted one"
 
 func isNameByte(c byte) bool {
 	return c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'

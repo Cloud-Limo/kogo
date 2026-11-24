@@ -2495,7 +2495,9 @@ Each entry: what was decided, why, and what would reopen it.
   of order**, each key once. `rt` knows no prelude type by name, and `Unordered`'s
   unexported method means no data class can be taken for a set by a member's name; `Map`
   can give its entries the same way. Not taken: an exported `Elements() []any`, which a
-  member could match and which copied every key on every comparison.
+  member could match and which copied every key on every comparison. Any other Go type
+  is compared by its exported fields, and one with fields and none exported panics
+  (DEV-1205).
 - **One declaration where Kotlin has two or more.** `listOfNotNull(vararg elements: T?)`
   covers Kotlin's single-element overload; `List<T>.plus(elements: List<T>)` stands for
   Kotlin's `Collection<T>.plus(Iterable<T>)`, since Kogo has no `Iterable`, and the
@@ -3651,7 +3653,7 @@ Each entry: what was decided, why, and what would reopen it.
   13): a kept connection now idles until the service closes it, and a TLS handshake
   is bounded by the handle's `Timeout` alone.
 - **`Json` is its text**, read again at each call, so `raw()` is untouched and a value
-  of it compares and prints as its text. Not taken: a parsed tree, which is faster on an
+  of it prints as its text, and compares by it since DEV-1205. Not taken: a parsed tree, which is faster on an
   answer read many times and loses the text.
 - **Section 13's sample binding is `Http.ask` and `perform`**, in place of an invented
   `Http.get` in a Go package `httpx`, which the real `Http` would contradict. The sample
@@ -4974,3 +4976,23 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   DEV-1201: eight such hand-ons, all ruled as the clerk recommended, waited 111 min).
   Not taken: hand on every one. Reopens on a `spec.md` change that the lead or Greg
   would have stopped, merged with no hand-on.
+
+## == compares what a prelude value holds (DEV-1205), 24 Nov 2026
+
+- **A prelude type is compared by its exported fields, as before, and so `Json`'s text,
+  `Field`'s parts and an endpoint's method and path are exported**, and `Field`'s kind
+  is an `int32`, which `rt` reads. Not taken: a second hook beside `Unordered`, as an
+  `Equals` method, which each type would write and keep in step with its fields.
+- **A Go type with fields and none exported panics on `==`** (a handle: `Db`, `Tx`,
+  `Http`, `Console`, `Clock`, `Request`, `Test`, `Raise`, and `Regex`, whose pattern is
+  now unexported): Kotlin compares each by identity, so two different ones were quietly
+  equal. A type with no fields (`Unit`) and a data class are not such a type. Not taken:
+  comparing unexported fields, which reaches pools, clients and functions. Reopens if
+  `kogo check` refuses `==` on a handle, as on a `Regex`.
+- **`==` and `!=` on a `Regex`, or on a value whose type holds one, are refused
+  (`regex-equality`)**, by the lead's ruling, as a `ByteArray` is and through the same
+  walk of the types, so the one inside a compared value costs nothing more. Not taken:
+  keeping two of one pattern equal, which answers otherwise than Kotlin 2.4.21.
+- **`mise run kotlin` gains one case, `regexText`**: a `Regex`'s text, which is how
+  the message says to compare two. Nothing else this changes runs in Kotlin: `Json`,
+  `Field` and the handles are Kogo's own, and `Regex ==` is refused.

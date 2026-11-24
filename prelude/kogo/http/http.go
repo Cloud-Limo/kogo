@@ -104,20 +104,21 @@ func Http_WithHeader(this Http, name, value string) Http {
 	return this
 }
 
-// An endpoint is a method and a path, with any id in it escaped.
-type endpoint struct{ method, path string }
+// An Endpoint is a method and a path, with any id in it escaped. Its
+// fields are exported, as Field's are, for rt's == to compare.
+type Endpoint struct{ Method, Path string }
 
 // A Lookup asks and changes nothing; an Action changes something
 // outside. They are two types so that ask takes only the one and
 // perform only the other.
-type Lookup struct{ endpoint }
-type Action struct{ endpoint }
+type Lookup struct{ Endpoint }
+type Action struct{ Endpoint }
 
 // path joins the parts as written and escapes the id alone, so an id
 // that holds a / or a ? stays one piece of the path. A written part
 // holds nothing to escape: Go would otherwise escape the whole path
 // again, the id's %2F by then a /.
-func path(method, before string, id *string, after string) endpoint {
+func path(method, before string, id *string, after string) Endpoint {
 	for piece := range strings.SplitSeq(before+after, "/") {
 		if piece != url.PathEscape(piece) {
 			panic(fmt.Sprintf("an endpoint's path is written as it is sent, and %q is not: %q", piece, before+after))
@@ -132,7 +133,7 @@ func path(method, before string, id *string, after string) endpoint {
 		panic(fmt.Sprintf("an endpoint's path begins with /: %q", before))
 	}
 	if id == nil {
-		return endpoint{method, before}
+		return Endpoint{method, before}
 	}
 	switch {
 	case !strings.HasSuffix(before, "/"):
@@ -142,7 +143,7 @@ func path(method, before string, id *string, after string) endpoint {
 	case *id == "" || *id == "." || *id == "..":
 		panic(fmt.Sprintf("an id in a path is not %q", *id))
 	}
-	return endpoint{method, before + url.PathEscape(*id) + after}
+	return Endpoint{method, before + url.PathEscape(*id) + after}
 }
 
 func Lookup_String_String(method, path_ string) Lookup { return Lookup{path(method, path_, nil, "")} }
@@ -160,7 +161,7 @@ func Action_String_String_String(method, before, id string) Action {
 	return Action{path(method, before, &id, "")}
 }
 func Action_String_String_String_String(method, before, id, after string) Action {
-	return Action{Lookup_String_String_String_String(method, before, id, after).endpoint}
+	return Action{Lookup_String_String_String_String(method, before, id, after).Endpoint}
 }
 
 // HttpFailure is prelude/http.kg's, written here as the emitter would
@@ -192,12 +193,12 @@ type HttpFailure_Unreadable struct {
 // when a kept connection fails before any answer: a lookup changes
 // nothing, so whatever its method it is marked as safe to repeat.
 func Http_Ask(this Http, endpoint Lookup, fields kogo.List[Field]) kogo.Either[HttpFailure, Json] {
-	return sorted(this.send(endpoint.endpoint, fields, true))
+	return sorted(this.send(endpoint.Endpoint, fields, true))
 }
 
 // Http_Perform sends an action, once.
 func Http_Perform(this Http, endpoint Action, fields kogo.List[Field]) kogo.Either[HttpFailure, Json] {
-	return sorted(this.send(endpoint.endpoint, fields, false))
+	return sorted(this.send(endpoint.Endpoint, fields, false))
 }
 
 // sorted is a call's end by how far it got and its status alone,
@@ -241,10 +242,10 @@ type failed struct {
 // status when an answer came, and why, with the body of a 3xx or a
 // 4xx. Never the query or the handle's headers: the path is the
 // endpoint's, which holds no query.
-func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *failed) {
+func (h Http) send(e Endpoint, fields kogo.List[Field], again bool) (*Json, *failed) {
 	answer, f := h.call(e, fields, again)
 	if f != nil {
-		args := []any{"method", e.method, "path", e.path}
+		args := []any{"method", e.Method, "path", e.Path}
 		if f.status != 0 {
 			args = append(args, "status", f.status)
 		}
@@ -263,14 +264,14 @@ func (h Http) send(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 // the client's word, cut as a refused body is. It is no action, as
 // ask's own logging is not.
 func Http_LogRefusal_Lookup_String(this Http, endpoint Lookup, why string) rt.Unit {
-	return this.refused(endpoint.endpoint, why)
+	return this.refused(endpoint.Endpoint, why)
 }
 func Http_LogRefusal_Action_String(this Http, endpoint Action, why string) rt.Unit {
-	return this.refused(endpoint.endpoint, why)
+	return this.refused(endpoint.Endpoint, why)
 }
 
-func (h Http) refused(e endpoint, why string) rt.Unit {
-	h.s.Log.Warn("kogo.http: refused in a 2xx", "method", e.method, "path", e.path, "why", cut(why))
+func (h Http) refused(e Endpoint, why string) rt.Unit {
+	h.s.Log.Warn("kogo.http: refused in a 2xx", "method", e.Method, "path", e.Path, "why", cut(why))
 	return rt.Unit{}
 }
 
@@ -283,19 +284,19 @@ func cut(s string) string {
 	return s
 }
 
-func (h Http) call(e endpoint, fields kogo.List[Field], again bool) (*Json, *failed) {
+func (h Http) call(e Endpoint, fields kogo.List[Field], again bool) (*Json, *failed) {
 	u := *h.base
-	u.RawPath = e.path // keeps an escaped id as it was written
-	u.Path, _ = url.PathUnescape(e.path)
+	u.RawPath = e.Path // keeps an escaped id as it was written
+	u.Path, _ = url.PathUnescape(e.Path)
 	var query, body []byte
 	for _, name := range slices.Sorted(maps.Keys(h.s.Query)) {
 		query = pair(query, name, h.s.Query[name])
 	}
 	contentType := ""
 	switch {
-	case e.method == "GET":
+	case e.Method == "GET":
 		query = form(query, "", fields)
-	case e.method == "DELETE" && len(fields) == 0:
+	case e.Method == "DELETE" && len(fields) == 0:
 		// No body and no Content-Type, as most clients send a DELETE.
 	case h.s.Encoding == Form:
 		body, contentType = form(nil, "", fields), "application/x-www-form-urlencoded"
@@ -309,7 +310,7 @@ func (h Http) call(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 	defer cancel()
 	// A send has left once it has a connection to write on.
 	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { sends++ }})
-	req, err := http.NewRequestWithContext(ctx, e.method, u.String(), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, e.Method, u.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, &failed{why: "the request could not be made: " + err.Error()}
 	}
@@ -331,7 +332,7 @@ func (h Http) call(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 		// not sent on the wire.
 		req.Header["Idempotency-Key"] = []string{}
 	case again:
-	case len(body) > 0 || keyed || e.method == "GET":
+	case len(body) > 0 || keyed || e.Method == "GET":
 		// Go repeats a request that failed on a kept connection when
 		// it can make its body again and takes it for safe: a GET, or
 		// one with an Idempotency-Key header. With a body it cannot
@@ -343,7 +344,7 @@ func (h Http) call(e endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 	}
 	resp, err := h.client.Do(req)
 	if sends > 1 {
-		h.s.Log.Warn("kogo.http: sent a second time", "method", e.method, "path", e.path)
+		h.s.Log.Warn("kogo.http: sent a second time", "method", e.Method, "path", e.Path)
 	}
 	if err != nil {
 		return nil, &failed{left: sends > 0, why: reason(err)}
@@ -392,14 +393,15 @@ func reason(err error) string {
 }
 
 // A Field is one name and its value: text, or the fields of a group,
-// or a list of strings, or a JSON object sent as it is.
+// or a list of strings, or a JSON object sent as it is. Its fields are
+// exported for rt's == to compare, as Json's text is.
 type Field struct {
-	name  string
-	text  string // a form's value
-	json  string // JSON's, when it is not a group or a list
-	group []Field
-	list  []string
-	kind  int // 0 a value, isGroup or isList
+	Name  string
+	Text  string // a form's value
+	JSON  string // JSON's, when it is not a group or a list
+	Group []Field
+	List  []string
+	Kind  int32 // 0 a value, isGroup or isList; an int32, as rt compares
 }
 
 const (
@@ -410,11 +412,11 @@ const (
 func quote(s string) string { return string(encode(s)) }
 
 func Field_String_String(name, value string) Field {
-	return Field{name: name, text: value, json: quote(value)}
+	return Field{Name: name, Text: value, JSON: quote(value)}
 }
 func Field_String_Long(name string, value int64) Field {
 	s := strconv.FormatInt(value, 10)
-	return Field{name: name, text: s, json: s}
+	return Field{Name: name, Text: s, JSON: s}
 }
 
 // Field_String_Double writes a number as Kogo's toString() does. JSON
@@ -423,39 +425,39 @@ func Field_String_Double(name string, value float64) Field {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		panic(fmt.Sprintf("field: %s is %s, which no service reads", name, rt.ToString(value)))
 	}
-	return Field{name: name, text: rt.ToString(value), json: rt.ToString(value)}
+	return Field{Name: name, Text: rt.ToString(value), JSON: rt.ToString(value)}
 }
 func Field_String_Boolean(name string, value bool) Field {
 	s := strconv.FormatBool(value)
-	return Field{name: name, text: s, json: s}
+	return Field{Name: name, Text: s, JSON: s}
 }
 func Field_String_ListString(name string, values kogo.List[string]) Field {
-	return Field{name: name, list: values, kind: isList}
+	return Field{Name: name, List: values, Kind: isList}
 }
 func Field_String_Json(name string, json Json) Field {
-	return Field{name: name, text: json.raw, json: json.raw}
+	return Field{Name: name, Text: json.Text, JSON: json.Text}
 }
 func Group(name string, fields kogo.List[Field]) Field {
-	return Field{name: name, group: fields, kind: isGroup}
+	return Field{Name: name, Group: fields, Kind: isGroup}
 }
 
 // form adds fields to a form or a query, in the order given: a
 // group's as group[name], a list's values each as name[].
 func form(to []byte, outer string, fields []Field) []byte {
 	for _, f := range fields {
-		name := f.name
+		name := f.Name
 		if outer != "" {
-			name = outer + "[" + f.name + "]"
+			name = outer + "[" + f.Name + "]"
 		}
-		switch f.kind {
+		switch f.Kind {
 		case isList:
-			for _, v := range f.list {
+			for _, v := range f.List {
 				to = pair(to, name+"[]", v)
 			}
 		case isGroup:
-			to = form(to, name, f.group)
+			to = form(to, name, f.Group)
 		default:
-			to = pair(to, name, f.text)
+			to = pair(to, name, f.Text)
 		}
 	}
 	return to
@@ -476,15 +478,15 @@ func object(fields []Field) []byte {
 		if i > 0 {
 			b.WriteByte(',')
 		}
-		b.Write(encode(f.name))
+		b.Write(encode(f.Name))
 		b.WriteByte(':')
-		switch f.kind {
+		switch f.Kind {
 		case isList:
-			b.Write(encode(append([]string{}, f.list...)))
+			b.Write(encode(append([]string{}, f.List...)))
 		case isGroup:
-			b.Write(object(f.group))
+			b.Write(object(f.Group))
 		default:
-			b.WriteString(f.json)
+			b.WriteString(f.JSON)
 		}
 	}
 	b.WriteByte('}')

@@ -1030,17 +1030,22 @@ func (c *checker) funcEquality(at syntax.Node, op string, x, y Type) {
 	for _, t := range []Type{x, y} {
 		where := holdsFunc(t, nil, map[*TypeDecl]bool{})
 		if where == "" {
-			// Nor is a ByteArray, which Kotlin compares by identity.
-			bytes := c.prelude("ByteArray")
-			if where = holdsFunc(t, bytes, map[*TypeDecl]bool{}); where != "" {
-				held := ", and " + where + " holds a ByteArray"
-				if where == "it" && named(nonNull(t)) == bytes {
-					held = ""
-				} else if where == "it" {
-					held = ", which holds a ByteArray"
+			// Nor is a ByteArray or a Regex, which Kotlin compares by identity.
+			for _, id := range [][3]string{
+				{"ByteArray", "bytes", "its bytes: compare the other properties, or what the bytes were made from"},
+				{"Regex", "regex", "its pattern: compare the patterns, as strings"},
+			} {
+				d := c.prelude(id[0])
+				if where = holdsFunc(t, d, map[*TypeDecl]bool{}); where != "" {
+					held := ", and " + where + " holds a " + id[0]
+					if where == "it" && named(nonNull(t)) == d {
+						held = ""
+					} else if where == "it" {
+						held = ", which holds a " + id[0]
+					}
+					c.errorf(at, id[1]+"-equality", "%s compares a %s%s, which Kotlin compares by identity, not by "+id[2], op, t, held)
+					return
 				}
-				c.errorf(at, "bytes-equality", "%s compares a %s%s, which Kotlin compares by identity, not by its bytes: compare the other properties, or what the bytes were made from", op, t, held)
-				return
 			}
 			continue
 		}
@@ -1071,9 +1076,10 @@ func (c *checker) functionText(at syntax.Node, t Type, how string) {
 
 // holdsFunc names where a value of t holds a function (spec.md 3): a
 // declaration's property, "it" for t or a type argument itself, or ""
-// for nowhere; or, given the ByteArray's declaration, where it holds
-// one of those instead. A declaration is read unsubstituted, once, and its type
-// arguments apart, so a type that refers to itself ends.
+// for nowhere; or, given the ByteArray's or the Regex's declaration,
+// where it holds one of those instead. A declaration is read
+// unsubstituted, once, and its type arguments apart, so a type that
+// refers to itself ends.
 func holdsFunc(t Type, bytes *TypeDecl, seen map[*TypeDecl]bool) string {
 	switch t := t.(type) {
 	case *FuncType:

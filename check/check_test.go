@@ -562,6 +562,18 @@ func TestByteArray(t *testing.T) {
 	})
 }
 
+// Nor is a Regex, which Kotlin compares by identity (spec.md 14).
+func TestRegexEquality(t *testing.T) {
+	re := "\n---\npackage kogo\nexternal class Regex\nexternal fun Regex(pattern: String): Regex"
+	rule := "data class Rule(val name: String, val re: Regex)\n"
+	passes(t, rule+"fun f(a: Rule, b: Regex?): Boolean = a.name == \"x\" && b != null && \"$b\" == \"a+\""+re)
+	refused(t, [][3]string{
+		{"fun f(): Boolean = Regex(\"a+\") ‸== Regex(\"a+\")" + re, "regex-equality", "== compares a Regex, which Kotlin compares by identity, not by its pattern: compare the patterns, as strings"},
+		{rule + "fun f(a: Rule, b: Rule): Boolean = a ‸!= b" + re, "regex-equality", "!= compares a Rule, and Rule's property re holds a Regex"},
+		{rule + "fun f(a: List<Rule>, b: List<Rule>): Boolean = a ‸== b" + re, "regex-equality", "Rule's property re holds a Regex"},
+	})
+}
+
 // Section 4: absence and narrowing.
 func TestNarrowing(t *testing.T) {
 	passes(t,

@@ -765,8 +765,10 @@ column.
   statement is kept. Two columns of one name are an error. A statement
   whose own `with` writes is an error under a query call, since Postgres
   takes such a `with` only at the top level: run the write as a
-  statement of its own. The fields of a whole row read as one column
-  (`select b as business`) are still read in the table's order.
+  statement of its own. A column of a composite type
+  (`select b as business`) is sent as its fields, each by the name
+  `kogo check` saw, so they too are read by name when the table or the
+  type changes.
 - A property may itself be a data class, written with a nullable or
   non-null type. It is filled from the columns whose names start with the
   property's name and an underscore:

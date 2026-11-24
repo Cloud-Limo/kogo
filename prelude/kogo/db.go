@@ -354,35 +354,15 @@ func NotNull[T any](p *T, column string) T {
 	return *p
 }
 
-// A Composite is where a value of a composite type is read to: Null
-// is set when the value is null, and otherwise each field is read
-// into what Fields holds for it, in Postgres's order.
-type Composite struct {
-	Null   *bool
-	Fields []any
-}
-
-func (c Composite) ScanNull() error     { *c.Null = true; return nil }
-func (c Composite) ScanIndex(i int) any { return c.Fields[i] }
-
-// Row gives the data class read from a composite value, or null.
-func Row[T any](null bool, v T) *T {
-	if null {
-		return nil
-	}
-	return &v
-}
-
 // Tx_Known gives this once its connection's driver knows the types
-// named, composite types and arrays that Postgres does not ship (one
-// of a domain, a domain over one), and what each is made of: the driver
-// reads a value of a type only when it has been told of the type, and
-// is told once for each connection. citext is an extension's, so the
-// driver is told of that too. A name is as Postgres writes it, quoted
-// where it must be, and is found on the connection's search path; the
-// driver is told of the type by its schema and its name in the
-// catalog, and then by the name as written, so that it is not told
-// again.
+// named, arrays that Postgres does not ship (one of a domain, a domain
+// over one), and what each is made of: the driver reads a value of a
+// type only when it has been told of the type, and is told once for
+// each connection. citext is an extension's, so the driver is told of
+// that too. A name is as Postgres writes it, quoted where it must be,
+// and is found on the connection's search path; the driver is told of
+// the type by its schema and its name in the catalog, and then by the
+// name as written, so that it is not told again.
 func Tx_Known(this Tx, names ...string) Tx {
 	conn := this.tx.Conn()
 	types := conn.TypeMap()

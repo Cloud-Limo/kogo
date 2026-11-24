@@ -147,7 +147,12 @@ func TestRows(t *testing.T) {
 			"Quote(id=00000000-0000-0000-0000-00000000000c, total=Amount(cents=2000, currency=NZD), deposit=Amount(cents=500, currency=null))]"},
 		{`t.HeldIn(db, "NZD")`, "Held(quote=Quote(id=00000000-0000-0000-0000-00000000000c, total=Amount(cents=2000, currency=NZD), deposit=Amount(cents=500, currency=null)))"},
 		{`t.HeldIn(db, "USD")`, "null"},
-		{`t.HeldIn(db, "%")`, "panics: queryOne read more than one row, and reads one or none: select \"quote\" from (select q as quote from quote q where (q.total).currency like $1\\n) _"},
+		{`t.HeldIn(db, "%")`, "panics: queryOne read more than one row, and reads one or none: select (\"quote\") is not distinct from null, (\"quote\").\"id\", " +
+			"((\"quote\").\"total\") is not distinct from null, ((\"quote\").\"total\").\"cents\", ((\"quote\").\"total\").\"currency\", " +
+			"((\"quote\").\"deposit\") is not distinct from null, ((\"quote\").\"deposit\").\"cents\", ((\"quote\").\"deposit\").\"currency\" " +
+			"from (select * from (select q as quote from quote q where (q.total).currency like $1\\n) _ offset 0) _ where 'quote'::regclass is not null and 'amount'::regclass is not null"},
+		{`t.Nulls(db)`, "[Deposit(n=1, deposit=Amount(cents=null, currency=null)), Deposit(n=2, deposit=null)]"},
+		{`t.NoShop(db)`, "panics: column shop is null, and fills a property that is not nullable"},
 		{`t.Quoted(db)`, "Priced(price=Price(cents=250))"},
 		{`t.Slug(db, "ACME-store")`, "Acme-Store"},
 		{`t.Slug(db, "none")`, "panics: querySingle read no row, and reads exactly one: select \"slug\" from (select slug from tenant where slug = $1\\n) _"},
@@ -203,6 +208,20 @@ fun heldIn(db: Db, currency: String): Held? = db.tx { tx ->
     tx.queryOne<Held>(sql"select q as quote from quote q where (q.total).currency like $currency")
 }
 
+// A row of nulls, and a null.
+data class Deposit(val n: Int, val deposit: Amount?)
+
+fun nulls(db: Db): List<Deposit> = db.tx { tx ->
+    tx.query<Deposit>(sql"""select n as "n!", case when n = 1 then row(null, null)::amount end as deposit from generate_series(1, 2) n order by n""")
+}
+
+// A whole row asserted there, and absent.
+data class Shopped(val shop: Shop)
+
+fun noShop(db: Db): Shopped = db.tx { tx ->
+    tx.querySingle<Shopped>(sql"""select t as "shop!" from business b left join tenant t on false where b.slug = 'acme'""")
+}
+
 fun slug(db: Db, slug: String): String = db.tx { tx -> tx.querySingle<String>(sql"select slug from tenant where slug = $slug") }
 fun has(db: Db, slug: String): Boolean = db.tx { tx -> tx.exists(sql"select 1 from tenant where slug = $slug") }
 `)
@@ -223,6 +242,7 @@ func TestValues(t *testing.T) {
 		{`t.Tags(db)`, "[[], []]"},
 		{`t.Zero(db)`, "0.00"},
 		{`t.Zeros(db)`, "[0.00, 0, 1.50]"},
+		{`t.Absent(db)`, "[Listed(n=1, every=null)]"},
 	}, `package t
 
 import kogo.time.Duration
@@ -239,6 +259,13 @@ data class Every(
 )
 
 fun everything(db: Db): List<Every> = db.tx { tx -> tx.query<Every>(sql"select * from every_type") }
+
+// A whole row with a list, absent.
+data class Listed(val n: Int, val every: Every?)
+
+fun absent(db: Db): List<Listed> = db.tx { tx ->
+    tx.query<Listed>(sql"""select 1 as "n!", e as every from (select 1) o left join every_type e on false""")
+}
 
 fun again(db: Db): Int = db.tx { tx ->
     val e = tx.querySingle<Every>(sql"select * from every_type")
@@ -330,13 +357,19 @@ return "altered"
 }
 `
 	row := "[Account(id=1, owner=alice, payee=bob)]"
+	held := "[Held(account=Account(id=1, owner=alice, payee=bob))]"
+	maybe := "[Maybe(n=1, account=Account(id=1, owner=alice, payee=bob)), Maybe(n=2, account=null)]"
 	expectWith(t, withDB+alter, "defer drop()\n", [][2]string{
 		{`t.Open(db)`, "Account(id=1, owner=alice, payee=bob)"},
 		{`t.All(db)`, row},
+		{`t.Whole(db)`, held},
+		{`t.Joined(db)`, maybe},
 		{`alter("alter table account add column was text; update account set was = owner; " +
 			"alter table account drop column owner; alter table account rename column was to owner")`, "altered"},
 		{`t.All(db)`, row},
 		{`t.All(db)`, row},
+		{`t.Whole(db)`, held},
+		{`t.Joined(db)`, maybe},
 		{`alter("alter table account add column note text")`, "altered"},
 		{`t.All(db)`, row},
 		{`t.Pay(db, "carol")`, "Account(id=1, owner=alice, payee=carol)"},
@@ -353,5 +386,52 @@ fun all(db: Db): List<Account> = db.tx { tx -> tx.query<Account>(sql"select * fr
 fun pay(db: Db, payee: String): Account = db.tx { tx ->
     tx.querySingle<Account>(sql"update account set payee = $payee where id = 1 returning *")
 }
+
+// A whole row as one column, there and absent.
+data class Held(val account: Account)
+data class Maybe(val n: Int, val account: Account?)
+
+fun whole(db: Db): List<Held> = db.tx { tx -> tx.query<Held>(sql"select a as account from account a order by a.id") }
+
+fun joined(db: Db): List<Maybe> = db.tx { tx ->
+    tx.query<Maybe>(sql"""select n as "n!", a as account from generate_series(1, 2) n left join account a on a.id = n order by n""")
+}
+`)
+}
+
+// A type made with create type is read by its fields' names too, on a
+// connection that read it before its fields moved: alone, and inside
+// a table's whole row. Postgres plans the statement again only for a
+// change to a relation it names, which the type is not.
+func TestMovedFields(t *testing.T) {
+	alter := `
+func alter(sql string) string {
+if _, err := pool.Exec(ctx, sql); err != nil {
+panic(err)
+}
+return "altered"
+}
+`
+	setup := "defer drop()\nif _, err := pool.Exec(ctx, `" + `
+insert into quote (id, total, deposit) values ('00000000-0000-0000-0000-00000000000d', (7, 'AUD'), (3, 'NZD'));
+` + "`); err != nil {\npanic(err)\n}\n"
+	quote := "Quote(id=00000000-0000-0000-0000-00000000000d, total=Amount(cents=7, currency=AUD), deposit=Amount(cents=3, currency=NZD))"
+	expectWith(t, withDB+alter, setup, [][2]string{
+		{`t.Quotes(db)`, "[" + quote + "]"},
+		{`t.HeldOne(db)`, "Held(quote=" + quote + ")"},
+		{`alter("alter type amount add attribute was bigint cascade; update quote set total.was = (total).cents, deposit.was = (deposit).cents; " +
+			"alter type amount drop attribute cents cascade; alter type amount rename attribute was to cents cascade")`, "altered"},
+		{`t.Quotes(db)`, "[" + quote + "]"},
+		{`t.Quotes(db)`, "[" + quote + "]"},
+		{`t.HeldOne(db)`, "Held(quote=" + quote + ")"},
+	}, `package t
+
+data class Amount(val cents: Long?, val currency: String?)
+data class Quote(val id: Uuid, val total: Amount, val deposit: Amount?)
+data class Held(val quote: Quote)
+
+fun quotes(db: Db): List<Quote> = db.tx { tx -> tx.query<Quote>(sql"select id, total, deposit from quote order by id") }
+
+fun heldOne(db: Db): Held = db.tx { tx -> tx.querySingle<Held>(sql"select q as quote from quote q") }
 `)
 }

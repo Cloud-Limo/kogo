@@ -14,10 +14,9 @@ import (
 // sql writes one of the five calls of spec.md 10.2 as a call of the
 // prelude's Go: the Tx, the statement as Postgres takes it, and what
 // each of its parameters binds, in the order written. A call that
-// reads rows also passes a function that reads one. Where a column
-// is of a composite type, or a column or a parameter of an array type
-// that Postgres does not ship, the Tx is one whose driver knows the
-// type.
+// reads rows also passes a function that reads one. Where a column,
+// a field of one, or a parameter is of an array type that Postgres
+// does not ship, the Tx is one whose driver knows the type.
 func (e *emitter) sql(x *syntax.Call) string {
 	sel := x.Fun.(*syntax.Select)
 	q := e.info.SQL[x.Args[0].Value.(*syntax.SQL)]
@@ -37,11 +36,7 @@ func (e *emitter) sql(x *syntax.Call) string {
 			if enums(c.Type) {
 				e.notYet(x, "column "+c.Name+", which holds a list of an enum,", "cast the list in the statement, as kinds::text[], and read a List<String>")
 			}
-			if c.Type.Fields != nil {
-				known = append(known, strconv.Quote(c.Type.Name))
-			} else if c.Type.Array != "" {
-				known = append(known, strconv.Quote(c.Type.Array))
-			}
+			known = arrays(known, c.Type)
 		}
 	}
 	if known != nil {
@@ -65,6 +60,19 @@ func (e *emitter) sql(x *syntax.Call) string {
 // until it is told of it, as it is told of a composite type.
 func enums(t sqlpass.Type) bool {
 	return t.Enum && t.List || slices.ContainsFunc(t.Fields, func(f sqlpass.Column) bool { return enums(f.Type) })
+}
+
+// arrays adds to known the array types that the driver must be told
+// of to read a value of the type t: t's own, or those of its fields,
+// which come as columns of their own (sqlpass's wrap).
+func arrays(known []string, t sqlpass.Type) []string {
+	if t.Array != "" {
+		known = append(known, strconv.Quote(t.Array))
+	}
+	for _, f := range t.Fields {
+		known = arrays(known, f.Type)
+	}
+	return known
 }
 
 // reader writes the function that reads one row of q as the type to:
@@ -122,9 +130,12 @@ func (e *emitter) fill(q *check.Query, t check.Type, path []int, absent bool, de
 // is read by the prelude's Array, which refuses what a List cannot
 // hold, and is null for a NULL; any other is read as it is, and the
 // driver refuses a null, as one in a column named "name!" (spec.md
-// 10.5). A composite type is read field by field, in Postgres's
-// order, into the properties of their names: null as a whole, and
-// never absent field by field.
+// 10.5). A composite type comes as a column that says whether it is
+// null and then one for each field (sqlpass's wrap), in the order kogo
+// check saw, each read into the property of its name: null as a
+// whole, and never field by field. Where it is null every field's
+// column is, so each is read as a pointer and only looked at where the
+// whole is there.
 func (e *emitter) column(name string, ct sqlpass.Type, t check.Type, absent bool, dest *string) (code string, nulls []string) {
 	kogo := e.use(preludePath + "kogo")
 	elem, null := bare(t)
@@ -137,11 +148,12 @@ func (e *emitter) column(name string, ct sqlpass.Type, t check.Type, absent bool
 		var props []string
 		for _, p := range d.Decl.Props {
 			i := slices.IndexFunc(ct.Fields, func(f sqlpass.Column) bool { return f.Name == check.Snake(p.Name) })
-			code, _ := e.column(name+"."+ct.Fields[i].Name, ct.Fields[i].Type, check.Subst(p.Type, d.Decl.Params, d.Args), false, &fields[i])
+			code, _ := e.column(name+"."+ct.Fields[i].Name, ct.Fields[i].Type, check.Subst(p.Type, d.Decl.Params, d.Args), true, &fields[i])
 			props = append(props, export(p.Name)+": "+code)
 		}
-		*dest = fmt.Sprintf("%s.Composite{Null: &%s, Fields: []any{%s}}", kogo, v, strings.Join(fields, ", "))
-		code, nulls = fmt.Sprintf("%s.Row(%s, %s{%s})", kogo, v, e.typ(d), strings.Join(props, ", ")), []string{v}
+		*dest = "&" + v + ", " + strings.Join(fields, ", ")
+		code = fmt.Sprintf("func() *%s { if %s { return nil }; return %s.Ptr(%s{%s}) }()", e.typ(d), v, e.rt(), e.typ(d), strings.Join(props, ", "))
+		nulls = []string{v}
 	case ct.List:
 		of, nullable := bare(elem.(*check.Named).Args[0])
 		e.w("var %s %s.Array[%s]", v, kogo, e.typ(of))

@@ -34,7 +34,7 @@ func (e *emitter) sql(x *syntax.Call) string {
 	if q.Row != nil {
 		for _, c := range q.Stmt.Columns {
 			if enums(c.Type) {
-				e.notYet(x, "column "+c.Name+", which holds a list of an enum,", "cast the list in the statement, as kinds::text[], and read a List<String>")
+				e.notYet(x, "column "+c.Name+", which holds a list of an enum,", "cast the list in the statement, as kinds::text[], and read a List<String?>")
 			}
 			known = arrays(known, c.Type)
 		}
@@ -98,15 +98,21 @@ func bare(t check.Type) (check.Type, bool) {
 
 // fill declares what the columns of the value at path, of the type
 // t, are scanned into: R itself, or a property on the way down from
-// it. It gives the Go of the value, and a test of each of its columns
-// for null. The value is its one column's, or a data class built from
-// the columns of its properties (spec.md 10.3); a nullable one is
-// null when all of them are. absent is whether a nullable data class
-// holds the value, so that its columns may be null whatever t says.
+// it. It gives the Go of the value, and a test for null of each of its
+// columns that is null only through an outer join. The value is its
+// one column's, or a data class built from the columns of its
+// properties (spec.md 10.3); a nullable one is null when those of its
+// columns are, which kogo check saw it has, and tells its holder of
+// none. absent is whether a nullable data class holds the value, so
+// that its columns may be null whatever t says.
 func (e *emitter) fill(q *check.Query, t check.Type, path []int, absent bool, dests []string) (code string, nulls []string) {
 	if j := slices.IndexFunc(q.Paths, func(p []int) bool { return slices.Equal(p, path) }); j >= 0 {
 		c := q.Stmt.Columns[j]
-		return e.column(c.Name, c.Type, t, absent, &dests[j])
+		code, nulls = e.column(c.Name, c.Type, t, absent, &dests[j])
+		if !c.Joined {
+			nulls = nil
+		}
+		return code, nulls
 	}
 	elem, null := bare(t)
 	d := elem.(*check.Named)
@@ -119,6 +125,7 @@ func (e *emitter) fill(q *check.Query, t check.Type, path []int, absent bool, de
 	code = e.typ(d) + "{" + strings.Join(props, ", ") + "}"
 	if null {
 		code = fmt.Sprintf("func() %s { if %s { return nil }; return %s.Ptr(%s) }()", e.typ(t), strings.Join(nulls, " && "), e.rt(), code)
+		nulls = nil
 	}
 	return code, nulls
 }
@@ -127,8 +134,8 @@ func (e *emitter) fill(q *check.Query, t check.Type, path []int, absent bool, de
 // is scanned into, and sets dest to point there. It gives the Go of
 // its value as the type t, and a test for null where it may be null.
 // A column that t or absent lets be null is read as a pointer; a list
-// is read by the prelude's Array, which refuses what a List cannot
-// hold, and is null for a NULL; any other is read as it is, and the
+// is read by the prelude's Array, as a List<T?>, the one kogo check
+// takes, and is null for a NULL; any other is read as it is, and the
 // driver refuses a null, as one in a column named "name!" (spec.md
 // 10.5). A composite type comes as a column that says whether it is
 // null and then one for each field (sqlpass's wrap), in the order kogo
@@ -155,12 +162,9 @@ func (e *emitter) column(name string, ct sqlpass.Type, t check.Type, absent bool
 		code = fmt.Sprintf("func() *%s { if %s { return nil }; return %s.Ptr(%s{%s}) }()", e.typ(d), v, e.rt(), e.typ(d), strings.Join(props, ", "))
 		nulls = []string{v}
 	case ct.List:
-		of, nullable := bare(elem.(*check.Named).Args[0])
+		of, _ := bare(elem.(*check.Named).Args[0])
 		e.w("var %s %s.Array[%s]", v, kogo, e.typ(of))
-		*dest, code, nulls = "&"+v, fmt.Sprintf("%s.List(%q)", v, name), []string{v + ".Nullable() == nil"}
-		if nullable {
-			code = v + ".Nullable()"
-		}
+		*dest, code, nulls = "&"+v, v+".Nullable()", []string{v + ".Nullable() == nil"}
 	case null || absent:
 		e.w("var %s *%s", v, e.typ(elem))
 		*dest, code, nulls = "&"+v, v, []string{v + " == nil"}

@@ -169,6 +169,7 @@ const (
 	cmdDelete   = 4 // update and insert lie between; merge is 5
 	rteRelation = 0
 	rteSubquery = 1
+	rteJoin     = 2
 	rteGroup    = 9
 )
 
@@ -202,12 +203,14 @@ var jsonbCasts = map[int]bool{3556: true, 3449: true, 3450: true, 3451: true, 34
 // is not null, a constant included; or a cast of any of these, but
 // one from jsonb or by a function of the schema's.
 // constant is whether a constant that is not null counts, as it does
-// among coalesce's arguments and nowhere else.
-func (c *Checker) notNull(ctx context.Context, q, expr *node, constant bool) (notNull, whole bool, err error) {
-	q, expr, rte, nulled := source(q, expr)
+// among coalesce's arguments and nowhere else. joins is whether to
+// answer as if no outer join nulled anything: a column not null then,
+// and nullable otherwise, is null only through an outer join.
+func (c *Checker) notNull(ctx context.Context, q, expr *node, constant, joins bool) (notNull, whole bool, err error) {
+	q, expr, rte, joined, nulled := source(q, expr)
 	whole = rte != nil && expr.num("varattno") == 0
 	switch {
-	case nulled || expr == nil:
+	case nulled || joined && !joins || expr == nil:
 	case rte != nil && whole:
 		notNull = true
 	case rte != nil:
@@ -220,19 +223,19 @@ func (c *Checker) notNull(ctx context.Context, q, expr *node, constant bool) (no
 		notNull = constant && expr.field("constisnull").text() == "false"
 	case expr.tag == "COALESCEEXPR":
 		for _, arg := range expr.field("args").items() {
-			if notNull, _, err = c.notNull(ctx, q, arg, true); notNull || err != nil {
+			if notNull, _, err = c.notNull(ctx, q, arg, true, joins); notNull || err != nil {
 				break
 			}
 		}
 	case expr.tag == "RELABELTYPE" || expr.tag == "COERCEVIAIO":
-		notNull, _, err = c.notNull(ctx, q, expr.field("arg"), constant)
+		notNull, _, err = c.notNull(ctx, q, expr.field("arg"), constant, joins)
 	case expr.tag == "FUNCEXPR" && (expr.num("funcformat") == 1 || expr.num("funcformat") == 2) &&
 		expr.num("funcid") < 16384 && !jsonbCasts[expr.num("funcid")]:
 		// a cast function of Postgres's own (below FirstNormalObjectId),
 		// explicit or implicit: its first argument is the value, any
 		// others a type modifier
 		if args := expr.field("args").items(); len(args) > 0 {
-			notNull, _, err = c.notNull(ctx, q, args[0], constant)
+			notNull, _, err = c.notNull(ctx, q, args[0], constant, joins)
 		}
 	}
 	return notNull, whole, err
@@ -241,21 +244,30 @@ func (c *Checker) notNull(ctx context.Context, q, expr *node, constant bool) (no
 // source follows expr, an expression of query q, through references
 // to a subquery's column or a grouped column, to what they name: an
 // expression of the query it ends in, and when that is a reference to
-// a table, the table's range table entry. nulled is whether an outer
-// join, a grouping set or returning's old or new can null a reference
-// on the way: Postgres marks a reference with the outer joins and
-// grouping sets that null it (varnullingrels).
-func source(q, expr *node) (endQ, endExpr, rte *node, nulled bool) {
+// a table, the table's range table entry. joined is whether an outer
+// join can null a reference on the way, and nulled whether a grouping
+// set or returning's old or new can: Postgres marks a reference with
+// the outer joins and grouping sets that null it (varnullingrels), by
+// their range table entries.
+func source(q, expr *node) (endQ, endExpr, rte *node, joined, nulled bool) {
 	for expr != nil && expr.tag == "VAR" && expr.num("varlevelsup") == 0 {
-		nulled = nulled || expr.num("varreturningtype") != 0 || len(expr.field("varnullingrels").items()) != 1
 		rtable, att, no := q.field("rtable").items(), expr.num("varattno"), expr.num("varno")
+		rels := expr.field("varnullingrels").items() // (b 3 5), or (b) for none
+		nulled = nulled || expr.num("varreturningtype") != 0 || len(rels) == 0
+		for _, by := range rels[min(1, len(rels)):] {
+			if i, err := strconv.Atoi(by.text()); err != nil || i < 1 || i > len(rtable) || rtable[i-1].num("rtekind") != rteJoin {
+				nulled = true
+			} else {
+				joined = true
+			}
+		}
 		if no < 1 || no > len(rtable) || att < 0 {
 			break
 		}
 		in, exprs := q, []*node(nil)
 		switch rte := rtable[no-1]; rte.num("rtekind") {
 		case rteRelation:
-			return q, expr, rte, nulled
+			return q, expr, rte, joined, nulled
 		case rteSubquery:
 			in = rte.field("subquery")
 			exprs = outputs(in)
@@ -267,5 +279,5 @@ func source(q, expr *node) (endQ, endExpr, rte *node, nulled bool) {
 		}
 		q, expr = in, exprs[att-1]
 	}
-	return q, expr, nil, nulled
+	return q, expr, nil, joined, nulled
 }

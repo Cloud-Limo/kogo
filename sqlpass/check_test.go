@@ -187,6 +187,36 @@ func TestSignatures(t *testing.T) {
 	}
 }
 
+// A column is null only through an outer join where it would be
+// non-null were the join inner: a NOT NULL column of the joined table,
+// its whole row, a count through a subquery. One nullable in its table,
+// or nulled by a grouping set or returning's old, is not.
+func TestJoined(t *testing.T) {
+	c := connect(t)
+	for literal, want := range map[string]string{
+		`select b.id, t.id as tenant_id, c.abn, coalesce(t.slug::text, '') as slug, t as tenant, o.n
+			from business b left join tenant t on t.business_id = b.id left join business c on c.id = b.id
+			left join (select business_id, count(*) as n from tenant group by business_id) o on o.business_id = b.id`: "tenant_id tenant n",
+		`select legal_name from business group by rollup (legal_name)`:                                "",
+		`insert into person (id, name, email) values ($id, $name, $email) returning old.id as old_id`: "",
+		`select g.person_id from business b full join admin_grant g on g.business_id = b.id`:          "person_id",
+	} {
+		st, err := check(c, literal)
+		if err != nil {
+			t.Fatalf("%s: %v", literal, err)
+		}
+		var joined []string
+		for _, col := range st.Columns {
+			if col.Joined {
+				joined = append(joined, col.Name)
+			}
+		}
+		if got := strings.Join(joined, " "); got != want {
+			t.Errorf("%s\n got %q joined, want %q", literal, got, want)
+		}
+	}
+}
+
 // An enum carries its constants, as a parameter, as a column and in a
 // list, for the checker to match them with a Kogo enum's.
 func TestEnumLabels(t *testing.T) {

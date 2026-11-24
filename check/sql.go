@@ -166,7 +166,7 @@ func (c *checker) row(lit *syntax.SQL, q *Query) {
 		// Where a data class had no column at all, a column left over
 		// of the name of one of its properties is likely its own, as b.*
 		// gives a business's: its error says what to select instead.
-		missed := c.fill(lit, d, "", nil, false, cols, q.Paths)
+		missed, _ := c.fill(lit, d, "", nil, false, cols, q.Paths)
 		for i, path := range q.Paths {
 			owned := slices.ContainsFunc(missed, func(m *Named) bool {
 				return slices.ContainsFunc(m.Decl.Props, func(p *Var) bool { return Snake(p.Name) == cols[i].Name })
@@ -197,12 +197,16 @@ func dataClass(t Type) *Named {
 // a data class takes the column of its name, of a composite type, or
 // else the columns that begin with its name and an underscore. prefix
 // is what the columns of d begin with and path the properties that
-// lead to d from R. Inside a nullable data class, a column that may be
-// null fills a property that may not, since all of them are null where
-// it is absent. missed holds the data classes that had no column at
-// all. A column that a property of d takes by name, as business_id,
-// does not count as one with the prefix of a sibling, business.
-func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, absent bool, cols []sqlpass.Column, paths [][]int) (missed []*Named) {
+// lead to d from R. Inside a nullable data class, absent, a column
+// null only through an outer join fills a property that may not be
+// null, since the class is null where those columns are; one that
+// may be null in its table does not. A nullable data class needs a
+// property that is not nullable filled by such a column, which joined
+// says d has, in itself or in a data class it holds that is not
+// nullable. missed holds the data classes that had no column at all.
+// A column that a property of d takes by name, as business_id, does
+// not count as one with the prefix of a sibling, business.
+func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, absent bool, cols []sqlpass.Column, paths [][]int) (missed []*Named, joined bool) {
 	c.builds(lit, d.Decl)
 	b := bind(d.Decl.Params, d.Args)
 	prefixed := func(name string) bool {
@@ -215,6 +219,7 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 		t, name, here := subst(p.Type, b), prefix+Snake(p.Name), append(slices.Clip(path), i)
 		what := d.Decl.Name + "." + p.Name
 		n := dataClass(t)
+		_, null := t.(*Nullable)
 		j := slices.IndexFunc(cols, func(col sqlpass.Column) bool { return col.Name == name })
 		switch {
 		case j < 0 && n != nil && !prefixed(name+"_"):
@@ -223,10 +228,15 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 			missed = append(missed, n)
 		case j < 0 && n != nil && len(path) > 8:
 			c.errorf(lit, "sql-columns", "%s holds data classes nested too deep to fill from columns", d)
-			return missed
+			return missed, joined
 		case j < 0 && n != nil:
-			_, null := t.(*Nullable)
-			missed = append(missed, c.fill(lit, n, name+"_", here, absent || null, cols, paths)...)
+			more, in := c.fill(lit, n, name+"_", here, absent || null, cols, paths)
+			missed, joined = append(missed, more...), joined || in && !null
+			if null && !in && more == nil {
+				c.errorf(lit, "sql-absent", "%s, a %s, has no property that is not nullable filled by a column null only through an outer join, "+
+					"so a row of nulls would read as no %s: select a NOT NULL column of the joined table for one, as in t.id as %s_id, or the table's whole row, as in select t as %s",
+					what, t, n, name, name)
+			}
 		case j < 0:
 			c.errorf(lit, "sql-column-missing", "no column fills %s: select one named %s, with as %s if need be", what, name, name)
 		case paths[j] != nil:
@@ -234,16 +244,18 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 		default:
 			paths[j] = here
 			c.column(lit, cols[j], t, absent, what, "")
+			joined = joined || cols[j].Joined && !null
 		}
 	}
-	return missed
+	return missed, joined
 }
 
 // column checks that a column, or a field of column of, can fill a
-// property, or the result, of type t: its type maps to t's, and it
-// is not null unless t is a T? or the column lies in a nullable data
-// class (spec.md 10.4, 10.5). A composite type fills a data class
-// field by field.
+// property, or the result, of type t: its type maps to t's, an array
+// fills a list whose elements are nullable, and it is not null unless
+// t is a T? or the column lies in a nullable data class, absent, and
+// is null only through an outer join (spec.md 10.3 to 10.5). A
+// composite type fills a data class field by field.
 func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent bool, what, of string) {
 	_, null := t.(*Nullable)
 	n := dataClass(t)
@@ -260,7 +272,7 @@ func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent boo
 		labels := unnamed(col.Type)
 		fix := "rename " + them(labels) + " in Postgres"
 		if of == "" && col.Type.List {
-			fix += ", or cast the column to text[] and read it as a List<String>"
+			fix += ", or cast the column to text[] and read it as a List<String?>"
 		} else if of == "" {
 			fix += ", or cast the column to text and read it as a String"
 		}
@@ -271,6 +283,13 @@ func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent boo
 	case col.Type.Fields == nil && !c.maps(nonNull(t), col.Type):
 		c.errorf(lit, "sql-column-type", "%s is a %s, and fills %s, a %s: make that a %s%s",
 			subject, kogoName(col.Type), what, t, kogoName(col.Type), cast)
+	case col.Type.List && !nullableElement(t):
+		elem := nonNull(t).(*Named).Args[0]
+		c.errorf(lit, "sql-nullable", "%s is an array, whose elements Postgres never promises are not null, and fills %s, a %s: "+
+			"make that a List<%s?>, and drop the nulls with filterNotNull() or refuse them with requireNotNull", subject, what, t, elem)
+	case col.Nullable && !null && absent && !col.Joined:
+		c.errorf(lit, "sql-nullable", "%s may be null in its table, and fills %s, a %s, in a nullable data class that is null where its outer join finds no row: make that a %s?%s",
+			subject, what, t, t, assert)
 	case col.Nullable && !null && !absent:
 		c.errorf(lit, "sql-nullable", "%s may be null, and fills %s, a %s: make that a %s?%s", subject, what, t, t, assert)
 	}
@@ -316,7 +335,8 @@ func (c *checker) fields(lit *syntax.SQL, col sqlpass.Column, d *Named) {
 
 // maps reports whether a Postgres type maps to the Kogo type t, which
 // is not a T? (spec.md 10.4). An enum maps by its constants; a list's
-// elements may be null.
+// elements may be T or T?, as a parameter's may: column asks a column
+// of T?.
 func (c *checker) maps(t Type, pt sqlpass.Type) bool {
 	n, ok := t.(*Named)
 	switch {
@@ -340,6 +360,16 @@ func (c *checker) maps(t Type, pt sqlpass.Type) bool {
 		home = "kogo.time"
 	}
 	return n.Decl.Name == pt.Name && n.Decl.Pkg == home && (n.Decl.Kind == "builtin" || n.Decl.Kind == "external class")
+}
+
+// nullableElement reports whether t, or t?, is a List whose elements
+// are nullable.
+func nullableElement(t Type) bool {
+	if n, ok := nonNull(t).(*Named); ok && len(n.Args) == 1 {
+		_, null := n.Args[0].(*Nullable)
+		return null || n.Args[0] == unknown
+	}
+	return t == unknown
 }
 
 // enumClass gives the enum class that t, or t?, names, or nil.

@@ -42,12 +42,11 @@ var shaped = [][5]string{
 var shapes = [][5]string{
 	{"Plain", "%[4]s::%[1]s", "%[2]s", "%[1]s", ""},
 	{"Null", "null::%[1]s", "%[2]s?", "%[1]s", ""},
-	{"Array", "array[%[4]s, %[5]s]::%[1]s[]", "List<%[2]s>", "%[1]s[]", ""},
+	{"Array", "array[%[4]s, %[5]s]::%[1]s[]", "List<%[2]s?>", "%[1]s[]", ""},
 	{"Nulls", "array[%[4]s, null, %[5]s]::%[1]s[]", "List<%[2]s?>", "%[1]s[]", ""},
-	{"NullsAsList", "array[%[4]s, null]::%[1]s[]", "List<%[2]s>", "%[1]s[]", "column v holds an array whose element 1 is NULL"},
-	{"TwoDimensions", "array[[%[4]s], [%[5]s]]::%[1]s[]", "List<%[2]s>", "%[1]s[]", "an array of 2 dimensions is not a List"},
+	{"TwoDimensions", "array[[%[4]s], [%[5]s]]::%[1]s[]", "List<%[2]s?>", "%[1]s[]", "an array of 2 dimensions is not a List"},
 	{"Domain", "%[5]s::d_%[3]s", "%[2]s", "%[1]s", ""},
-	{"DomainArray", "array[%[4]s, %[5]s]::d_%[3]s[]", "List<%[2]s>", "d_%[3]s[]", ""},
+	{"DomainArray", "array[%[4]s, %[5]s]::d_%[3]s[]", "List<%[2]s?>", "d_%[3]s[]", ""},
 }
 
 // Kogo reads a subset of what Postgres can send, and outside it
@@ -99,8 +98,8 @@ func TestShapes(t *testing.T) {
 		}
 	}
 	_, _, errs := emit(t, "x", refused)
-	if lists := strings.Count(refused, "fun "); len(errs) != lists || lists != 5 {
-		t.Errorf("%d of an enum's %d lists are refused, want each of 5: %v", len(errs), lists, errs)
+	if lists := strings.Count(refused, "fun "); len(errs) != lists || lists != 4 {
+		t.Errorf("%d of an enum's %d lists are refused, want each of 4: %v", len(errs), lists, errs)
 	}
 	for _, err := range errs {
 		if !strings.Contains(err.Message, "which holds a list of an enum") {
@@ -166,8 +165,6 @@ func TestLimits(t *testing.T) {
 	zero := "panics: a String that holds U+0000 cannot be sent to Postgres, whose text holds none (spec.md 10.4)"
 	cases := [][2]string{
 		{`t.Grid(db)`, "panics: can't scan into dest[0] (col: x!): an array of 2 dimensions is not a List, which has one (spec.md 10.4)"},
-		{`t.Ints(db)`, "panics: column ids holds an array whose element 0 is NULL, and fills a List whose elements are not nullable " +
-			"(spec.md 10.4): read it as a List<T?>, or keep the nulls out in the statement"},
 		{`t.IntsOrNull(db)`, "[null]"},
 		{`t.Lower(db)`, "[1, 2]"}, // a lower bound is not kept
 		{`t.Nums(db)`, "[0.00, 1.50]"},
@@ -188,39 +185,36 @@ func TestLimits(t *testing.T) {
 
 import kogo.time.LocalDate
 
-fun grid(db: Db): List<Int> = db.tx { tx -> tx.querySingle<List<Int>>(sql"""select '{{1,2},{3,4}}'::int[] as "x!" """) }
-fun ints(db: Db): List<Int> = db.tx { tx ->
-    tx.querySingle<List<Int>>(sql"""select array_agg(t.id) as "ids!" from (select 1) one left join account t on false""")
-}
+fun grid(db: Db): List<Int?> = db.tx { tx -> tx.querySingle<List<Int?>>(sql"""select '{{1,2},{3,4}}'::int[] as "x!" """) }
 fun intsOrNull(db: Db): List<Int?> = db.tx { tx ->
     tx.querySingle<List<Int?>>(sql"""select array_agg(t.id) as "ids!" from (select 1) one left join account t on false""")
 }
-fun lower(db: Db): List<Int> = db.tx { tx -> tx.querySingle<List<Int>>(sql"""select '[5:6]={1,2}'::int[] as "x!" """) }
-fun nums(db: Db): List<Decimal> = db.tx { tx -> tx.querySingle<List<Decimal>>(sql"""select '{0.00,1.50}'::d_numeric[] as "x!" """) }
-fun uuids(db: Db): List<Uuid> = db.tx { tx ->
-    tx.querySingle<List<Uuid>>(sql"""select '{00000000-0000-0000-0000-000000000002}'::d_uuid[] as "x!" """)
+fun lower(db: Db): List<Int?> = db.tx { tx -> tx.querySingle<List<Int?>>(sql"""select '[5:6]={1,2}'::int[] as "x!" """) }
+fun nums(db: Db): List<Decimal?> = db.tx { tx -> tx.querySingle<List<Decimal?>>(sql"""select '{0.00,1.50}'::d_numeric[] as "x!" """) }
+fun uuids(db: Db): List<Uuid?> = db.tx { tx ->
+    tx.querySingle<List<Uuid?>>(sql"""select '{00000000-0000-0000-0000-000000000002}'::d_uuid[] as "x!" """)
 }
 
 // A domain over an array, an array of citext, and a NULL for a List?.
-data class Tagged(val tags: List<String>, val folded: List<String>, val none: List<String>?)
+data class Tagged(val tags: List<String?>, val folded: List<String?>, val none: List<String?>?)
 fun tags(db: Db): String = db.tx { tx ->
     val t = tx.querySingle<Tagged>(sql"""select '{a,b}'::d_tags as "tags!", '{Fold}'::citext[] as "folded!", null::text[] as none""")
     "${t.tags} ${t.folded} ${t.none}"
 }
 
 // A composite type whose fields are such arrays, which come as columns.
-data class TagSet(val tags: List<String>?, val names: List<String>?)
+data class TagSet(val tags: List<String?>?, val names: List<String?>?)
 data class Sets(val set: TagSet)
 fun tagSets(db: Db): TagSet = db.tx { tx ->
     tx.querySingle<Sets>(sql"""select row('{a,b}', '{c}')::tag_set as "set!" """).set
 }
 
 // An array of a domain initdb makes, below Postgres's first oid.
-fun cardinals(db: Db): List<Int> = db.tx { tx ->
-    tx.querySingle<List<Int>>(sql"""select '{1,2}'::information_schema.cardinal_number[] as "x!" """)
+fun cardinals(db: Db): List<Int?> = db.tx { tx ->
+    tx.querySingle<List<Int?>>(sql"""select '{1,2}'::information_schema.cardinal_number[] as "x!" """)
 }
 fun sendDates(db: Db): Int = db.tx { tx ->
-    val ds = tx.querySingle<List<LocalDate>>(sql"""select '{2026-01-02,2026-01-03}'::date[] as "x!" """)
+    val ds = tx.querySingle<List<LocalDate?>>(sql"""select '{2026-01-02,2026-01-03}'::date[] as "x!" """)
     tx.execute(sql"select from unnest($ds::d_date[])")
 }
 

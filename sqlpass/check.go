@@ -272,17 +272,8 @@ func (c *Checker) wrap(ctx context.Context, st *Statement, query *node, sd *pgco
 		body = body[:query.num("stmt_location")+n]
 	}
 	sql := "select " + cols + " from (" + body + "\n) _"
-	switch {
-	case query.num("commandType") != cmdSelect:
+	if query.num("commandType") != cmdSelect {
 		sql = "with _ as (" + body + "\n) select " + cols + " from _"
-	case w.pins != nil:
-		// Postgres works a subquery with an offset out once and does
-		// not fold it into the select of its fields, where a function or
-		// a subquery that gives a composite would run once for each.
-		sql = "select " + cols + " from (select * from (" + body + "\n) _ offset 0) _"
-	}
-	if w.pins != nil {
-		sql += " where " + strings.Join(w.pins, " and ")
 	}
 	wd, err := c.conn.PgConn().Prepare(ctx, "", sql, sd.ParamOIDs)
 	if err != nil {
@@ -301,11 +292,10 @@ func (c *Checker) wrap(ctx context.Context, st *Statement, query *node, sd *pgco
 }
 
 // A wrapped is what the wrap selects, names, the name Postgres gives
-// each, want, and its type where the statement says it, oids; and a
-// test for each composite type among them, pins.
+// each, want, and its type where the statement says it, oids.
 type wrapped struct {
-	names, want, pins []string
-	oids              []uint32
+	names, want []string
+	oids        []uint32
 }
 
 // add adds ref, a column or a field of the type t, of Postgres's type
@@ -313,19 +303,13 @@ type wrapped struct {
 // is null, as a whole and never field by field, and then each of its
 // fields by name. So no value of a composite type is sent, whose
 // fields come in the type's order as the database served has it, and
-// the driver need not know the type. The test names the type's own
-// relation, which is all that tells Postgres a statement prepared
-// before the type changed must be planned again: a type that is no
-// table of the statement is otherwise not looked at.
+// the driver need not know the type.
 func (w *wrapped) add(ref, name string, oid uint32, t Type) {
 	if t.Fields == nil {
 		w.names, w.want, w.oids = append(w.names, ref), append(w.want, name), append(w.oids, oid)
 		return
 	}
 	w.names, w.want, w.oids = append(w.names, "("+ref+") is not distinct from null"), append(w.want, "?column?"), append(w.oids, 0)
-	if pin := "'" + strings.ReplaceAll(t.Name, "'", "''") + "'::regclass is not null"; !slices.Contains(w.pins, pin) {
-		w.pins = append(w.pins, pin)
-	}
 	for _, f := range t.Fields {
 		w.add("("+ref+")."+pgx.Identifier{f.Name}.Sanitize(), f.Name, 0, f.Type)
 	}

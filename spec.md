@@ -697,6 +697,10 @@ Nothing else from Arrow exists: no `Raise<E>` receivers (section 14),
 
 SQL is written as Postgres SQL in a `sql"""..."""` literal and is checked
 against the real schema when the program is compiled.
+A program is checked against one schema, and Kogo promises what it
+reads only against that schema. After a change to a table, a column or
+a type that its SQL names, check, build and start the program again:
+what a running program does across such a change is not promised.
 
 ```kotlin
 data class SupplierRow(val id: ID, val legalName: String, val driverSharePercent: Int)
@@ -767,8 +771,8 @@ column.
   takes such a `with` only at the top level: run the write as a
   statement of its own. A column of a composite type
   (`select b as business`) is sent as its fields, each by the name
-  `kogo check` saw, so they too are read by name when the table or the
-  type changes.
+  `kogo check` saw, so a read does not depend on the order of a table's
+  columns or a type's fields.
 - A property may itself be a data class, written with a nullable or
   non-null type. It is filled from the columns whose names start with the
   property's name and an underscore:

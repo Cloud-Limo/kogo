@@ -1178,10 +1178,10 @@ and not a promise that it is all:
   `Double`, a `String`, a `Char` or a `Boolean`, or one of these that
   may be null, as Kotlin does. A key of any other type, an enum or a
   time among them, is refused at `kogo check` with `sort-key`, and so
-  is `maxOrNull` on a list of any other type or of one that may be
-  null. The list it gives is Kotlin's, equal keys in the order they
-  came; how often and in what order it calls the selector is not, and
-  Kotlin promises neither.
+  is `maxOrNull` of a list of any other type (and of one that may be
+  null, which kotlinc refuses too). The list each sort gives is
+  Kotlin's, equal keys in the order they came; how often and in what
+  order it calls the selector is not, and Kotlin promises neither.
 - A `Set`'s `+` or `-` of one element that is itself a `List` or a
   `Set` is refused at `kogo check` with `set-operand`: Kotlin takes a
   `List` or a `Set` there as the elements to add or remove, and gives

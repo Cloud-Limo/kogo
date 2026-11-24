@@ -4934,3 +4934,12 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   otherwise than Kotlin. When built, `examples/` held no `this` inside an
   `either { }`, and the tests three, each a receiver (`this.raise`, `this.ensure`,
   `this.ensureNotNull`).
+
+## An area with no booking under it is cased by hand (DEV-1212), 24 Nov 2026
+
+- **An area with no booking under it gets its cases by hand** (Greg's ruling of 24 Nov
+  2026 on DEV-1171; `doc/porting.md`, beside the rule of DEV-1162 that a newly ported
+  area's cases come from a generated world): a deviation by name, each planted bug
+  with a case that sees it. Not taken: a world of its own for each such area, which
+  costs what the first did for one to three bugs apiece. Reopens when a generated world
+  can draw such an area.

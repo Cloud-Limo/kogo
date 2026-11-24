@@ -356,6 +356,20 @@ Kotlin infers more. These are errors in Kogo, each with its fix:
 | a lambda parameter typed by a later argument | `{ e: StoreError -> ... }` |
 | `val xs: List<Long> = listOf(1, 2)`: the arguments settle `T` first, and there a literal is an `Int` | `listOf<Long>(1, 2)`, or `1L` |
 
+A type parameter may be settled as a nullable type, and then a bare
+`T` may be null: `?:`, `?.`, `== null` and `when` test it for null as
+Kotlin does, so `fun <T> orElse(v: T, fallback: T): T = v ?: fallback`
+gives the fallback for a null `v`. Kotlin's `T?` of a nullable `T` holds
+one null where Go would hold two, so a nullable type is refused for a
+type parameter that its function or type makes a `T?` of: in its
+signature, or in its body by a call that gives one, as `firstOrNull`,
+`lastOrNull`, `getOrNull` and `takeIf` do, or a generic function that
+does so in turn. `firstOr` above, called on a `List<Long?>`, is refused
+by `kogo emit` (`not-yet-emitted`): pass a type that is not nullable
+and keep the null outside, `firstOr(holes.mapNotNull { it }, 5L)`. A
+function that only carries its `T`, as one that runs a block and returns
+its answer, takes a nullable type.
+
 ### 5.2 Overloads
 
 A call keeps the candidates of its name whose receiver and arguments

@@ -280,7 +280,7 @@ func TestEmitRefuses(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 	code, out := kogo(t, map[string]string{"a.kg": "package a\n\nfun f(x: Int?): Int? = x.takeIf { true }\n"}, dir)
-	want := `{"file":"a.kg","line":3,"column":24,"code":"not-yet-emitted","message":"a nullable type argument for T, which is used as T? where it is declared, is not emitted yet: pass a type that is not nullable, and keep the null outside"}
+	want := `{"file":"a.kg","line":3,"column":24,"code":"not-yet-emitted","message":"a nullable type argument for T, which is used as T? in takeIf or a fun it calls, is not emitted yet: pass takeIf a type that is not nullable, and keep the null outside, as mapNotNull { it } or ?: does"}
 `
 	if written, _ := os.ReadDir(dir); code != 1 || out != want || len(written) != 0 {
 		t.Errorf("exit %d, want 1, with %d files written\n got %s\nwant %s", code, len(written), out, want)

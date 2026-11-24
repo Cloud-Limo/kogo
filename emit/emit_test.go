@@ -598,6 +598,29 @@ fun page2(): Page<String> = Page(listOf("a"))
 `)
 }
 
+// A bare T may stand for a nullable type: ?: and ?. test it for null
+// as == null does (spec 5.1), and a fun that only carries its T takes
+// a nullable one.
+func TestGenericNull(t *testing.T) {
+	expect(t, [][2]string{
+		{"t.Nulls()", "7 0 9 null null"},
+		{"t.Values()", "3 1 4 2 2"},
+	}, `package t
+
+data class Wrap<T>(val value: T)
+
+fun <T> orElse(v: T, fallback: T): T = v ?: fallback
+fun <T> has(v: T): Int = v?.let { 1 } ?: 0
+fun <T> Wrap<T>.valueOr(d: T): T = value ?: d
+fun <T> carry(block: () -> T): T = block()
+fun <T> run2(v: T): T = carry { v }
+
+fun none(): Long? = null
+fun nulls(): String = "${orElse(none(), 7L)} ${has(none())} ${Wrap(none()).valueOr(9L)} ${carry { none() }} ${run2(none())}"
+fun values(): String = "${orElse(3L, 7L)} ${has(3L)} ${Wrap(4L).valueOr(9L)} ${carry { 2L }} ${run2(2L)}"
+`)
+}
+
 // A type parameter without a Go name in scope is the emitter's own
 // mistake: it stops, rather than write a type with no name.
 func TestForeignTypeParam(t *testing.T) {
@@ -1088,6 +1111,9 @@ func TestRefused(t *testing.T) {
 		{"enum class Kind { in_house, outside }\nfun f(tx: Tx, kinds: List<Kind>): Int = tx.execute(sql\"delete from invite where kind = any($kinds)\")", "2:93: not-yet-emitted", "a parameter that is a list of an enum"},
 		{"enum class Kind { in_house, outside }\nfun f(tx: Tx): List<Kind>? = tx.querySingle<List<Kind>?>(sql\"select array_agg(kind) as kinds from invite\")", "2:30: not-yet-emitted", "column kinds, which holds a list of an enum,"},
 		{"fun f(x: Int?): Int? = x.takeIf { true }", "1:24: not-yet-emitted", "a nullable type argument for T, which is used as T?"},
+		{"fun <T> firstOr(items: List<T>, fallback: T): T = items.firstOrNull() ?: fallback\nfun g(): Long? = firstOr(listOf<Long?>(null), 5L)", "2:18: not-yet-emitted", "used as T? in firstOr or a fun it calls, is not emitted yet: pass firstOr a type that is not nullable"},
+		{"fun <T> first(items: List<T>): Boolean = items.firstOrNull() == null\nfun <U> via(items: List<U>): Boolean = first(items)\nfun g(): Boolean = via(listOf<Long?>(null))", "3:20: not-yet-emitted", "used as U? in via or a fun it calls"},
+		{"fun <T> keep(v: T, fallback: T): T = v.takeIf { it != null } ?: fallback\nfun g(x: Long?): Long? = keep(x, 7L)", "2:26: not-yet-emitted", "used as T? in keep"},
 		{"fun <T> none(x: T?): T? = x\nfun g(): Int? = none(null)", "2:17: not-yet-emitted", "write the type arguments, none<...>(...)"},
 		{"sealed interface S<out T> {\n    data class A<T>(val v: T) : S<T>\n}\nfun f(s: S<S.A<Int>>): S<S<Int>> = s", "4:36: not-yet-emitted", "build the value with the wider type argument"},
 		{"enum class Kind { entries, b }", "1:19: go-name", "are both Kind_entries in Go"},

@@ -2194,8 +2194,15 @@ Each entry: what was decided, why, and what would reopen it.
 - **Evaluation order.** Go orders calls left to right and nothing else, so what must be
   ordered is a call: a read of a local `var` (`rt.Val`), since a lambda called later in
   the expression may assign it, and `/` and `%` (`rt.Div`, `rt.Rem`), which panic. A
-  call's operands written out of the order of their slots (named arguments, `x in c`, a
-  constructor's defaults) are read into temporaries first. Not ordered: nothing known.
+  call's operands written out of the order of their slots (named arguments, a
+  constructor's defaults) are read into temporaries first, as Kotlin reads them.
+  `x in c` and `x in a..b` read the right side first, as Kotlin's `c.contains(x)` does
+  (DEV-1157): the left first had been chosen as the order written, and DEV-1143 ran
+  both and found `i in listOf(bump())` `true` in Kotlin and `false` here, and where
+  both sides panic, the message the other side's. In `when (x) { in a..b -> }` the
+  subject is read first in both. Only an order `mise run kotlin` compares is known to
+  agree with Kotlin's; one nobody wrote a case for is not. Reopens: a case there that
+  differs.
 - **A parameter with a default is a pointer in Go**, nil when the call leaves it out, and
   the fun gives it its default, which may read the parameters before it. A constructor's
   default is written at the call, since it can read no parameter.
@@ -4408,6 +4415,12 @@ Greg's ruling, 22 Nov 2026: a regex is a language of its own.
   first seen in production. The run-time panic stays behind the check. Not taken: an
   overload for each key type, as `sumOf` has, about 10 declarations with their Go; or
   the panic alone. Reopen when a port sorts by an enum or a time.
+- **`sortedBy` calls its selector as Go's stable sort asks** (lead, 24 Nov 2026,
+  DEV-1157): the list it gives is Kotlin's, and the number and order of the calls are
+  not (DEV-1143 found 166 of 250 inputs differ, through a selector that logs). Kotlin's
+  documentation promises neither, so spec 12 says so and `mise run kotlin` keeps the
+  difference (`hSortCalls`). Not taken: matching the JVM's sort call for call. Reopen
+  when a port's selector has an effect that adds up.
 - **A `Map` compares its entries in any order, and writes itself `{k=v}`**, as Kotlin's,
   on the same `ordered` keys as a `Set`. `for` over a `Map` stays unemitted: no port
   needs it yet.

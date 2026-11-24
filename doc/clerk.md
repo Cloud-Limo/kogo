@@ -26,7 +26,8 @@ DEV-NNN" starts no clerk at its merge, and an issue moved to Done by
 hand starts one, which fits no row and is handed on.
 It pulls `~/Dev/kogo` before it starts a clerk, so this file is
 `main`'s, and its first poll records what is there and starts none.
-It runs one clerk at a time, since two merges would share `kogo_test`.
+It runs one clerk at a time, so each merge is checked on the `main`
+the one before it left.
 It leaves alone an issue labelled `lead` or `agent`, but for a merge,
 and takes it up from its newest event when the label goes. For a
 clerk that fails, the cap included, it labels the issue `lead` under

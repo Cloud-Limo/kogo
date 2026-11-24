@@ -7,8 +7,8 @@ test lines, from counting the Kotlin a piece replaces or from the
 designs' own guesses; nothing was built to measure it. The ops
 site's table marks each piece built, with its PR, or not; Linear holds
 the state of what is not. This file holds the order and the reasons,
-and is rewritten when either moves. Last rewritten 21 Nov 2026
-(DEV-1041).
+and is rewritten when either moves. Last rewritten 24 Nov 2026
+(DEV-1215), with section 2's order as Greg agreed it that day.
 
 ## The goal
 
@@ -144,29 +144,30 @@ issue where there is one.
 | 13j | cusoon2 | A Google stand-in for the comparison and the port's tests | ~160 / 40 | cusoon2 PR 1572 |
 | 13k | cusoon2 | The port of Place Details, the time zone and `compositePlace` | ~230 / 120 | cusoon2 PR 1576, 1580 |
 | 13l | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13l's: ~1,600 / 850) | cusoon2 PR 1597, 1600, 1603, 1604, 1605, 1608 |
-| 18 | cusoon2 | Kotlin first: ten keys move into `settings`; `deployment.goPort` | ~60 / 50 | no, DEV-1124 |
-| 19 | cusoon2 | The ops site's Go `main` | 150 / 80 | no, DEV-1125 |
-| 20 | cusoon2 | Serve the ops site from Go; waits on DEV-1139 (the second stress of the Go `main`) and DEV-1162 (the trial of generated worlds) | | no |
+| 18 | cusoon2 | Kotlin first: ten keys move into `settings`; `deployment.goPort` | ~60 / 50 | cusoon2 PR 1609 |
+| 19 | cusoon2 | The ops site's Go `main` | 150 / 80 | cusoon2 PR 1611 |
+| 20 | cusoon2 | Serve the ops site from Go; waits on the release work below, DEV-1055 (the Go unit's memory and build), the mends DEV-1208 and DEV-1211, and the lead's reading of the entries DEV-1198 marked wrong value or outage | | no |
 
-`sendInvite` compares with its `outbound_message` rows forgiven as
-owed until the port queues the invite's email (DEV-885), so "the 21
-operations switch together once all 21 compare clean" waits on it: it
-stands before row 20, not row 19.
+Row 20's earlier waits are over: the second stress of the Go `main`
+(DEV-1139), the trial of generated worlds (DEV-1162), and the invite's
+email queued by the port (DEV-885, cusoon2 PR 1612), so `sendInvite`
+compares its `outbound_message` rows like any other.
 
 Beside 13b to 13l, as tests in the Kotlin: the probes of each second id
 and admin-only field, the storefront's (DEV-1031, cusoon2 PR 1563)
 and then the ops site's (DEV-1038, 0 / 40).
 
-Beside it, before the first list goes live (DEV-930, about 290 / 220):
-the release carries Go; units, health and CI; routing and the port
-key; migrations from Go's `migrate`; the batch lock and the
+Beside it, before the first list goes live (DEV-930, about 290 / 220,
+not filed): the release carries Go; units, health and CI; routing and
+the port key; migrations from Go's `migrate`; the batch lock and the
 concurrency test.
 
 ### 2. The rest of cusoon2
 
 Mail's, the PDF's, Stripe's and Google's sizes were measured by four
-explorations of cusoon2's Kotlin (DEV-1046 to DEV-1049, 21 Nov 2026);
-the rest are estimates.
+explorations of cusoon2's Kotlin (DEV-1046 to DEV-1049, 21 Nov 2026),
+and the booker's by slicing it (DEV-1146, 23 Nov 2026); the rest are
+estimates.
 
 | Area | Size |
 | --- | --- |
@@ -176,13 +177,104 @@ the rest are estimates.
 | PDF: our own small writer (about 380 Go and font data) and the layouts | 1,610 / 640, the tests holding a comparison harness of about 200 |
 | The daemon's 16 queues, Stripe's two among them (245 / 200) | 1,400 / 600 |
 | Stripe's client through `kogo.http`, with the keyed call (`keyedAction`, `performOnce`, `EffectKey`) 45 / 90 in Kogo | 127 / 150 |
-| Google's client (legacy endpoints) through `kogo.http`, of which 13k's 230 / 120 is in table 1, with 70 / 80 in the prelude | 600 / 300 |
-| A paged list (not designed) | |
-| The booker's 70 operations: all in Kotlin RPC since GraphQL left cusoon2 (DEV-893's first step, cusoon2 PR 1557); its second step, the port, is sliced when this row is reached | 4,500 / 2,000 |
+| Google's client (legacy endpoints) through `kogo.http`, with 70 / 80 in the prelude; 13k's 230 / 120 is built, in table 1 | about 370 / 180 left |
+| The booker's 72 operations, all in Kotlin RPC since GraphQL left cusoon2 (DEV-893's first step, cusoon2 PR 1557), in 17 slices; its one paged list, `bookings`, seeks with a row comparison that passes `kogo check` as written (DEV-1146, "The paged list: facts") | about 3,930 / 2,860, with 225 / 295 in the prelude as DEV-1146 counted it, of which G2's 110 / 150 fell to Postgres's `pickup()` (DEV-1178) |
 | Translating cusoon2's tests into the test form, area by area | |
 
-Each row here that deletes Kotlin names its research runs when it is
-next.
+#### The order (Greg, 24 Nov 2026)
+
+Three rules, each against a kind of rework:
+
+1. **One booker slice is open in cusoon2 at a time**, with at most one
+   piece beside it that touches other files (the pricing, Google's
+   client, Stripe's client). Every port PR shares `schema.kg`,
+   `kogo/pins` and the comparison's Go, and one that falls behind
+   `renew` costs a Fix round.
+2. **A Kotlin-first change that alters the wire lands before the first
+   slice that meets it.** A small one goes into its slice's own PR.
+3. **Kogo's own work lands ahead of the slice that needs it.** The
+   clerk merges it, so it runs beside cusoon2's.
+
+In cusoon2, in this order:
+
+1. DEV-1213: the port reads a booking's price as its two columns,
+   which releases Kogo's DEV-1208.
+2. Slice 1 (DEV-1214), with the unknown storefront's 403 Kotlin first
+   in the same PR.
+3. Slices 2, 3 and 4.
+4. Slices 5 to 8, with the pricing (slice 10) beside them.
+5. Kotlin first, one PR with the frontend: a time on the wire as its
+   parts (a date, an hour, a minute), so the reader's own 400 covers
+   one that does not read; `bookingStatus`'s 500; and the Kotlin's
+   `bookingTime` onto `pickup()`, which ends the port's deviation
+   from DEV-1178. It lands before slice 9, the first to read a time
+   from a caller.
+6. Slice 9, with Google's Directions and Autocomplete beside it.
+7. Slices 11 to 14.
+8. Stripe's client; the login design's sitting with Greg, at any time
+   before this; then slices 15 to 17.
+9. The commands, mail, the PDFs, then the daemon's queues, which wait
+   on the runner.
+
+The slices are DEV-1146's, with its later answers applied. Sizes are
+Kogo code / tests; slice 1's code is measured, the rest are the
+Kotlin's lines at 0.85. The slices' 3,820 / 2,860 and about 110 lines
+of row types in `schema.kg` make the area's total.
+
+| # | Slice | Operations | Size | Waits on |
+| --- | --- | --- | --- | --- |
+| 1 | Mount the storefront's list, with its `admin` gate and the drivers page | `drivers`, `upsertDriver` | 115 / 150 | Kotlin first in its PR: the unknown storefront and a missing header become the list's check's 403 |
+| 2 | What a page asks first: the `anyone`, `maybe`, `customer` and `booker` gates | `booker`, `logout`, `showTestModeBand`, `googleMapsBrowserKey`, `branding`, `stripeConfig`, `areas`, `defaultArea`, `airportAirlines`, `commonPlaces`, `placeNicknames`, `bookerByNewBookerSecret`, `dismissNamePrompt` | 260 / 150 | 1 |
+| 3 | The places an admin and a customer keep | `place`, `journey`, `updateJourney`, `upsertPlaceNickname`, `deletePlaceNickname`, `upsertCommonPlace`, `deleteCommonPlace` | 200 / 130 | 2 |
+| 4 | The `viewer` gate and the steps to a booking | `resendBookingEmail`, `pastPassengers` | 150 / 120 | 2 |
+| 5 | The booking page's read | `booking` | 430 / 180 | 4; the prelude's names |
+| 6 | The booking's one-field writes | `cancelBooking`, `uncancelBooking`, `setBookingsHidden`, `setBookingPromotion`, `setBookingNotes`, `setBookingDriver`, `setBookingBooker`, `bookingDriverUpdate` | 135 / 200 | 5 |
+| 7 | The invoices | `invoice`, `invoiceByNumber`, `recordInvoicePayment`, `voidInvoice`, `resendInvoice`, `resendInvoiceStatus`, `createStripeCharge`, `stripeCharge`, `invoiceBookings` | 260 / 220 | 5 |
+| 8 | The cards and the payment link | `stripeCards`, `stripeCard`, `createStripeCard`, `bookingPaymentLink`, `useBookingPaymentLink` | 110 / 90 | 4 |
+| 9 | The lists | `bookings`, `bookingsSummary`, `bookers` | 200 / 160 | 5; the time on the wire as its parts |
+| 10 | The pricing, as functions compared by generated cases | none | 330 / 150 | `kogo.math` |
+| 11 | The wizard's quotes | `charges`, `discountedTotal`, `loyaltyProgramDiscount` | 295 / 200 | 5, 10 |
+| 12 | The price and the payment details | `setBookingPrice`, `setPaymentDetails` | 185 / 170 | 6, 10 |
+| 13 | The journeys and the place search | `ensureJourney`, `bookingStatus`, `placeSuggest` | 280 / 220 | 3; Google's Directions and Autocomplete |
+| 14 | Submitting and editing a booking | `submitBooking`, `setBookingDetails` | 335 / 260 | 11, 13 |
+| 15 | The customer's logins | `startEmailLogin`, `completeEmailLogin`, `startPasskeyLogin`, `completePasskeyLogin` | 225 / 200 | 2; the login design; DEV-1135 |
+| 16 | The customer's passkeys | `hasPasskey`, `passkeys`, `startPasskeyRegistration`, `completePasskeyRegistration`, `deletePasskey` | 70 / 80 | 15 |
+| 17 | The profile | `bookerProfile`, `createBooker`, `updateBooker` | 240 / 180 | 15; Stripe's client; DEV-1135; Kotlin first in its PR: `bookerProfile` refuses a visitor, so its row is `gatedBy viewer` |
+
+What the answers to DEV-1146 changed in it:
+
+- **A pickup's wall time** (G2) is Postgres's `pickup()` (DEV-1178):
+  `kogo.time` gains none of the fourteen names, and `LocalDateTime`
+  stays out. The 14 operations that hold a row read the view; the 5
+  whose time is not yet a row ask the function once each.
+- **The two enums Kogo cannot name** (G4) are a cast and a literal in
+  the port, a deviation by name in each slice's Decided; renaming them
+  is the cleanup's, after the Kotlin is deleted.
+- **`kogo.math` is Go's functions** (Q2): `sin`, `cos`, `asin` and
+  their kind give Go's result, arithmetic gives Kotlin's bits, and
+  the pricing's comparison compares the area chosen, never a distance
+  at full width.
+- **Five gates** (Q3), with six rows under `maybe`: `placeNicknames`,
+  `hasPasskey`, `passkeys`, `pastPassengers`, `charges` and
+  `loyaltyProgramDiscount`.
+- What an address that mail cannot carry answers (DEV-1135) is still
+  Greg's; slices 15 and 17 meet it at their doors.
+
+In Kogo, beside it:
+
+- The prelude's names before slice 5: spec 12's that it lacks (G6,
+  about 50 / 60) and the four of Kotlin's approved (a `Set`'s `+` and
+  `-`, `getOrNull`, `!in`; about 30 / 40), the rest written the longer
+  way inside the spec.
+- `kogo.math` before slice 10, about 25 / 30.
+- The keyed call before Stripe's client, 45 / 90.
+- The runner after "Guide DEV-1141": four of its sketch's twelve gaps
+  are Greg's, so its design is a sitting, not a run.
+- Mail's prelude and the PDF writer, before mail and the PDFs.
+
+No slice puts Go in front of a user or deletes Kotlin, so none waits
+on a research run. Each switch-over does, and names its runs when it
+is next.
 
 ### 3. Operator money
 
@@ -199,5 +291,5 @@ longest lead time and can go out early.
   application code and two expected panics become.
 - `doc/remains.md`'s review of `find` and `fair`, with the runner.
   Settled on 23 Nov 2026 ("A worker keeps the loop over tenants").
-- A paged list's design, before DEV-893's lists slice.
-- The login design's details, when the session slice is scoped.
+- The login design's details, in a sitting with Greg before Stripe's
+  client and slices 15 to 17.

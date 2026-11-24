@@ -4684,10 +4684,11 @@ The lead ruled the encoder changes, not the comparison; the agent's, for the res
   checks after it writes. The cost is one round trip per gated request on a
   `SerializableTx`. Not taken: dropping the savepoint and holding the gate to reading by
   `gate-writes` alone, DEV-1145's other option, which saves the trip and loses Postgres's
-  refusal of a write inside a function and of `nextval`.
+  refusal of a write inside a function and of `nextval`. Reopen if the gate stops being
+  run in a read-only savepoint, or if Postgres stops judging a transaction read-only by
+  its first snapshot.
 - **`heldRace`'s gate reads the table the race counts** (`person`), not the session's
   table, which the test schema has not: the read that matters is any first read.
 - **A sentence each in spec 15 and `doc/gates.md`**, though neither said the gate's read
   is the first: each describes the savepoint, and the statement before it is now part of
-  how the gate runs. Reopen if a gate on a `Tx` is ever run read-only, where the same
-  statement is needed.
+  how the gate runs.

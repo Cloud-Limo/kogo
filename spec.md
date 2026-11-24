@@ -1662,18 +1662,19 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   runs: in a savepoint that Postgres holds read-only and the server
   releases before the work. The server runs a statement before the
   savepoint, so that the transaction's first snapshot is not taken
-  read-only: Postgres would then leave the whole transaction out of
-  its serialization checks, also after the work writes. There a write, one inside a function of
-  the database's too, `nextval` and a row lock are each a bug, and a
-  panic (section 8). A setting the gate makes with `set_config` is
-  allowed, and is still set in the work, which writes as before: a
-  gate binds the tenant so. An advisory lock and a write to a
-  temporary table pass, since Postgres's read-only mode allows them,
-  and neither this nor `gate-writes` refuses them. A gate on a `Tx` is not run so,
-  since Postgres's read-only mode refuses the lock such a gate may
-  take: the compile error of 15.2 alone holds it, and a write inside
-  a function of the database or `nextval` in such a gate is not
-  refused.
+  read-only: Postgres may then leave the whole transaction out of its
+  serialization checks, also after it writes: it does when no other
+  writing transaction at SERIALIZABLE is open as the first snapshot is
+  taken. There a write, one inside a function of the database's too,
+  `nextval` and a row lock are each a bug, and a panic (section 8). A
+  setting the gate makes with `set_config` is allowed, and is still
+  set in the work, which writes as before: a gate binds the tenant so.
+  An advisory lock and a write to a temporary table pass, since
+  Postgres's read-only mode allows them, and neither this nor
+  `gate-writes` refuses them. A gate on a `Tx` is not run so, since
+  Postgres's read-only mode refuses the lock such a gate may take: the
+  compile error of 15.2 alone holds it, and a write inside a function
+  of the database or `nextval` in such a gate is not refused.
 - The first parameter of the gate, or of an ungated operation that
   takes a transaction, names the kind the server opens (10.7): at
   SERIALIZABLE for a `SerializableTx`, at READ COMMITTED for a `Tx`.

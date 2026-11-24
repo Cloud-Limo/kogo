@@ -203,7 +203,7 @@ func reading[P any](tx kogo.Tx, serializable bool, gate func() kogo.Either[strin
 	if !serializable {
 		return gate()
 	}
-	// A read-only first snapshot would leave the whole transaction out
+	// A read-only first snapshot can leave the whole transaction out
 	// of Postgres's serialization checks, also after it writes.
 	kogo.Tx_Execute(tx, "select 1")
 	return kogo.Tx_Atomically(tx, func() kogo.Either[string, P] {

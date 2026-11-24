@@ -78,6 +78,8 @@ So that a ruling made early is not made blind:
 
 For what is left at the end, and for the lead's own choices:
 
+- a piece opens with the problem and the how in plain words, as a
+  project manager would put it, before any code or counts;
 - a short piece of code that shows the thing;
 - the mistake most likely to be made there, as code;
 - what catches it, with the choice and without;

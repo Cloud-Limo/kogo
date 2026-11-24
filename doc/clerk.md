@@ -74,7 +74,7 @@ Take the first row that fits:
 | In Review | `Fixed:` | Merging |
 | Todo | none | the lead's, who chooses where it runs: exit |
 | any | async `Start:` or `Launched:`, `[agent]` | the run's: exit |
-| Todo | async `Start:`, no label | a speculative run, the lead's to label: exit |
+| Todo | async `Start:`, no label | a research run, Greg's to start, the lead labelling on his word: exit |
 | In Progress | `Taken` | the session's: exit |
 | Backlog | `Parked:`, or an older `Lead:` line of what brings it back | After a merge moves it, when that is a merge; else the lead's |
 | any | `Start:` | the step's, running: exit |
@@ -188,8 +188,10 @@ pushes it (a clean merge of the base changes nothing the Review read, so
 it is yours though you write no code), runs the tests, `leaks` and,
 unless the PR changes only `.md` files, the two comparisons with Kotlin.
 For a cusoon2 PR it makes or moves `~/Dev/cusoon2-dev-NNN`, detached at
-the pushed head, and runs that checkout's `kogo/run.sh` when the PR
-touches `kogo/` or a file `kogo/pins` names. It takes a minute or so,
+the pushed head, and runs that checkout's `kogo/drift.sh`, then its
+`kogo/run.sh`, when the PR touches `kogo/` or a file `kogo/pins`
+names; a pin left behind answers `fix: kogo/pins` with the Fix's
+phrase. It takes a minute or so,
 and more when it must run a comparison on `main` too. Its first line is
 one of three:
 
@@ -212,11 +214,13 @@ one of three:
   wait for Cloud CI, which runs `mise run check-all` and the tests: `lin
   clerk` watches that sha's run, tells Greg in his inbox on green, and
   posts a `Failed:` with `lead` on red.
-- `fix: <why>`. The base moved and the command could not merge it: a
-  conflict, or any cusoon2 PR. Merge nothing and post no `Checked:`.
-  Start the Fix it names the way How the next step starts says, whose
-  brief asks only that it merge the base, test and push; for a port's
-  PR, the line under it holds the brief's phrase.
+- `fix: <why>`. The base moved and the command could not merge it (a
+  conflict, or any cusoon2 PR), or a port's cusoon2 PR left its line
+  of `kogo/pins` behind (`fix: kogo/pins`). Merge nothing and post no
+  `Checked:`. Start the Fix it names the way How the next step starts
+  says; its brief merges the base, tests and pushes, or for `fix:
+  kogo/pins` sets the changed lines and runs `kogo/run.sh`. For a
+  port's PR, the line under it holds the brief's phrase.
 - `fail: <what>`. Hand on with that line and the lines under it: a
   check's last lines, and for a comparison what `main` says of the
   same check. When `main` fails the same way, the PR is not the cause.

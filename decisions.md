@@ -2473,10 +2473,18 @@ Each entry: what was decided, why, and what would reopen it.
 
 ## Taken adding what the invoice ledger calls (DEV-841), not yet discussed
 
-- **A `Set` walks its keys to find one.** The one ordered implementation is a slice of
-  keys compared with `rt.Equal`, so a lookup costs the set's size and `setOf` its square.
-  A hash would need a second walk that agrees with `==` everywhere. Reopen when a set or
-  a map is big enough for the walk to show.
+- **A `Set` or a `Map` finds a key of a plain kind through a Go map, and walks for any
+  other** (corrected by DEV-1210; it first said every key was walked, to be reopened when a
+  set grew big enough to show, and DEV-1198's trial F4 showed it: 6.5 s for
+  `toSet().contains` over 20,000 ids). Greg ruled on 24 Nov 2026: a map for a `String`,
+  `Int`, `Long`, `Boolean`, `Uuid` or enum key, where Go's `==` is Kotlin's, the walk for
+  the rest, and a note in spec 12 that warns of it. An enum is taken as any named string
+  but `Decimal` (the other named strings, rpc's `Refused` and `notText`, are never a Kogo
+  key); a `Char` walks, being unnamed in the ruling. Not taken: a hash for every key, a
+  second walk that must agree with `==` everywhere, about 45 / 25 lines, where any
+  disagreement makes `contains` answer false for a key that is there. `==` of two sets or
+  maps still walks both; reopen that when a port compares two large ones, and the rest when
+  a large collection keyed by another kind is needed.
 - **`rt`'s `==` compares a Go type that embeds `rt.Unordered` by its `Keys()` regardless
   of order**, each key once. `rt` knows no prelude type by name, and `Unordered`'s
   unexported method means no data class can be taken for a set by a member's name; `Map`

@@ -3799,9 +3799,11 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   marked transaction, and `gate-proof`, `proof-tx-escapes` and
   `outside-passes-proof` go, with spec 15.7 as it stood. A gate's
   answer holds its transaction in a plain property, which is kept in
-  a name, destructured and passed on. This overrides DEV-1029's note,
-  above, that the rules on a proof's transaction stay. They refused a
-  stand-in, a transaction kept in a name, and not the mistake, a
+  a name, destructured and passed on. This overrides DEV-1029 (20
+  Nov 2026), which took out the rule that a statement binds
+  something of its proof and kept the rules on a proof's
+  transaction. They refused a stand-in, a transaction kept in a
+  name, and not the mistake, a
   transaction used after it ended; and cusoon2's ops port could not
   be written under them, its gate answering a call with a plain
   transaction. `doc/design.md`, principle 1, gains Greg's clause.

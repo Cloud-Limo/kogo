@@ -341,18 +341,24 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 	panic("unreachable")
 }
 
+// raiseThisAt refuses a this that Kotlin reads as the raise scope
+// (spec.md 9).
+func (c *checker) raiseThisAt(e *syntax.Ident, t Type) {
+	name := t.String()
+	if n, ok := t.(*Named); ok {
+		name = n.Decl.Simple()
+	}
+	name = strings.ToLower(name[:1]) + name[1:]
+	c.errorf(e, "raise-this", "in Kotlin this inside either { } or db.tx { } is the raise scope, not this %s: name it in a val before the block, as val %s = this, and use that (spec.md 9)", t, name)
+}
+
 // ident reads a name: a local, a member of this, a top-level val, a
 // data object or Unit.
 func (c *checker) ident(e *syntax.Ident) Type {
 	switch o := c.scope.lookup(e.Name).(type) {
 	case *Var:
 		if e.Name == "this" && c.recv != e && c.raiseThis {
-			name := o.Type.String()
-			if n, ok := o.Type.(*Named); ok {
-				name = n.Decl.Simple()
-			}
-			name = strings.ToLower(name[:1]) + name[1:]
-			c.errorf(e, "raise-this", "in Kotlin this inside either { } or db.tx { } is the raise scope, not this %s: name it in a val before the block, as val %s = this, and use that (spec.md 9)", o.Type, name)
+			c.raiseThisAt(e, o.Type)
 		}
 		c.info.Uses[e] = o
 		t := c.typeOf(o)

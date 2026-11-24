@@ -907,6 +907,10 @@ func TestFailures(t *testing.T) {
 		{acct + "fun Acct.f(): Either<String, String> = either { \"I am $‸this\" }", "raise-this", rename},
 		{acct + "fun Acct.f(): Either<String, String> = either { g(‸this) }", "raise-this", rename},
 		{acct + "fun Acct.f(): Either<String, String> = either { ‸this.toString() }", "raise-this", rename},
+		{acct + "fun Acct.f(): Either<String, String> = either { ‸this.let { \"I am $it\" } }", "raise-this", rename},
+		{acct + "fun Acct.f(): Either<String, String> = either { \"I am ${‸this.right()}\" }", "raise-this", rename},
+		{acct + "fun Acct.f(): Either<String, String> = either { ‸toString() }", "raise-this", rename},
+		{acct + "fun Acct.f(): Either<String, String> = either { ‸let { \"I am $it\" } }", "raise-this", rename},
 		{acct + "fun Acct.f(): Either<String, List<String>> = either { listOf(1).map { g(‸this) } }", "raise-this", rename},
 		{acct + "fun Acct.f(db: Db): Either<String, String> = db.tx { tx -> g(‸this) }", "raise-this", rename},
 		// A local fun is not in the raise scope, and Kotlin's this there is still the Raise.

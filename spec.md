@@ -667,11 +667,14 @@ Outside a raise scope these forms are errors: wrap the code in
   an error that says to rename the member. `this.raise(...)` on such a
   member is the same error, since in Kotlin `this` inside `either { }`
   is the raise scope.
-- So, in an extension or a data class's fun, a `this` that stands as
-  a value inside a raise scope, or in a local fun there, is a compile
-  error (`raise-this`): `"I am $this"` would print the receiver here
-  and the raise scope in Kotlin. So is `this.toString()`, which the
-  raise scope has too. Name the receiver in a `val` before the block,
+- So, in an extension or a data class's fun, inside a raise scope's
+  block or a local fun there, a `this` whose text Kotlin reads as the
+  raise scope is a compile error (`raise-this`): it would mean the
+  receiver here and the raise scope in Kotlin. That is a `this` that
+  stands as a value, `"I am $this"`, and a call the raise scope takes
+  as well, on `this` or on no receiver: `toString()` and an extension
+  on a type parameter, `this.let { "$it" }`, `also`, `takeIf`,
+  `right`, `left`. Name the receiver in a `val` before the block,
   `val acct = this`, and use the `val`. A member read through it,
   `this.name`, stays: kotlinc refuses it, so nothing differs.
 

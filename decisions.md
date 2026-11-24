@@ -2416,6 +2416,8 @@ Each entry: what was decided, why, and what would reopen it.
 - **`db.tx(serializable = true)` reruns without a limit**, as the spec says, on SQLSTATE
   40001 and 40P01 only, whether the block or the commit met it. Without `serializable`
   neither is rerun. Reopen with a limit if a workload livelocks.
+  *Superseded in part 24 Nov 2026 by "A plain `db.tx` reruns on a deadlock" (DEV-1209)
+  below: the plain form reruns on 40P01, also without a limit.*
 - **`tx.atomically` is the driver's nested transaction**, a savepoint, rolled back on any
   panic that leaves the block, a failure or a bug. The block keeps using the outer `Tx`.
   *Agreed with Greg 24 Nov 2026 (DEV-1198), kept as written.*
@@ -4907,13 +4909,20 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   data class's fun, a `this` that stands as a value inside `either { }` is Kotlin's
   `Raise` and Kogo's receiver, and `"I am $this"` is valid in both. The message says to
   name the receiver in a `val` before the block. `this.name` stays, kotlinc refusing it.
-  Decided here, beyond the ruling's words: the block of the raising `db.tx` is held the
-  same, since it is a `Raise<E>.(Tx) -> A` in Kotlin as `either`'s is, and the one check
-  (the checker's raise scope) covers both; and `this.toString()` is refused too, since
-  Kotlin's `Raise` has a `toString` and the text is valid in both and prints differently.
+  Decided here, beyond the ruling's words, and ruled by the lead on PR 185 as cases of
+  the ruling's reason, text valid in both that means something else in each: the block of
+  the raising `db.tx` is held the same, since it is a `Raise<E>.(Tx) -> A` in Kotlin as
+  `either`'s is, and the one check (the checker's raise scope) covers both; and a call
+  that Kotlin's `Raise` takes as well is refused, written on `this` or on no receiver:
+  `toString()` and an extension on a type parameter (`let`, `also`, `takeIf`, `right`,
+  `left`). kotlinc 2.4.21 with Arrow 2.2.3 prints `DefaultRaise@…` for `toString()` and
+  `let { "I am $it" }` inside `either { }`, unwritten receiver and all (run 24 Nov 2026).
+  The check is by what the call resolves to, not by its name, so a prelude extension on a
+  type parameter added later is held too.
   A local fun inside the block is held too: it is not in the raise scope (spec 9), but
   its `this` is the `Raise` in Kotlin (kotlinc 2.4.21 with Arrow 2.2.3 takes `fun g():
-  Raise<String> = this` there, run 24 Nov 2026). Not taken: holding `either { }` alone,
-  which leaves the same hole in `db.tx { }`. When built, `examples/` held no `this` inside an
+  Raise<String> = this` there, run 24 Nov 2026). Not taken: holding `either { }` and a
+  bare `this` alone, which left `db.tx { "$this" }` and `this.let { "$it" }` answering
+  otherwise than Kotlin. When built, `examples/` held no `this` inside an
   `either { }`, and the tests three, each a receiver (`this.raise`, `this.ensure`,
   `this.ensureNotNull`).

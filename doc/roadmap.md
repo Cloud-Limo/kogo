@@ -68,9 +68,10 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   Apache-2.0, its history kept: it has its `LICENSE` (DEV-941, PR 78)
   and its module is `github.com/Cloud-Limo/kogo` (DEV-942, PR 86),
   which cusoon2 requires (cusoon2 PR 1527). Its runtime is an
-  ordinary Go module pinned by commit and the `kogo` tool a mise
-  install. Emitting in every build is the medium-term option
-  once the builder has a Postgres.
+  ordinary Go module pinned by commit, and the `kogo` tool is built
+  from that same commit by the `tool` line of cusoon2's
+  `kogo/go/go.mod`. Emitting in every build is the medium-term
+  option once the builder has a Postgres.
 
 ## Settled for the ops site (19 Nov 2026)
 
@@ -227,19 +228,19 @@ of row types in `schema.kg` make the area's total.
 | 2 | What a page asks first: the `anyone`, `maybe` and `customer` gates, and `booker` | `booker`, `logout`, `showTestModeBand`, `googleMapsBrowserKey`, `branding`, `stripeConfig`, `areas`, `defaultArea`, `airportAirlines`, `commonPlaces`, `placeNicknames`, `bookerByNewBookerSecret`, `dismissNamePrompt` | 260 / 150 | 1 |
 | 3 | The places an admin and a customer keep | `place`, `journey`, `updateJourney`, `upsertPlaceNickname`, `deletePlaceNickname`, `upsertCommonPlace`, `deleteCommonPlace` | 200 / 130 | 2 |
 | 4 | The `viewer` gate and the steps to a booking | `resendBookingEmail`, `pastPassengers` | 150 / 120 | 2 |
-| 5 | The booking page's read | `booking` | 430 / 180 | 4; the prelude's names |
+| 5 | The booking page's read | `booking` | 430 / 180 | 4 |
 | 6 | The booking's one-field writes | `cancelBooking`, `uncancelBooking`, `setBookingsHidden`, `setBookingPromotion`, `setBookingNotes`, `setBookingDriver`, `setBookingBooker`, `bookingDriverUpdate` | 135 / 200 | 5 |
 | 7 | The invoices | `invoice`, `invoiceByNumber`, `recordInvoicePayment`, `voidInvoice`, `resendInvoice`, `resendInvoiceStatus`, `createStripeCharge`, `stripeCharge`, `invoiceBookings` | 260 / 220 | 5 |
 | 8 | The cards and the payment link | `stripeCards`, `stripeCard`, `createStripeCard`, `bookingPaymentLink`, `useBookingPaymentLink` | 110 / 90 | 4 |
 | 9 | The lists | `bookings`, `bookingsSummary`, `bookers` | 200 / 160 | 5; the time on the wire as its parts |
 | 10 | The pricing, as functions compared by generated cases | none | 330 / 150 | `kogo.math` |
-| 11 | The wizard's quotes | `charges`, `discountedTotal`, `loyaltyProgramDiscount` | 295 / 200 | 5, 10 |
+| 11 | The wizard's quotes | `charges`, `discountedTotal`, `loyaltyProgramDiscount` | 295 / 200 | 5, 10; the time on the wire as its parts |
 | 12 | The price and the payment details | `setBookingPrice`, `setPaymentDetails` | 185 / 170 | 6, 10 |
-| 13 | The journeys and the place search | `ensureJourney`, `bookingStatus`, `placeSuggest` | 280 / 220 | 3; Google's Directions and Autocomplete |
+| 13 | The journeys and the place search | `ensureJourney`, `bookingStatus`, `placeSuggest` | 280 / 220 | 3; the time on the wire as its parts; Google's Directions and Autocomplete |
 | 14 | Submitting and editing a booking | `submitBooking`, `setBookingDetails` | 335 / 260 | 11, 13 |
-| 15 | The customer's logins | `startEmailLogin`, `completeEmailLogin`, `startPasskeyLogin`, `completePasskeyLogin` | 225 / 200 | 2; the login design; DEV-1135 |
+| 15 | The customer's logins | `startEmailLogin`, `completeEmailLogin`, `startPasskeyLogin`, `completePasskeyLogin` | 225 / 200 | 2; the login design |
 | 16 | The customer's passkeys | `hasPasskey`, `passkeys`, `startPasskeyRegistration`, `completePasskeyRegistration`, `deletePasskey` | 70 / 80 | 15 |
-| 17 | The profile | `bookerProfile`, `createBooker`, `updateBooker` | 240 / 180 | 15; Stripe's client; DEV-1135; Kotlin first in its PR: `bookerProfile` refuses a visitor, so its row is `gatedBy viewer` |
+| 17 | The profile | `bookerProfile`, `createBooker`, `updateBooker` | 240 / 180 | 15; Stripe's client; Kotlin first in its PR: `bookerProfile` refuses a visitor, so its row is `gatedBy viewer` |
 
 What the answers to DEV-1146 changed in it:
 
@@ -257,15 +258,14 @@ What the answers to DEV-1146 changed in it:
 - **Five gates** (Q3), with six rows under `maybe`: `placeNicknames`,
   `hasPasskey`, `passkeys`, `pastPassengers`, `charges` and
   `loyaltyProgramDiscount`.
-- What an address that mail cannot carry answers (DEV-1135) is still
-  Greg's; slices 15 and 17 meet it at their doors.
 
 In Kogo, beside it:
 
-- The prelude's names before slice 5: spec 12's that it lacks (G6,
-  about 50 / 60) and the four of Kotlin's approved (a `Set`'s `+` and
-  `-`, `getOrNull`, `!in`; about 30 / 40), the rest written the longer
-  way inside the spec.
+- The prelude's names are built (DEV-1216, PR 189): spec 12's that it
+  lacked (G6) and three of Kotlin's four approved (a `Set`'s `+` and
+  `-`, `getOrNull`), the rest written the longer way inside the spec.
+  `!in` is not: a port writes `!(x in c)` until Kogo's subset next
+  widens (DEV-1184).
 - `kogo.math` before slice 10, about 25 / 30.
 - The keyed call before Stripe's client, 45 / 90.
 - The runner after "Guide DEV-1141": four of its sketch's twelve gaps

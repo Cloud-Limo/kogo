@@ -411,8 +411,10 @@ func (c *Checker) typeOf(ctx context.Context, oid uint32) (Type, error) {
 	}
 	var name, kind, category, display string
 	var base, elem, relid uint32
+	var shipped bool
 	err := c.conn.QueryRow(ctx, `select typname, typtype::text, typcategory::text, typbasetype, typelem, typrelid,
-		format_type(oid, null) from pg_type where oid = $1`, oid).Scan(&name, &kind, &category, &base, &elem, &relid, &display)
+		format_type(oid, null), oid < 16384 and typnamespace = 'pg_catalog'::regnamespace
+		from pg_type where oid = $1`, oid).Scan(&name, &kind, &category, &base, &elem, &relid, &display, &shipped)
 	if err != nil {
 		return Type{}, err
 	}
@@ -446,10 +448,11 @@ func (c *Checker) typeOf(ctx context.Context, oid uint32) (Type, error) {
 	if err != nil {
 		return Type{}, err
 	}
-	// The driver knows the arrays Postgres ships, whose oids are below
-	// 16384, its FirstNormalObjectId; it reads any other, an array of
-	// a domain or a domain over an array, once told of it by name.
-	if t.Array = ""; t.List && oid >= 16384 {
+	// The driver knows the arrays of pg_catalog that initdb makes,
+	// whose oids are below 16384, its FirstNormalObjectId; it reads any
+	// other, an array of a domain, a domain over an array, or one of
+	// information_schema's domains, once told of it by name.
+	if t.Array = ""; t.List && !shipped {
 		t.Array = display
 	}
 	c.types[oid] = t

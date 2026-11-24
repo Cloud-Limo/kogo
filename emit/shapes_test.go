@@ -168,6 +168,8 @@ func TestLimits(t *testing.T) {
 		{`t.Nums(db)`, "[0.00, 1.50]"},
 		{`t.Uuids(db)`, "[00000000-0000-0000-0000-000000000002]"},
 		{`t.Tags(db)`, "[a, b] [Fold] null"},
+		{`t.Cardinals(db)`, "[1, 2]"},
+		{`t.SendDates(db)`, "2"}, // d_date[] is read by no case before it
 		{`t.Keep(db, "a\x00b", nil)`, zero},
 		{`t.Keep(db, "a", []string{"b", "\x00"})`, zero},
 		{`t.KeepOrNull(db, []*string{nil, rt.Ptr("\x00")})`, zero},
@@ -177,6 +179,8 @@ func TestLimits(t *testing.T) {
 		cases = append(cases, [2]string{`t.Many(db)`, "panics: execute changed 2200000000 rows, more than the Int it gives can hold (spec.md 10.4)"})
 	}
 	expectWith(t, withDB, "defer drop()\n", cases, `package t
+
+import kogo.time.LocalDate
 
 fun grid(db: Db): List<Int> = db.tx { tx -> tx.querySingle<List<Int>>(sql"""select '{{1,2},{3,4}}'::int[] as "x!" """) }
 fun ints(db: Db): List<Int> = db.tx { tx ->
@@ -196,6 +200,15 @@ data class Tagged(val tags: List<String>, val folded: List<String>, val none: Li
 fun tags(db: Db): String = db.tx { tx ->
     val t = tx.querySingle<Tagged>(sql"""select '{a,b}'::d_tags as "tags!", '{Fold}'::citext[] as "folded!", null::text[] as none""")
     "${t.tags} ${t.folded} ${t.none}"
+}
+
+// An array of a domain initdb makes, below Postgres's first oid.
+fun cardinals(db: Db): List<Int> = db.tx { tx ->
+    tx.querySingle<List<Int>>(sql"""select '{1,2}'::information_schema.cardinal_number[] as "x!" """)
+}
+fun sendDates(db: Db): Int = db.tx { tx ->
+    val ds = tx.querySingle<List<LocalDate>>(sql"""select '{2026-01-02,2026-01-03}'::date[] as "x!" """)
+    tx.execute(sql"select from unnest($ds::d_date[])")
 }
 
 fun keep(db: Db, name: String, more: List<String>): Int = db.tx { tx ->

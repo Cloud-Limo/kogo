@@ -4710,10 +4710,12 @@ limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
   500. Not taken: dropping the character, which is another value.
 - **The driver is told of every array type Postgres does not ship** (finding 8): one of
   a domain, a domain over an array, `citext[]`. `sqlpass.Type.Array` holds Postgres's
-  name for it, set where the type's oid is 16384 or more, Postgres's
-  `FirstNormalObjectId`; the emitter hands it to `Tx_Known`, which now takes any type's
-  name, for a column and for a parameter alike. Not taken: asking the catalog whether
-  the element is a domain, which misses a domain over an array; telling the driver at
+  name for it, set unless the type is in `pg_catalog` with an oid below 16384, Postgres's
+  `FirstNormalObjectId`: `information_schema`'s domains, such as `cardinal_number`, are
+  made by initdb below it, and their arrays are not the driver's. The emitter hands it
+  to `Tx_Known`, which now takes any type's name, for a column and for a parameter
+  alike. Not taken: the oid alone, which misses `cardinal_number[]`; asking the catalog
+  whether the element is a domain, which misses a domain over an array; telling the driver at
   the read from the row's description, by when the result's format is already asked for.
 - **An array of a domain over an array is `sql-unmapped-type`**: it is a list of lists,
   the catalog tells, and it was typed `List<T>` and could not be read. Found by a probe

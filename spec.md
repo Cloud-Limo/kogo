@@ -1809,6 +1809,10 @@ Inputs and answers are JSON.
   never holds half of a surrogate pair (section 3): an input's
   `"\ud800"` reads as U+FFFD, which an answer then writes, where
   Kotlin's answer differs.
+- A `String` on the wire holds no U+0000, which Postgres's `text`
+  cannot hold (10.4): an input's `"a\u0000b"` is a 400, `input.name
+  holds U+0000`, whether or not the operation would send it to
+  Postgres. It is a limit of the subset, where Kotlin reads the string.
 - Reading is strict. A key that is missing, a key the type does not
   have, a value of another type, a number that is not whole or does
   not fit where an `Int` or a `Long` is wanted, a string that is not a
@@ -1829,8 +1833,9 @@ Inputs and answers are JSON.
   class the application declares, which its environment holds as one
   property, and one object of its configuration file, a key for each
   property. Nothing defaults: a key that is missing or of another
-  type stops the start with an error that names the key and never
-  its value, `settings.opsOrigin is missing`. It differs from an input
+  type, or a `String` that holds U+0000, stops the start with an
+  error that names the key and never its value,
+  `settings.opsOrigin is missing`. It differs from an input
   twice: a key the class does not have is reported and ignored, so
   that one file serves the program before and after a deploy; and an
   enum or a data class of the prelude is no setting yet, and an error

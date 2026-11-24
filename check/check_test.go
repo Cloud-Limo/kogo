@@ -106,7 +106,8 @@ func run(t *testing.T, src string) (*Info, []*syntax.Error) {
 // its own signature, as "$a: Int, ${b.c}: Kind{x y} -> id: Uuid, n:
 // List<Long>?", the parameters in the pass's order, a name once,
 // Kind{x y} an enum of the constants x and y, and t(a: Int, b: Uuid?)
-// the composite type t of fields a and b. A literal holding « is
+// the composite type t of fields a and b; a column of a type T?? is
+// null only through an outer join. A literal holding « is
 // refused there. A word @person:update says the statement needs
 // update of the table person, and @person that it reads it;
 // @utility:LOCKSTMT that it is the utility statement Postgres tags so.
@@ -149,8 +150,9 @@ func signature(lit *syntax.SQL) (*sqlpass.Statement, error) {
 		cols := []sqlpass.Column{}
 		for _, col := range split(s) {
 			if name, t, ok := strings.Cut(strings.TrimSpace(col), ": "); ok {
+				t, joined := strings.CutSuffix(t, "??")
 				base, null := strings.CutSuffix(t, "?")
-				cols = append(cols, sqlpass.Column{Name: name, Type: typ(base), Nullable: null})
+				cols = append(cols, sqlpass.Column{Name: name, Type: typ(base), Nullable: null || joined, Joined: joined, Outer: joined})
 			}
 		}
 		return cols
@@ -950,7 +952,16 @@ fun n(tx: Tx): Int = tx.execute(sql" -> v: Void")`,
 		// Nested data classes, one on the absent side of an outer join.
 		`data class Tenant(val id: Uuid, val slug: String)
 data class Row(val id: Uuid, val tenant: Tenant?, val owner: Tenant)
-fun f(tx: Tx): List<Row> = tx.query<Row>(sql" -> id: Uuid, tenant_id: Uuid?, tenant_slug: String?, owner_id: Uuid, owner_slug: String")`,
+fun f(tx: Tx): List<Row> = tx.query<Row>(sql" -> id: Uuid, tenant_id: Uuid??, tenant_slug: String??, owner_id: Uuid, owner_slug: String")`,
+		// On the absent side, a column never null (a coalesce) or
+		// asserted ("name!") fills a property that may not be null,
+		// and the class is told there by a column null only through
+		// the join, in itself or in a class it holds that is not
+		// nullable.
+		`data class Tenant(val id: Uuid, val slug: String)
+data class Shop(val tenant: Tenant, val note: String?)
+data class Row(val tenant: Tenant?, val shop: Shop?)
+fun f(tx: Tx): List<Row> = tx.query<Row>(sql" -> tenant_id: Uuid??, tenant_slug: String, shop_tenant_id: Uuid??, shop_tenant_slug: String??, shop_note: String?")`,
 		// Whole rows of a join, one on the absent side, a column of a
 		// type made with create type, whose fields may be null, and a
 		// row holding one.
@@ -977,7 +988,7 @@ external class Instant`,
 			"column legal_name fills no property of Row: add a property legalName, or leave the column out"},
 		{"data class Row(val id: Uuid, val legalName: String)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> id: Uuid\")", "sql-column-missing",
 			"no column fills Row.legalName: select one named legal_name, with as legal_name if need be"},
-		{"data class T(val id: Uuid, val slug: String)\ndata class Row(val tenant: T?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> tenant_id: Uuid\")", "sql-column-missing",
+		{"data class T(val id: Uuid, val slug: String)\ndata class Row(val tenant: T?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> tenant_id: Uuid??\")", "sql-column-missing",
 			"no column fills T.slug: select one named tenant_slug"},
 		{"data class Row(val id: Uuid)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> id: Long\")", "sql-column-type",
 			"column id is a Long, and fills Row.id, a Uuid: make that a Long, or cast the column in the statement"},
@@ -997,6 +1008,20 @@ external class Instant`,
 		{"data class Row(val abn: String)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> abn: String?\")", "sql-nullable",
 			`column abn may be null, and fills Row.abn, a String: make that a String?, or if the column is never null, name it as "abn!"`},
 		{"fun f(tx: Tx): String = tx.querySingle<String>(‸sql\" -> abn: String?\")", "sql-nullable", "fills the result, a String: make that a String?"},
+		// Inside a nullable data class, a column null in its table fills
+		// only a T?, and the class needs a column null only through the
+		// join in a property that is not nullable.
+		{"data class T(val id: Uuid, val slug: String)\ndata class Row(val tenant: T?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> tenant_id: Uuid??, tenant_slug: String?\")", "sql-nullable",
+			`column tenant_slug may be null even where its outer join finds a row, and fills T.slug, a String, in a nullable data class that is null where that join finds none: make that a String?, or if the column is never null, name it as "tenant_slug!"`},
+		{"data class T(val id: Uuid?, val abn: String?)\ndata class Row(val tenant: T?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> tenant_id: Uuid??, tenant_abn: String?\")", "sql-absent",
+			"Row.tenant, a T?, has no property that is not nullable filled by a column null only through an outer join, so a row of nulls would read as no T: " +
+				"select a NOT NULL column of the joined table for one, as in t.id as tenant_id, or the table's whole row, as in select t as tenant"},
+		// A nullable data class whose columns no outer join can null, as
+		// returning * gives, is refused whole, in words that name no join.
+		{"data class C(val amount: Long, val currency: String?)\ndata class Row(val price: C?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> price_amount: Long?, price_currency: String?\")", "sql-absent",
+			"Row.price, a C?, is filled by columns that may each be null on their own: read each as a T? property of Row in its place, and build the C from them in Kogo"},
+		{"data class T(val slug: String)\ndata class S(val t: T?)\ndata class Row(val s: S?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> s_t_slug: String??\")", "sql-absent",
+			"Row.s, a S?, has no property"},
 		{"fun f(tx: Tx): Long = tx.querySingle<Long>(‸sql\" -> a: Long, b: Long\")", "sql-columns",
 			"this statement gives 2 columns, and a Long is one: read them into a data class with a property for each, or select one column"},
 		{"fun f(tx: Tx): List<Long> = tx.query<Long>(‸sql\"\")", "sql-columns", "this statement gives no columns: call execute, or add returning"},
@@ -1147,7 +1172,7 @@ func TestWalledConstructorOnTheWire(t *testing.T) {
 func TestSQLFacts(t *testing.T) {
 	info, errs := run(t, `data class Tenant(val id: Uuid, val slug: String)
 data class Row(val id: Uuid, val tenant: Tenant?)
-fun f(tx: Tx, id: Uuid, n: Int): List<Row> = tx.query<Row>(sql"$id: Uuid, ${n + 1}: Int, $id -> tenant_slug: String?, id: Uuid, tenant_id: Uuid?")`)
+fun f(tx: Tx, id: Uuid, n: Int): List<Row> = tx.query<Row>(sql"$id: Uuid, ${n + 1}: Int, $id -> tenant_slug: String??, id: Uuid, tenant_id: Uuid??")`)
 	if errs != nil {
 		t.Fatal(errs)
 	}

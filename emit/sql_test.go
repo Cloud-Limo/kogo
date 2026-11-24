@@ -131,15 +131,17 @@ fun token(db: Db): String = db.tx { tx ->
 
 // Rows fill R by the checker's facts, and the row count rules of the
 // calls hold (spec.md 10.2, 10.3, 10.5): a nullable nested data class
-// is null when all of its columns are, a column named "name!" panics
-// on a null, a list among them, and a composite type fills a data
-// class by its fields, whatever its name.
+// is null when its columns null only through the outer join are,
+// whatever its others hold, a column named "name!" panics on a null,
+// a list among them, and a composite type fills a data class by its
+// fields, whatever its name.
 func TestRows(t *testing.T) {
 	sites := "[Site(legalName=Acme, shop=Shop(id=00000000-0000-0000-0000-000000000004, businessId=00000000-0000-0000-0000-000000000001, slug=Acme-Store)), Site(legalName=Bolt, shop=null)]"
 	expectWith(t, withDB, seed, [][2]string{
 		{`t.Sites(db)`, sites},
 		{`t.WholeSites(db)`, sites},
 		{`t.HalfSites(db)`, "panics: column shop_slug is null, and fills a property that is not nullable"},
+		{`t.Notes(db)`, "[Noted(legalName=Acme, note=Note(id=00000000-0000-0000-0000-000000000004, text=Acme-Store)), Noted(legalName=Bolt, note=null)]"},
 		{`t.Largest(db, 1000)`, "2000"},
 		{`t.Largest(db, 5000)`, "panics: can't scan into dest[0] (col: m!): cannot scan NULL into *int64"},
 		{`t.NoNames(db)`, "panics: column names is null, and fills a property that is not nullable"},
@@ -176,10 +178,21 @@ fun wholeSites(db: Db): List<Site> = db.tx { tx ->
     tx.query<Site>(sql"select b.legal_name, t as shop from business b left join tenant t on t.business_id = b.id order by b.legal_name")
 }
 
-// A shop that is there, by its id, with a slug that is not.
+// A shop that is there, by its id, with a slug asserted that is not.
 fun halfSites(db: Db): List<Site> = db.tx { tx ->
     tx.query<Site>(sql"""
-        select b.legal_name, b.id as shop_id, b.id as shop_business_id, t.slug as shop_slug
+        select b.legal_name, t.id as shop_id, t.business_id as shop_business_id, nullif(t.slug, 'Acme-Store') as "shop_slug!"
+        from business b left join tenant t on t.business_id = b.id order by b.legal_name
+    """)
+}
+
+// A class told there by its id, beside a column that is never null.
+data class Note(val id: Uuid, val text: String)
+data class Noted(val legalName: String, val note: Note?)
+
+fun notes(db: Db): List<Noted> = db.tx { tx ->
+    tx.query<Noted>(sql"""
+        select b.legal_name, t.id as note_id, coalesce(t.slug::text, '') as note_text
         from business b left join tenant t on t.business_id = b.id order by b.legal_name
     """)
 }

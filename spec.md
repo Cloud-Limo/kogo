@@ -798,10 +798,22 @@ column.
   property's name and an underscore:
   `select sa.driver_share_percent, b.id as business_id, b.legal_name as business_legal_name`
   fills `data class Supplier(val driverSharePercent: Int, val business: BusinessName)`.
-  A nullable nested data class is `null` when all of its columns are null
-  (the absent side of an outer join), so a column that may be null fills
-  a property of it that may not. A null there in a row where another of
-  its columns is not null panics (section 8).
+  A nullable nested data class, on the absent side of an outer join, is
+  told by its columns that are null only through the join: a `NOT NULL`
+  column of the joined table, or its whole row. Such a column fills a
+  property of it that may not be null; any other column that may be
+  null fills only a `T?` there, as a field of a whole row does (10.5).
+  The class must have at least one property that is not nullable filled
+  by such a column, in itself or in a data class it holds that is not
+  nullable, and `kogo check` refuses one that has none: select one, as
+  `t.id as storefront_id`, or the table's whole row. So a class whose
+  columns no outer join can null, as `returning *` gives a table's own
+  nullable columns, is refused too: read each column as a `T?` property
+  and build the class from them in Kogo. The class is
+  `null` when those columns are null, whatever its others hold, so
+  `coalesce(n.text, '') as note_text` beside `n.id as note_id` reads as
+  no note where there is none. A column asserted with `"name!"` that is
+  null where the class is there panics (section 8).
 - A property that is a data class may instead be filled by the one column
   of its name, of a composite type (10.4). A table's name or alias on its
   own is its whole row, so whole rows are read from a join as
@@ -882,7 +894,13 @@ empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
 Kogo reads a subset of what Postgres can send, and outside it refuses:
 at `kogo check` where the catalog or the statement tells, else by a
 panic that names the limit (section 8). It never gives another value.
-The limits, with those above:
+`kogo check` refuses a type Postgres does not promise where a truthful
+one exists (`String?`), unless the author asserts it with `"name!"`
+(10.5), and Kogo panics naming the limit only where no truthful type
+exists. An array's elements are the exception: there Postgres promises
+nothing either way, so the author's `List<T>` is the assertion. The
+last limit below is the other, one `kogo check` cannot yet tell. The
+limits, with those above:
 
 - A type that is not in the table, an array of a composite type or of a
   domain over an array, a `record`, an enum with a label no constant
@@ -894,10 +912,11 @@ The limits, with those above:
   and a `List` has one. A lower bound other than 1 is not kept, which
   loses nothing a `List` has.
 - A `NULL` element read into a `List<T>`: a panic when it is read, which
-  names the column. Postgres says of no array that its elements are not
-  null, so `kogo check` takes `List<T>` and `List<T?>` alike: write
-  `List<T?>` where an element may be null, as in an `array_agg` over an
-  outer join, which gives `{NULL}` for a row with none.
+  names the column. Postgres says nothing of an array's elements, so the
+  author does: `List<T>` asserts that none is null and is held by this
+  panic, as `"name!"` is for a column (10.5); `List<T?>` takes them.
+  Write `List<T?>` where an element may be null, as in an `array_agg`
+  over an outer join, which gives `{NULL}` for a row with none.
 - `infinity` in a `timestamptz` or a `date`, `24:00` in a `time`, an
   `interval` with months: a panic when it is read.
 - A `String` that holds U+0000, alone or in a `List`: a panic when it is
@@ -907,6 +926,11 @@ The limits, with those above:
 - A count of more than 2,147,483,647 rows from `tx.execute`, whose
   result is an `Int`: a panic once the statement has run, which rolls
   the transaction back.
+- In a nullable nested data class, a column that a second outer join
+  can null, where the class's own join finds a row: it fills a property
+  that may not be null, and a null there is a panic when it is read
+  that names the column. `kogo check` does not yet tell one outer join
+  from another.
 
 An array of a domain, and a domain over an array, are read as the array
 of the base type is.
@@ -937,7 +961,10 @@ of the base type is.
   run time panics) or `as "name?"` (force nullable). A field has no
   override: select it as a column of its own.
 - A non-null column may fill a `T?` property. A nullable column filling a
-  `T` property is a compile error.
+  `T` property is a compile error, but for one null only through an
+  outer join inside a nullable nested data class, which the class's
+  absence covers (10.3). An array's elements are the author's to
+  type (10.4).
 - A parameter may always be `T?`; it is sent as SQL `NULL`.
 
 ### 10.6 Idioms that replace a query builder

@@ -42,11 +42,18 @@ func (t Type) String() string {
 	return t.Name
 }
 
-// A Column is one result column.
+// A Column is one result column. Joined is whether it is null only
+// through an outer join: it would be non-null by spec.md 10.5 were the
+// join inner, as a NOT NULL column of the joined table is, and one
+// that may be null even where the join finds a row is not; nor is one
+// the author names "name?". Outer is whether it is a reference that
+// an outer join can null, Joined or not.
 type Column struct {
 	Name     string
 	Type     Type
 	Nullable bool
+	Joined   bool
+	Outer    bool
 }
 
 // A Table is a table or a view that Postgres's tree lists for a
@@ -217,11 +224,15 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 		}
 		whole := false // a table's whole row, whose fields are NOT NULL as its columns are
 		if len(exprs) == len(sd.Fields) {
-			var notNull bool
-			if notNull, whole, err = c.notNull(ctx, query, exprs[i], false); err != nil {
+			var notNull, inner bool
+			if notNull, whole, err = c.notNull(ctx, query, exprs[i], false, false); err == nil && !notNull {
+				inner, _, err = c.notNull(ctx, query, exprs[i], false, true)
+			}
+			if err != nil {
 				return nil, err
 			}
-			col.Nullable = !notNull
+			col.Nullable, col.Joined = !notNull, inner
+			_, _, _, col.Outer, _ = source(query, exprs[i])
 		}
 		if !whole {
 			col.Type = loose(col.Type)
@@ -229,6 +240,7 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 		// "?column?" is Postgres's name for an unnamed column, not an override.
 		if n := len(col.Name) - 1; n > 0 && (col.Name[n] == '!' || col.Name[n] == '?') && col.Name != "?column?" {
 			col.Name, col.Nullable = col.Name[:n], col.Name[n] == '?'
+			col.Joined = col.Joined && !col.Nullable // "name?": the author's "may be null", not the join's
 		}
 		st.Columns = append(st.Columns, col)
 	}

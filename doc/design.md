@@ -47,7 +47,16 @@ constraints) is worth typing.
    typing; ask the database. Kogo reads a subset of what Postgres can
    send. Outside it Kogo refuses: at `kogo check` where the catalog or
    the statement tells, else by a panic that names the limit. It never
-   gives another value. `spec.md` 10.4 lists the limits.
+   gives another value. `kogo check` refuses a type Postgres does not
+   promise where a truthful one exists (`String?`), unless the author
+   asserts it with `"name!"`, and Kogo panics naming the limit only
+   where no truthful type exists (an interval with months, `infinity`,
+   `24:00`). An array's elements are the exception: Postgres promises
+   nothing of them either way, so `List<T>` is the author's assertion,
+   held by a panic that names the column. `spec.md` 10.4 lists the
+   limits, and the other exception, which `kogo check` cannot yet
+   tell: a column a second outer join nulls, in a nullable nested data
+   class.
 5. **Go is a backend, not a source language.** Nobody reads the emitted
    Go, but line directives map it back to the source, written at the
    start of each line: `/*line ../../src/a.kg:26*/`, padded so that
@@ -118,7 +127,10 @@ asking Postgres to prepare it.
    arrays through the catalog.
 5. Decide nullability by section 10.5: non-null only for a plain
    reference to a `NOT NULL` column not on the nullable side of an outer
-   join; `as "name!"` and `as "name?"` override.
+   join, which the pass tells apart from one that may be null where the
+   join finds a row
+   (the class that holds it is absent where it is null); `as "name!"`
+   and `as "name?"` override.
 6. Hand the signature to the checker, whose facts the emitter writes
    the call from ("The emitter" below).
 
@@ -277,7 +289,8 @@ column that says whether it is null and one for each field, by name,
 so no composite value reaches the driver. An array type Postgres does
 not ship is read once the connection's driver has been told of it.
 An array is read by the prelude's `Array`, which refuses what a `List`
-cannot hold (principle 4).
+cannot hold (principle 4). A nullable nested data class filled by prefix is null
+where its columns null only through the outer join are.
 `db.tx` begins, commits and rolls back around its block, and
 `tx.atomically` is a savepoint; whatever Postgres refuses is a panic,
 which rolls back on its way out as a failure does.

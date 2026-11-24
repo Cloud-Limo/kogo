@@ -98,15 +98,21 @@ func bare(t check.Type) (check.Type, bool) {
 
 // fill declares what the columns of the value at path, of the type
 // t, are scanned into: R itself, or a property on the way down from
-// it. It gives the Go of the value, and a test of each of its columns
-// for null. The value is its one column's, or a data class built from
-// the columns of its properties (spec.md 10.3); a nullable one is
-// null when all of them are. absent is whether a nullable data class
-// holds the value, so that its columns may be null whatever t says.
+// it. It gives the Go of the value, and a test for null of each of its
+// columns that is null only through an outer join. The value is its
+// one column's, or a data class built from the columns of its
+// properties (spec.md 10.3); a nullable one is null when those of its
+// columns are, which kogo check saw it has, and tells its holder of
+// none. absent is whether a nullable data class holds the value, so
+// that its columns may be null whatever t says.
 func (e *emitter) fill(q *check.Query, t check.Type, path []int, absent bool, dests []string) (code string, nulls []string) {
 	if j := slices.IndexFunc(q.Paths, func(p []int) bool { return slices.Equal(p, path) }); j >= 0 {
 		c := q.Stmt.Columns[j]
-		return e.column(c.Name, c.Type, t, absent, &dests[j])
+		code, nulls = e.column(c.Name, c.Type, t, absent, &dests[j])
+		if !c.Joined {
+			nulls = nil
+		}
+		return code, nulls
 	}
 	elem, null := bare(t)
 	d := elem.(*check.Named)
@@ -119,6 +125,7 @@ func (e *emitter) fill(q *check.Query, t check.Type, path []int, absent bool, de
 	code = e.typ(d) + "{" + strings.Join(props, ", ") + "}"
 	if null {
 		code = fmt.Sprintf("func() %s { if %s { return nil }; return %s.Ptr(%s) }()", e.typ(t), strings.Join(nulls, " && "), e.rt(), code)
+		nulls = nil
 	}
 	return code, nulls
 }

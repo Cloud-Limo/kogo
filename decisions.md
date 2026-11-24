@@ -2084,10 +2084,11 @@ Each entry: what was decided, why, and what would reopen it.
 - **A property takes the column named by its name in snake case**, `legalName` from
   `legal_name`, compared exactly; a quoted mixed-case alias fills nothing. Of two columns
   with one name, the second fills nothing and is reported.
-- **Inside a nullable nested data class, a column that may be null fills a property that
-  may not** (spec 10.3): on the outer join's absent side every column is null. Accepted
-  hole: a row where only some of them are null passes the check, and the emitted code must
-  panic on it.
+- **Inside a nullable nested data class, a column null only through its outer join fills
+  a property that may not be null** (spec 10.3), and any other column that may be null
+  fills only a `T?`. Corrected by Greg's ruling of 24 Nov 2026 (DEV-1198, built in DEV-1208): this
+  first said any column that may be null filled such a property, and accepted the hole
+  of a row where only some of them are null.
 - **An enum maps by its set of constants**, in any order, whatever either side calls the
   type. A list's elements may be `T` or `T?`, since Postgres does not say whether an array
   holds a null.
@@ -2380,9 +2381,10 @@ Each entry: what was decided, why, and what would reopen it.
   refuses a null read into what is not a pointer, and that refusal is the panic of a
   column named `"name!"` (spec 10.5): the SQL pass strips the `!`, so the emitter cannot
   tell such a column from one Postgres declares `NOT NULL`, and need not. Inside a
-  nullable nested data class every column is a pointer; the data class is `null` when all
-  are, and a null beside one that is not panics, naming the column (spec 10.3, the hole
-  DEV-827 accepted). A `List` is read as a pointer whatever its column says: the driver
+  nullable nested data class every column is a pointer; the data class is `null` when its
+  columns null only through the outer join are, and a null in an asserted `"name!"`
+  where it is there panics, naming the column (spec 10.3; corrected in DEV-1208 from "when
+  all are"). A `List` is read as a pointer whatever its column says: the driver
   reads a null into a slice as an empty one, with no error, so `NotNull` panics instead.
 - **The prelude's types take themselves to and from the driver's**, by the interfaces pgx
   reads and writes its own types through, so a `Uuid`, an `Instant` or a `Decimal` is an
@@ -4629,6 +4631,7 @@ limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
   `List<T?>` for an array, the strict reading of the sentence, since the catalog does
   tell that the column is an array: it changes what every `List<String>` over a
   `text[]` means, a change to the language, and so Greg's. Reopen with that ruling.
+  Greg ruled it so on 24 Nov 2026 and took it back the same day (DEV-1208, below).
 - **Every array is read as its elements' `T?` and a `List<T>` copied from it**
   (`kogo.Array`), an allocation an element more than before. Not taken: reading a
   `List<T>` straight and matching the driver's error text for a null, which the
@@ -4892,6 +4895,74 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   service answered, as a 4xx does. Not taken: every `Unknown`.
 - **The log line is `service`, with the service's host and why**, never its address's
   user, path or query. Not taken: the handle's whole address.
+
+## Reads take only the types Postgres promises (DEV-1208), 24 Nov 2026
+
+Greg's rulings 3 and 6 and the line at DEV-1198's guide, and his answer to the lead
+after it, built here; the entries of DEV-827 and DEV-832 they override are corrected in
+place above. His ruling 4 there, an array column filling only a `List<T?>`, he took back
+on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` stand.
+
+- **An array column fills `List<T>` or `List<T?>`, as before** (Greg's Ruling on PR 184,
+  24 Nov 2026, overriding his ruling 4 of the same day, which was made on "no cusoon2
+  `.kg` file reads an array"; the port reads three). For a column, three things can say
+  it is not null: Postgres (`not null`), the SQL (`coalesce`, `count`, `exists`) and the
+  author (`"name!"`). For an array's elements none of the first two exists, so the author
+  does: `List<T>` asserts that none is null and is held by a panic at the read that names
+  the column, as `"name!"` is for a column; `List<T?>` takes them. Not taken: only
+  `List<T?>`, a rule no author could ever satisfy, since a column the program fills from
+  a `List<Uuid>` parameter, or an `array_agg` whose SQL filters its nulls, would still
+  read as `List<Uuid?>`, and the check would move into hand-written code at each use;
+  carrying the nullability of `array_agg`'s argument into the elements, which would also
+  have to recognise the `filter` that mends it, and that is the SQL pass typing SQL.
+- **Inside a nullable nested data class filled by prefix, a property that may not be null
+  takes only a column null only through the outer join**: one non-null were the join
+  inner. The SQL pass tells it by `varnullingrels`: a nulling by a join's range table
+  entry is the join's; one by a grouping set, or returning's old or new, is not, and
+  leaves the column nullable as before (the agent's: Not taken, counting those as a
+  join, since a row of a grouping set or an old row that is absent is not the class's
+  absence).
+- **The class needs one property that is not nullable filled by such a column**, in
+  itself or in a data class it holds that is not nullable (the agent's: one in a nullable
+  class it holds tells that class, not this). Otherwise `sql-absent`.
+- **The class is `null` when all of its columns null only through the join are null**,
+  `&&` as before over fewer columns (the agent's). Not taken: `||`. With columns from two
+  outer joins in one class, `&&` panics naming the column where one join finds a row and
+  the other none, and `||` would read the row that is there as none, unseen: Greg's test
+  of a hole is "we do something stupid or bad and never notice". A column of a `T?`
+  property null only through the join counts too.
+- **The line**, spec 10.4 and `doc/design.md` principle 4: `kogo check` refuses a type
+  Postgres does not promise where a truthful one exists (`String?`), unless the author
+  asserts it with `"name!"`, and panics naming the limit only where none does. An
+  array's elements are its exception, named there: Postgres promises nothing of them
+  either way, so `List<T>` is the author's assertion (the Ruling above). The agent's,
+  in the Fix of 24 Nov 2026: the Ruling calls the array the line's one exception, and
+  the second outer join below stays one too, so both are named, the array as where
+  Postgres promises nothing and the join as what `kogo check` cannot yet tell. Not
+  taken: dropping the join's, which the earlier Ruling kept.
+- **The other exception to the line: a column a second outer join nulls**, in a nullable
+  nested data class, fills a property that may not be null and panics, naming the column,
+  where the class's join finds a row and the second none (the lead's ruling on the Code
+  review, 24 Nov 2026; spec 10.4 lists it). The pass's `Joined` says null through some
+  outer join, not through the class's. Not taken here: carrying the joins that null each
+  column and refusing a class whose columns differ in them, which is new analysis in the
+  SQL pass and its own issue. That refusal ends this exception.
+- **A nullable nested data class whose columns no outer join can null is refused**, as
+  `Booking.price: Charge?` over a table's own two nullable columns tied by a check
+  constraint (Greg's Ruling b on PR 184, 24 Nov 2026): the author reads each column as a
+  `T?` property and builds the class in Kogo. `sql-absent` says so for such a class, and
+  names no join; the SQL pass's `Outer` says whether an outer join can null a column at
+  all, and a class with no `Outer` column is this case. Not taken: the all-null test kept
+  for a class with no join, which brings back the panic on a half-filled row and a second
+  rule in spec 10.3; and merging with the join's messages as they were. The agent's: a
+  column of such a class that may be null in a property that may not be null gets no
+  `sql-nullable` of its own, since `sql-absent` refuses the class whole and `"name!"` would
+  not save it (not taken: both errors, the second saying the same); a column that is an
+  expression over a joined one, as `lower(t.slug)`, is not `Outer`, so a class of only
+  such columns gets this message, whose advice holds there too.
+- **`as "name?"` clears `Joined`** (the Code review's fix): the author's "may be null" is
+  not the join's, so such a column neither fills a property that may not be null in a
+  nullable class nor tells the class's absence.
 
 ## Greg's rulings on DEV-1198: the wire, the deadlock, `this` (DEV-1209), 24 Nov 2026
 

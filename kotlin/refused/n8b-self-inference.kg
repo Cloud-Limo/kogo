@@ -1,0 +1,8 @@
+// kotlinc refuses line 6
+// A local fun whose return type is inferred from itself.
+package kt
+
+fun f(): Int {
+    fun g() = g()
+    return 1
+}

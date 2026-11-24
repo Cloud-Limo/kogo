@@ -27,21 +27,46 @@ kotlin -cp "_work/kotlin.jar:$arrow" MainKt _work/cases > _work/kotlin
 
 go run ./cases diff _work/cases _work/kogo _work/kotlin
 
-# Each deliberate deviation is refused by kotlinc on the line its
-# file's first line names, so no Kotlin habit applies to one unnoticed.
-mkdir _work/deviations
-for f in deviations/*.kg; do
-    line=$(head -1 "$f" | sed -n 's|^// kotlinc refuses line \([0-9][0-9]*\)$|\1|p')
-    kt="_work/deviations/$(basename "$f" .kg).kt"
-    cp "$f" "$kt"
-    if out=$(kotlinc -nowarn "$kt" -d _work/deviations 2>&1); then
-        echo "$f: kotlinc accepts it, and a deviation must be refused" >&2
-        exit 1
+# refuses f: kotlinc must refuse the file f with an error on the line
+# its first line names, "// kotlinc refuses line N", and with
+# ", kogo check line M" after that, kogo check must refuse it on line M,
+# or without it on line N, when kogo is set. Each file is a package.
+refuses() {
+    local f=$1 dir head line ours out
+    dir=_work/$(basename "$(dirname "$f")")/$(basename "$f" .kg)
+    mkdir -p "$dir"
+    head=$(head -1 "$f")
+    line=$(sed -n 's|^// kotlinc refuses line \([0-9][0-9]*\)\(, kogo check line [0-9][0-9]*\)\{0,1\}$|\1|p' <<<"$head")
+    ours=$(sed -n 's|^// kotlinc refuses line [0-9]*, kogo check line \([0-9][0-9]*\)$|\1|p' <<<"$head")
+    cp "$f" "$dir/$(basename "$f" .kg).kt"
+    if out=$(kotlinc -nowarn "$dir"/*.kt -d "$dir" 2>&1); then
+        echo "$f: kotlinc accepts it, and it must be refused" >&2
+        return 1
     fi
-    if [[ -z $line ]] || ! grep -qE "^$kt:$line:[0-9]+: error:" <<<"$out"; then
+    if [[ -z $line ]] || ! grep -qE "^$dir/[^:]*:$line:[0-9]+: error:" <<<"$out"; then
         echo "$f: kotlinc did not refuse line ${line:-?} (first line: // kotlinc refuses line N):" >&2
         echo "$out" >&2
-        exit 1
+        return 1
     fi
-done
+    [[ -n ${2:-} ]] || return 0
+    cp "$f" "$dir/"
+    if out=$(_work/kogoc check "$dir" 2>&1); then
+        echo "$f: kogo check accepts it, and kotlinc refuses it" >&2
+        return 1
+    fi
+    if ! grep -q "\"line\":${ours:-$line}," <<<"$out"; then
+        echo "$f: kogo check did not refuse line ${ours:-$line}:" >&2
+        echo "$out" >&2
+        return 1
+    fi
+}
+
+# Each deliberate deviation is refused by kotlinc on the line its
+# file's first line names, so no Kotlin habit applies to one unnoticed.
+for f in deviations/*.kg; do refuses "$f"; done
 echo "deviations: kotlinc refuses all $(ls deviations/*.kg | wc -l)"
+
+# What kotlinc refuses, kogo check refuses (spec.md 1).
+go build -o _work/kogoc ../cmd/kogo
+for f in refused/*.kg; do refuses "$f" kogo; done
+echo "refused: kotlinc and kogo check refuse all $(ls refused/*.kg | wc -l)"

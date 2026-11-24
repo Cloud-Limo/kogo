@@ -1,0 +1,13 @@
+// kotlinc refuses line 6
+// external fun as an interface's member.
+package kt
+
+interface Tr {
+    external fun foo(): Int
+}
+
+data class D(val n: Int) : Tr {
+    override fun foo(): Int = n
+}
+
+fun f(t: Tr): Int = t.foo()

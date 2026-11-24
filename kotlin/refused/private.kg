@@ -1,0 +1,7 @@
+// kotlinc refuses line 7
+// A public fun that takes a private type.
+package refused
+
+private data class Hidden(val n: Int)
+
+fun shown(hidden: Hidden): Int = hidden.n

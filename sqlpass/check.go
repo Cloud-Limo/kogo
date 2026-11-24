@@ -244,8 +244,8 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 // a with, the one place Postgres takes insert, update, delete and
 // merge. The wrap is prepared too, so that what is checked is what is
 // sent. Postgres takes a with that writes only at the top level, so a
-// read whose own with writes is refused. The fields of a whole row
-// read as one column are still sent in the table's order.
+// read whose own with writes is refused. A column of a composite type
+// is sent as its fields (add).
 func (c *Checker) wrap(ctx context.Context, st *Statement, query *node, sd *pgconn.StatementDescription) error {
 	if query.field("hasModifyingCTE").text() == "true" {
 		return &Error{0, "sql-writing-with", "a statement that reads rows into R cannot have a with that writes, " +
@@ -255,7 +255,7 @@ func (c *Checker) wrap(ctx context.Context, st *Statement, query *node, sd *pgco
 	if st.Utility != "" || len(sd.Fields) == 0 {
 		return nil
 	}
-	names := make([]string, len(sd.Fields))
+	var w wrapped
 	seen := map[string]bool{}
 	for i, f := range sd.Fields {
 		if seen[f.Name] {
@@ -263,32 +263,72 @@ func (c *Checker) wrap(ctx context.Context, st *Statement, query *node, sd *pgco
 				"two columns are named %s, and Kogo reads a column by its name: name each once with as, as in b.id as business_id", f.Name)}
 		}
 		seen[f.Name] = true
-		names[i] = pgx.Identifier{f.Name}.Sanitize()
+		w.add(pgx.Identifier{f.Name}.Sanitize(), f.Name, f.DataTypeOID, st.Columns[i].Type)
 	}
-	cols, body := strings.Join(names, ", "), st.SQL
+	cols, body := strings.Join(w.names, ", "), st.SQL
 	// Postgres's own end of the statement drops a trailing ; (0 is the
 	// end), and the newline ends a -- comment the statement ends with.
 	if n := query.num("stmt_len"); n > 0 {
 		body = body[:query.num("stmt_location")+n]
 	}
 	sql := "select " + cols + " from (" + body + "\n) _"
-	if query.num("commandType") != cmdSelect {
+	switch {
+	case query.num("commandType") != cmdSelect:
 		sql = "with _ as (" + body + "\n) select " + cols + " from _"
+	case w.pins != nil:
+		// Postgres works a subquery with an offset out once and does
+		// not fold it into the select of its fields, where a function or
+		// a subquery that gives a composite would run once for each.
+		sql = "select " + cols + " from (select * from (" + body + "\n) _ offset 0) _"
+	}
+	if w.pins != nil {
+		sql += " where " + strings.Join(w.pins, " and ")
 	}
 	wd, err := c.conn.PgConn().Prepare(ctx, "", sql, sd.ParamOIDs)
 	if err != nil {
 		return &Error{0, "sql-wrap", fmt.Sprintf("Postgres refused the statement as Kogo sends it, %s: %v", sql, err)}
 	}
-	if len(wd.Fields) != len(sd.Fields) {
-		return &Error{0, "sql-wrap", fmt.Sprintf("the statement as Kogo sends it, %s, describes %d columns, the statement %d", sql, len(wd.Fields), len(sd.Fields))}
+	if len(wd.Fields) != len(w.want) {
+		return &Error{0, "sql-wrap", fmt.Sprintf("the statement as Kogo sends it, %s, describes %d columns, and Kogo reads %d", sql, len(wd.Fields), len(w.want))}
 	}
 	for i, f := range wd.Fields {
-		if f.Name != sd.Fields[i].Name || f.DataTypeOID != sd.Fields[i].DataTypeOID {
-			return &Error{0, "sql-wrap", fmt.Sprintf("the statement as Kogo sends it, %s, does not describe column %d as the statement does, %s", sql, i+1, sd.Fields[i].Name)}
+		if f.Name != w.want[i] || w.oids[i] != 0 && f.DataTypeOID != w.oids[i] {
+			return &Error{0, "sql-wrap", fmt.Sprintf("the statement as Kogo sends it, %s, does not describe column %d as the statement does, %s", sql, i+1, w.want[i])}
 		}
 	}
 	st.SQL = sql
 	return nil
+}
+
+// A wrapped is what the wrap selects, names, the name Postgres gives
+// each, want, and its type where the statement says it, oids; and a
+// test for each composite type among them, pins.
+type wrapped struct {
+	names, want, pins []string
+	oids              []uint32
+}
+
+// add adds ref, a column or a field of the type t, of Postgres's type
+// oid where it is a column: itself, or for a composite type whether it
+// is null, as a whole and never field by field, and then each of its
+// fields by name. So no value of a composite type is sent, whose
+// fields come in the type's order as the database served has it, and
+// the driver need not know the type. The test names the type's own
+// relation, which is all that tells Postgres a statement prepared
+// before the type changed must be planned again: a type that is no
+// table of the statement is otherwise not looked at.
+func (w *wrapped) add(ref, name string, oid uint32, t Type) {
+	if t.Fields == nil {
+		w.names, w.want, w.oids = append(w.names, ref), append(w.want, name), append(w.oids, oid)
+		return
+	}
+	w.names, w.want, w.oids = append(w.names, "("+ref+") is not distinct from null"), append(w.want, "?column?"), append(w.oids, 0)
+	if pin := "'" + strings.ReplaceAll(t.Name, "'", "''") + "'::regclass is not null"; !slices.Contains(w.pins, pin) {
+		w.pins = append(w.pins, pin)
+	}
+	for _, f := range t.Fields {
+		w.add("("+ref+")."+pgx.Identifier{f.Name}.Sanitize(), f.Name, 0, f.Type)
+	}
 }
 
 // ruled reports whether an insert, update or delete is done instead by

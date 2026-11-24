@@ -169,6 +169,7 @@ func TestLimits(t *testing.T) {
 		{`t.Uuids(db)`, "[00000000-0000-0000-0000-000000000002]"},
 		{`t.Tags(db)`, "[a, b] [Fold] null"},
 		{`t.Cardinals(db)`, "[1, 2]"},
+		{`t.TagSets(db)`, "TagSet(tags=[a, b], names=[c])"},
 		{`t.SendDates(db)`, "2"}, // d_date[] is read by no case before it
 		{`t.Keep(db, "a\x00b", nil)`, zero},
 		{`t.Keep(db, "a", []string{"b", "\x00"})`, zero},
@@ -200,6 +201,13 @@ data class Tagged(val tags: List<String>, val folded: List<String>, val none: Li
 fun tags(db: Db): String = db.tx { tx ->
     val t = tx.querySingle<Tagged>(sql"""select '{a,b}'::d_tags as "tags!", '{Fold}'::citext[] as "folded!", null::text[] as none""")
     "${t.tags} ${t.folded} ${t.none}"
+}
+
+// A composite type whose fields are such arrays, which come as columns.
+data class TagSet(val tags: List<String>?, val names: List<String>?)
+data class Sets(val set: TagSet)
+fun tagSets(db: Db): TagSet = db.tx { tx ->
+    tx.querySingle<Sets>(sql"""select row('{a,b}', '{c}')::tag_set as "set!" """).set
 }
 
 // An array of a domain initdb makes, below Postgres's first oid.

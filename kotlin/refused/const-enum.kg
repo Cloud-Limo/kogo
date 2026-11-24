@@ -1,0 +1,7 @@
+// kotlinc refuses line 7
+// A const val of a type not a primitive or String: an enum constant.
+package refused
+
+enum class Colour { red, blue }
+
+const val chosen: Colour = Colour.red

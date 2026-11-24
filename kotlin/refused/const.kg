@@ -1,0 +1,7 @@
+// kotlinc refuses line 7
+// A const val whose value is a call.
+package refused
+
+fun one(): Long = 1L
+
+const val made: Long = one()

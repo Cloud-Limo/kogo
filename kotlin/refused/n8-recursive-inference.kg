@@ -1,0 +1,6 @@
+// kotlinc refuses line 5
+// Two funs whose return types are inferred from each other.
+package kt
+
+fun foo() = bar()
+fun bar() = foo()

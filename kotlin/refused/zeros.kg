@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// An integer literal with a leading zero, which Go would read as octal.
+package refused
+
+fun ten(): Int = 010

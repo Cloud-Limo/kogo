@@ -1,0 +1,7 @@
+// kotlinc refuses line 6
+// An interface that declares toString, which every Kotlin value has.
+package refused
+
+interface Titled {
+    fun toString(): String
+}

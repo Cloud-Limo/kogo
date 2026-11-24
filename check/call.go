@@ -366,8 +366,9 @@ func (c *checker) resolve(at, where syntax.Node, name string, cands []*Func, rec
 			}
 		}
 		left = slices.DeleteFunc(left, func(k candidate) bool { return !c.accepts(k, typed) })
-		if len(left) > 1 {
-			left = c.byLambda(left, typed)
+		prelude := func(k candidate) bool { return k.f.Pkg == "kogo" || strings.HasPrefix(k.f.Pkg, "kogo.") }
+		if len(left) > 1 && !slices.ContainsFunc(left, func(k candidate) bool { return !prelude(k) }) {
+			left = c.byLambda(left, typed) // only the prelude's, as only Kotlin's library (spec.md 5.2)
 		}
 	}
 	sigs := func(fs []*Func) string { // for the errors only
@@ -456,14 +457,17 @@ func vararg(p *Var) bool {
 // or the names of the arguments do not fit it.
 func place(f *Func, args []*syntax.Arg) ([][]syntax.Expr, string) {
 	placed := make([][]syntax.Expr, len(f.Params))
-	next := 0
-	for _, a := range args {
+	next, moved := 0, false // moved: a named argument stood out of its place
+	for n, a := range args {
 		i := next
 		switch {
 		case a.Name != "":
 			if i = slices.IndexFunc(f.Params, func(p *Var) bool { return p.Name == a.Name }); i < 0 {
 				return nil, "has no parameter named " + a.Name
 			}
+			moved = moved || i != n
+		case moved && !a.Trailing:
+			return nil, "is given an argument by place after one named out of its place, which kotlinc refuses: name this one too"
 		case a.Trailing:
 			i = len(f.Params) - 1
 		case i < len(f.Params) && !vararg(f.Params[i]):
@@ -709,6 +713,9 @@ func (c *checker) apply(at, where syntax.Node, k candidate, recv syntax.Expr, ty
 	if f.Kind == Copy {
 		c.builds(where, f.Owner)
 	} else {
+		if f.Kind == ToString {
+			c.functionText(where, subst(f.Receiver, b), "in toString()")
+		}
 		c.demand(where, f.Name, f.vis)
 	}
 	c.acts(where, f)

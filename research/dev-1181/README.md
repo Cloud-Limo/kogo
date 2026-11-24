@@ -48,5 +48,6 @@ still decides each one.
 
 `forms/` holds the smallest program of each form found, each a program
 of its own (`kogo check research/dev-1181/forms/<one dir with it>`):
-`kogo check` passes each but `n13`, which makes it panic, and kotlinc
-refuses each.
+`kogo check` passes each but `panic-when-is.kg`, which makes it panic,
+and kotlinc refuses each. The number is the form's in DEV-1181's answer;
+`confirmed.tsv` gives the form of each file kotlinc confirmed.

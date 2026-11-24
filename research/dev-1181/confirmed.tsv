@@ -1,0 +1,60 @@
+# form	source dir	file	whole or reduced	kotlinc's first error
+known, wider: const val of a type not primitive or String	testData-diagnostics-tests	modifiers/const/types.kt	reduced	const 'val' has type 'MyEnum'. Only primitive types and 'String' are a
+known, wider: override on a top-level declaration	testData-diagnostics-tests	declarationChecks/illegalModifiersOnClass.kt	reduced	modifier 'override' is not applicable to 'enum class'.
+known, wider: override on a top-level declaration	testData-diagnostics-tests	declarationChecks/localFunctionNoInheritVisibility.kt	reduced	modifier 'override' is not applicable to 'top level function'.
+known, wider: override on a top-level declaration	testData-diagnostics-tests	declarationChecks/packageDeclarationModifiers.kt	reduced	modifier 'override' is not applicable to 'top level property with back
+known, wider: override on a top-level declaration	testData-diagnostics-tests	declarationChecks/propertyInPackageHasNoInheritVisibility.kt	reduced	modifier 'override' is not applicable to 'top level property with back
+known: a data class with no property	testData-diagnostics-tests	dataClasses/emptyConstructor.kt	reduced	data class must have at least one primary constructor parameter.
+known: a data class with no property	testData-diagnostics-tests	secondaryConstructors/dataClasses.kt	reduced	data class must have at least one primary constructor parameter.
+known: a property declared twice	testData-diagnostics-tests	dataClasses/repeatedProperties.kt	reduced	conflicting declarations:
+known: a type parameter declared twice	testData-diagnostics-tests	redeclarations/RedeclaredTypeParameters.kt	reduced	conflicting declarations:
+known: a type parameter declared twice	testData-diagnostics-tests	redeclarations/interfaceTypeParameters.kt	reduced	conflicting declarations:
+known: a visibility on an interface's member	testData-diagnostics-tests	modifiers/internalInInterface.kt	reduced	modifier 'internal' is not applicable inside 'interface'.
+known: a visibility on an interface's member	testData-diagnostics-tests	modifiers/privateInInterface.kt	reduced	abstract property in interface cannot be private.
+known: an enum constant declared twice	testData-diagnostics-tests	redeclarations/kt2418.kt	reduced	conflicting declarations:
+known: else not a when's last branch	tests-spec-testData-diagnostics	linked/expressions/when-expression/p-6/neg/7.1.kt	whole	'else' entry must be the last one in a 'when' expression.
+known: else not a when's last branch	tests-spec-testData-diagnostics	linked/expressions/when-expression/p-6/neg/7.2.kt	whole	'else' entry must be the last one in a 'when' expression.
+known: overloads told apart by a lambda's result	fir-analysis-tests-testData-resolve	callResolution/eagerLambdaAnalysis/potentiallyMeaningfulCaseWithContracts.kt	reduced	overload resolution ambiguity between candidates:
+known: overloads told apart by a lambda's result	testData-diagnostics-tests	resolve/overloadConflicts/emptyLambdaUnitNoDiscrimination.kt	reduced	overload resolution ambiguity between candidates:
+known: overloads told apart by a lambda's result	testData-diagnostics-testsWithStdLib	factoryPattern/overloadByLambdaReturnType_enabled_no_annotation.kt	reduced	overload resolution ambiguity between candidates:
+known: overloads told apart by a type argument alone	testData-diagnostics-tests	overload/ConflictingOlverloadsGenericFunctions.kt	reduced	platform declaration clash: The following declarations have the same J
+new 10: overloads told apart by T? against T	testData-diagnostics-tests	overload/OverloadingByTypeParameterNullability.kt	reduced	conflicting overloads:
+new 11: x < (... > ...) that kotlinc reads as type arguments	testData-diagnostics-tests	syntax/complicatedLTGT.kt	reduced	condition type mismatch: inferred type is 'Int' but 'Boolean' was expe
+new 12: an annotation on a typealias, never resolved	testData-diagnostics-tests	typealias/annotationsOnTypeAliases.kt	reduced	unresolved reference 'NoTarget'.
+new 12: an annotation on a typealias, never resolved	testData-diagnostics-testsWithStdLib	experimental/annotation.kt	reduced	unresolved reference 'EAnno'.
+new 13: a local val with type parameters	testData-diagnostics-tests	declarationChecks/localVariablesWithTypeParameters_1_4.kt	reduced	local variables cannot have type parameters.
+new 13: a local val with type parameters	tests-spec-testData-diagnostics	notLinked/local-variables/type-parameters/neg/1.kt	reduced	local variables cannot have type parameters.
+new 14: external fun as an interface's member	testData-diagnostics-testsWithStdLib	native/trait.kt	reduced	members of interfaces cannot be external.
+new 15: _ as a name	testData-diagnostics-tests	Underscore.kt	reduced	names _, __, ___, ... are reserved in Kotlin.
+new 15: _ as a name	testData-diagnostics-tests	UnderscoreOld.kt	reduced	names _, __, ___, ... are reserved in Kotlin.
+new 15: _ as a name	testData-diagnostics-tests	inference/underscoredTypeInForbiddenPositions.kt	reduced	names _, __, ___, ... are reserved in Kotlin.
+new 15: _ as a name	testData-diagnostics-tests	inference/underscoredTypeInForbiddenPositions.latestLV.kt	reduced	names _, __, ___, ... are reserved in Kotlin.
+new 15: _ as a name	testData-diagnostics-tests	unnamedLocalVariables/unnamedLocalVariableVsNamedUnderscore_Disabled.kt	reduced	the feature "unnamed local variables" is experimental and should be en
+new 15: _ as a name	testData-diagnostics-tests	unnamedLocalVariables/unnamedLocalVariables.kt	reduced	the feature "unnamed local variables" is experimental and should be en
+new 15: _ as a name	testData-diagnostics-tests	unnamedLocalVariables/unnamedLocalVariablesOld.kt	reduced	the feature "unnamed local variables" is experimental and should be en
+new 15: _ as a name	testData-diagnostics-tests	unnamedLocalVariables/unnamedLocalVariables_Disabled.kt	reduced	the feature "unnamed local variables" is experimental and should be en
+new 15: _ as a name	testData-diagnostics-tests	unnamedLocalVariables/unnamedLocalVariables_DisabledOld.kt	reduced	the feature "unnamed local variables" is experimental and should be en
+new 16: && or || as a when (x) condition	testData-diagnostics-tests	constantEvaluator/constant/duplicateLabelWithNonTrivialCondition_disabled.kt	reduced	logical expression in when-with-subject. The branch will be matched by
+new 16: && or || as a when (x) condition	testData-diagnostics-tests	constantEvaluator/constant/duplicateLabelWithNonTrivialCondition_enabled.kt	reduced	logical expression in when-with-subject. The branch will be matched by
+new 17: package kotlin	testData-diagnostics-tests	deprecated/deprecatedSinceKotlin/error.kt	reduced	only the Kotlin standard library is allowed to use the 'kotlin' packag
+new 17: package kotlin	testData-diagnostics-tests	deprecated/deprecatedSinceKotlin/hidden.kt	reduced	only the Kotlin standard library is allowed to use the 'kotlin' packag
+new 18: an empty when over a sealed interface with no variant	testData-diagnostics-tests	when/nonExhaustiveWhenStatement_1_7.kt	reduced	'when' expression must be exhaustive. Add an 'else' branch.
+new 19: empty destructuring	fir-analysis-tests-testData-resolve	destructuring/nameBasedDestructuringIllegalSyntaxShortForm.kt	reduced	syntax error: Expecting a name.
+new 1: a named fun where an expression or a loop's body goes	testData-diagnostics-tests	declarationChecks/kt47245.kt	whole	anonymous functions with names are prohibited.
+new 1: a named fun where an expression or a loop's body goes	testData-diagnostics-tests	declarationChecks/namedFunAsLastExpressionInBlock.kt	reduced	'if' must have both main and 'else' branches when used as an expressio
+new 2: an own name imported with as stays in scope	testData-diagnostics-tests	imports/ImportFromCurrentWithDifferentName.kt	whole	unresolved reference 'A'.
+new 3: an enum constant named name, ordinal or entries	testData-diagnostics-tests	enum/entries/enumEntriesAmbiguityForbidden.kt	reduced	conflicting declarations: the enum entry 'entries' and the property 'E
+new 3: an enum constant named name, ordinal or entries	testData-diagnostics-tests	enum/entries/enumEntriesAmbiguityPrioritized.kt	reduced	conflicting declarations: the enum entry 'entries' and the property 'E
+new 3: an enum constant named name, ordinal or entries	testData-diagnostics-tests	enum/entries/redeclarationOfEnumEntriesNameWithIntrinsicPrioritized.kt	reduced	conflicting declarations: the enum entry 'entries' and the property 'E
+new 3: an enum constant named name, ordinal or entries	testData-diagnostics-tests	redeclarations/EnumName.kt	whole	conflicting declarations:
+new 4: a when branch with no condition	testData-diagnostics-tests	when/EmptyConditionWithExpression.kt	whole	syntax error: Expecting an expression, is-condition or in-condition.
+new 4: a when branch with no condition	testData-diagnostics-tests	when/EmptyConditionWithExpressionEnum.kt	whole	syntax error: Expecting an expression, is-condition or in-condition.
+new 5: a lambda on the line after a call	testData-diagnostics-tests	resolve/newLineLambda.kt	reduced	return type mismatch: expected '(() -> Unit) -> (() -> Unit) -> Unit',
+new 6: a typealias to a type parameter	testData-diagnostics-tests	typealias/typeAliasShouldExpandToClass.kt	reduced	type alias expands to 'T (of typealias ToTypeParam1<T>)', which is not
+new 7: a property's type parameter not in its receiver	testData-diagnostics-tests	typeParameters/propertyTypeParameters.kt	reduced	type parameter of a property must be used in its receiver type or cont
+new 8: inferred return types that need each other	testData-diagnostics-tests	RecursiveTypeInference.kt	reduced	type checking has run into a recursive problem. Easiest workaround: sp
+new 8: inferred return types that need each other	testData-diagnostics-tests	inference/recursiveLocalFuns/selfCall.kt	reduced	type checking has run into a recursive problem. Easiest workaround: sp
+new 9: a positional argument after a named one out of place	testData-diagnostics-tests	namedArguments/mixedNamedPosition/defaults.kt	reduced	mixing named and positional arguments is not allowed unless the order 
+new 9: a positional argument after a named one out of place	testData-diagnostics-tests	namedArguments/mixedNamedPosition/oldInference.kt	reduced	mixing named and positional arguments is not allowed unless the order 
+new 9: a positional argument after a named one out of place	testData-diagnostics-tests	namedArguments/mixedNamedPosition/simple.kt	reduced	mixing named and positional arguments is not allowed unless the order 
+new 9: a positional argument after a named one out of place	testData-diagnostics-tests	namedArguments/namedArgumentsAndDefaultValues.kt	reduced	mixing named and positional arguments is not allowed unless the order 

@@ -197,6 +197,79 @@ func TestSets(t *testing.T) {
 	}
 }
 
+type shade string
+
+type point struct{ X, Y int32 }
+
+// A key of a plain kind is found through a Go map and any other by
+// the walk, and each answers as the walk alone does: contains, get,
+// distinctBy and == of two sets.
+func TestSetKinds(t *testing.T) {
+	nan := math.NaN()
+	agrees(t, true, []string{"a", "b", "a", ""}, "c")
+	agrees(t, true, []int32{1, 2, 1, 0}, 3)
+	agrees(t, true, []int64{1, 2, 1, 0}, 3)
+	agrees(t, true, []bool{true, true}, false)
+	agrees(t, true, []Uuid{{1}, {2}, {1}}, Uuid{3})
+	agrees(t, true, []shade{"red", "blue", "red"}, "green")
+	agrees(t, false, []float64{nan, 0.0, math.Copysign(0, -1), nan, 1}, 2)
+	agrees(t, false, []point{{1, 2}, {2, 1}, {1, 2}}, point{2, 2})
+	agrees(t, false, []Decimal{"1.0", "1.00", "1.0"}, "2")
+}
+
+func agrees[K any](t *testing.T, mapped bool, keys []K, absent K) {
+	t.Helper()
+	var walk []K // the keys as the walk alone keeps them
+	for _, k := range keys {
+		if !slices.ContainsFunc(walk, func(x K) bool { return rt.Equal(x, k) }) {
+			walk = append(walk, k)
+		}
+	}
+	s := SetOf(keys...)
+	if (s.at != nil) != mapped {
+		t.Errorf("a set of %T is found through a map: %v", absent, s.at != nil)
+	}
+	m := List_GroupBy(keys, func(k K) K { return k })
+	if !rt.Equal(s.keys, walk) || !rt.Equal(m.keys, walk) || !rt.Equal(List_DistinctBy(keys, func(k K) K { return k }), walk) {
+		t.Errorf("%s holds %s, not the walk's %s", rt.ToString(keys), rt.ToString(s.keys), rt.ToString(walk))
+	}
+	for i, k := range walk {
+		if !Set_Contains(s, k) || len(*Map_Get(m, k)) != len(slices.DeleteFunc(slices.Clone(keys), func(x K) bool { return !rt.Equal(x, k) })) {
+			t.Errorf("%s: key %d, %s, is not found as the walk finds it", rt.ToString(keys), i, rt.ToString(k))
+		}
+	}
+	if Set_Contains(s, absent) || Map_Get(m, absent) != nil {
+		t.Errorf("%s holds %s", rt.ToString(keys), rt.ToString(absent))
+	}
+	if !rt.Equal(s, SetOf(List_Reversed(walk)...)) || rt.Equal(s, SetOf(walk[1:]...)) {
+		t.Errorf("%s == of two sets does not answer as the walk does", rt.ToString(keys))
+	}
+}
+
+// A set is copied by value: whatever adds to a copy leaves the first
+// as it was, and either can still add.
+func TestSetCopy(t *testing.T) {
+	first := SetOf("a", "b")
+	second := first
+	second.add("c")
+	first.add("d")
+	third := first
+	third.add("e")
+	for _, c := range []struct {
+		s    Set[string]
+		want string
+	}{{first, "[a, b, d]"}, {second, "[a, b, c]"}, {third, "[a, b, d, e]"}} {
+		if got := rt.ToString(c.s); got != c.want {
+			t.Errorf("a set copied and added to is %s, not %s", got, c.want)
+		}
+		for _, k := range []string{"a", "b", "c", "d", "e"} {
+			if Set_Contains(c.s, k) != strings.Contains(c.want, k) {
+				t.Errorf("%s contains %s: %v", c.want, k, !strings.Contains(c.want, k))
+			}
+		}
+	}
+}
+
 // An id is written as a UUID is, sorts after one made earlier, and is
 // equal to itself and to no other.
 func TestIds(t *testing.T) {

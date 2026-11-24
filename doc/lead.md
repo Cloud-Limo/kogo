@@ -73,8 +73,8 @@ clerk's, by the table in `doc/clerk.md`: leave it alone.
 | Todo, no event, or a `Parked:` that the clerk moved there | choose where it runs, below |
 | any, `Held:` or `Walkthrough:` | Greg's walkthrough, below |
 | any, `Released:` | the walkthrough is over: as the comment before its `Held:` says |
-| Todo, async `Start:`, no label | a speculative run: label up to three a night |
-| In Review, `Answer:`, or a comment that is no step's | a speculative run's answer, or a run that failed: read it |
+| Todo, async `Start:`, no label | a research run's brief, written ahead: labelled on Greg's word |
+| In Review, `Answer:`, or a comment that is no step's | a research run's answer, or a run that failed: read it |
 | Backlog, `Parked:` or an older `Lead:`, what brings it back | Todo, when Greg says so; the clerk moves one that waited on a merge |
 | In Review, `Checked:` | waits on Cloud CI, then Greg's inbox |
 | any, `Clerk:` or `Failed:`, no label | as the comment says |
@@ -85,6 +85,17 @@ goes to Backlog, with `Parked: until <issue keys, or what>; then
 <what>` posted by `lin step`, and you move it to Todo when Greg says
 so. You can do now draws only from Todo, In Progress and In Review,
 never Backlog.
+
+A row of the roadmap that puts Go in front of a user, or deletes
+Kotlin, names the research runs that attack what it rests on, and does
+not start until they have answered and every finding of a quietly
+wrong value or outcome is mended or ruled on. Each run starts on
+Greg's word; one he declines does not hold its row.
+
+When several runs are out on the same code, the lead files nothing
+from one until all have answered, and groups their findings by cause
+before ruling on any. A fault doing harm to something live is the
+exception.
 
 ## What goes to Greg
 
@@ -110,6 +121,10 @@ allowed.
 Bring Greg one choice at a time, never a list of choices, in the
 form of `doc/guide.md`, "The form of a choice":
 
+- first, as a project manager would put it, the problem it solves and
+  how, in plain words, before any code or counts; for a research run,
+  what it attacks, its cap, and what the last run of its kind cost
+  and found;
 - two or three sentences of context that stand on their own;
 - a short piece of code, in Kogo or SQL, that shows the thing;
 - the mistake most likely to be made there, as code, and what catches
@@ -257,6 +272,10 @@ him, as `doc/clerk.md` says, and you do not wait for it.
   another, so a session coding it settles the design alone. A brief that proposes a
   rule asks for its count against every instance, not a sample: on
   DEV-1020, a rule on statements would have read 4 of the port's 17.
+  A design the roadmap rests on is built as a sketch by a research run
+  before its first slice is filed, as DEV-1141 did for `doc/work.md`:
+  twelve gaps, and its row moved from 750 / 600 to about 1,050 / 960.
+  That sketch starts on Greg's word, as below.
 - **Local**, `lin local DEV-NNN <where> "Pickup DEV-NNN"`, when the
   work needs this VM (a stack, a read of `cusoon_b`, the stage-1
   ports) or lands in a repository other than its
@@ -278,12 +297,16 @@ him, as `doc/clerk.md` says, and you do not wait for it.
   Pickup as `doc/clerk.md` says for an issue with none; to keep a
   later step Greg's, label the issue `lead` and tell him.
 
-A speculative run (cusoon2's `doc/plans/async-agent-runs.md`) takes
-`lin launch --no-label`; at the end of the day you label up to three,
-those whose answer changes tomorrow's work, with `lin label DEV-NNN
-agent`. A note posted before then changes nothing, since the
-launcher takes the newest async `Start:`; to change the brief, edit
-it.
+A research run, one that goes looking and answers with a comment (a
+stress, an attack, a hunt, a sketch, a trial), is labelled on Greg's
+word and never on your own: he looks at his subscription's usage
+first. You may say which runs a row waits on, and post a brief ahead
+with `lin launch --no-label`; on his word, `lin label DEV-NNN agent`.
+A note posted before then changes nothing, since the launcher takes
+the newest async `Start:`; to change the brief, edit it. When one
+answers, report what it cost against what it found: its minutes and
+model, and its dollars only now and then, as a relative measure,
+since Greg pays a subscription and not API rates.
 
 ## A walkthrough
 

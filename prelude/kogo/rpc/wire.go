@@ -166,8 +166,8 @@ func (r reader) read(t reflect.Type, j any, at string) (reflect.Value, error) {
 			return v, bad(at, "is not one of %s", strings.Join(names, ", "))
 		}
 		v.SetString(s)
-	case t.Kind() == reflect.String && strings.ContainsRune(s, 0): // Postgres's text holds none
-		return v, bad(at, "holds U+0000, which a String on the wire cannot: leave it out")
+	case t.Kind() == reflect.String && strings.ContainsRune(s, 0):
+		return v, bad(at, holdsNul)
 	case t.Kind() == reflect.String:
 		v.SetString(s)
 	case t.Kind() == reflect.Slice:
@@ -227,14 +227,21 @@ func (r reader) object(t reflect.Type, m map[string]any, at string) (reflect.Val
 	return v, nil
 }
 
-// valid says whether each enum that v holds is one of its entries, as
-// read does of JSON: v is Go's, where an enum is any string.
+// holdsNul is how read and valid refuse a String that holds U+0000,
+// which Postgres's text cannot hold.
+const holdsNul = "holds U+0000, which no input or setting may: leave it out"
+
+// valid says whether each enum that v holds is one of its entries, and
+// each String holds no U+0000, as read does of JSON: v is Go's, where
+// an enum is any string.
 func (r reader) valid(v reflect.Value, at string) error {
 	switch t := v.Type(); {
 	case t.Kind() == reflect.String && t != reflect.TypeFor[string]():
 		if names := r.enums[t]; !slices.Contains(names, v.String()) {
 			return bad(at, "is not one of %s", strings.Join(names, ", "))
 		}
+	case t.Kind() == reflect.String && strings.ContainsRune(v.String(), 0):
+		return bad(at, holdsNul)
 	case t.Kind() == reflect.Pointer && !v.IsNil():
 		return r.valid(v.Elem(), at)
 	case t.Kind() == reflect.Slice:

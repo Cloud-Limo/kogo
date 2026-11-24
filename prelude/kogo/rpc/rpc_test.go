@@ -269,7 +269,7 @@ func TestHandler(t *testing.T) {
 		{"POST", "add", `{"name":"panics"}`, `500 request `},
 		{"POST", "add", `{"name":"secret","more":1}`, `400 add: input.more is not a key of Person`},
 		// Postgres's text holds no U+0000, so the reader refuses it.
-		{"POST", "add", `{"name":"a\u0000secret"}`, `400 add: input.name holds U+0000, which a String on the wire cannot: leave it out`},
+		{"POST", "add", `{"name":"a\u0000secret"}`, `400 add: input.name holds U+0000, which no input or setting may: leave it out`},
 		{"POST", "add", `{"name":"asecret"}`, `200 {"type":"ok","value":"secret answer"}`},
 		{"POST", "login", `{"name":"kept"}`, `200 {"type":"refused","message":"secret refusal"}`},
 		{"POST", "who", `not read`, `200 {"type":"ok","value":{"header":"me","cookie":"crumb","missing":null,"host":"example.com","address":"192.0.2.1"}}`},
@@ -469,6 +469,7 @@ func TestCall(t *testing.T) {
 		{show(Call(calls, r, addOp, Person{Name: "called"})), "secret answer"},
 		{show(Call(calls, r, addOp, Person{Name: "refused call"})), "refused: secret refusal"},
 		{show(Call(calls, r, addOp, Person{Name: "panics call"}))[:12], " 500 request"},
+		{show(Call(calls, r, addOp, Person{Name: "a\x00called"})), " 400 add: input.name holds U+0000, which no input or setting may: leave it out"},
 		{show(Call(calls, r, NewOp[env, rt.Unit, int32]("nothing"), rt.Unit{})), "0 404 "},
 		{show(Call(calls, r, NewOp[env, Felt, int32]("feel"), Felt{Moods: []*Mood{&cross, nil}})), "2"},
 		{show(Call(calls, r, NewOp[env, Felt, int32]("feel"), Felt{Moods: []*Mood{&cross, &wild}})), "0 400 feel: input.moods[1] is not one of Calm, Cross"},
@@ -499,7 +500,7 @@ func TestCall(t *testing.T) {
 	if f, _ := err.(Failed); f.Status != 503 {
 		t.Errorf("deadlocked fails with %#v, want a Failed of 503", err)
 	}
-	if got, want := strings.Join(served, ","), "who ok,signIn ok,add ok,add refused,add 500,nothing 404,feel ok,feel 400,deadlocked 503"; got != want {
+	if got, want := strings.Join(served, ","), "who ok,signIn ok,add ok,add refused,add 500,add 400,nothing 404,feel ok,feel 400,deadlocked 503"; got != want {
 		t.Errorf("served %s, want %s", got, want)
 	}
 	// SetCookies writes what a browser's call would have set.

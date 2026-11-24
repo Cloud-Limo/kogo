@@ -4779,5 +4779,10 @@ limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
 - **Settings are refused too**: they are read by the same reader (15.4), so a setting
   holding U+0000 stops the start, naming the key. Not taken: a reader with a flag to let
   them through, a line for a case no one has.
+- **`rpc.Call` refuses it too**, with the reader's message from one constant: a route in
+  Go's `main` reads a caller's body and calls an operation without the reader, and Greg's
+  rule covers every operation. Not taken: leaving routes to check their own input.
+- **One message for inputs and settings**: "holds U+0000, which no input or setting may:
+  leave it out", since a setting is not on the wire. Not taken: a message per case.
 - **Spec 10.4's line stays**: a `String` the program makes that holds U+0000 is still a
   panic when it is sent; an input can no longer bring one.

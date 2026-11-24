@@ -26,6 +26,10 @@ only bindings write `external` (section 13), so no author meets it:
 - the lists, `api` (section 15) and `tests` (section 16);
 - `action fun`, a function that changes something outside (7.1).
 
+Beside them, what kotlinc refuses Kogo refuses, whatever Go would make
+of it: `kotlin/refused/` holds a file of each such form that `kogo
+check` once passed, and `mise run kotlin` checks that both refuse each.
+
 ## 2. Files, packages, visibility
 
 ```kotlin
@@ -135,7 +139,10 @@ subject with such a value. Comparing with `null` is allowed. Where the
 type does not show the function, behind a type parameter or an
 interface, the comparison panics once it reaches the function, and
 answers `false` where a part before it differs, `contains`, `distinct`
-and a `Set`'s or `Map`'s keys included.
+and a `Set`'s or `Map`'s keys included. In a template a value whose type
+holds one, through the same types, is an error (`function-text`):
+Kotlin writes a function as its class and an identity that changes
+every run, so no program can rest on its text.
 
 A `ByteArray` is bytes, as a `bytea` column holds them (10.4) and a
 binding makes or takes them. Kogo code names the type, reads a value
@@ -389,13 +396,20 @@ since no call could choose between them. So are two `fun`s of one name
 in an interface, and a `fun` named for a data class with its
 constructor's parameter types, reported at the `fun`. Parameter names,
 results, and the names and order of type parameters do not tell them
-apart; two `private` ones in different files do not meet. Bindings with
+apart; two `private` ones in different files do not meet. Nor do type
+arguments, a `?` but on a number, a `Boolean` or a `Char`, or the
+types inside a function type: the JVM holds two that differ only so as
+one signature, and kotlinc refuses them, so `f(xs: List<Int>)` beside
+`f(xs: List<Long>)`, `<A> f(a: A?)` beside `<B> f(b: B)` and
+`f(g: () -> Int)` beside `f(g: () -> String)` are errors in a
+program. Bindings with
 a receiver are one group across packages, whatever their visibility, as
 they are in scope everywhere.
 
 One exception: when the candidates left differ only in what one lambda
 parameter returns, as the prelude's `sumOf` does for `Int`, `Long` and
-`Double`, the lambda is read once and what it returns chooses.
+`Double`, the lambda is read once and what it returns chooses. Only
+the prelude declares such funs, as only Kotlin's library does.
 
 Where the receiver, the count and the names leave one candidate, each
 argument is read as that candidate's parameter wants it, so a whole-number literal

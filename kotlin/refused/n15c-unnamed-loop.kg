@@ -1,0 +1,8 @@
+// kotlinc refuses line 6
+// _ as a loop's name.
+package kt
+
+fun f(): Int {
+    for (_ in 1..3) {}
+    return 0
+}

@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// A property's type parameter not in its receiver.
+package kt
+
+val <T, U> List<U>.size2: Int get() = 2

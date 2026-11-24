@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// A type parameter declared twice.
+package refused
+
+fun <T, T> twice(a: T): T = a

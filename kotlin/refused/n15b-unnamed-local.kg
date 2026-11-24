@@ -1,0 +1,10 @@
+// kotlinc refuses line 8
+// _ as a local val's name.
+package kt
+
+fun g(): Int = 1
+
+fun f(): Int {
+    val _ = g()
+    return 0
+}

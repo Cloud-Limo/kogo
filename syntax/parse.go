@@ -127,6 +127,24 @@ func (p *parser) ident() (Pos, string) {
 	return t.pos, t.text
 }
 
+// name reads the name a declaration takes. twice says it is taken
+// already, by the declaration's kind (spec.md 1: kotlinc refuses
+// both). _ and __ are no names in Kotlin.
+func (p *parser) name(twice bool, kind string) string {
+	pos, name := p.ident()
+	if twice {
+		p.fail(pos, "duplicate", "the %s %s is declared twice: rename one", kind, name)
+	}
+	p.unnamed(pos, name, kind)
+	return name
+}
+
+func (p *parser) unnamed(pos Pos, name, kind string) {
+	if strings.Trim(name, "_") == "" {
+		p.fail(pos, "underscore", "%s is no name in Kotlin, which keeps it for what is unused: give the %s a name", name, kind)
+	}
+}
+
 // path reads a dotted name.
 func (p *parser) path() *Ident {
 	pos, name := p.ident()
@@ -336,7 +354,18 @@ func (p *parser) modifier() bool {
 
 func (p *parser) modifiers() Modifiers {
 	var m Modifiers
+	seen := map[string]bool{}
 	for {
+		word := p.tok.text
+		switch {
+		case p.modifier() && seen[word]:
+			p.fail(p.tok.pos, "modifier", "%s is written twice, which kotlinc refuses: write it once", word)
+		case p.modifier() && (p.at("private") || p.at("internal")) && m.Visibility != "":
+			p.fail(p.tok.pos, "modifier", "%s and %s are both written, which kotlinc refuses: write the one meant", m.Visibility, word)
+		}
+		if p.modifier() {
+			seen[word] = true
+		}
 		switch {
 		case p.at("@"):
 			m.Annotations = append(m.Annotations, p.annotation())
@@ -496,7 +525,9 @@ func nullable(t Type) bool {
 func (p *parser) funDecl(m Modifiers, abstract bool) *FunDecl {
 	d := &FunDecl{Pos: p.want("fun"), Mods: m}
 	d.TypeParams = p.typeParams(false)
+	at := p.tok.pos
 	d.Receiver, d.Name = p.receiverAndName()
+	p.unnamed(at, d.Name, "fun")
 	d.Params = p.params(false, m.External)
 	if p.got(":") {
 		d.Result = p.typ()
@@ -534,7 +565,7 @@ func (p *parser) typeParams(out bool) []*TypeParam {
 		if p.at("in") {
 			p.fail(p.tok.pos, "syntax", "a type parameter is plain, or out on a sealed interface or an external class")
 		}
-		_, tp.Name = p.ident()
+		tp.Name = p.name(slices.IndexFunc(tps, func(o *TypeParam) bool { return o.Name == p.tok.text }) >= 0, "type parameter")
 		if p.at(":") {
 			p.fail(p.tok.pos, "syntax", "a type parameter has no bound")
 		}
@@ -573,7 +604,7 @@ func (p *parser) params(ctor, external bool) []*Param {
 			if !ctor && (par.Val || par.Override || p.at("var")) {
 				p.fail(pos, "syntax", "a function's parameter is written name: Type")
 			}
-			_, par.Name = p.ident()
+			par.Name = p.name(ctor && slices.ContainsFunc(ps, func(o *Param) bool { return o.Name == p.tok.text }), map[bool]string{true: "property", false: "parameter"}[ctor])
 			p.want(":")
 			par.Type = p.typ()
 			if p.got("=") {
@@ -594,7 +625,12 @@ func (p *parser) valDecl(m Modifiers, abstract bool) *ValDecl {
 	if p.at("(") {
 		d.Destructure = p.names()
 	} else {
+		at := p.tok.pos
 		d.Receiver, d.Name = p.receiverAndName()
+		p.unnamed(at, d.Name, "val")
+	}
+	if d.TypeParams != nil && d.Receiver == nil {
+		p.fail(d.Pos, "type-params", "only an extension val takes type parameters, which kotlinc refuses elsewhere: remove <...>")
 	}
 	if p.got(":") {
 		d.Type = p.typ()
@@ -625,11 +661,14 @@ func (p *parser) names() []string {
 			names = append(names, n)
 		})
 	})
+	if names == nil {
+		p.fail(p.toks[p.i-1].pos, "syntax", "a destructuring names at least one value: (a, b)")
+	}
 	return names
 }
 
 func (p *parser) classDecl(d *ClassDecl) *ClassDecl {
-	_, d.Name = p.ident()
+	d.Name = p.name(false, "type")
 	switch d.Kind {
 	case "data class":
 		d.TypeParams = p.typeParams(false)
@@ -653,7 +692,11 @@ func (p *parser) classDecl(d *ClassDecl) *ClassDecl {
 		p.want("{")
 		p.nested(false, func() {
 			for !p.at("}") && !p.at(";") {
-				pos, name := p.ident()
+				if p.at("name") || p.at("ordinal") || p.at("entries") {
+					p.fail(p.tok.pos, "duplicate", "every enum has %s already, and kotlinc refuses a constant of that name: rename it", p.tok.text)
+				}
+				pos := p.tok.pos
+				name := p.name(slices.ContainsFunc(d.Entries, func(e *Ident) bool { return e.Name == p.tok.text }), "constant")
 				d.Entries = append(d.Entries, &Ident{pos, name})
 				if p.at("(") || p.at("{") {
 					p.fail(p.tok.pos, "syntax", "an enum is constants only: no constructor and no body")
@@ -788,6 +831,9 @@ func (p *parser) body() *Block {
 		return p.block()
 	}
 	pos := p.tok.pos
+	if p.at("fun") {
+		p.fail(pos, "local-fun", "kotlinc reads a fun here as an expression, and refuses one with a name: declare it in braces, { fun %s ... }, or before", p.peek(1).text)
+	}
 	return &Block{pos, []Stmt{p.stmt()}}
 }
 
@@ -885,7 +931,7 @@ func (p *parser) forStmt() *For {
 		if p.at("(") {
 			f.Destructure = p.names()
 		} else {
-			_, f.Name = p.ident()
+			f.Name = p.name(false, "loop's value")
 		}
 		p.want("in")
 		f.Iter = p.expr()
@@ -920,6 +966,9 @@ func (p *parser) binary(min int) Expr {
 			return x
 		}
 		p.next()
+		if t.text == "<" && p.at("(") {
+			p.typeArgsRead(t.pos)
+		}
 		if t.text == "is" {
 			x = &Is{t.pos, x, p.typ()}
 			continue
@@ -927,6 +976,26 @@ func (p *parser) binary(min int) Expr {
 		x = &Binary{t.pos, t.text, x, p.binary(level + 1)}
 		if level == 4 && precedence[p.tok.text] == 4 && p.tok.kind == tOp && !p.nl() {
 			p.fail(p.tok.pos, "syntax", "comparisons do not chain: join two with &&")
+		}
+	}
+}
+
+// typeArgsRead refuses x < (... > ...), which kotlinc reads as type
+// arguments: a > (not >=) before the ( after the < closes.
+func (p *parser) typeArgsRead(lt Pos) {
+	depth := 0
+	for n := 0; p.peek(n).kind != tEOF; n++ {
+		switch t := p.peek(n); t.text {
+		case "(":
+			depth++
+		case ")":
+			if depth--; depth == 0 {
+				return
+			}
+		case ">":
+			if t.kind == tOp {
+				p.fail(lt, "less-than", "kotlinc reads this < and the > after it as type arguments: name the right side first, val y = (...), and compare with it")
+			}
 		}
 	}
 }
@@ -977,6 +1046,11 @@ func (p *parser) postfix(x Expr) Expr {
 			p.next()
 			pos, name := p.ident()
 			x = &Select{pos, x, t.text == "?.", name}
+		case p.nl() && p.at("{"):
+			if _, ok := x.(*Call); ok {
+				p.fail(t.pos, "lambda-line", "kotlinc takes a lambda on the line after a call as the call's last argument: end the call's line with ;, or name the lambda with a val")
+			}
+			return x
 		case p.nl():
 			return x
 		case p.at("("):
@@ -1272,10 +1346,16 @@ func (p *parser) when() *When {
 	p.nested(false, func() {
 		for p.got(";"); !p.at("}"); {
 			b := &Branch{Pos: p.tok.pos}
+			if n := len(w.Branches); n > 0 && w.Branches[n-1].Conds == nil {
+				p.fail(w.Branches[n-1].Pos, "when-branch", "else is a when's last branch, as kotlinc has it: move it to the end")
+			}
 			if p.got("else") {
 				p.want("->")
 			} else {
 				p.nested(true, func() {
+					if p.at("->") {
+						p.fail(p.tok.pos, "when-branch", "a branch has a condition before ->, or is else")
+					}
 					for !p.at("->") {
 						c := &Cond{Pos: p.tok.pos}
 						p.refuseNot()
@@ -1286,6 +1366,9 @@ func (p *parser) when() *When {
 							c.Op, c.X = "in", p.expr()
 						default:
 							c.X = p.expr()
+						}
+						if x, ok := c.X.(*Binary); ok && w.Subject != nil && (x.Op == "&&" || x.Op == "||") {
+							p.fail(x.Pos, "when-branch", "kotlinc refuses %s in a branch of a when with a subject, where it compares the subject with a Boolean: drop the subject and write each test whole, when { ... }", x.Op)
 						}
 						b.Conds = append(b.Conds, c)
 						if !p.got(",") {
@@ -1298,6 +1381,9 @@ func (p *parser) when() *When {
 			b.Body = p.body()
 			w.Branches = append(w.Branches, b)
 			p.end()
+		}
+		if w.Branches == nil {
+			p.fail(w.Pos, "when-branch", "a when has at least one branch: write one, or remove the when")
 		}
 		p.next()
 	})

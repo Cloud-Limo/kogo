@@ -1,0 +1,9 @@
+// kotlinc refuses line 9
+// A data class that names one interface twice.
+package refused
+
+interface Counted {
+    val count: Int
+}
+
+data class Tally(override val count: Int) : Counted, Counted

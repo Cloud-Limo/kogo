@@ -1312,3 +1312,24 @@ func dump(info *Info, f *syntax.File) string {
 	slices.Sort(lines)
 	return strings.Join(lines, "\n") + "\n"
 }
+
+// What kotlinc refuses, kogo check refuses (spec.md 1): each form has
+// its file in kotlin/refused, which mise run kotlin checks against
+// both. These are the cases beside them: what stays accepted, and
+// what kotlinc takes and Kogo refuses.
+func TestKotlinRefuses(t *testing.T) {
+	passes(t,
+		"fun f(x: Int, y: Int): Boolean = x < (y + 1)",
+		"fun f(x: Int, y: Int): Boolean = x < (if (y >= 115) 1 else 2)",
+		"fun g(x: Int): Int = 1\nfun g(x: Int?): Int = 2",
+		"const val a: Int = 1\nconst val b: Int = -a + 1\nconst val s: String = \"x$b\"",
+		"private data class H(val n: Int)\nprivate fun f(h: H): Int = h.n",
+		"val <T> List<T>.two: Int\n    get() = 2",
+	)
+	rule := "data class Rule(val name: String, val test: (Long) -> Boolean)\n"
+	refused(t, [][3]string{
+		{"fun f(): Int = when {\n    ‸is Int -> 33\n    else -> 34\n}", "when-branch", "is tests a when's subject, and this when has none"},
+		{"fun f(g: () -> Int): String = \"${‸g}\"", "function-text", "a () -> Int in a template writes a function as Kotlin writes its class and an identity that changes every run: write a name"},
+		{rule + "fun f(r: Rule?): String = \"rule $‸r\"", "function-text", "a Rule? in a template writes a function as Kotlin writes its class and an identity that changes every run, and Rule's property test holds one"},
+	})
+}

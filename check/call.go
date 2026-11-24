@@ -456,14 +456,17 @@ func vararg(p *Var) bool {
 // or the names of the arguments do not fit it.
 func place(f *Func, args []*syntax.Arg) ([][]syntax.Expr, string) {
 	placed := make([][]syntax.Expr, len(f.Params))
-	next := 0
-	for _, a := range args {
+	next, moved := 0, false // moved: a named argument stood out of its place
+	for n, a := range args {
 		i := next
 		switch {
 		case a.Name != "":
 			if i = slices.IndexFunc(f.Params, func(p *Var) bool { return p.Name == a.Name }); i < 0 {
 				return nil, "has no parameter named " + a.Name
 			}
+			moved = moved || i != n
+		case moved && !a.Trailing:
+			return nil, "is given an argument by place after one named out of its place, which kotlinc refuses: name this one too"
 		case a.Trailing:
 			i = len(f.Params) - 1
 		case i < len(f.Params) && !vararg(f.Params[i]):

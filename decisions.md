@@ -4663,3 +4663,47 @@ The lead ruled the encoder changes, not the comparison; the agent's, for the res
   against Kotlin.
 - **`http/json.go`'s `encode` is left as it is**: it writes to a third party, which
   compares no bytes, and still escapes U+2028 there.
+
+## What kotlinc refuses, `kogo check` refuses (DEV-1156), 24 Nov 2026
+
+The lead ruled form 11 (narrowly) and finding 4 (refused); the agent's, for the rest.
+
+- **`kotlin/refused/`, one form a file**: DEV-1143's `misplaced.kg`, `modifiers.kg` and
+  `twice.kg` each held two forms, so a refusal of one passed the file; each is two files
+  now. Not taken: a file per finding, which tests only the first refusal it meets.
+- **Both must refuse on a named line**, not merely somewhere, so a refusal of the wrong
+  thing fails. Where they place it apart (a call against a declaration, an import against
+  a use, a lambda against the return it spoils), the first line names both,
+  `// kotlinc refuses line N, kogo check line M`. Not taken: any error passing.
+- **A refusal syntax can see is the parser's** (`else` not last, `010`, a modifier twice,
+  a name declared twice in one list, `_`, a named `fun` as a body, `val <T>` with no
+  receiver, `val ()`, `x < (... > ...)`, a lambda on the line after a call, a `when`
+  branch with no condition, `&&` in `when (x)`, an empty `when`); the rest is the
+  checker's. `when-branch` serves every `when` form, `duplicate` every name twice.
+- **Overloads are compared as the JVM erases them, at the declaration**: type arguments,
+  a `?` but on `Int`, `Long`, `Double`, `Boolean` and `Char`, and the types inside a
+  function type are dropped. One rule holds DEV-1143's `erased.kg` and `lambda.kg` and
+  DEV-1181's `T?` against `T`; `lambda.kg` is refused at its second fun where kotlinc
+  refuses the call. For the program alone: the prelude's `sumOf` is Kotlin's own
+  library's. Two files of one package meet, where the JVM's clash is within one file.
+  Not taken: refusing the call, which leaves a pair no call may ever use.
+- **`import own.Name as Other` is refused at the import**, where Kotlin refuses a later
+  use of `Name`. Not taken: hiding `Name` in the file, a new rule of scope for one form.
+- **An empty `when` is refused whatever its subject**; Kotlin refuses it only where it
+  must be exhaustive, but it does nothing. Not taken: the sealed case alone.
+- **`name`, `ordinal` and `entries` as an enum's constant are refused**, `entries` too,
+  so emit's test row for `Kind_entries` in Go goes: the form never reaches `emit` now.
+- **A function in a template is refused through the types `==` looks through** (a data
+  class's property, a variant, a type argument), since finding 4's case is a data class
+  holding one. Not taken: a bare function alone.
+- **`_` is refused as a fun's, a val's, a parameter's, a loop's, a type's, a type
+  parameter's, a constant's and a property's name**, and stays where Kotlin takes it: a
+  destructuring's part and a lambda's parameter.
+- **A const val is a number, a `Boolean`, a `Char` or a `String`, not nullable, made of
+  literals, operators, templates and other const vals.** A private type may not show in
+  a fun's or a member's signature, a data class's property or a val's type wider than it;
+  a supertype and a typealias are not checked, as no file of the hunt needed them.
+- **An interface may not declare `toString()` or `hashCode()`** with no parameter;
+  `equals` is left, as Kogo has no `Any` to write its parameter with.
+
+Reopen any of these when a form refused here is one kotlinc takes in a port.

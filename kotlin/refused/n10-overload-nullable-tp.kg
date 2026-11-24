@@ -1,0 +1,6 @@
+// kotlinc refuses line 6
+// Overloads told apart by T? against T.
+package kt
+
+fun <A> pick(arg: A?): String = "nullable"
+fun <B> pick(arg: B): String = "plain"

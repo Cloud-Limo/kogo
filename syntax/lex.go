@@ -1,6 +1,7 @@
 package syntax
 
 import (
+	"cmp"
 	"fmt"
 	"sort"
 	"strconv"
@@ -225,6 +226,9 @@ func (l *lexer) number(t *token) {
 		t.lit = "Double"
 	}
 	t.value = strings.ReplaceAll(l.text[start:l.off], "_", "")
+	if t.lit == "Int" && len(t.value) > 1 && t.value[0] == '0' {
+		fail(l.source, t.pos, "number-syntax", "a whole number does not begin with 0, as kotlinc has it: write %s", cmp.Or(strings.TrimLeft(t.value, "0"), "0"))
+	}
 	if t.lit == "Int" && l.off < l.end && l.text[l.off] == 'L' {
 		l.off++
 		t.lit = "Long"

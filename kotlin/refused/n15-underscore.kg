@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// _ as a parameter's name.
+package kt
+
+fun f(_: Int): Int = 0

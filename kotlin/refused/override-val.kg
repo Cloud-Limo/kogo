@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// override before a top-level val.
+package refused
+
+override val limit: Int = 3

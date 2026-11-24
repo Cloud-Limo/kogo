@@ -4564,5 +4564,8 @@ The agent's, on DEV-1133's stress run; the issue gave the three mends and left t
   `set_config(..., true)`, as the message says.
 - **The gap named, not closed**: a function that sets a session's state,
   `set_config(..., false)` among them, is not seen, since the pass does not look into a
-  function. Not taken: refusing `set_config` with `false` by reading the call, which
-  re-reads SQL that Postgres does not type for us.
+  function. Not taken: refusing a `set_config` whose third argument is `false`, which
+  the pass could find in the tree it already reads (`FUNCEXPR`'s `funcid` and `args`):
+  that argument may be a parameter or an expression, known only when the statement
+  runs, and every other function that sets a session's state stays unseen, so refusing
+  the one call closes almost none of the gap.

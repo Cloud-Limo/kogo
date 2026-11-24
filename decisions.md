@@ -2200,8 +2200,8 @@ Each entry: what was decided, why, and what would reopen it.
   (DEV-1157): the left first had been chosen as the order written, and DEV-1143 ran
   both and found `i in listOf(bump())` `true` in Kotlin and `false` here, and where
   both sides panic, the message the other side's. In `when (x) { in a..b -> }` the
-  subject is read first in both. What is ordered is what `mise run kotlin` compares;
-  an order nobody wrote a case for is not known to agree. Reopens: a case there that
+  subject is read first in both. Only an order `mise run kotlin` compares is known to
+  agree with Kotlin's; one nobody wrote a case for is not. Reopens: a case there that
   differs.
 - **A parameter with a default is a pointer in Go**, nil when the call leaves it out, and
   the fun gives it its default, which may read the parameters before it. A constructor's

@@ -343,16 +343,57 @@ func List_GroupBy[T, K any](this List[T], keySelector func(T) K) Map[K, List[T]]
 }
 
 // ordered holds each key once, in the order first given, comparing
-// keys as == does (decisions.md). Set is built on it, and Map is to be
-// built on it, with a value beside each key. A lookup walks the keys.
-type ordered[K any] struct{ keys []K }
-
-func (o ordered[K]) index(k K) int {
-	return slices.IndexFunc(o.keys, func(x K) bool { return rt.Equal(x, k) })
+// keys as == does (decisions.md). Set and Map are built on it. A key
+// of a plain kind is found through at, where Go's == is Kotlin's;
+// any other is found by walking the keys (spec.md 12). Add only to a
+// value being built: a copy shares the keys' array, at and a Map's
+// values, so whatever adds to a copy (a plus, say) builds its own first.
+type ordered[K any] struct {
+	keys []K
+	at   map[any]int // each key's position, or nil to walk
 }
 
+// orderedOf holds keys that are each there once already.
+func orderedOf[K any](keys []K) ordered[K] {
+	o := ordered[K]{keys: keys}
+	if plain(reflect.TypeFor[K]()) {
+		o.at = make(map[any]int, len(keys))
+		for i, k := range keys {
+			o.at[k] = i
+		}
+	}
+	return o
+}
+
+// plain is whether t is a String, an Int, a Long, a Boolean, a Uuid
+// or an enum (a named string), whose == is Go's.
+func plain(t reflect.Type) bool {
+	switch t {
+	case reflect.TypeFor[int32](), reflect.TypeFor[int64](), reflect.TypeFor[bool](), reflect.TypeFor[Uuid]():
+		return true
+	}
+	return t.Kind() == reflect.String && t != reflect.TypeFor[Decimal]()
+}
+
+func (o ordered[K]) index(k K) int {
+	if o.at == nil {
+		return slices.IndexFunc(o.keys, func(x K) bool { return rt.Equal(x, k) })
+	}
+	if i, ok := o.at[k]; ok {
+		return i
+	}
+	return -1
+}
+
+// add decides the kind with the first key.
 func (o *ordered[K]) add(k K) {
+	if len(o.keys) == 0 {
+		*o = orderedOf(o.keys)
+	}
 	if o.index(k) < 0 {
+		if o.at != nil {
+			o.at[k] = len(o.keys)
+		}
 		o.keys = append(o.keys, k)
 	}
 }
@@ -369,7 +410,7 @@ func (s Set[T]) Keys() reflect.Value { return reflect.ValueOf(s.keys) }
 
 // Set_widen keeps every key: values that differ as Ts differ as Bs.
 func Set_widen[A, B any](s Set[A], f func(A) B) Set[B] {
-	return Set[B]{ordered: ordered[B]{List_widen(s.keys, f)}}
+	return Set[B]{ordered: orderedOf(List_widen(s.keys, f))}
 }
 
 func SetOf[T any](elements ...T) Set[T] {

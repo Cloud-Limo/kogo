@@ -270,6 +270,8 @@ func TestErrors(t *testing.T) {
 			`column "n" has the Postgres type pg_namespace, whose field oid has the Postgres type oid, which has no Kogo type: select its fields as columns`},
 		{"an array of a composite type with a field outside the table, named as an array",
 			`«select array[null::pg_namespace] as ns`, "sql-unmapped-type", `column "ns" has the Postgres type pg_namespace[], which has no Kogo type`},
+		{"an array of a domain over an array, a list of lists, which no List<T> holds",
+			`«select array['{a}'::d_tags] as tags`, "sql-unmapped-type", `column "tags" has the Postgres type d_tags[], which has no Kogo type`},
 		{"a read whose own with writes, which Postgres takes only at the top level",
 			`«with gone as (delete from session returning id) select count(*) from gone`, "sql-writing-with", "move the writing with into a statement of its own"},
 		{"two columns of one name, which the wrap cannot name apart",

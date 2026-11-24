@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"reflect"
 	"slices"
@@ -216,7 +217,9 @@ func rows[R any](tx Tx, sql string, read func(Scan) R, args []any, max int) []R 
 
 // bound gives the arguments as the driver takes them. A List is never
 // NULL: an empty one may be Go's nil slice, which the driver would
-// send as NULL, so it is sent as an empty array.
+// send as NULL, so it is sent as an empty array. A String that holds
+// U+0000, alone or in a List, is a panic that says so: Postgres's
+// text holds none (spec.md 10.4).
 func bound(args []any) []any {
 	for i, a := range args {
 		v := reflect.ValueOf(a)
@@ -226,8 +229,18 @@ func bound(args []any) []any {
 		if v.Kind() == reflect.Slice && v.IsNil() {
 			args[i] = reflect.MakeSlice(v.Type(), 0, 0).Interface()
 		}
+		noZero(v)
+		for j := 0; v.Kind() == reflect.Slice && j < v.Len(); j++ {
+			noZero(reflect.Indirect(v.Index(j)))
+		}
 	}
 	return args
+}
+
+func noZero(v reflect.Value) {
+	if v.Kind() == reflect.String && strings.ContainsRune(v.String(), 0) {
+		panic("a String that holds U+0000 cannot be sent to Postgres, whose text holds none (spec.md 10.4)")
+	}
 }
 
 // The five calls of spec.md 10.2. R is the type the call gives for
@@ -271,7 +284,59 @@ func Tx_Exists(this Tx, sql string, args ...any) bool {
 }
 
 func Tx_Execute(this Tx, sql string, args ...any) int32 {
-	return int32(must(this.tx.Exec(this.ctx, sql, bound(args)...)).RowsAffected())
+	return affected(must(this.tx.Exec(this.ctx, sql, bound(args)...)).RowsAffected())
+}
+
+// affected gives execute's rows as its Int. Postgres counts in 64 bits:
+// a count past an Int is a panic, never the Int its low bits make.
+func affected(rows int64) int32 {
+	if rows > math.MaxInt32 {
+		panic(fmt.Sprintf("execute changed %d rows, more than the Int it gives can hold (spec.md 10.4)", rows))
+	}
+	return int32(rows)
+}
+
+// An Array is where an array is read to: each element as a T?, since
+// Postgres says of no array that its elements are not null. Kogo
+// reads one dimension (spec.md 10.4): an array of more is a panic,
+// never the flat List the driver would make of it.
+type Array[T any] struct{ elems *List[*T] }
+
+func (a *Array[T]) SetDimensions(d []pgtype.ArrayDimension) error {
+	a.elems = nil
+	if len(d) > 1 {
+		return fmt.Errorf("an array of %d dimensions is not a List, which has one (spec.md 10.4)", len(d))
+	}
+	if d != nil {
+		list := List[*T]{}
+		if len(d) == 1 {
+			list = make(List[*T], d[0].Length)
+		}
+		a.elems = &list
+	}
+	return nil
+}
+
+func (a *Array[T]) ScanIndex(i int) any { return &(*a.elems)[i] }
+func (a *Array[T]) ScanIndexType() any  { return new(*T) }
+
+// Nullable gives what was read as a List<T?>, or null for a NULL.
+func (a *Array[T]) Nullable() *List[*T] { return a.elems }
+
+// List gives what was read as a List<T>, or null for a NULL. A NULL
+// element is a panic that names the column.
+func (a *Array[T]) List(column string) *List[T] {
+	if a.elems == nil {
+		return nil
+	}
+	list := make(List[T], len(*a.elems))
+	for i, e := range *a.elems {
+		if e == nil {
+			panic(fmt.Sprintf("column %s holds an array whose element %d is NULL, and fills a List whose elements are not nullable (spec.md 10.4): read it as a List<T?>, or keep the nulls out in the statement", column, i))
+		}
+		list[i] = *e
+	}
+	return &list
 }
 
 // NotNull gives the value of a column that the row's type says is not
@@ -303,8 +368,9 @@ func Row[T any](null bool, v T) *T {
 	return &v
 }
 
-// Tx_Known gives this once its connection's driver knows the
-// composite types named, and what their fields are made of: the driver
+// Tx_Known gives this once its connection's driver knows the types
+// named, composite types and arrays that Postgres does not ship (one
+// of a domain, a domain over one), and what each is made of: the driver
 // reads a value of a type only when it has been told of the type, and
 // is told once for each connection. citext is an extension's, so the
 // driver is told of that too. A name is as Postgres writes it, quoted
@@ -326,10 +392,10 @@ func Tx_Known(this Tx, names ...string) Tx {
 	var found []string
 	must(0, conn.QueryRow(this.ctx, `select array_agg(coalesce(n.nspname || '.' || t.typname, '') order by u.i)
 		from unnest($1::text[]) with ordinality u(name, i)
-		left join pg_type t on t.oid = to_regtype(u.name) and t.typtype = 'c'
+		left join pg_type t on t.oid = to_regtype(u.name)
 		left join pg_namespace n on n.oid = t.typnamespace`, names).Scan(&found))
 	if i := slices.Index(found, ""); i >= 0 {
-		panic("Postgres has no composite type " + names[i] + " on this connection's search path")
+		panic("Postgres has no type " + names[i] + " on this connection's search path")
 	}
 	must(conn.LoadTypes(this.ctx, found)) // which tells the driver of each
 	for i, name := range found {

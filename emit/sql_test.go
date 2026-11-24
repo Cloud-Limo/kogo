@@ -147,10 +147,10 @@ func TestRows(t *testing.T) {
 			"Quote(id=00000000-0000-0000-0000-00000000000c, total=Amount(cents=2000, currency=NZD), deposit=Amount(cents=500, currency=null))]"},
 		{`t.HeldIn(db, "NZD")`, "Held(quote=Quote(id=00000000-0000-0000-0000-00000000000c, total=Amount(cents=2000, currency=NZD), deposit=Amount(cents=500, currency=null)))"},
 		{`t.HeldIn(db, "USD")`, "null"},
-		{`t.HeldIn(db, "%")`, "panics: queryOne read more than one row, and reads one or none: select q as quote from quote q where (q.total).currency like $1"},
+		{`t.HeldIn(db, "%")`, "panics: queryOne read more than one row, and reads one or none: select \"quote\" from (select q as quote from quote q where (q.total).currency like $1\\n) _"},
 		{`t.Quoted(db)`, "Priced(price=Price(cents=250))"},
 		{`t.Slug(db, "ACME-store")`, "Acme-Store"},
-		{`t.Slug(db, "none")`, "panics: querySingle read no row, and reads exactly one: select slug from tenant where slug = $1"},
+		{`t.Slug(db, "none")`, "panics: querySingle read no row, and reads exactly one: select \"slug\" from (select slug from tenant where slug = $1\\n) _"},
 		{`t.Has(db, "acme-store")`, "true"},
 		{`t.Has(db, "none")`, "false"},
 	}, `package t
@@ -310,5 +310,48 @@ fun contains(a: ByteArray, b: ByteArray): Boolean = listOf(a).contains(b)
 fun inSet(a: ByteArray, b: ByteArray): Boolean = b in setOf(a)
 fun boxed(a: ByteArray, b: ByteArray): Boolean = same(F("x", a), F("x", b))
 fun text(a: ByteArray): String = "${F("x", a)}"
+`)
+}
+
+// A read takes each column by the name kogo check saw, so a table
+// whose columns the database served orders otherwise, as after a
+// column is dropped and added again, or which has one more, is read
+// right (spec.md 10.3): read by position, the first read after the
+// move would panic on its cached plan and the second swap owner and
+// payee. Each alter runs on the schema the program reads, not the one
+// checked.
+func TestMovedColumns(t *testing.T) {
+	alter := `
+func alter(sql string) string {
+if _, err := pool.Exec(ctx, sql); err != nil {
+panic(err)
+}
+return "altered"
+}
+`
+	row := "[Account(id=1, owner=alice, payee=bob)]"
+	expectWith(t, withDB+alter, "defer drop()\n", [][2]string{
+		{`t.Open(db)`, "Account(id=1, owner=alice, payee=bob)"},
+		{`t.All(db)`, row},
+		{`alter("alter table account add column was text; update account set was = owner; " +
+			"alter table account drop column owner; alter table account rename column was to owner")`, "altered"},
+		{`t.All(db)`, row},
+		{`t.All(db)`, row},
+		{`alter("alter table account add column note text")`, "altered"},
+		{`t.All(db)`, row},
+		{`t.Pay(db, "carol")`, "Account(id=1, owner=alice, payee=carol)"},
+	}, `package t
+
+data class Account(val id: Int, val owner: String, val payee: String)
+
+fun open(db: Db): Account = db.tx { tx ->
+    tx.querySingle<Account>(sql"insert into account (id, owner, payee) values (1, 'alice', 'bob') returning *")
+}
+
+fun all(db: Db): List<Account> = db.tx { tx -> tx.query<Account>(sql"select * from account order by id") }
+
+fun pay(db: Db, payee: String): Account = db.tx { tx ->
+    tx.querySingle<Account>(sql"update account set payee = $payee where id = 1 returning *")
+}
 `)
 }

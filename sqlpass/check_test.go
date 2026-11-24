@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func connect(t *testing.T) *Checker {
@@ -267,6 +270,10 @@ func TestErrors(t *testing.T) {
 			`column "n" has the Postgres type pg_namespace, whose field oid has the Postgres type oid, which has no Kogo type: select its fields as columns`},
 		{"an array of a composite type with a field outside the table, named as an array",
 			`«select array[null::pg_namespace] as ns`, "sql-unmapped-type", `column "ns" has the Postgres type pg_namespace[], which has no Kogo type`},
+		{"a read whose own with writes, which Postgres takes only at the top level",
+			`«with gone as (delete from session returning id) select count(*) from gone`, "sql-writing-with", "move the writing with into a statement of its own"},
+		{"two columns of one name, which the wrap cannot name apart",
+			`«select b.id, t.id from business b join tenant t on t.business_id = b.id`, "sql-duplicate-column", "two columns are named id"},
 		{"a parameter of a type outside the table",
 			`select id from business where created_at::timestamp = «$at`, "sql-unmapped-type", "parameter $at has the Postgres type timestamp without time zone"},
 	} {
@@ -286,7 +293,8 @@ func TestErrors(t *testing.T) {
 // the first seven in a gate and passes the rest. The last two write
 // and are not caught: a function's body is not in the tree. Then a
 // lock through a view, merge and upsert, and two utility statements,
-// whose tree lists no table and gives Postgres's tag instead.
+// whose tree lists no table and gives Postgres's tag instead. Each is
+// checked as execute takes it, since a read refuses a with that writes.
 func TestTables(t *testing.T) {
 	c := connect(t)
 	for literal, want := range map[string]string{
@@ -312,7 +320,7 @@ func TestTables(t *testing.T) {
 		`set local statement_timeout = '5s'`: "VARIABLESETSTMT",
 		`copy person from stdin`:             "COPYSTMT",
 	} {
-		st, err := check(c, literal)
+		st, err := c.CheckDiscarding(context.Background(), literal, spans(literal))
 		if err != nil {
 			t.Errorf("%s: %v", literal, err)
 			continue
@@ -324,5 +332,66 @@ func TestTables(t *testing.T) {
 		if strings.Join(got, ", ") != want {
 			t.Errorf("%s touches %q, want %q", literal, strings.Join(got, ", "), want)
 		}
+	}
+}
+
+// A read sends its statement as written, under a select of its
+// columns by name: a select inside a subquery, any other in a with. A
+// -- comment at its end stays a comment. exists and execute send it
+// as written.
+func TestWrap(t *testing.T) {
+	c := connect(t)
+	for literal, want := range map[string]string{
+		"select slug from tenant -- by slug":  `select "slug" from (select slug from tenant -- by slug` + "\n) _",
+		`select count(*) as "n!" from tenant`: `select "n!" from (select count(*) as "n!" from tenant` + "\n) _",
+		"select slug from tenant; -- by slug": `select "slug" from (select slug from tenant` + "\n) _",
+		`merge into account a using (values (1)) v(id) on a.id = v.id when matched then delete returning a.id`: `with _ as (merge into account a ` +
+			"using (values (1)) v(id) on a.id = v.id when matched then delete returning a.id\n) select \"id\" from _",
+	} {
+		if st, err := check(c, literal); err != nil || st.SQL != want {
+			t.Errorf("%s: got %v, %v; want %s", literal, st, err, want)
+		}
+	}
+	lit := `select slug from tenant`
+	if st, err := c.CheckDiscarding(context.Background(), lit, nil); err != nil || st.SQL != lit {
+		t.Errorf("exists and execute: got %v, %v; want %s", st, err, lit)
+	}
+}
+
+// Postgres does not promise that a select keeps the order of the
+// subquery it wraps; Postgres 18's planner keeps it. Under the
+// settings that force a parallel plan, with and without Gather Merge,
+// this fails if a later Postgres loses it.
+func TestWrapKeepsOrder(t *testing.T) {
+	c, ctx := connect(t), context.Background()
+	st, err := check(c, `select id, k from ranked order by k`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, setting := range []string{"on", "off"} {
+		tx, err := c.conn.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		if _, err := tx.Exec(ctx, "set local parallel_setup_cost = 0; set local parallel_tuple_cost = 0; "+
+			"set local min_parallel_table_scan_size = 0; set local min_parallel_index_scan_size = 0; "+
+			"set local max_parallel_workers_per_gather = 8; set local parallel_leader_participation = off; "+
+			"set local enable_gathermerge = "+setting); err != nil {
+			t.Fatal(err)
+		}
+		rows, _ := tx.Query(ctx, "explain (costs off) "+st.SQL)
+		lines, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		plan := strings.Join(lines, " / ")
+		t.Logf("enable_gathermerge = %s: %s", setting, plan)
+		if err != nil || !strings.Contains(plan, "Gather") {
+			t.Errorf("enable_gathermerge = %s: no parallel plan, so the order is not tested: %s %v", setting, plan, err)
+		}
+		rows, _ = tx.Query(ctx, st.SQL)
+		ks, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (k int, err error) { return k, r.Scan(nil, &k) })
+		if err != nil || len(ks) != 5000 || !slices.IsSorted(ks) {
+			t.Errorf("enable_gathermerge = %s: %d rows, sorted %v, %v", setting, len(ks), slices.IsSorted(ks), err)
+		}
+		tx.Rollback(ctx)
 	}
 }

@@ -105,8 +105,8 @@ func build(t *testing.T, files func(root string) map[string][]byte) string {
 
 // run emits a program and runs a driver that prints the value of each
 // Go expression of calls, in package t, a line each as toString()
-// writes it, or the panic it ends in. more is Go that the driver
-// declares, and setup Go that it runs first.
+// writes it, or the panic it ends in, its newlines written \n. more
+// is Go that the driver declares, and setup Go that it runs first.
 func run(t *testing.T, more, setup string, calls []string, sources ...string) []string {
 	t.Helper()
 	out := build(t, func(root string) map[string][]byte {
@@ -114,11 +114,11 @@ func run(t *testing.T, more, setup string, calls []string, sources ...string) []
 		if errs != nil {
 			t.Fatalf("%v", errs)
 		}
-		driver := "package main\nimport (\n\"fmt\"\n\"github.com/Cloud-Limo/kogo/rt\"\n\"ROOT/t\"\n)\n" + more + `
+		driver := "package main\nimport (\n\"fmt\"\n\"strings\"\n\"github.com/Cloud-Limo/kogo/rt\"\n\"ROOT/t\"\n)\n" + more + `
 func show(value func() any) {
 defer func() {
 if p := recover(); p != nil {
-fmt.Println("panics:", p)
+fmt.Println("panics:", strings.ReplaceAll(fmt.Sprint(p), "\n", "\\n"))
 }
 }()
 fmt.Println(rt.ToString(value()))

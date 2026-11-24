@@ -4991,8 +4991,8 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   if an operation's work leaves its goroutine.
 - **The panic must hold the failure as text** for the 503, `(why=...)` as
   `error("idp: $failure")` writes it, not its bare `why` (a short one, such as `EOF`,
-  turns up in a bug's own message): a program that met the failure, dealt with it and later panicked on a bug of its
-  own still gets its 500 and trace. Not taken: any panic after a call that got no
+  turns up in a bug's own message): a program that met the failure, dealt with it and
+  later panicked on a bug of its own still gets its 500 and trace. Not taken: any panic after a call that got no
   answer. A program whose panic drops the failure's text stays a 500 (cusoon2's
   `orThrow` is changed in its own issue).
 - **A 5xx, an answer that broke off and one past the limit are not "no answer"**: the

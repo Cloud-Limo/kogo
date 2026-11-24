@@ -27,9 +27,9 @@ type Param struct {
 // parser found it: literal[Start:End].
 type Span struct{ Start, End int }
 
-// An edit records one renumbering: the parameter is at sql[at:], and
+// An edit records one renumbering: parameter n is at sql[at:], and
 // the text after it lies shift bytes further on in the literal.
-type edit struct{ at, shift int }
+type edit struct{ at, shift, n int }
 
 // rewrite replaces each parameter with a numbered one. A name that
 // occurs twice is one parameter; an expression is one parameter per
@@ -65,7 +65,7 @@ func rewrite(literal string, spans []Span) (string, []Param, []edit, error) {
 		}
 		at := sql.Len()
 		fmt.Fprintf(&sql, "$%d", n)
-		edits = append(edits, edit{at, s.End - sql.Len()})
+		edits = append(edits, edit{at, s.End - sql.Len(), n})
 		prev = s.End
 	}
 	if err := text(prev, len(literal)); err != nil {

@@ -83,16 +83,17 @@ func (r *reader) value() *node {
 	return &node{atom: t}
 }
 
-// params records where each parameter the tree refers to lies, as a
-// byte offset in the statement's text. Kind 0 is a parameter of the
+// params records the number of each parameter the tree refers to by
+// where it lies, a byte offset in the statement's text: its own, or a
+// cast's that Postgres moved it to. Kind 0 is a parameter of the
 // statement; Postgres numbers its own, as for a row compared with a
 // subquery, from 1 as well.
-func (n *node) params(at map[int]bool) {
+func (n *node) params(at map[int]int) {
 	if n == nil {
 		return
 	}
 	if n.tag == "PARAM" && n.num("paramkind") == 0 {
-		at[n.num("location")] = true
+		at[n.num("location")] = n.num("paramid")
 	}
 	for _, f := range n.fields {
 		f.params(at)

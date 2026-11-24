@@ -4683,7 +4683,11 @@ The lead ruled finding 11; the agent's, for the rest.
 
 - **Each `$name` is checked where it is written**, by the byte offset of each `PARAM`
   in Postgres's tree against where the rewrite put it, and no SQL text is read. Not taken:
-  a scan of the literal for quotes, which re-implements Postgres's lexer.
+  a scan of the literal for quotes, which re-implements Postgres's lexer. A cast moves an
+  untyped `PARAM`'s location to the cast's start (`cast(` or `text(`), so each location
+  claims the first unclaimed `$name` of its number at or after it, and one left over is
+  refused. Not taken: matching offsets exactly, which refused `cast($x as int)`. A `$x`
+  in a comment inside a cast, `cast(/* $x */ $x as int)`, is refused at the real `$x`.
 - **A syntax error at a parameter gets the hint for a `$` as text**, since a dollar
   quote's tag, `$q$`, reads as one: told by the error's offset being a parameter's. Not
   taken: telling a dollar quote from the text, which is more reading of SQL text. A real

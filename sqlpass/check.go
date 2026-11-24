@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -151,11 +152,22 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 	}
 	// Each $name or ${expr} must be a parameter where it is written: a
 	// name written twice is one parameter, so one inside a quoted string
-	// would otherwise be hidden by the other.
-	at := map[int]bool{}
+	// would otherwise be hidden by the other. A cast moves a parameter's
+	// location to its own start, so each location claims the first
+	// unclaimed edit of its number at or after it.
+	at := map[int]int{}
 	query.params(at)
-	for i, e := range edits {
-		if !at[e.at] {
+	claimed := make([]bool, len(edits))
+	for _, loc := range slices.Sorted(maps.Keys(at)) {
+		for i, e := range edits {
+			if !claimed[i] && e.n == at[loc] && e.at >= loc {
+				claimed[i] = true
+				break
+			}
+		}
+	}
+	for i := range edits {
+		if !claimed[i] {
 			return nil, &Error{spans[i].Start, "sql-parameter-syntax", fmt.Sprintf(
 				"Postgres does not see %s as a parameter: it is inside a quoted string or a comment; %s",
 				literal[spans[i].Start:spans[i].End], dollarText)}

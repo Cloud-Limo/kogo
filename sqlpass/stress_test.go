@@ -85,6 +85,21 @@ func TestStressNameInsideAString(t *testing.T) {
 		"sql-parameter-syntax")
 }
 
+// A cast moves an untyped PARAM's location to the cast's own, the
+// keyword of cast($x as t) or the name of text($x), so each location
+// claims the first unclaimed $name of its number at or after it: a
+// real parameter passes however it is cast, and a $x in a string is
+// still left over.
+func TestCastParameterIsSeen(t *testing.T) {
+	c := stressed(t, `create table t (id integer primary key, name text not null);`)
+	wantSignature(t, c, `select id from t where id = cast($x as integer)`, "(x: Int) -> id: Int")
+	wantSignature(t, c, `select cast($x as text) as "a!"`, "(x: String) -> a: String")
+	wantSignature(t, c, `select text($x) as "a!"`, "(x: String) -> a: String")
+	wantSignature(t, c, `update t set name = cast($n as text) where id = $id returning id`, "(n: String, id: Int) -> id: Int")
+	wantSignature(t, c, `select id from t where id = any(cast($ids as int[]))`, "(ids: List<Int>) -> id: Int")
+	wantCode(t, c, `select cast('$x' || $x as text) as "a!"`, "sql-parameter-syntax")
+}
+
 // Finding 9: Postgres 18 sets attnotnull for a NOT NULL constraint
 // that is NO INHERIT, and a child's rows, which the parent's scan
 // gives, may hold a null. Only `from only` keeps the column non-null.

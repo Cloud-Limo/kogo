@@ -15,5 +15,5 @@ SQL
 PGPASSWORD=kogo psql -qX -v ON_ERROR_STOP=1 -h 127.0.0.1 -U kogo -d "$db" -f testdata/schema.sql
 # Drop each kogo_test_NNN whose kogo-dev-NNN beside this one is gone.
 for old in $(sudo -n -u postgres psql -qXAt -c "select datname from pg_database where datname ~ '^kogo_test_[0-9]+$'"); do
-  [[ -d ../kogo-dev-${old#kogo_test_} ]] || sudo -n -u postgres psql -qX -c "drop database $old" || echo "testdb: kept $old" >&2
+  [[ -d ../kogo-dev-${old#kogo_test_} ]] || sudo -n -u postgres psql -qX -c "drop database if exists $old" || echo "testdb: kept $old" >&2
 done

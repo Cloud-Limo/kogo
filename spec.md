@@ -902,6 +902,23 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
 - `tx.atomically { ... }` runs a nested block in a savepoint and rolls
   back to it on a failure. The block is in the raise scope around it,
   as any lambda is.
+- A `Tx` runs select, insert, update, delete and merge alone, by any
+  of the five calls and `tx.refusal`, in a test file too. Any other
+  statement is what Postgres calls a utility statement, as `commit`,
+  `rollback`, `set`, `set local`, `copy`, `lock table` or `discard`,
+  and is a compile error, `sql-utility`, named by Postgres's own tag
+  for it. `commit` or `rollback` would end the transaction `db.tx`
+  holds, so the rest of the block runs outside one and a panic rolls
+  nothing back; a `set` would reach later requests on the pooled
+  connection. `db.tx` begins and ends the transaction, and a setting
+  that lasts the transaction is bound with `select set_config('name',
+  $value, true)`. The pass does not look into a function: one that
+  sets a session's state, `set_config(..., false)` among them, is not
+  seen.
+
+  ```
+  orders.kg:12:16 sql-utility: this is a utility statement (Postgres's TRANSACTIONSTMT), and a Tx runs select, insert, update, delete and merge alone: db.tx begins and ends the transaction, and a setting is bound with select set_config('name', $value, true) (spec.md 10.7)
+  ```
 
 ### 10.8 A refused statement, in a test
 
@@ -1556,9 +1573,10 @@ one returns an `Either` whose `Left` is a refusal in words:
   and that inserts into, updates or deletes from a table or a view is
   a compile error, `gate-writes`, and so is one that locks rows (`for
   update`, `for share`) where the gate takes a `SerializableTx`; a
-  gate on a `Tx` may lock. So is a utility statement, as `truncate`
-  or `lock table`; a gate binds the tenant, a setting, with
-  `set_config`. Postgres
+  gate on a `Tx` may lock. A utility statement, as `truncate` or
+  `lock table`, is `sql-utility` wherever it is (10.7), a gate's
+  included; a gate binds the tenant, a setting, with `set_config`.
+  Postgres
   says what each statement needs of each table, as it types the
   statement (section 10). It does not say what a function the
   statement calls writes, nor `nextval`: 15.3. A call through a value
@@ -1935,8 +1953,8 @@ val cardDiscount =
   serialization failure in a test is a panic that fails the test, as
   any statement Postgres stopped is (10.8).
 - The transaction never commits, so a deferred constraint never fires
-  in a test: a test that wants it to runs
-  `tx.execute(sql"set constraints all immediate")` first. A value
+  in a test, and a test cannot make it fire: `set constraints` is a
+  utility statement, which a `Tx` does not run (10.7). A value
   taken from a sequence is not rolled back, so a test does not assert
   one.
 - A test passes when its block returns. A panic fails it: a failed

@@ -391,7 +391,7 @@ val bug =
 
 val timedOut =
     test("is stopped, not refused") { tx, env ->
-        tx.execute(sql"set local statement_timeout = 50")
+        tx.execute(sql"select set_config('statement_timeout', '50', true)")
         assertEquals("57014", tx.refusal(sql"select pg_sleep(1)")?.sqlState)
     }
 

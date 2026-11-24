@@ -803,17 +803,25 @@ column.
   column of the joined table, or its whole row. Such a column fills a
   property of it that may not be null; any other column that may be
   null fills only a `T?` there, as a field of a whole row does (10.5).
-  The class must have at least one property that is not nullable filled
-  by such a column, in itself or in a data class it holds that is not
-  nullable, and `kogo check` refuses one that has none: select one, as
-  `t.id as storefront_id`, or the table's whole row. So a class whose
-  columns no outer join can null, as `returning *` gives a table's own
-  nullable columns, is refused too: read each column as a `T?` property
-  and build the class from them in Kogo. The class is
-  `null` when those columns are null, whatever its others hold, so
-  `coalesce(n.text, '') as note_text` beside `n.id as note_id` reads as
-  no note where there is none. A column asserted with `"name!"` that is
-  null where the class is there panics (section 8).
+  Those columns share their outer joins: one that an outer join can
+  null other than the first's, or besides them, fills only a `T?`
+  there, `"name!"` or not. Over `business b left join tenant t on
+  t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id`,
+  `t.id as shop_id` tells a `Shop?` and `d.driver_id as shop_driver_id`
+  fills only a `Uuid?` of it, as through a subquery on the nullable
+  side with an outer join of its own. The class must have at least one
+  property that is not nullable filled by such a column, in itself or
+  in a data class it holds that is not nullable, and `kogo check`
+  refuses one that has none: select one, as `t.id as storefront_id`, or
+  the table's whole row. So a class whose columns no outer join can
+  null, as `returning *` gives a table's own nullable columns, is
+  refused too: read each column as a `T?` property and build the class
+  from them in Kogo. The class is `null` when the columns that tell it,
+  those filling a property that may not be null, are null, whatever its
+  others hold, so `coalesce(n.text, '') as note_text` beside
+  `n.id as note_id` reads as no note where there is none. A column
+  asserted with `"name!"` that is null where the class is there panics
+  (section 8).
 - A property that is a data class may instead be filled by the one column
   of its name, of a composite type (10.4). A table's name or alias on its
   own is its whole row, so whole rows are read from a join as
@@ -899,7 +907,6 @@ one exists (`String?`), unless the author asserts it with `"name!"`
 (10.5), and Kogo panics naming the limit only where no truthful type
 exists. An array's elements are the exception: there Postgres promises
 nothing either way, so the author's `List<T>` is the assertion. The
-last limit below is the other, one `kogo check` cannot yet tell. The
 limits, with those above:
 
 - A type that is not in the table, an array of a composite type or of a
@@ -926,11 +933,6 @@ limits, with those above:
 - A count of more than 2,147,483,647 rows from `tx.execute`, whose
   result is an `Int`: a panic once the statement has run, which rolls
   the transaction back.
-- In a nullable nested data class, a column that a second outer join
-  can null, where the class's own join finds a row: it fills a property
-  that may not be null, and a null there is a panic when it is read
-  that names the column. `kogo check` does not yet tell one outer join
-  from another.
 
 An array of a domain, and a domain over an array, are read as the array
 of the base type is.

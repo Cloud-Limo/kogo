@@ -549,6 +549,36 @@ func TestErrors(t *testing.T) {
 	}
 }
 
+// In a nullable nested data class, a column that another outer join
+// can null than the class's own fills only a T?: through a join of
+// the statement, through one in a subquery on the nullable side, and
+// asserted with "name!".
+func TestSecondJoin(t *testing.T) {
+	testDB(t)
+	code, out := kogo(t, map[string]string{"a.kg": `package a
+
+data class Shop(val id: Uuid, val driverId: Uuid)
+data class Row(val legalName: String, val shop: Shop?)
+
+fun f(tx: Tx): List<Row> = tx.query<Row>(sql"""select b.legal_name, t.id as shop_id, d.driver_id as shop_driver_id
+    from business b left join tenant t on t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id""")
+
+fun g(tx: Tx): List<Row> = tx.query<Row>(sql"""select b.legal_name, s.tid as shop_id, s.did as shop_driver_id
+    from business b left join (select t.business_id, t.id as tid, d.driver_id as did
+        from tenant t left join tenant_driver d on d.tenant_id = t.id) s on s.business_id = b.id""")
+
+fun h(tx: Tx): List<Row> = tx.query<Row>(sql"""select b.legal_name, t.id as shop_id, d.driver_id as "shop_driver_id!"
+    from business b left join tenant t on t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id""")
+`})
+	want := `{"file":"a.kg","line":6,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through the outer join to d, and fills Shop.driverId, a Uuid, in a nullable data class that is null where the outer join to t finds no row: make that a Uuid?"}
+{"file":"a.kg","line":9,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through the outer joins to s and d in s, and fills Shop.driverId, a Uuid, in a nullable data class that is null where the outer join to s finds no row: make that a Uuid?"}
+{"file":"a.kg","line":13,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through the outer join to d, and fills Shop.driverId, a Uuid, in a nullable data class that is null where the outer join to t finds no row: make that a Uuid?"}
+`
+	if code != 1 || out != want {
+		t.Errorf("exit %d, want 1\n got %s\nwant %s", code, out, want)
+	}
+}
+
 // A <dir> that is a link to a program's directory is that directory:
 // its errors are found and name each file under the link as given.
 func TestLinkedDir(t *testing.T) {

@@ -152,7 +152,11 @@ func signature(lit *syntax.SQL) (*sqlpass.Statement, error) {
 			if name, t, ok := strings.Cut(strings.TrimSpace(col), ": "); ok {
 				t, joined := strings.CutSuffix(t, "??")
 				base, null := strings.CutSuffix(t, "?")
-				cols = append(cols, sqlpass.Column{Name: name, Type: typ(base), Nullable: null || joined, Joined: joined, Outer: joined})
+				col := sqlpass.Column{Name: name, Type: typ(base), Nullable: null || joined, Joined: joined}
+				if joined {
+					col.Joins = []string{"t"}
+				}
+				cols = append(cols, col)
 			}
 		}
 		return cols

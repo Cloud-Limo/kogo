@@ -4930,7 +4930,7 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   outer joins in one class, `&&` panics naming the column where one join finds a row and
   the other none, and `||` would read the row that is there as none, unseen: Greg's test
   of a hole is "we do something stupid or bad and never notice". A column of a `T?`
-  property null only through the join counts too.
+  property null only through the join counted too, until DEV-1211 (below).
 - **The line**, spec 10.4 and `doc/design.md` principle 4: `kogo check` refuses a type
   Postgres does not promise where a truthful one exists (`String?`), unless the author
   asserts it with `"name!"`, and panics naming the limit only where none does. An
@@ -4939,20 +4939,20 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   in the Fix of 24 Nov 2026: the Ruling calls the array the line's one exception, and
   the second outer join below stays one too, so both are named, the array as where
   Postgres promises nothing and the join as what `kogo check` cannot yet tell. Not
-  taken: dropping the join's, which the earlier Ruling kept.
+  taken: dropping the join's, which the earlier Ruling kept. DEV-1211 ended the join's.
 - **The other exception to the line: a column a second outer join nulls**, in a nullable
   nested data class, fills a property that may not be null and panics, naming the column,
   where the class's join finds a row and the second none (the lead's ruling on the Code
   review, 24 Nov 2026; spec 10.4 lists it). The pass's `Joined` says null through some
   outer join, not through the class's. Not taken here: carrying the joins that null each
   column and refusing a class whose columns differ in them, which is new analysis in the
-  SQL pass and its own issue. That refusal ends this exception.
+  SQL pass and its own issue. That refusal ends this exception: DEV-1211 (below).
 - **A nullable nested data class whose columns no outer join can null is refused**, as
   `Booking.price: Charge?` over a table's own two nullable columns tied by a check
   constraint (Greg's Ruling b on PR 184, 24 Nov 2026): the author reads each column as a
   `T?` property and builds the class in Kogo. `sql-absent` says so for such a class, and
-  names no join; the SQL pass's `Outer` says whether an outer join can null a column at
-  all, and a class with no `Outer` column is this case. Not taken: the all-null test kept
+  names no join; the SQL pass's `Outer` (since DEV-1211, `Joins` not empty) says whether
+  an outer join can null a column at all, and a class with no `Outer` column is this case. Not taken: the all-null test kept
   for a class with no join, which brings back the panic on a half-filled row and a second
   rule in spec 10.3; and merging with the join's messages as they were. The agent's: a
   column of such a class that may be null in a property that may not be null gets no
@@ -5040,3 +5040,37 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
 - **`!in` stays out**, as the brief allowed: DEV-1184, the check a widening of the
   subset brings, is about 350 code lines, far above the brief's 20. `!(x in c)` says it.
   Reopens with DEV-1184.
+
+## A second outer join in a nullable nested data class (DEV-1211), 24 Nov 2026
+
+- **A column carries the outer joins that can null it** (`Column.Joins`, which replaces
+  `Outer`), read from `varnullingrels` at each query level `source` passes through,
+  outermost first and in range table order within a level, so two columns nulled alike
+  have equal lists. A join is named by the aliases on its nullable side (a left join's
+  right, a right join's left, a full join's both), as Postgres's `eref` gives them, and
+  `in s` for each subquery it lies in: `d`, `d in s`. Not taken: the range table index
+  alone as the Review sketched, which compares as well but leaves the message nothing to
+  name; the table's own name beside its alias (`tenant_driver d`), which needs a
+  catalog query per join for words the statement already shows. Two joins whose
+  nullable sides are the same tables, as a full join under a left join, share a name;
+  every column they null is nulled by both, so they never tell columns apart.
+- **The class's joins are its first column's**, in property order, of those null only
+  through an outer join that fill a property that may not be null; each later one with
+  other joins gets `sql-nullable`, which names both and says to write `T?`. Not taken:
+  choosing the column with the fewest joins, which reads better where the second
+  column comes first, at the cost of a second pass; ordering the properties is the
+  author's fix there.
+- **`"name!"` takes part** in the comparison, as in the absence: an asserted column with
+  other joins would still tell the class there where its own join found none, and panic
+  naming another column. Not taken: leaving it out of both, which changes what tells a
+  class whose only such columns are asserted.
+- **The class is absent by the columns that fill its properties that may not be null**,
+  no longer also by those of its `T?` properties null only through an outer join. The
+  refusal's own advice needs it: over `left join tenant t … left join business c on c.id
+  = b.id`, `Store(id: Uuid, owner: String?)` from `t.id as store_id, c.legal_name as
+  store_owner` panicked on a business with no tenant, since `&&` found the owner there.
+  About 1 code / 13 test lines beyond the Scope. Not taken: leaving it, which keeps a
+  panic `kogo check` now steers authors into.
+- **The rule compares only within one nullable class filled by prefix**; a nullable
+  class it holds has its own joins, and a whole row (spec 10.5), a CTE, a view or a union
+  is left as it was (the Scope's Not here).

@@ -46,14 +46,16 @@ func (t Type) String() string {
 // through an outer join: it would be non-null by spec.md 10.5 were the
 // join inner, as a NOT NULL column of the joined table is, and one
 // that may be null even where the join finds a row is not; nor is one
-// the author names "name?". Outer is whether it is a reference that
-// an outer join can null, Joined or not.
+// the author names "name?". Joins names the outer joins that can null
+// it as a reference, Joined or not, each by what lies on its nullable
+// side ("d", or "d in s" for one in subquery s); two columns that
+// outer joins null alike have the same Joins.
 type Column struct {
 	Name     string
 	Type     Type
 	Nullable bool
 	Joined   bool
-	Outer    bool
+	Joins    []string
 }
 
 // A Table is a table or a view that Postgres's tree lists for a
@@ -232,7 +234,7 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 				return nil, err
 			}
 			col.Nullable, col.Joined = !notNull, inner
-			_, _, _, col.Outer, _ = source(query, exprs[i])
+			_, _, _, col.Joins, _ = source(query, exprs[i])
 		}
 		if !whole {
 			col.Type = loose(col.Type)

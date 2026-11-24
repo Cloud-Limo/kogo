@@ -207,7 +207,8 @@ var jsonbCasts = map[int]bool{3556: true, 3449: true, 3450: true, 3451: true, 34
 // answer as if no outer join nulled anything: a column not null then,
 // and nullable otherwise, is null only through an outer join.
 func (c *Checker) notNull(ctx context.Context, q, expr *node, constant, joins bool) (notNull, whole bool, err error) {
-	q, expr, rte, joined, nulled := source(q, expr)
+	q, expr, rte, by, nulled := source(q, expr)
+	joined := len(by) > 0
 	whole = rte != nil && expr.num("varattno") == 0
 	switch {
 	case nulled || joined && !joins || expr == nil:
@@ -244,12 +245,15 @@ func (c *Checker) notNull(ctx context.Context, q, expr *node, constant, joins bo
 // source follows expr, an expression of query q, through references
 // to a subquery's column or a grouped column, to what they name: an
 // expression of the query it ends in, and when that is a reference to
-// a table, the table's range table entry. joined is whether an outer
-// join can null a reference on the way, and nulled whether a grouping
-// set or returning's old or new can: Postgres marks a reference with
-// the outer joins and grouping sets that null it (varnullingrels), by
-// their range table entries.
-func source(q, expr *node) (endQ, endExpr, rte *node, joined, nulled bool) {
+// a table, the table's range table entry. joins names the outer joins
+// that can null a reference on the way, and nulled is whether a
+// grouping set or returning's old or new can: Postgres marks a
+// reference with the outer joins and grouping sets that null it
+// (varnullingrels), by their range table entries. A join is named by
+// what lies on its nullable side, as the statement names it, and the
+// subqueries it lies in: "d in s".
+func source(q, expr *node) (endQ, endExpr, rte *node, joins []string, nulled bool) {
+	within := ""
 	for expr != nil && expr.tag == "VAR" && expr.num("varlevelsup") == 0 {
 		rtable, att, no := q.field("rtable").items(), expr.num("varattno"), expr.num("varno")
 		rels := expr.field("varnullingrels").items() // (b 3 5), or (b) for none
@@ -258,7 +262,7 @@ func source(q, expr *node) (endQ, endExpr, rte *node, joined, nulled bool) {
 			if i, err := strconv.Atoi(by.text()); err != nil || i < 1 || i > len(rtable) || rtable[i-1].num("rtekind") != rteJoin {
 				nulled = true
 			} else {
-				joined = true
+				joins = append(joins, strings.Join(q.field("jointree").side(rtable, i), ", ")+within)
 			}
 		}
 		if no < 1 || no > len(rtable) || att < 0 {
@@ -267,10 +271,11 @@ func source(q, expr *node) (endQ, endExpr, rte *node, joined, nulled bool) {
 		in, exprs := q, []*node(nil)
 		switch rte := rtable[no-1]; rte.num("rtekind") {
 		case rteRelation:
-			return q, expr, rte, joined, nulled
+			return q, expr, rte, joins, nulled
 		case rteSubquery:
 			in = rte.field("subquery")
 			exprs = outputs(in)
+			within = " in " + rte.field("eref").field("aliasname").text() + within
 		case rteGroup:
 			exprs = rte.field("groupexprs").items()
 		}
@@ -279,5 +284,48 @@ func source(q, expr *node) (endQ, endExpr, rte *node, joined, nulled bool) {
 		}
 		q, expr = in, exprs[att-1]
 	}
-	return q, expr, nil, joined, nulled
+	return q, expr, nil, joins, nulled
+}
+
+// side gives the names of what lies on the nullable side of the outer
+// join that is range table entry i, found in n, a query's jointree or
+// a part of it: a left join's right, a right join's left, a full
+// join's both. A name is the alias Postgres gives an entry, its own
+// name where the statement gives none.
+func (n *node) side(rtable []*node, i int) (names []string) {
+	switch {
+	case n == nil:
+	case n.tag == "JOINEXPR" && n.num("rtindex") == i:
+		t := n.num("jointype") // Postgres's JoinType: 1 left, 2 full, 3 right
+		if t >= 2 {
+			names = n.field("larg").leaves(rtable)
+		}
+		if t <= 2 {
+			names = append(names, n.field("rarg").leaves(rtable)...)
+		}
+	case n.tag == "JOINEXPR":
+		if names = n.field("larg").side(rtable, i); names == nil {
+			names = n.field("rarg").side(rtable, i)
+		}
+	case n.tag == "FROMEXPR":
+		for _, v := range n.field("fromlist").items() {
+			if names = v.side(rtable, i); names != nil {
+				break
+			}
+		}
+	}
+	return names
+}
+
+// leaves gives the names of the range table entries that n, a part of
+// a jointree, joins.
+func (n *node) leaves(rtable []*node) []string {
+	switch i := n.num("rtindex"); {
+	case n == nil:
+	case n.tag == "RANGETBLREF" && i >= 1 && i <= len(rtable):
+		return []string{rtable[i-1].field("eref").field("aliasname").text()}
+	case n.tag == "JOINEXPR":
+		return append(n.field("larg").leaves(rtable), n.field("rarg").leaves(rtable)...)
+	}
+	return nil
 }

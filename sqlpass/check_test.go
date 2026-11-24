@@ -218,27 +218,34 @@ func TestJoined(t *testing.T) {
 	}
 }
 
-// A column is under an outer join where one can null it on the way,
-// nullable in its table or not; a table's own column, as returning *
-// gives, is not.
-func TestOuter(t *testing.T) {
+// A column carries the outer joins that can null it on the way,
+// nullable in its table or not, each named by its nullable side and
+// the subqueries it lies in; a table's own column, as returning *
+// gives, has none.
+func TestJoins(t *testing.T) {
 	c := connect(t)
 	for literal, want := range map[string]string{
-		`select b.id, t.id as tenant_id, t.slug, c.abn from business b left join tenant t on t.business_id = b.id left join business c on c.id = b.id`: "tenant_id slug abn",
+		`select b.id, t.id as tenant_id, t.slug, c.abn from business b left join tenant t on t.business_id = b.id left join business c on c.id = b.id`: "tenant_id[t] slug[t] abn[c]",
 		`update business set abn = $abn where id = $id returning *`:                                                                                    "",
+		`select t.id as shop_id, d.driver_id as shop_driver_id
+			from business b left join tenant t on t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id`: "shop_id[t] shop_driver_id[d]",
+		`select s.tid as shop_id, s.did as shop_driver_id from business b left join (select t.business_id, t.id as tid, d.driver_id as did
+			from tenant t left join tenant_driver d on d.tenant_id = t.id) s on s.business_id = b.id`: "shop_id[s] shop_driver_id[s | d in s]",
+		`select g.person_id, b.id from business b full join (admin_grant g join person p on p.id = g.person_id) on g.business_id = b.id`: "person_id[b, g, p] id[b, g, p]",
+		`select t.id from tenant_driver d right join tenant t on t.id = d.tenant_id`:                                                     "",
 	} {
 		st, err := check(c, literal)
 		if err != nil {
 			t.Fatalf("%s: %v", literal, err)
 		}
-		var outer []string
+		var joins []string
 		for _, col := range st.Columns {
-			if col.Outer {
-				outer = append(outer, col.Name)
+			if col.Joins != nil {
+				joins = append(joins, col.Name+"["+strings.Join(col.Joins, " | ")+"]")
 			}
 		}
-		if got := strings.Join(outer, " "); got != want {
-			t.Errorf("%s\n got %q outer, want %q", literal, got, want)
+		if got := strings.Join(joins, " "); got != want {
+			t.Errorf("%s\n got %q, want %q", literal, got, want)
 		}
 	}
 }

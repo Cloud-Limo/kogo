@@ -54,9 +54,7 @@ constraints) is worth typing.
    `24:00`). An array's elements are the exception: Postgres promises
    nothing of them either way, so `List<T>` is the author's assertion,
    held by a panic that names the column. `spec.md` 10.4 lists the
-   limits, and the other exception, which `kogo check` cannot yet
-   tell: a column a second outer join nulls, in a nullable nested data
-   class.
+   limits.
 5. **Go is a backend, not a source language.** Nobody reads the emitted
    Go, but line directives map it back to the source, written at the
    start of each line: `/*line ../../src/a.kg:26*/`, padded so that

@@ -224,7 +224,7 @@ of row types in `schema.kg` make the area's total.
 | # | Slice | Operations | Size | Waits on |
 | --- | --- | --- | --- | --- |
 | 1 | Mount the storefront's list, with its `admin` gate and the drivers page | `drivers`, `upsertDriver` | 115 / 150 | Kotlin first in its PR: the unknown storefront and a missing header become the list's check's 403 |
-| 2 | What a page asks first: the `anyone`, `maybe`, `customer` and `booker` gates | `booker`, `logout`, `showTestModeBand`, `googleMapsBrowserKey`, `branding`, `stripeConfig`, `areas`, `defaultArea`, `airportAirlines`, `commonPlaces`, `placeNicknames`, `bookerByNewBookerSecret`, `dismissNamePrompt` | 260 / 150 | 1 |
+| 2 | What a page asks first: the `anyone`, `maybe` and `customer` gates, and `booker` | `booker`, `logout`, `showTestModeBand`, `googleMapsBrowserKey`, `branding`, `stripeConfig`, `areas`, `defaultArea`, `airportAirlines`, `commonPlaces`, `placeNicknames`, `bookerByNewBookerSecret`, `dismissNamePrompt` | 260 / 150 | 1 |
 | 3 | The places an admin and a customer keep | `place`, `journey`, `updateJourney`, `upsertPlaceNickname`, `deletePlaceNickname`, `upsertCommonPlace`, `deleteCommonPlace` | 200 / 130 | 2 |
 | 4 | The `viewer` gate and the steps to a booking | `resendBookingEmail`, `pastPassengers` | 150 / 120 | 2 |
 | 5 | The booking page's read | `booking` | 430 / 180 | 4; the prelude's names |

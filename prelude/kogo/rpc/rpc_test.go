@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/Cloud-Limo/kogo/internal/testdb"
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	khttp "github.com/Cloud-Limo/kogo/prelude/kogo/http"
 	"github.com/Cloud-Limo/kogo/rt"
 )
 
@@ -205,7 +207,23 @@ var table = Table[env]{Check: ours, Operations: []Operation[env]{
 	Gated("strays", true, strays, bound), Outside("straysOutside", true, strays, act),
 	Gated("straysPlain", false, strays, bound),
 	Tx("waits", false, waits), Tx("cut", false, cut), Tx("crashed", false, crashed),
+	Db("unanswered", unanswered(true)), Db("unansweredThenBug", unanswered(false)),
 }}
+
+// unanswered calls a service that is not there and panics with the
+// failure, as a program that asked for no Either does; or, not named,
+// with a bug of its own whose text holds the failure's bare why.
+func unanswered(named bool) func(kogo.Db, env, Request, rt.Unit) kogo.Either[string, bool] {
+	return func(kogo.Db, env, Request, rt.Unit) kogo.Either[string, bool] {
+		idp, _ := khttp.New(khttp.Service{Address: "http://127.0.0.1:1", Encoding: khttp.JSON, MaxAnswer: 1 << 10,
+			Timeout: time.Second, Log: slog.New(slog.DiscardHandler)})
+		l := khttp.Http_Ask(idp, khttp.Lookup_String_String("GET", "/me"), nil).(kogo.Either_Left[khttp.HttpFailure])
+		if named {
+			kogo.Error("idp: " + rt.ToString(l.Value))
+		}
+		panic("a bug after " + l.Value.(khttp.HttpFailure_NotSent).Why)
+	}
+}
 
 // waits locks the row "locked", which a test holds from a connection
 // of its own, and so waits until that ends or the request does.
@@ -620,6 +638,26 @@ func TestDeadline(t *testing.T) {
 	if status, _ := post(left, "waits"); status != 499 {
 		t.Errorf("a request whose client left answers %d, want 499", status)
 	}
+	// A client that sent its body and left, over a socket, while a
+	// Unit operation waits on the row: Go sees it go only once the
+	// body is read.
+	served := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(served)
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	conn, err := net.Dial("tcp", srv.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	fmt.Fprint(conn, "POST /waits HTTP/1.1\r\nHost: x\r\nContent-Length: 2\r\n\r\n{}")
+	time.AfterFunc(100*time.Millisecond, func() { conn.Close() })
+	<-served
+	if took := time.Since(start); took > 400*time.Millisecond {
+		t.Errorf("a client that left during a Unit operation is seen after %v, want at once", took)
+	}
 	// A connection a request ended is closed, and the pool counts it
 	// given back once it is.
 	held := func() (busy int32) {
@@ -651,6 +689,13 @@ func TestDeadline(t *testing.T) {
 		t.Errorf("a request waiting on a full pool answers %d after %v, want 503 at %v", status, took, h.Limit)
 	}
 	give()
+	// A service that does not answer is a 503 too, with one line.
+	if status, _ := post(ctx, "unanswered"); status != 503 {
+		t.Errorf("a service that does not answer answers %d, want 503", status)
+	}
+	if status, _ := post(ctx, "unansweredThenBug"); status != 500 {
+		t.Errorf("a bug after a service did not answer answers %d, want 500", status)
+	}
 	// The database ends the connection, or there is none to reach.
 	if status, _ := post(ctx, "cut"); status != 503 {
 		t.Errorf("a connection the database ended answers %d, want 503", status)
@@ -678,7 +723,7 @@ func TestDeadline(t *testing.T) {
 			got = append(got, fmt.Sprint(m["msg"], " ", m["operation"], " ", m["outcome"]))
 		}
 	}
-	if got, want := strings.Join(got, ","), "served waits 499,ERROR database cut false,ERROR database crashed false,ERROR database who false"; got != want {
+	if got, want := strings.Join(got, ","), "served waits 499,served waits 499,ERROR service unanswered false,ERROR panic unansweredThenBug true,served unansweredThenBug 500,ERROR database cut false,ERROR database crashed false,ERROR database who false"; got != want {
 		t.Errorf("the log is %s, want %s:\n%s", got, want, log.String())
 	}
 }

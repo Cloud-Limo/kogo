@@ -29,6 +29,7 @@ func Open(ctx context.Context, schemaFile string) (pool *pgxpool.Pool, drop func
 	must(err)
 	schema := fmt.Sprintf("test_%d", os.Getpid())
 	cfg.ConnConfig.RuntimeParams["search_path"] = schema + ", public"
+	cfg.ConnConfig.RuntimeParams["timezone"] = "UTC" // as kogo.CheckPool requires
 	pool, err = pgxpool.NewWithConfig(ctx, cfg)
 	must(err)
 	_, err = pool.Exec(ctx, "drop schema if exists "+schema+" cascade; create schema "+schema+"; "+string(statements))

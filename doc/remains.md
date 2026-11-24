@@ -112,11 +112,9 @@ Agreed subject to this review:
   lead's call with it (21 Nov 2026): `performOnce`, when built, sends
   once more on any connection, as the JDK does; that issue corrects
   `doc/work.md`'s "kept connection".
-- **The Go already written against the rule on Go's defaults**: the
-  handler, the prelude, and `kogo.mail` when it is built. And against
-  the rule that it is handed its clock (`doc/work.md`, "How it is
-  tested"): the handler reads the system clock for the limit on
-  reruns.
+- **The Go already written against the rule that it is handed its
+  clock** (`doc/work.md`, "How it is tested"): the handler reads the
+  system clock for the request's limit and the pause before a rerun.
 - **What sits behind cusoon2's PDF extension** (`doc/work.md`, "An
   application's own extensions"): the roadmap plans a small writer
   of cusoon2's own, about 380 lines of Go and font data

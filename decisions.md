@@ -4768,3 +4768,40 @@ limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
 - **A sentence each in spec 15 and `doc/gates.md`**, though neither said the gate's read
   is the first: each describes the savepoint, and the statement before it is now part of
   how the gate runs.
+
+## The tables of the handler and the database handle (DEV-1155), 24 Nov 2026
+
+DEV-1148's sitting, piece 2, moved the rule on Go's defaults to `doc/design.md` and asked
+for the two tables in spec 15.5; the new rows were the agent's to choose.
+
+- **Kogo requires of the pool, and sets nothing on it**: the lead's ruling on DEV-1138
+  (24 Nov 2026) that the pool is the application's to make. `kogo.CheckPool` panics,
+  naming the setting, and `NewHandler`, `NewCalls` and `test.Run` call it at start, so
+  a test runs on a pool the server would take. Not taken: the prelude setting what it
+  requires on the pool it is handed, which changes what the application made.
+- **The session's time zone is required to be UTC**, as the run-time parameter
+  `timezone` in the pool's config, read there and not from a connection: a statement's
+  `now()::date`, `date_trunc` or cast to text reads the session's zone, and the
+  failure is a quietly different answer. A role's or a database's default of UTC does
+  not meet it, since the config is what holds on every connection whatever the role.
+  Not taken: any zone, so long as one is stated, which lets a test database and a
+  served one read the same statement differently; asking a connection at start, which
+  costs a connection and tells nothing of the pool's next one.
+- **A connection's longest life is required above 0; its idle time and the health check
+  are pgxpool's, kept with nothing required.** A connection keeps the types it was told
+  of (`Tx_Known`) by their OIDs until it closes, so one that lived for ever would keep
+  failing to read a type a migration made again, under another OID; pgxpool's 0 is
+  "never". Closing an idle connection costs a new one and never an answer, and pgxpool
+  pings a connection idle over a second before it hands it out, so one the database
+  ended meanwhile reaches no request (`TestPool`). A health check of 0 is refused by
+  pgxpool itself, whose ticker panics as the pool is made. Not taken: a ceiling on the life
+  (the hour serves; nothing measured a better one); requiring `ShouldPing` to be
+  pgxpool's own, since without it a dead connection is a 503, not a wrong answer.
+- **A row's test is named by its package** (`rpc.TestLimits`, `emit.TestLimits`), as two
+  packages have a test of one name. Not taken: names alone, as spec 12's tables have
+  none.
+- **The pause before a rerun is held by a ceiling on reruns**: a request that conflicts
+  every time reruns at most 20 times in 50 ms (575 with no pause, tried). Not taken:
+  a clock handed to `InTx`, which `doc/remains.md` still lists.
+- **`doc/remains.md` keeps the half of its line on the clock**: the handler still reads
+  the system clock for its limit and the pause, and nothing here changes that.

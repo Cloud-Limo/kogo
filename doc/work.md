@@ -403,11 +403,9 @@ Weighed and not taken:
 
 ### What Go would decide, Kogo states
 
-A binding's behaviour is Kogo's: the spec states it, and where Go has
-a default the spec does not state, the binding turns it off and a
-test shows it. `doc/design.md` has the rule for values ("never
-inherit Go's by accident"); this is the same rule for what reaches
-the network.
+The rule was first written here, for the bindings, and is now
+`doc/design.md`'s, for all Go in the prelude ("Keeping the general
+language open"). What follows is how it was met for `kogo.http`.
 
 The case that raised it, read in Go 1.27.4 (`net/http`,
 `request.go` and `transport.go`): a request that carries an

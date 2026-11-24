@@ -83,21 +83,23 @@ func (r *reader) value() *node {
 	return &node{atom: t}
 }
 
-// params records the number of each parameter the tree refers to.
-// Kind 0 is a parameter of the statement; Postgres numbers its own,
-// as for a row compared with a subquery, from 1 as well.
-func (n *node) params(seen map[int]bool) {
+// params records the number of each parameter the tree refers to by
+// where it lies, a byte offset in the statement's text: its own, or a
+// cast's that Postgres moved it to. Kind 0 is a parameter of the
+// statement; Postgres numbers its own, as for a row compared with a
+// subquery, from 1 as well.
+func (n *node) params(at map[int]int) {
 	if n == nil {
 		return
 	}
 	if n.tag == "PARAM" && n.num("paramkind") == 0 {
-		seen[n.num("paramid")] = true
+		at[n.num("location")] = n.num("paramid")
 	}
 	for _, f := range n.fields {
-		f.params(seen)
+		f.params(at)
 	}
 	for _, v := range n.list {
-		v.params(seen)
+		v.params(at)
 	}
 }
 
@@ -209,7 +211,7 @@ func (c *Checker) notNull(ctx context.Context, q, expr *node, constant bool) (no
 	case rte != nil && whole:
 		notNull = true
 	case rte != nil:
-		notNull, err = c.columnNotNull(ctx, rte.num("relid"), expr.num("varattno"))
+		notNull, err = c.columnNotNull(ctx, rte.num("relid"), expr.num("varattno"), rte.field("inh").text() != "false")
 	case expr.tag == "AGGREF": // count() and count("any"), pg_catalog's by oid
 		notNull = expr.num("aggfnoid") == 2803 || expr.num("aggfnoid") == 2147
 	case expr.tag == "SUBLINK":

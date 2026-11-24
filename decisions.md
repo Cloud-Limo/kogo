@@ -4943,3 +4943,29 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   with a case that sees it. Not taken: a world of its own for each such area, which
   costs what the first did for one to three bugs apiece. Reopens when a generated world
   can draw such an area.
+
+## The booker's prelude names (DEV-1216), 24 Nov 2026
+
+- **`maxOrNull` and `sortedByDescending` order as `sortedBy` does**, through one
+  `compare`, and `kogo check` refuses them on the same types (`sort-key`): `maxOrNull`
+  also on an element that may be null, which kotlinc refuses too (a `T?` is not
+  `Comparable`). For a `Double`, Kotlin's `maxOrNull` is `Math.max` and gives what
+  `compare`'s order gives: a NaN wins, and `0.0` beats `-0.0`, seen in `mise run kotlin`.
+  So Kogo matches Kotlin there rather than refusing a `Double`. Not taken: an overload
+  for each element type, as `sumOf` has.
+- **A `Set`'s `+` and `-` are three overloads each**: an element, a `List` and a `Set`.
+  Kotlin's take an `Iterable`, which Kogo has no type for. Not taken: an element and a
+  `List` alone, which leaves `roles + otherRoles` written `+ otherRoles.toList()`.
+- **A `Set`'s `+` or `-` of one element that is a `List` or a `Set` is refused**
+  (`set-operand`), judged by the operand's own type, so a `Set<List<Long>?>` is held too:
+  kotlinc 2.4.21 reads `setOf(xs, ys) - xs` through `minus(elements: Iterable<T>)` with
+  `T` as `Any`, giving `[[1, 2], [3]]` where removing `xs` itself gives `[[3]]`, and
+  `s + xs` gives `[[1, 2], [3], 1, 2]` (run 24 Nov 2026). Kogo has no `Any`, so the
+  check sits at the one place the two choose apart. `setOf(xs)` says it in both. Not
+  taken: picking the collection overload as Kotlin does, which gives a `Set<Any>` Kogo
+  cannot type.
+- **A map's `keys` shares the map's keys** (`Map_Keys`): a `Set`'s `+` and `-` build
+  their own, as everything that adds to `ordered` already must.
+- **`!in` stays out**, as the brief allowed: DEV-1184, the check a widening of the
+  subset brings, is about 350 code lines, far above the brief's 20. `!(x in c)` says it.
+  Reopens with DEV-1184.

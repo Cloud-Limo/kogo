@@ -238,6 +238,10 @@ func agrees[K any](t *testing.T, mapped bool, keys []K, absent K) {
 			t.Errorf("%s: key %d, %s, is not found as the walk finds it", rt.ToString(keys), i, rt.ToString(k))
 		}
 	}
+	if !rt.Equal(List_Distinct(keys), walk) || !rt.Equal(Map_Keys(List_AssociateBy(keys, func(k K) K { return k })).keys, walk) ||
+		!rt.Equal(SetT_Plus_ListT(SetOf(walk[0]), keys).keys, walk) || !rt.Equal(SetT_Minus_T(s, walk[0]).keys, walk[1:]) {
+		t.Errorf("%s: distinct, associateBy, a set's plus or minus keeps other than the walk's %s", rt.ToString(keys), rt.ToString(walk))
+	}
 	if Set_Contains(s, absent) || Map_Get(m, absent) != nil {
 		t.Errorf("%s holds %s", rt.ToString(keys), rt.ToString(absent))
 	}
@@ -736,7 +740,7 @@ func TestListCorners(t *testing.T) {
 		t.Error("two maps compare by their keys alone, or by their order")
 	}
 	defer func() {
-		if p := recover(); p == nil || !strings.HasPrefix(p.(string), "sortedBy orders by an Int") {
+		if p := recover(); p == nil || !strings.HasPrefix(p.(string), "sortedBy, sortedByDescending and maxOrNull order by an Int") {
 			t.Errorf("sortedBy by a list panics with %v", p)
 		}
 	}()

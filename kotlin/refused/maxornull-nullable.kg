@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// maxOrNull of a list whose elements may be null.
+package refused
+
+fun f(xs: List<Long?>): Long? = xs.maxOrNull()

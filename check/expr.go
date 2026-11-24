@@ -686,7 +686,11 @@ func (c *checker) operator(at syntax.Node, name string, x syntax.Expr, xt Type, 
 		c.expr(y, nil)
 		return c.errorf(at, "no-overload", "this operator is not defined for a %s: no binding declares %s for it", xt, name)
 	}
-	return c.resolve(at, at, name, cands, x, xt, nil, []*syntax.Arg{{Pos: y.At(), Value: y}}, want)
+	t := c.resolve(at, at, name, cands, x, xt, nil, []*syntax.Arg{{Pos: y.At(), Value: y}}, want)
+	if call := c.info.Calls[at]; call != nil {
+		c.setOperand(at, call, y)
+	}
+	return t
 }
 
 // rangeOf gives the type a range holds, Int or Long, or nil when e is

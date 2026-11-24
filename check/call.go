@@ -130,6 +130,9 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 		c.zoneOffset(e, call.Func)
 		c.regexPattern(e, call.Func)
 		c.sortKey(e, call)
+		if len(e.Args) == 1 {
+			c.setOperand(e.Fun, call, e.Args[0].Value)
+		}
 		if id, ok := e.Fun.(*syntax.Ident); ok && call.Func.Receiver != nil && c.raised(call.Func.Receiver) == nil {
 			c.narrowedThis(id)
 		}
@@ -180,19 +183,48 @@ func (c *checker) regexPattern(e *syntax.Call, f *Func) {
 	}
 }
 
-// sortKey refuses the prelude's sortedBy on a key whose type Kogo
-// does not order (spec.md 12), where Kotlin orders any Comparable and
-// refuses the rest at compile time.
+// sortKey refuses the prelude's sortedBy and sortedByDescending on a
+// key, and maxOrNull on an element, whose type Kogo does not order
+// (spec.md 12), where Kotlin orders any Comparable and refuses the
+// rest at compile time. maxOrNull's element may not be null, as in
+// Kotlin, where a T? is not Comparable.
 func (c *checker) sortKey(e *syntax.Call, call *Call) {
 	f := call.Func
-	if f.Pkg != "kogo" || f.Receiver == nil || f.Name != "sortedBy" || len(call.TypeArgs) != 2 || len(e.Args) != 1 {
+	if f.Pkg != "kogo" || f.Receiver == nil {
 		return
 	}
-	k := nonNull(call.TypeArgs[1])
+	var k Type
+	var at syntax.Node
+	what, orders, may, fix := "key", "orders only by", ", or one of these that may be null", "give it one of these, such as a field of the %[2]s"
+	switch {
+	case (f.Name == "sortedBy" || f.Name == "sortedByDescending") && len(call.TypeArgs) == 2 && len(e.Args) == 1:
+		k, at = nonNull(call.TypeArgs[1]), e.Args[0].Value
+	case f.Name == "maxOrNull" && len(call.TypeArgs) == 1 && len(e.Args) == 0:
+		k, at, what, orders, may, fix = call.TypeArgs[0], e.Fun, "list's element", "finds the largest only of", "", "map the list to one of these first, as mapNotNull does to drop a null"
+	default:
+		return
+	}
 	if k == unknown || is(k, tInt) || is(k, tLong) || is(k, tDouble) || is(k, tString) || is(k, tChar) || is(k, tBoolean) {
 		return
 	}
-	c.errorf(e.Args[0].Value, "sort-key", "this key is a %s, and sortedBy orders only by an Int, a Long, a Double, a String, a Char or a Boolean, or one of these that may be null: give it one of these, such as a field of the %s (spec 12)", k, k)
+	c.errorf(at, "sort-key", "this %[1]s is a %[2]s, and %[3]s %[4]s an Int, a Long, a Double, a String, a Char or a Boolean%[5]s: "+fix+" (spec 12)", what, k, f.Name, orders, may)
+}
+
+// setOperand refuses a Set's + or - of one element, arg, where that
+// is a List or a Set (spec.md 12): Kotlin reads such an operand as the
+// elements to add or remove, through its Iterable<Any> overload.
+func (c *checker) setOperand(at syntax.Node, call *Call, arg syntax.Expr) {
+	f := call.Func
+	set, ok := f.Receiver.(*Named)
+	if f.Pkg != "kogo" || !ok || set.Decl != c.prelude("Set") || f.Name != "plus" && f.Name != "minus" || len(f.Params) != 1 {
+		return
+	}
+	if _, one := f.Params[0].Type.(*TypeParam); !one {
+		return
+	}
+	if n, ok := c.info.Types[arg].(*Named); ok && (n.Decl == c.prelude("List") || n.Decl == c.prelude("Set")) {
+		c.errorf(at, "set-operand", "this is a %s, and Kotlin takes a List or a Set after a Set's + or - as the elements to add or remove: write setOf(...) around it to add or remove it whole (spec 12)", n)
+	}
 }
 
 // offsetID is java.time's rule for an ID that ZoneId.of reads as an

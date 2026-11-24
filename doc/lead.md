@@ -298,8 +298,8 @@ him, as `doc/clerk.md` says, and you do not wait for it.
   later step Greg's, label the issue `lead` and tell him.
 
 A research run, one that goes looking and answers with a comment (a
-stress, an attack, a hunt, a sketch, a trial), is labelled on Greg's
-word and never on your own: he looks at his subscription's usage
+stress, an attack, a hunt, a sketch, a trial), is started on Greg's
+word, by `lin label` or `lin local`, and never on your own: he looks at his subscription's usage
 first. You may say which runs a row waits on, and post a brief ahead
 with `lin launch --no-label`; on his word, `lin label DEV-NNN agent`.
 A note posted before then changes nothing, since the launcher takes

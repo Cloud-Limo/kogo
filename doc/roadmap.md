@@ -146,7 +146,7 @@ issue where there is one.
 | 13l | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13l's: ~1,600 / 850) | cusoon2 PR 1597, 1600, 1603, 1604, 1605, 1608 |
 | 18 | cusoon2 | Kotlin first: ten keys move into `settings`; `deployment.goPort` | ~60 / 50 | no, DEV-1124 |
 | 19 | cusoon2 | The ops site's Go `main` | 150 / 80 | no, DEV-1125 |
-| 20 | cusoon2 | Serve the ops site from Go; waits on DEV-1139 (the second stress of the Go `main`) and the trial of generated worlds | | no |
+| 20 | cusoon2 | Serve the ops site from Go; waits on DEV-1139 (the second stress of the Go `main`) and DEV-1162 (the trial of generated worlds) | | no |
 
 `sendInvite` compares with its `outbound_message` rows forgiven as
 owed until the port queues the invite's email (DEV-885), so "the 21

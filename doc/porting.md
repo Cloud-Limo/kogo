@@ -129,14 +129,13 @@ written by hand, since each set sees bugs the other misses (DEV-1162):
 cusoon2's `go/gen` writes them from a fixed seed on every run, each
 flag the area reads drawn both ways, each list of none, one and two,
 each limit on it and a step either side, and a limit drawn with the
-state that reaches it; `kogo/run.sh` runs both sets, or one alone by
-`KOGO_CASES`. `0 differ` does not say the cases reached anything, so
-the handoff gives the reach `go/compare` prints under its count: of
-each operation's generated calls, how many got past its door, and of
-those drawn for a state, how many reached it. Then plant one bug in
-the port (a cent off, a dropped `where`, a swapped share), see the
-comparison exit 1 and name the right case, and say so in the handoff:
-rule 6 applied to the comparison itself.
+state that reaches it. `0 differ` does not say the cases reached
+anything, so the handoff gives the reach `go/compare` prints under its
+count: of each operation's generated calls, how many got past its
+door, and of those drawn for a state, how many reached it. Then plant
+one bug in the port (a cent off, a dropped `where`, a swapped share),
+see the comparison exit 1 and name the right case, and say so in the
+handoff: rule 6 applied to the comparison itself.
 
 **Add what the spec lists.** A name the port needs that the spec lists
 and the prelude lacks is added to the prelude (DEV-875), not written

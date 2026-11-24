@@ -215,17 +215,19 @@ func (e *emitter) into(x syntax.Expr, d dest) {
 	}
 }
 
-// elvis writes x ?: y toward d: y is read only when x is null.
+// elvis writes x ?: y toward d: y is read only when x is null. A
+// bare T may stand for a nullable type, and is tested as == null does.
 func (e *emitter) elvis(x *syntax.Binary, d dest) {
-	n, ok := e.info.Types[x.X].(*check.Nullable)
-	if !ok {
+	xt := e.info.Types[x.X]
+	n, ok := xt.(*check.Nullable)
+	if _, bare := xt.(*check.TypeParam); !ok && !bare {
 		e.into(x.X, d)
 		return
 	}
 	t := e.temp()
-	e.open("if %s := %s; %s != nil {", t, e.expr(x.X), t)
-	if _, null := d.typ.(*check.Nullable); null {
-		e.put(d, t, n)
+	e.open("if %s := %s; !%s {", t, e.expr(x.X), e.isNull(t, xt))
+	if _, null := d.typ.(*check.Nullable); null || !ok {
+		e.put(d, t, xt)
 	} else if d.kind != drop {
 		e.put(d, "(*"+t+")", n.Elem)
 	}
@@ -237,15 +239,20 @@ func (e *emitter) elvis(x *syntax.Binary, d dest) {
 // safe writes recv?.member toward d. rest gives the Go for the member
 // of a receiver that is not null, and its type.
 func (e *emitter) safe(recv syntax.Expr, d dest, rest func(*operand, check.Type) (string, check.Type)) {
-	n, ok := e.info.Types[recv].(*check.Nullable)
-	if !ok {
-		code, t := rest(&operand{x: recv, code: e.expr(recv)}, e.info.Types[recv])
+	rt := e.info.Types[recv]
+	n, ok := rt.(*check.Nullable)
+	if _, bare := rt.(*check.TypeParam); !ok && !bare {
+		code, t := rest(&operand{x: recv, code: e.expr(recv)}, rt)
 		e.put(d, code, t)
 		return
 	}
 	t := e.temp()
-	e.open("if %s := %s; %s != nil {", t, e.expr(recv), t)
-	code, typ := rest(&operand{code: "(*" + t + ")"}, n.Elem)
+	e.open("if %s := %s; !%s {", t, e.expr(recv), e.isNull(t, rt))
+	inner, it := t, rt
+	if ok {
+		inner, it = "(*"+t+")", n.Elem
+	}
+	code, typ := rest(&operand{code: inner}, it)
 	e.put(d, code, typ)
 	if d.kind != drop {
 		e.turn("} else {")

@@ -4569,3 +4569,35 @@ The agent's, on DEV-1133's stress run; the issue gave the three mends and left t
   that argument may be a parameter or an expression, known only when the statement
   runs, and every other function that sets a session's state stays unseen, so refusing
   the one call closes almost none of the gap.
+
+## A bare `T` that is null, and the `T?` of a nullable `T` (DEV-1179), 24 Nov 2026
+
+Greg's ruling on DEV-1143's finding 1, and the agent's choices beside it.
+
+- **`?:` and `?.` test a bare `T` for null as `== null` does** (Greg): `rt.Equal` of it and
+  null, the one test `equals` gives, now named `isNull` in `emit/expr.go`. Not taken: a
+  second way of asking (a reflection test of its own, or a type switch).
+- **A `T?` whose `T` is itself nullable is refused, not emitted** (Greg): Kotlin holds one
+  null where Go's `**T` holds two, and the outer pointer is not nil when the value is.
+  Not taken: folding the two nulls into one wherever the value goes, a conversion at each
+  call, return and store that crosses a type parameter. Reopen when a port holds a generic
+  fun that forms a `T?` and is called with a nullable type.
+- **Only a type parameter made `T?` is refused a nullable type** (Greg): in its signature,
+  as since DEV-830, or in its body, by a `T?` it writes or a call whose own type parameter
+  is made `T?`, through as many generic funs as it is given to. The follow does not pass
+  through a generic type's type arguments (Greg, on the review): a value of `Opt<T>` whose
+  field is `T?` is built either as `Opt<Long?>`, which the type's own mark refuses, or in a
+  generic fun, where building it writes the `T?` and marks that fun's `T`, so following the
+  type as well refused only correct programs, as `val o: Opt<T>? = null`. Not taken:
+  refusing every nullable type argument to a generic fun, since a wrapper called with a
+  nullable result is what a port writes most. Reopen as above.
+- **The refusal stays `kogo emit`'s `not-yet-emitted`**, not `kogo check`'s. Which
+  parameters are made `T?` is learned as the emitter writes each body's Go types (a `T?`
+  local, a safe call's value, a prelude fun's signature), so the checker would need a
+  second walk over every body to know it. Not taken: a check in `kogo check`, the better
+  place were it as cheap. Reopen when `kogo check` has to answer it alone, as when the
+  emitter is not run before a port is called done.
+- **`v.takeIf { it != null } ?: fallback` on a nullable `T` is refused with the rest**,
+  though it gave Kotlin's answer: its `takeIf` makes a `T?` of the `T`, and its right
+  answer came only from the lambda's own test. Not taken: telling such a body apart, which
+  would be the folding above in one place.

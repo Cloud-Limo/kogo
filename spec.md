@@ -1786,6 +1786,10 @@ Inputs and answers are JSON.
   never holds half of a surrogate pair (section 3): an input's
   `"\ud800"` reads as U+FFFD, which an answer then writes, where
   Kotlin's answer differs.
+- A `String` on the wire holds no U+0000, which Postgres's `text`
+  cannot hold (10.4): an input's `"a\u0000b"` is a 400, `input.name
+  holds U+0000`, whether or not the operation would send it to
+  Postgres. It is a limit of the subset, where Kotlin reads the string.
 - Reading is strict. A key that is missing, a key the type does not
   have, a value of another type, a number that is not whole or does
   not fit where an `Int` or a `Long` is wanted, a string that is not a

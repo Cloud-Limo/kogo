@@ -268,6 +268,9 @@ func TestHandler(t *testing.T) {
 		{"POST", "add", `{"name":"refused"}`, `200 {"type":"refused","message":"secret refusal"}`},
 		{"POST", "add", `{"name":"panics"}`, `500 request `},
 		{"POST", "add", `{"name":"secret","more":1}`, `400 add: input.more is not a key of Person`},
+		// Postgres's text holds no U+0000, so the reader refuses it.
+		{"POST", "add", `{"name":"a\u0000secret"}`, `400 add: input.name holds U+0000, which a String on the wire cannot: leave it out`},
+		{"POST", "add", `{"name":"asecret"}`, `200 {"type":"ok","value":"secret answer"}`},
 		{"POST", "login", `{"name":"kept"}`, `200 {"type":"refused","message":"secret refusal"}`},
 		{"POST", "who", `not read`, `200 {"type":"ok","value":{"header":"me","cookie":"crumb","missing":null,"host":"example.com","address":"192.0.2.1"}}`},
 		{"POST", "nothing", `{}`, `404 `},
@@ -412,7 +415,7 @@ func TestHandler(t *testing.T) {
 	if len(readOnly) != 4 || !readOnly["INSERT"] || !readOnly["UPDATE"] || !readOnly["SELECT"] || !readOnly["nextval()"] {
 		t.Errorf("a check that writes, or a gate that writes, locks or counts, is not refused by Postgres: %v", readOnly)
 	}
-	if len(ids) != 45 || strings.Contains(log.String(), "secret") {
+	if len(ids) != 47 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
 	if reruns["race ok"] < 1 || reruns["heldRace ok"] < 1 || reruns["deadlocked 503"] < 1 || reruns["deadlockedPlain 503"] < 1 || reruns["add ok"] != 0 {

@@ -166,6 +166,8 @@ func (r reader) read(t reflect.Type, j any, at string) (reflect.Value, error) {
 			return v, bad(at, "is not one of %s", strings.Join(names, ", "))
 		}
 		v.SetString(s)
+	case t.Kind() == reflect.String && strings.ContainsRune(s, 0): // Postgres's text holds none
+		return v, bad(at, "holds U+0000, which a String on the wire cannot: leave it out")
 	case t.Kind() == reflect.String:
 		v.SetString(s)
 	case t.Kind() == reflect.Slice:

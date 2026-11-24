@@ -4768,3 +4768,16 @@ limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
 - **A sentence each in spec 15 and `doc/gates.md`**, though neither said the gate's read
   is the first: each describes the savepoint, and the statement before it is now part of
   how the gate runs.
+
+## U+0000 in a string on the wire is a 400 (DEV-1192), 24 Nov 2026
+
+- **The reader refuses a `String` that holds U+0000**, wherever it stands in the input,
+  as the lead ruled on DEV-1153 under Greg's rule that nothing a caller can cause is a
+  500. The refusal is at the plain `String` alone: an enum or a `Uuid` that holds one is
+  already refused as not one of its names or not a `Uuid`. Not taken: refusing only a
+  string an operation sends to Postgres, which the reader cannot know.
+- **Settings are refused too**: they are read by the same reader (15.4), so a setting
+  holding U+0000 stops the start, naming the key. Not taken: a reader with a flag to let
+  them through, a line for a case no one has.
+- **Spec 10.4's line stays**: a `String` the program makes that holds U+0000 is still a
+  panic when it is sent; an input can no longer bring one.

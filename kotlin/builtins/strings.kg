@@ -18,6 +18,7 @@ fun strings(f: String, s: String, t: String, n: Int, m: Int): String? = when (f)
     "contains" -> "${s.contains(t)} ${(s + t + s).contains(t)}"
     "containsChar" -> "${t.map { s.contains(it) }} ${s.map { (t + s).contains(it) }}"
     "lowercase" -> s.lowercase()
+    "filter" -> "<${s.filter { it.isWhitespace() }}> <${s.filter { "ab c".contains(it) }}> <${s.filter { t.contains(it) }}> <${s.filter { t.map { c -> c }.take(1).contains(it) }}>"
     "filterNot" -> s.filterNot { it.isWhitespace() }
     "filterNotIn" -> s.filterNot { t.map { c -> c }.toSet().contains(it) }
     "substringFrom" -> s.substring(n)

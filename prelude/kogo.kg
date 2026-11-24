@@ -21,10 +21,12 @@ external fun <T> listOfNotNull(vararg elements: T?): List<T>
 external fun <T> emptyList(): List<T>
 external val <T> List<T>.size: Int
 external fun <T> List<T>.get(index: Int): T
+external fun <T> List<T>.getOrNull(index: Int): T?
 external fun <T> List<T>.isEmpty(): Boolean
 external fun <T> List<T>.isNotEmpty(): Boolean
 external fun <T> List<T>.contains(element: T): Boolean
 external fun <T> List<T>.none(predicate: (T) -> Boolean): Boolean
+external fun <T> List<T>.all(predicate: (T) -> Boolean): Boolean
 external fun <T> List<T>.first(): T
 external fun <T> List<T>.firstOrNull(): T?
 external fun <T> List<T>.firstOrNull(predicate: (T) -> Boolean): T?
@@ -47,16 +49,29 @@ external fun <T> List<T>.sumOf(selector: (T) -> Int): Int
 external fun <T> List<T>.sumOf(selector: (T) -> Long): Long
 external fun <T> List<T>.plus(elements: List<T>): List<T>
 external fun <T, R> List<T>.mapNotNull(transform: (T) -> R?): List<R>
+external fun <T, R> List<T>.flatMap(transform: (T) -> List<R>): List<R>
+external fun <T> List<T>.maxOrNull(): T?
 external fun <T, R> List<T>.sortedBy(selector: (T) -> R): List<T>
+external fun <T, R> List<T>.sortedByDescending(selector: (T) -> R): List<T>
+external fun <T> List<T>.distinct(): List<T>
 external fun <T, K> List<T>.distinctBy(selector: (T) -> K): List<T>
 external fun <T> List<T>.reversed(): List<T>
 external fun <T, K> List<T>.groupBy(keySelector: (T) -> K): Map<K, List<T>>
+external fun <T, K> List<T>.associateBy(keySelector: (T) -> K): Map<K, T>
+external fun <T, K, V> List<T>.associate(transform: (T) -> Pair<K, V>): Map<K, V>
 
 external fun <T> setOf(vararg elements: T): Set<T>
 external fun <T> Set<T>.contains(element: T): Boolean
 external fun <T, R> Set<T>.mapNotNull(transform: (T) -> R?): List<R>
+external fun <T> Set<T>.plus(element: T): Set<T>
+external fun <T> Set<T>.plus(elements: List<T>): Set<T>
+external fun <T> Set<T>.plus(elements: Set<T>): Set<T>
+external fun <T> Set<T>.minus(element: T): Set<T>
+external fun <T> Set<T>.minus(elements: List<T>): Set<T>
+external fun <T> Set<T>.minus(elements: Set<T>): Set<T>
 
 external fun <K, V> Map<K, V>.get(key: K): V?
+external val <K, V> Map<K, V>.keys: Set<K>
 
 external val String.length: Int
 external fun String.plus(other: String): String
@@ -70,6 +85,7 @@ external fun String.ifBlank(defaultValue: () -> String): String
 external fun String.startsWith(prefix: String): Boolean
 external fun String.endsWith(suffix: String): Boolean
 external fun String.replace(regex: Regex, replacement: String): String
+external fun String.filter(predicate: (Char) -> Boolean): String
 external fun String.filterNot(predicate: (Char) -> Boolean): String
 external fun String.lowercase(): String
 external fun String.contains(other: String): Boolean

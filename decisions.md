@@ -4601,3 +4601,24 @@ Greg's ruling on DEV-1143's finding 1, and the agent's choices beside it.
   though it gave Kotlin's answer: its `takeIf` makes a `T?` of the `T`, and its right
   answer came only from the lambda's own test. Not taken: telling such a body apart, which
   would be the folding above in one place.
+
+## A string on the wire is written as Kotlin writes it (DEV-1172), 24 Nov 2026
+
+The lead ruled the encoder changes, not the comparison; the agent's, for the rest.
+
+- **`rpc`'s `quote` is its own loop, not `encoding/json` with `SetEscapeHTML(false)`** as
+  `http/json.go` has it: Go escapes U+2028 and U+2029 whatever the setting, and Kotlin
+  does not, so the setting alone leaves a difference. It escapes `"`, `\` and each
+  character below U+0020, `\b \t \n \f \r` short and the rest `\u00xx` in lower case,
+  byte for byte what kotlinx.serialization 1.13.0 wrote for each (checked by hand, the
+  probe in the handoff). Not taken: the encoder followed by a replace of `\u2028`, which
+  a string holding a backslash then `u2028` breaks.
+- **A lone surrogate stays a limit, stated in spec 15.4**: Go reads one as U+FFFD, where
+  Kotlin's answer differs. A Kogo string holds no half of a surrogate pair (spec section 3),
+  and no row of Postgres holds one.
+- **No case in `mise run kotlin`**: its cases call Kogo built-ins from `.kg` source, and
+  `quote` is none, so the check has no form for this case.
+  The test holds the bytes Kotlin wrote instead. Reopen if the wire gets a check of its own
+  against Kotlin.
+- **`http/json.go`'s `encode` is left as it is**: it writes to a third party, which
+  compares no bytes, and still escapes U+2028 there.

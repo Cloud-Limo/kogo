@@ -4929,3 +4929,10 @@ again (spec 10). It supersedes DEV-1194's entries on the `offset 0` layer and th
   none of those names and spec 14's row on `LocalDateTime` stands. Not taken: the names
   in `kogo.time`, about 110 code / 150 tests, which make Go's a third copy of the rules
   beside the JVM's and Postgres's. Reopen if a port has no database beside it.
+
+## decisions.md merges as a union (DEV-1200), 24 Nov 2026
+
+- **`decisions.md merge=union`**, and no other file (Greg): git reads it from the branch
+  merged into, so a PR opened before this lands conflicts once more; GitHub's own merge
+  does not read it, which does not matter, since `main` is merged in the worktree.
+  Reopens if two kept versions of one rewritten entry reach `main`.

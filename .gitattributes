@@ -1,2 +1,4 @@
 # Kogo is Kotlin's syntax, so GitHub highlights .kg files as Kotlin.
 *.kg linguist-language=Kotlin
+# Every PR appends to decisions.md, so a merge keeps both sides' entries.
+decisions.md merge=union

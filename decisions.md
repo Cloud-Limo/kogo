@@ -4928,6 +4928,19 @@ override are corrected in place above.
   outer join, not through the class's. Not taken here: carrying the joins that null each
   column and refusing a class whose columns differ in them, which is new analysis in the
   SQL pass and its own issue. That refusal ends this exception.
+- **A nullable nested data class whose columns no outer join can null is refused**, as
+  `Booking.price: Charge?` over a table's own two nullable columns tied by a check
+  constraint (Greg's Ruling b on PR 184, 24 Nov 2026): the author reads each column as a
+  `T?` property and builds the class in Kogo. `sql-absent` says so for such a class, and
+  names no join; the SQL pass's `Outer` says whether an outer join can null a column at
+  all, and a class with no `Outer` column is this case. Not taken: the all-null test kept
+  for a class with no join, which brings back the panic on a half-filled row and a second
+  rule in spec 10.3; and merging with the join's messages as they were. The agent's: a
+  column of such a class that may be null in a property that may not be null gets no
+  `sql-nullable` of its own, since `sql-absent` refuses the class whole and `"name!"` would
+  not save it (not taken: both errors, the second saying the same); a column that is an
+  expression over a joined one, as `lower(t.slug)`, is not `Outer`, so a class of only
+  such columns gets this message, whose advice holds there too.
 - **`as "name?"` clears `Joined`** (the Code review's fix): the author's "may be null" is
   not the join's, so such a column neither fills a property that may not be null in a
   nullable class nor tells the class's absence.

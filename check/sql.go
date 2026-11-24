@@ -166,7 +166,7 @@ func (c *checker) row(lit *syntax.SQL, q *Query) {
 		// Where a data class had no column at all, a column left over
 		// of the name of one of its properties is likely its own, as b.*
 		// gives a business's: its error says what to select instead.
-		missed, _ := c.fill(lit, d, "", nil, false, cols, q.Paths)
+		missed, _ := c.fill(lit, d, "", nil, present, cols, q.Paths)
 		for i, path := range q.Paths {
 			owned := slices.ContainsFunc(missed, func(m *Named) bool {
 				return slices.ContainsFunc(m.Decl.Props, func(p *Var) bool { return Snake(p.Name) == cols[i].Name })
@@ -180,9 +180,20 @@ func (c *checker) row(lit *syntax.SQL, q *Query) {
 		c.errorf(lit, "sql-columns", "this statement gives %d columns, and a %s is one: read them into a data class with a property for each, or select one column", len(cols), q.Row)
 	default:
 		q.Paths[0] = []int{}
-		c.column(lit, cols[0], q.Row, false, "the result", "")
+		c.column(lit, cols[0], q.Row, present, "the result", "")
 	}
 }
+
+// An absence says whether a data class being filled may be absent:
+// it is, or lies in, a nullable data class, whose columns an outer
+// join can null or none of them.
+type absence int
+
+const (
+	present absence = iota
+	outer
+	alone
+)
 
 // dataClass gives t, or what t? holds, when it is a data class.
 func dataClass(t Type) *Named {
@@ -204,9 +215,11 @@ func dataClass(t Type) *Named {
 // property that is not nullable filled by such a column, which joined
 // says d has, in itself or in a data class it holds that is not
 // nullable. missed holds the data classes that had no column at all.
+// A nullable data class none of whose columns an outer join can null
+// is refused all the same, with messages that name no join.
 // A column that a property of d takes by name, as business_id, does
 // not count as one with the prefix of a sibling, business.
-func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, absent bool, cols []sqlpass.Column, paths [][]int) (missed []*Named, joined bool) {
+func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, absent absence, cols []sqlpass.Column, paths [][]int) (missed []*Named, joined bool) {
 	c.builds(lit, d.Decl)
 	b := bind(d.Decl.Params, d.Args)
 	prefixed := func(name string) bool {
@@ -230,9 +243,20 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 			c.errorf(lit, "sql-columns", "%s holds data classes nested too deep to fill from columns", d)
 			return missed, joined
 		case j < 0 && n != nil:
-			more, in := c.fill(lit, n, name+"_", here, absent || null, cols, paths)
+			inner := absent
+			if null {
+				inner = alone
+				if slices.ContainsFunc(cols, func(col sqlpass.Column) bool { return col.Outer && strings.HasPrefix(col.Name, name+"_") }) {
+					inner = outer
+				}
+			}
+			more, in := c.fill(lit, n, name+"_", here, inner, cols, paths)
 			missed, joined = append(missed, more...), joined || in && !null
-			if null && !in && more == nil {
+			if null && !in && more == nil && inner == alone {
+				c.errorf(lit, "sql-absent", "%s, a %s, is filled by columns that may each be null on their own: "+
+					"read each as a T? property of %s in its place, and build the %s from them in Kogo",
+					what, t, d, n)
+			} else if null && !in && more == nil {
 				c.errorf(lit, "sql-absent", "%s, a %s, has no property that is not nullable filled by a column null only through an outer join, "+
 					"so a row of nulls would read as no %s: select a NOT NULL column of the joined table for one, as in t.id as %s_id, or the table's whole row, as in select t as %s",
 					what, t, n, name, name)
@@ -256,7 +280,7 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 // t is a T? or the column lies in a nullable data class, absent, and
 // is null only through an outer join (spec.md 10.3 to 10.5). A
 // composite type fills a data class field by field.
-func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent bool, what, of string) {
+func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent absence, what, of string) {
 	_, null := t.(*Nullable)
 	n := dataClass(t)
 	subject, cast, assert := "column "+col.Name, ", or cast the column in the statement", fmt.Sprintf(", or if the column is never null, name it as \"%s!\"", col.Name)
@@ -292,10 +316,12 @@ func (c *checker) column(lit *syntax.SQL, col sqlpass.Column, t Type, absent boo
 		}
 		c.errorf(lit, "sql-nullable", "%s is an array, whose elements Postgres never promises are not null, and fills %s, a %s: "+
 			"make that a %s, and drop the nulls with filterNotNull() or refuse them with requireNotNull", subject, what, t, want)
-	case col.Nullable && !null && absent && !col.Joined:
+	case col.Nullable && !null && absent == alone:
+		// the class is refused whole, by sql-absent, which says what to write
+	case col.Nullable && !null && absent == outer && !col.Joined:
 		c.errorf(lit, "sql-nullable", "%s may be null even where its outer join finds a row, and fills %s, a %s, in a nullable data class that is null where that join finds none: make that a %s?%s",
 			subject, what, t, t, assert)
-	case col.Nullable && !null && !absent:
+	case col.Nullable && !null && absent == present:
 		c.errorf(lit, "sql-nullable", "%s may be null, and fills %s, a %s: make that a %s?%s", subject, what, t, t, assert)
 	}
 	if col.Type.Fields != nil && n != nil {
@@ -328,7 +354,7 @@ func (c *checker) fields(lit *syntax.SQL, col sqlpass.Column, d *Named) {
 			continue
 		}
 		used[j] = true
-		c.column(lit, col.Type.Fields[j], subst(p.Type, b), false, d.Decl.Name+"."+p.Name, col.Name)
+		c.column(lit, col.Type.Fields[j], subst(p.Type, b), present, d.Decl.Name+"."+p.Name, col.Name)
 	}
 	for j, f := range col.Type.Fields {
 		if !used[j] {

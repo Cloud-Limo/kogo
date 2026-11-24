@@ -806,7 +806,10 @@ column.
   The class must have at least one property that is not nullable filled
   by such a column, in itself or in a data class it holds that is not
   nullable, and `kogo check` refuses one that has none: select one, as
-  `t.id as storefront_id`, or the table's whole row. The class is
+  `t.id as storefront_id`, or the table's whole row. So a class whose
+  columns no outer join can null, as `returning *` gives a table's own
+  nullable columns, is refused too: read each column as a `T?` property
+  and build the class from them in Kogo. The class is
   `null` when those columns are null, whatever its others hold, so
   `coalesce(n.text, '') as note_text` beside `n.id as note_id` reads as
   no note where there is none. A column asserted with `"name!"` that is

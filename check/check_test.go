@@ -152,7 +152,7 @@ func signature(lit *syntax.SQL) (*sqlpass.Statement, error) {
 			if name, t, ok := strings.Cut(strings.TrimSpace(col), ": "); ok {
 				t, joined := strings.CutSuffix(t, "??")
 				base, null := strings.CutSuffix(t, "?")
-				cols = append(cols, sqlpass.Column{Name: name, Type: typ(base), Nullable: null || joined, Joined: joined})
+				cols = append(cols, sqlpass.Column{Name: name, Type: typ(base), Nullable: null || joined, Joined: joined, Outer: joined})
 			}
 		}
 		return cols
@@ -1015,6 +1015,10 @@ external class Instant`,
 		{"data class T(val id: Uuid?, val abn: String?)\ndata class Row(val tenant: T?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> tenant_id: Uuid??, tenant_abn: String?\")", "sql-absent",
 			"Row.tenant, a T?, has no property that is not nullable filled by a column null only through an outer join, so a row of nulls would read as no T: " +
 				"select a NOT NULL column of the joined table for one, as in t.id as tenant_id, or the table's whole row, as in select t as tenant"},
+		// A nullable data class whose columns no outer join can null, as
+		// returning * gives, is refused whole, in words that name no join.
+		{"data class C(val amount: Long, val currency: String?)\ndata class Row(val price: C?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> price_amount: Long?, price_currency: String?\")", "sql-absent",
+			"Row.price, a C?, is filled by columns that may each be null on their own: read each as a T? property of Row in its place, and build the C from them in Kogo"},
 		{"data class T(val slug: String)\ndata class S(val t: T?)\ndata class Row(val s: S?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> s_t_slug: String??\")", "sql-absent",
 			"Row.s, a S?, has no property"},
 		{"fun f(tx: Tx): Long = tx.querySingle<Long>(‸sql\" -> a: Long, b: Long\")", "sql-columns",

@@ -218,6 +218,31 @@ func TestJoined(t *testing.T) {
 	}
 }
 
+// A column is under an outer join where one can null it on the way,
+// nullable in its table or not; a table's own column, as returning *
+// gives, is not.
+func TestOuter(t *testing.T) {
+	c := connect(t)
+	for literal, want := range map[string]string{
+		`select b.id, t.id as tenant_id, t.slug, c.abn from business b left join tenant t on t.business_id = b.id left join business c on c.id = b.id`: "tenant_id slug abn",
+		`update business set abn = $abn where id = $id returning *`:                                                                                    "",
+	} {
+		st, err := check(c, literal)
+		if err != nil {
+			t.Fatalf("%s: %v", literal, err)
+		}
+		var outer []string
+		for _, col := range st.Columns {
+			if col.Outer {
+				outer = append(outer, col.Name)
+			}
+		}
+		if got := strings.Join(outer, " "); got != want {
+			t.Errorf("%s\n got %q outer, want %q", literal, got, want)
+		}
+	}
+}
+
 // An enum carries its constants, as a parameter, as a column and in a
 // list, for the checker to match them with a Kogo enum's.
 func TestEnumLabels(t *testing.T) {

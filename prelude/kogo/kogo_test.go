@@ -647,21 +647,31 @@ func TestOverloads(t *testing.T) {
 	}
 }
 
-// A plain db.tx is run once: a deadlock in it is a panic, not a rerun
-// (spec.md 10.7).
-func TestPlainTxRunsOnce(t *testing.T) {
+// A plain db.tx is rerun on a deadlock, as the server's Tx is, and on
+// no other conflict: a serialization failure in it is a panic (spec.md
+// 10.7).
+func TestPlainTxRerunsDeadlock(t *testing.T) {
 	ctx, pool := testPool(t)
+	db := NewDb(ctx, pool)
 	runs := 0
-	defer func() {
-		if p, _ := recover().(*pgconn.PgError); p == nil || p.Code != "40P01" || runs != 1 {
-			t.Errorf("a deadlock in a plain db.tx ran it %d times and panicked with %v", runs, p)
-		}
-	}()
-	Db_Tx_Boolean_TxToA(NewDb(ctx, pool), nil, func(Tx) rt.Unit {
-		if runs++; runs == 1 {
+	got := Db_Tx_Boolean_TxToA(db, nil, func(Tx) int {
+		if runs++; runs < 3 {
 			panic(&pgconn.PgError{Code: "40P01"})
 		}
-		return rt.Unit{}
+		return runs
+	})
+	if got != 3 {
+		t.Errorf("a plain db.tx deadlocked twice gave %d, want its third run's 3", got)
+	}
+	runs = 0
+	defer func() {
+		if p, _ := recover().(*pgconn.PgError); p == nil || p.Code != "40001" || runs != 1 {
+			t.Errorf("a serialization failure in a plain db.tx ran it %d times and panicked with %v", runs, p)
+		}
+	}()
+	Db_Tx_Boolean_TxToA(db, nil, func(Tx) rt.Unit {
+		runs++
+		panic(&pgconn.PgError{Code: "40001"})
 	})
 }
 

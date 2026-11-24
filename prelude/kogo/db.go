@@ -73,11 +73,12 @@ func must[T any](v T, err error) T {
 // Db_Tx_Boolean_TxToA is db.tx { } where the enclosing fun returns no
 // Either: it commits when block returns and rolls back when block
 // panics, with a failure of a raise scope around it or with a bug.
-// It is at READ COMMITTED, and run once; db.tx(serializable = true)
-// is at SERIALIZABLE, and rerun on each conflict.
+// It is at READ COMMITTED, and rerun on a deadlock alone, as the
+// server's Tx is; db.tx(serializable = true) is at SERIALIZABLE, and
+// rerun on each conflict.
 func Db_Tx_Boolean_TxToA[A any](this Db, serializable *bool, block func(Tx) A) A {
 	s := serializable != nil && *serializable
-	return InTx(this, s, func(*pgconn.PgError) bool { return s }, block)
+	return InTx(this, s, func(c *pgconn.PgError) bool { return s || c.Code == "40P01" }, block)
 }
 
 // InTx is db.tx { }, for the server too, which limits its reruns: at

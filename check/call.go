@@ -80,6 +80,9 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			c.loose(e.Args, nil)
 			return unknown
 		}
+		if name != "toString" { // Raise's own in Kotlin: this stands as a value
+			c.recv = recv
+		}
 		if rt = c.expr(recv, nil); rt == unknown {
 			c.loose(e.Args, nil)
 			return unknown
@@ -129,6 +132,16 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 		c.sortKey(e, call)
 		if id, ok := e.Fun.(*syntax.Ident); ok && call.Func.Receiver != nil && c.raised(call.Func.Receiver) == nil {
 			c.narrowedThis(id)
+		}
+		// In Kotlin an extension on a type parameter, called on this
+		// or on none, takes the Raise, as toString() does (spec.md 9).
+		_, anyRecv := call.Func.Receiver.(*TypeParam)
+		if x, ok := recv.(*syntax.Ident); ok && x.Name == "this" && c.raiseThis && anyRecv {
+			c.raiseThisAt(x, rt)
+		} else if id, ok := e.Fun.(*syntax.Ident); ok && c.raiseThis && (anyRecv || call.Func.Kind == ToString) {
+			if v, ok := c.scope.lookup("this").(*Var); ok {
+				c.raiseThisAt(id, v.Type)
+			}
 		}
 	}
 	if safe {

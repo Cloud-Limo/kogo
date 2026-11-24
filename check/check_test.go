@@ -898,6 +898,26 @@ func TestFailures(t *testing.T) {
 		{"fun f(g: () -> Int): Either<String, Int> = either(‸g)", "type-mismatch", "this is a () -> Int where a Raise<String>.() -> Int is wanted"},
 		{"fun f(): Either<String, Int> = ‸either(1) { raise(\"no\") }", "arguments", "either is given block twice"},
 	})
+	// A this that stands as a value inside a raise scope is Kotlin's
+	// Raise and Kogo's receiver, so it is refused; a member read through
+	// it, which kotlinc refuses, and one named before the block are not.
+	acct := "data class Acct(val name: String)\nfun g(a: Acct): String = a.name\n"
+	rename := "in Kotlin this inside either { } or db.tx { } is the raise scope, not this Acct: name it in a val before the block, as val acct = this, and use that"
+	refused(t, [][3]string{
+		{acct + "fun Acct.f(): Either<String, String> = either { \"I am $‸this\" }", "raise-this", rename},
+		{acct + "fun Acct.f(): Either<String, String> = either { g(‸this) }", "raise-this", rename},
+		{acct + "fun Acct.f(): Either<String, String> = either { ‸this.toString() }", "raise-this", rename},
+		{acct + "fun Acct.f(): Either<String, String> = either { ‸this.let { \"I am $it\" } }", "raise-this", rename},
+		{acct + "fun Acct.f(): Either<String, String> = either { \"I am ${‸this.right()}\" }", "raise-this", rename},
+		{acct + "fun Acct.f(): Either<String, String> = either { ‸toString() }", "raise-this", rename},
+		{acct + "fun Acct.f(): Either<String, String> = either { ‸let { \"I am $it\" } }", "raise-this", rename},
+		{acct + "fun Acct.f(): Either<String, List<String>> = either { listOf(1).map { g(‸this) } }", "raise-this", rename},
+		{acct + "fun Acct.f(db: Db): Either<String, String> = db.tx { tx -> g(‸this) }", "raise-this", rename},
+		// A local fun is not in the raise scope, and Kotlin's this there is still the Raise.
+		{acct + "fun Acct.f(): Either<String, String> = either {\n    fun h(): String = g(‸this)\n    h()\n}", "raise-this", rename},
+		{"interface Shown {\n    fun show(): Either<String, String>\n}\ndata class Box(val n: Int) : Shown {\n    override fun show(): Either<String, String> = either { \"box $‸this\" }\n}", "raise-this", "not this Box: name it in a val before the block, as val box = this"},
+	})
+	passes(t, acct+"fun Acct.f(): Either<String, String> = either { this.name + name + this.f2() }\nfun Acct.f2(): String = \"I am $this\"\nfun Acct.f3(): Either<String, String> {\n    val acct = this\n    return either { g(acct) }\n}")
 	// Only a refused Raise<E> receiver keeps quiet about the body: an
 	// unknown type there still lets raise-scope be said.
 	if _, errs := run(t, "fun Foo.f(): Int = raise(\"no\")"); len(errs) != 2 || errs[0].Code != "unknown-name" || errs[1].Code != "raise-scope" {
@@ -1092,6 +1112,24 @@ func TestMarkedConstructor(t *testing.T) {
 	}
 	// Answering with one makes none.
 	passes(t, head+body+"api ops unchecked { f ungated }\n"+op("Unit", "H"))
+}
+
+// A constructor that is private or internal is a wall as a marked one
+// is (spec.md 15.4): no input holds its class, alone, nested or in a
+// List, and an answer may.
+func TestWalledConstructorOnTheWire(t *testing.T) {
+	head := "package kogo.rpc\nexternal class Request\n---\nimport kogo.rpc.Request\ndata class Env(val n: Int)\n"
+	why := ", and no request makes one: take the id or the slug in the input and make the value with the function that checks it"
+	for _, wall := range []string{"private", "internal"} {
+		h := "data class H " + wall + " constructor(val n: Int)\n"
+		ctor := "whose constructor is " + wall + why
+		refused(t, [][3]string{
+			{head + h + "api ops unchecked { ‸f ungated }\n" + op("H", "Unit"), "wire", "f's input is a H, " + ctor},
+			{head + h + "data class In(val h: H?)\napi ops unchecked { ‸f ungated }\n" + op("In", "Unit"), "wire", "f's input holds In.h: H?, " + ctor},
+			{head + h + "api ops unchecked { ‸f ungated }\n" + op("List<H>", "Unit"), "wire", "f's input holds a H, " + ctor},
+		})
+		passes(t, head+h+"api ops unchecked { f ungated }\n"+op("Unit", "H"))
+	}
 }
 
 // For each literal, what each parameter binds and the property each

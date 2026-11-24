@@ -101,6 +101,8 @@ type checker struct {
 	result     Type                      // what the enclosing fun returns
 	loops      int                       // the loops around this place, inside its fun or lambda
 	raise      Type                      // the E of the raise scope around this place, or nil
+	recv       syntax.Expr               // the receiver of a call or a select being read
+	raiseThis  bool                      // a raise scope's block lies between here and the this in scope
 	lambdas    []*syntax.Lambda          // the lambdas around this place
 	acted      bool                      // the fun at hand has called an action
 	inTx       int                       // how many of lambdas are handed a Tx
@@ -760,6 +762,8 @@ func (c *checker) body(f *Func, d *syntax.FunDecl) {
 	var raise Type
 	if f.Receiver != nil {
 		c.define(d, &Var{Kind: Param, Name: "this", Type: f.Receiver})
+		defer func(b bool) { c.raiseThis = b }(c.raiseThis)
+		c.raiseThis = false
 	}
 	if n, ok := d.Receiver.(*syntax.NamedType); ok && f.Receiver == unknown {
 		if t, _ := c.findType(n.Name); t != nil && t == c.prelude("Raise") {

@@ -228,23 +228,30 @@ func (c *Checker) wrap(ctx context.Context, st *Statement, query *node, sd *pgco
 	for i, f := range sd.Fields {
 		if seen[f.Name] {
 			return &Error{0, "sql-duplicate-column", fmt.Sprintf(
-				"two columns are named %s, and Kogo reads a column by its name: name each once, as in t.%s as t_%s", f.Name, f.Name, f.Name)}
+				"two columns are named %s, and Kogo reads a column by its name: name each once with as, as in b.id as business_id", f.Name)}
 		}
 		seen[f.Name] = true
 		names[i] = pgx.Identifier{f.Name}.Sanitize()
 	}
-	cols := strings.Join(names, ", ")
-	// The newline ends a -- comment that the statement ends with.
-	sql := "select " + cols + " from (" + st.SQL + "\n) _"
+	cols, body := strings.Join(names, ", "), st.SQL
+	// Postgres's own end of the statement drops a trailing ; (0 is the
+	// end), and the newline ends a -- comment the statement ends with.
+	if n := query.num("stmt_len"); n > 0 {
+		body = body[:query.num("stmt_location")+n]
+	}
+	sql := "select " + cols + " from (" + body + "\n) _"
 	if query.num("commandType") != cmdSelect {
-		sql = "with _ as (" + st.SQL + "\n) select " + cols + " from _"
+		sql = "with _ as (" + body + "\n) select " + cols + " from _"
 	}
 	wd, err := c.conn.PgConn().Prepare(ctx, "", sql, sd.ParamOIDs)
 	if err != nil {
 		return &Error{0, "sql-wrap", fmt.Sprintf("Postgres refused the statement as Kogo sends it, %s: %v", sql, err)}
 	}
+	if len(wd.Fields) != len(sd.Fields) {
+		return &Error{0, "sql-wrap", fmt.Sprintf("the statement as Kogo sends it, %s, describes %d columns, the statement %d", sql, len(wd.Fields), len(sd.Fields))}
+	}
 	for i, f := range wd.Fields {
-		if len(wd.Fields) != len(sd.Fields) || f.Name != sd.Fields[i].Name || f.DataTypeOID != sd.Fields[i].DataTypeOID {
+		if f.Name != sd.Fields[i].Name || f.DataTypeOID != sd.Fields[i].DataTypeOID {
 			return &Error{0, "sql-wrap", fmt.Sprintf("the statement as Kogo sends it, %s, does not describe column %d as the statement does, %s", sql, i+1, sd.Fields[i].Name)}
 		}
 	}

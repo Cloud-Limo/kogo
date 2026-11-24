@@ -732,8 +732,9 @@ column.
   `legal_name` fills property `legalName` (snake_case to camelCase). Every
   property must be filled and every column used; give a column a name with
   `as`.
-- A query call sends the statement as written, wrapped under a select
-  of its columns by the names `kogo check` saw: a select as
+- A query call sends its statement, a select, insert, update, delete
+  or merge (10.7), as written, wrapped under a select of its columns by
+  the names `kogo check` saw, less a trailing `;`: a select as
   `select "a", "b" from (...) _`, any other statement as
   `with _ as (...) select "a", "b" from _`. So a row is read by name
   even when the database served orders a table's columns otherwise than

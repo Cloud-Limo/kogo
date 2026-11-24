@@ -114,19 +114,11 @@ func run(t *testing.T, more, setup string, calls []string, sources ...string) []
 		if errs != nil {
 			t.Fatalf("%v", errs)
 		}
-		driver := "package main\nimport (\n\"fmt\"\n\"github.com/Cloud-Limo/kogo/rt\"\n\"ROOT/t\"\n)\n" + more + `
+		driver := "package main\nimport (\n\"fmt\"\n\"strings\"\n\"github.com/Cloud-Limo/kogo/rt\"\n\"ROOT/t\"\n)\n" + more + `
 func show(value func() any) {
 defer func() {
 if p := recover(); p != nil {
-var line []byte
-for _, c := range []byte(fmt.Sprint(p)) {
-if c == '\n' {
-line = append(line, '\\', 'n')
-} else {
-line = append(line, c)
-}
-}
-fmt.Println("panics:", string(line))
+fmt.Println("panics:", strings.ReplaceAll(fmt.Sprint(p), "\n", "\\n"))
 }
 }()
 fmt.Println(rt.ToString(value()))

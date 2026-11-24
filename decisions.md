@@ -4574,6 +4574,11 @@ Greg's ruling of 24 Nov 2026 on DEV-1161's research; the agent's where marked.
 - **Nullability and tables are still read from the statement as written** (the
   sketch's): the wrap neither renames nor reorders, and its description is compared
   with the statement's.
+- **A trailing `;` is cut at Postgres's own end of the statement** (the review's, on
+  DEV-1167): the wrap takes the statement up to its tree's `stmt_location` plus
+  `stmt_len`, 0 meaning to the end, so a `;` and any comment after it are dropped
+  and no SQL text is read. Not taken: refusing a trailing `;` with a code of its
+  own, which would refuse a statement that checked before the wrap.
 
 ## A Tx runs no utility statement (DEV-1176), 24 Nov 2026
 

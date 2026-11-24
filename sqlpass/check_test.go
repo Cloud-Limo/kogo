@@ -344,8 +344,7 @@ func TestWrap(t *testing.T) {
 	for literal, want := range map[string]string{
 		"select slug from tenant -- by slug":  `select "slug" from (select slug from tenant -- by slug` + "\n) _",
 		`select count(*) as "n!" from tenant`: `select "n!" from (select count(*) as "n!" from tenant` + "\n) _",
-		`insert into account values (1, 'a', 'b') returning *`: `with _ as (insert into account values (1, 'a', 'b') returning *` +
-			"\n) select \"id\", \"owner\", \"payee\" from _",
+		"select slug from tenant; -- by slug": `select "slug" from (select slug from tenant` + "\n) _",
 		`merge into account a using (values (1)) v(id) on a.id = v.id when matched then delete returning a.id`: `with _ as (merge into account a ` +
 			"using (values (1)) v(id) on a.id = v.id when matched then delete returning a.id\n) select \"id\" from _",
 	} {

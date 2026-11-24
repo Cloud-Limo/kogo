@@ -80,6 +80,9 @@ func (c *checker) call(e *syntax.Call, want Type) Type {
 			c.loose(e.Args, nil)
 			return unknown
 		}
+		if name != "toString" { // Raise's own in Kotlin: this stands as a value
+			c.recv = recv
+		}
 		if rt = c.expr(recv, nil); rt == unknown {
 			c.loose(e.Args, nil)
 			return unknown

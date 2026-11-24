@@ -346,6 +346,14 @@ func (c *checker) expr1(e syntax.Expr, want Type) Type {
 func (c *checker) ident(e *syntax.Ident) Type {
 	switch o := c.scope.lookup(e.Name).(type) {
 	case *Var:
+		if e.Name == "this" && c.recv != e && c.raiseThis {
+			name := o.Type.String()
+			if n, ok := o.Type.(*Named); ok {
+				name = n.Decl.Simple()
+			}
+			name = strings.ToLower(name[:1]) + name[1:]
+			c.errorf(e, "raise-this", "in Kotlin this inside either { } or db.tx { } is the raise scope, not this %s: name it in a val before the block, as val %s = this, and use that (spec.md 9)", o.Type, name)
+		}
 		c.info.Uses[e] = o
 		t := c.typeOf(o)
 		if t != o.Type {
@@ -524,6 +532,7 @@ func (c *checker) sel(e *syntax.Select) Type {
 	if c.packaged(e) {
 		return unknown
 	}
+	c.recv = e.X
 	rt := c.expr(e.X, nil)
 	if rt == unknown {
 		return unknown

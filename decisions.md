@@ -2464,17 +2464,16 @@ Each entry: what was decided, why, and what would reopen it.
 
 - **A `Set` or a `Map` finds a key of a plain kind through a Go map, and walks for any
   other** (corrected by DEV-1210; it first said every key was walked, to be reopened when a
-  set grew big enough for the walk to show, and DEV-1198's trial F4 showed it: 6.5 s for
-  `toSet().contains` over 20,000 ids). Greg ruled on 24 Nov 2026: beside its slice of keys,
-  kept for order, `ordered` holds a map from a key to its position when the key is a
-  `String`, an `Int`, a `Long`, a `Boolean`, a `Uuid` or an enum, where Go's `==` is
-  Kotlin's; a `Double` (NaN, the two zeros), a `T?` (a pointer), a data class, a `Pair`, a
-  `List`, a `Decimal` and a type of `kogo.time` keep the walk, and spec 12 warns of it. The
-  kind is read from the type with the first key. A copy shares the map, so one that finds
-  another copy has added (the map longer than its keys) takes its own. Not taken: a hash
-  for every key, a second walk that must agree with `==` everywhere, about 45 / 25 lines,
-  where any disagreement makes `contains` answer false for a key that is there. Reopen
-  when a large collection keyed by another kind is needed.
+  set grew big enough to show, and DEV-1198's trial F4 showed it: 6.5 s for
+  `toSet().contains` over 20,000 ids). Greg ruled on 24 Nov 2026: a map for a `String`,
+  `Int`, `Long`, `Boolean`, `Uuid` or enum key, where Go's `==` is Kotlin's, the walk for
+  the rest, and a note in spec 12 that warns of it. An enum is taken as any named string
+  but `Decimal` (the other named strings, rpc's `Refused` and `notText`, are never a Kogo
+  key); a `Char` walks, being unnamed in the ruling. Not taken: a hash for every key, a
+  second walk that must agree with `==` everywhere, about 45 / 25 lines, where any
+  disagreement makes `contains` answer false for a key that is there. `==` of two sets or
+  maps still walks both; reopen that when a port compares two large ones, and the rest when
+  a large collection keyed by another kind is needed.
 - **`rt`'s `==` compares a Go type that embeds `rt.Unordered` by its `Keys()` regardless
   of order**, each key once. `rt` knows no prelude type by name, and `Unordered`'s
   unexported method means no data class can be taken for a set by a member's name; `Map`

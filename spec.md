@@ -1108,7 +1108,9 @@ any type may be a key. A key that is a `String`, an `Int`, a `Long`, a
 type, a `T?` among them, is found by walking the keys: a lookup costs
 the size of the collection and building one its square, so think hard
 before keying a large `Set` or `Map` (or a `distinctBy`, `groupBy` or
-`associateBy`) by anything else. This may be mended; nothing promises it.
+`associateBy`) by anything else. `==` of two `Set`s or two `Map`s walks
+whatever the kind of key, so comparing two large ones costs the product
+of their sizes. This may be mended; nothing promises it.
 
 There are no mutable collections, sequences or arrays. Build a list with
 `map`/`filter`/`+`, or accumulate into a local `var` of an immutable list.

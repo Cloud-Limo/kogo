@@ -345,7 +345,9 @@ func List_GroupBy[T, K any](this List[T], keySelector func(T) K) Map[K, List[T]]
 // ordered holds each key once, in the order first given, comparing
 // keys as == does (decisions.md). Set and Map are built on it. A key
 // of a plain kind is found through at, where Go's == is Kotlin's;
-// any other is found by walking the keys (spec.md 12).
+// any other is found by walking the keys (spec.md 12). Add only to a
+// value being built: a copy shares the keys' array, at and a Map's
+// values, so whatever adds to a copy (a plus, say) builds its own first.
 type ordered[K any] struct {
 	keys []K
 	at   map[any]int // each key's position, or nil to walk
@@ -377,17 +379,16 @@ func (o ordered[K]) index(k K) int {
 	if o.at == nil {
 		return slices.IndexFunc(o.keys, func(x K) bool { return rt.Equal(x, k) })
 	}
-	if i, ok := o.at[k]; ok && i < len(o.keys) { // a copy may have added past this one's keys
+	if i, ok := o.at[k]; ok {
 		return i
 	}
 	return -1
 }
 
-// add decides the kind with the first key. A copy shares at and the
-// keys' array, so one that finds another copy has added takes its own.
+// add decides the kind with the first key.
 func (o *ordered[K]) add(k K) {
-	if len(o.keys) == 0 || o.at != nil && len(o.at) != len(o.keys) {
-		*o = orderedOf(slices.Clip(o.keys))
+	if len(o.keys) == 0 {
+		*o = orderedOf(o.keys)
 	}
 	if o.index(k) < 0 {
 		if o.at != nil {

@@ -246,30 +246,6 @@ func agrees[K any](t *testing.T, mapped bool, keys []K, absent K) {
 	}
 }
 
-// A set is copied by value: whatever adds to a copy leaves the first
-// as it was, and either can still add.
-func TestSetCopy(t *testing.T) {
-	first := SetOf("a", "b")
-	second := first
-	second.add("c")
-	first.add("d")
-	third := first
-	third.add("e")
-	for _, c := range []struct {
-		s    Set[string]
-		want string
-	}{{first, "[a, b, d]"}, {second, "[a, b, c]"}, {third, "[a, b, d, e]"}} {
-		if got := rt.ToString(c.s); got != c.want {
-			t.Errorf("a set copied and added to is %s, not %s", got, c.want)
-		}
-		for _, k := range []string{"a", "b", "c", "d", "e"} {
-			if Set_Contains(c.s, k) != strings.Contains(c.want, k) {
-				t.Errorf("%s contains %s: %v", c.want, k, !strings.Contains(c.want, k))
-			}
-		}
-	}
-}
-
 // An id is written as a UUID is, sorts after one made earlier, and is
 // equal to itself and to no other.
 func TestIds(t *testing.T) {

@@ -717,6 +717,11 @@ fun suppliersOf(tx: Tx, operatorId: ID): List<SupplierRow> =
   The value is sent to Postgres separately from the statement. A name
   written twice is one parameter; an expression is evaluated and bound
   each time it is written. `$1` is an error; any other `$` is SQL text.
+  Each `$name` and `${expr}` must be where Postgres reads a parameter:
+  one inside a quoted string, a comment or a dollar quote's tag is an
+  error, even where the same name is a parameter elsewhere. A `$` as
+  text before a name or a digit is written `chr(36)`, as in
+  `'in ' || chr(36) || 'AUD'`, or bound as a parameter holding it.
 - A statement that fits on one line may be written `sql"..."`. Neither
   form has escapes.
 - A `sql"""` literal may only appear as the argument of one of the five
@@ -783,8 +788,9 @@ column.
   `queryOne<R>` gives the `R?`. A scalar `R` is a `T?` where its column
   may be null: `queryOne<String?>`.
 - `select t.*` is allowed when the data class has exactly the table's
-  columns. `kogo schema` writes `schema.kg` with one such data class per
-  table and one enum per Postgres enum; it is ordinary source, checked in.
+  columns. `kogo schema`, which is not built yet, is to write `schema.kg`
+  with one such data class per table and one enum per Postgres enum; it
+  is ordinary source, checked in, and written by hand until then.
 
 ### 10.4 Type mapping
 
@@ -846,6 +852,38 @@ to +5874897-12-31 for a `date`. A `Decimal` holds `NaN` and `Infinity` as well
 as numbers, and a zero keeps its scale: `0.00`. An empty `List` is sent as an
 empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
 `bytea`.
+
+Kogo reads a subset of what Postgres can send, and outside it refuses:
+at `kogo check` where the catalog or the statement tells, else by a
+panic that names the limit (section 8). It never gives another value.
+The limits, with those above:
+
+- A type that is not in the table, an array of a composite type or of a
+  domain over an array, a `record`, an enum with a label no constant
+  can have: `kogo check`.
+- A list of an enum, as a column or a parameter: refused when the
+  program is emitted, with the cast to write.
+- An array of more than one dimension: a panic when it is read.
+  Postgres's `integer[]` does not say how many dimensions a value has,
+  and a `List` has one. A lower bound other than 1 is not kept, which
+  loses nothing a `List` has.
+- A `NULL` element read into a `List<T>`: a panic when it is read, which
+  names the column. Postgres says of no array that its elements are not
+  null, so `kogo check` takes `List<T>` and `List<T?>` alike: write
+  `List<T?>` where an element may be null, as in an `array_agg` over an
+  outer join, which gives `{NULL}` for a row with none.
+- `infinity` in a `timestamptz` or a `date`, `24:00` in a `time`, an
+  `interval` with months: a panic when it is read.
+- A `String` that holds U+0000, alone or in a `List`: a panic when it is
+  sent, since Postgres's `text` holds none.
+- A `Duration`, an `Instant` or a `LocalDate` past Postgres's range: a
+  panic when it is sent.
+- A count of more than 2,147,483,647 rows from `tx.execute`, whose
+  result is an `Int`: a panic once the statement has run, which rolls
+  the transaction back.
+
+An array of a domain, and a domain over an array, are read as the array
+of the base type is.
 
 ### 10.5 Nullability
 
@@ -1677,17 +1715,21 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   transaction (15.7).
 - A gate on a `SerializableTx` runs held to reading, each time it
   runs: in a savepoint that Postgres holds read-only and the server
-  releases before the work. There a write, one inside a function of
-  the database's too, `nextval` and a row lock are each a bug, and a
-  panic (section 8). A setting the gate makes with `set_config` is
-  allowed, and is still set in the work, which writes as before: a
-  gate binds the tenant so. An advisory lock and a write to a
-  temporary table pass, since Postgres's read-only mode allows them,
-  and neither this nor `gate-writes` refuses them. A gate on a `Tx` is not run so,
-  since Postgres's read-only mode refuses the lock such a gate may
-  take: the compile error of 15.2 alone holds it, and a write inside
-  a function of the database or `nextval` in such a gate is not
-  refused.
+  releases before the work. The server runs a statement before the
+  savepoint, so that the transaction's first snapshot is not taken
+  read-only: Postgres may then leave the whole transaction out of its
+  serialization checks, also after it writes: it does when no other
+  writing transaction at SERIALIZABLE is open as the first snapshot is
+  taken. There a write, one inside a function of the database's too,
+  `nextval` and a row lock are each a bug, and a panic (section 8). A
+  setting the gate makes with `set_config` is allowed, and is still
+  set in the work, which writes as before: a gate binds the tenant so.
+  An advisory lock and a write to a temporary table pass, since
+  Postgres's read-only mode allows them, and neither this nor
+  `gate-writes` refuses them. A gate on a `Tx` is not run so, since
+  Postgres's read-only mode refuses the lock such a gate may take: the
+  compile error of 15.2 alone holds it, and a write inside a function
+  of the database or `nextval` in such a gate is not refused.
 - The first parameter of the gate, or of an ungated operation that
   takes a transaction, names the kind the server opens (10.7): at
   SERIALIZABLE for a `SerializableTx`, at READ COMMITTED for a `Tx`.

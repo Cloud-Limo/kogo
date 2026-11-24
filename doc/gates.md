@@ -431,7 +431,11 @@ checks were run on Postgres 18.7 on 17 Nov 2026:
   included, and `nextval`, and a row lock (`for update`, `for share`,
   `for key share`); it allows `set_config`. After the release the
   transaction writes again, and a setting made in the gate is still
-  set, until the transaction ends.
+  set, until the transaction ends. A statement runs before the
+  savepoint: Postgres may leave a transaction whose first snapshot is
+  taken read-only out of its serialization checks, also after it
+  writes. It does when no other writing transaction at SERIALIZABLE is
+  open as that snapshot is taken (DEV-1145, F-0; DEV-1151).
 - **When it compiles.** A statement a gate reaches is refused unless
   every table that Postgres's tree lists for it needs select alone:
   the tree the printed table is read from ("The table is printed"

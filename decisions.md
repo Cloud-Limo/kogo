@@ -733,8 +733,10 @@ Each entry: what was decided, why, and what would reopen it.
   clean merge of the base changes nothing the Review read, so it is the one commit the
   clerk makes. Not taken: a Fix run for each base merge (DEV-1005), which cost Kogo PR 111
   two runs, and whose cost grows with the square of the PRs open. A third tip of `main`
-  is handed on, not chased. cusoon2 keeps the Fix, its check being cloud CI on the pushed
-  head. Reopen if a clean merge breaks what a Review passed.
+  is handed on, not chased. `lin merge-check` merges `renew` clean into a cusoon2 PR too
+  (DEV-1202), Cloud CI running on the pushed head; a Fix is kept for a conflict, and for
+  a port's PR when `renew` brings more than `doc/`, `infra/`, `frontend/` or `site/`,
+  since its pin may then move. Reopen if a clean merge breaks what a Review passed.
 - **The lead's and the clerk's instructions, revised from a day's use** (20 Nov 2026,
   Greg, item by item; DEV-1023). Each cost a round trip on 20 Nov.
   - A Budget outgrown is handed on only when a Fix or a Question of the Review cuts

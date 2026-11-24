@@ -139,10 +139,10 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   `spec.md` too), and run the tests. Change no code. Write one
   comment: the first line `Review: <PR url> at <sha> · N fix, N won't
   fix, N question`, then a numbered list. Each item is a **Fix** (what
-  is wrong, the change, its size as code / tests), a **Won't fix** (the
-  finding and why it stays) or a **Question** (a choice that is Greg's
-  or the lead's: the options and which you lean to). Post it with
-  `lin step DEV-NNN < review.md`, print it, and stop.
+  is wrong, the change, its size as code / tests), a **Won't fix** (one
+  line: the finding and why it stays) or a **Question** (a choice that
+  is Greg's or the lead's: the options and which you lean to). Post it
+  with `lin step DEV-NNN < review.md`, print it, and stop.
 - **Fix.** "Fix DEV-NNN": in the same place, fast-forwarded or made as
   in Code review when missing, make every Fix of the newest Review,
   read on the PR, as further commits. A `Ruling:` comment after it, on

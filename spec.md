@@ -1880,9 +1880,9 @@ application chooses.
   no bug: neither it, nor a database that is down, nor a service that
   does not answer is answered or logged as a panic. A service has not
   answered where a call of the request got no status, refused or past
-  its time limit, and the panic's message holds that failure's `why`,
+  its time limit, and the panic's message holds that failure as text,
   as `error("idp: $failure")` does: a later panic of the program's own
-  stays a panic.
+  stays a panic, even one whose message holds the bare `why`.
 
 **Nothing a caller can cause by what it sends is a panic.** A panic
 is a bug of Kogo's or of the program's: it is answered 500 and logged

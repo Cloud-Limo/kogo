@@ -4989,8 +4989,9 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   writes, which the lead ruled out; the request's context on the handle, which `Http`
   does not carry (spec 12); a record by `why` alone, shared by every request. Reopens
   if an operation's work leaves its goroutine.
-- **The panic must hold the failure's `why`** for the 503, as `error("idp: $failure")`
-  does: a program that met the failure, dealt with it and later panicked on a bug of its
+- **The panic must hold the failure as text** for the 503, `(why=...)` as
+  `error("idp: $failure")` writes it, not its bare `why` (a short one, such as `EOF`,
+  turns up in a bug's own message): a program that met the failure, dealt with it and later panicked on a bug of its
   own still gets its 500 and trace. Not taken: any panic after a call that got no
   answer. A program whose panic drops the failure's text stays a 500 (cusoon2's
   `orThrow` is changed in its own issue).

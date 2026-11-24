@@ -211,7 +211,7 @@ var table = Table[env]{Check: ours, Operations: []Operation[env]{
 
 // unanswered calls a service that is not there and panics with the
 // failure, as a program that asked for no Either does; or, not named,
-// with a bug of its own.
+// with a bug of its own whose text holds the failure's bare why.
 func unanswered(named bool) func(kogo.Db, env, Request, rt.Unit) kogo.Either[string, bool] {
 	return func(kogo.Db, env, Request, rt.Unit) kogo.Either[string, bool] {
 		idp, _ := khttp.New(khttp.Service{Address: "http://127.0.0.1:1", Encoding: khttp.JSON, MaxAnswer: 1 << 10,
@@ -220,7 +220,7 @@ func unanswered(named bool) func(kogo.Db, env, Request, rt.Unit) kogo.Either[str
 		if named {
 			kogo.Error("idp: " + rt.ToString(l.Value))
 		}
-		panic("a bug")
+		panic("a bug after " + l.Value.(khttp.HttpFailure_NotSent).Why)
 	}
 }
 

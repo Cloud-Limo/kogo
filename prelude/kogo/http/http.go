@@ -509,15 +509,17 @@ var watched sync.Map
 
 // Watch has this goroutine's calls watched until the func it gives,
 // which ends the watch and gives the newest call that got no answer,
-// when the panic p's text holds its why: a failure the program met
-// and dealt with does not make a later panic of its own a 503.
+// when the panic p's text holds that failure as rt.ToString writes
+// it, "(why=...)": a failure the program met and dealt with does not
+// make a later panic of its own a 503, even one whose text holds the
+// bare why, such as "EOF".
 func Watch() func(p any) (NoAnswer, bool) {
 	g := goroutine()
 	w := &NoAnswer{}
 	watched.Store(g, w)
 	return func(p any) (NoAnswer, bool) {
 		watched.Delete(g)
-		return *w, p != nil && w.Why != "" && strings.Contains(fmt.Sprint(p), w.Why)
+		return *w, p != nil && w.Why != "" && strings.Contains(fmt.Sprint(p), "(why="+w.Why+")")
 	}
 }
 

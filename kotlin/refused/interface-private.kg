@@ -1,0 +1,7 @@
+// kotlinc refuses line 6
+// A visibility on an interface's member.
+package refused
+
+interface Guarded {
+    private val secret: Int
+}

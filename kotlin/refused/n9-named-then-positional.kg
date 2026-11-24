@@ -1,0 +1,7 @@
+// kotlinc refuses line 7
+// A positional argument after a named one out of its place.
+package kt
+
+fun bar(x: Int = 1, y: Int = 1, z: String): String = "$x $y $z"
+
+fun f(): String = bar(z = "z", 5)

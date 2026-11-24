@@ -1117,7 +1117,7 @@ func TestRefused(t *testing.T) {
 		{"fun <T> keep(v: T, fallback: T): T = v.takeIf { it != null } ?: fallback\nfun g(x: Long?): Long? = keep(x, 7L)", "2:26: not-yet-emitted", "used as T? in keep"},
 		{"fun <T> none(x: T?): T? = x\nfun g(): Int? = none(null)", "2:17: not-yet-emitted", "write the type arguments, none<...>(...)"},
 		{"sealed interface S<out T> {\n    data class A<T>(val v: T) : S<T>\n}\nfun f(s: S<S.A<Int>>): S<S<Int>> = s", "4:36: not-yet-emitted", "build the value with the wider type argument"},
-		{"enum class Kind { entries, b }", "1:19: go-name", "are both Kind_entries in Go"},
+		{"enum class Kind { a }\ndata class Kind_a(val n: Int)", "2:1: go-name", "are both Kind_a in Go"},
 		{"data class D(val a: Int, val A: Int)", "1:26: go-name", "two members of D are both A in Go"},
 		{"interface I {\n    val name: String\n}\ndata class D(override val name: String, val getName: String) : I", "4:14: go-name", "two members of D are both GetName in Go"},
 	} {

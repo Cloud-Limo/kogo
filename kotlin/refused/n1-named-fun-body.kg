@@ -1,0 +1,9 @@
+// kotlinc refuses line 7
+// A named fun as a loop's body.
+package kt
+
+fun f(): Int {
+    var n = 0
+    for (i in 0..2) fun x() {}
+    return n
+}

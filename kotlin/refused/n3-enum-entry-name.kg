@@ -1,0 +1,7 @@
+// kotlinc refuses line 5
+// An enum constant named ordinal, name or entries, which every enum has.
+package kt
+
+enum class Field { name, ordinal, entries }
+
+fun f(): String = Field.ordinal.name

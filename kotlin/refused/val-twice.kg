@@ -1,0 +1,8 @@
+// kotlinc refuses line 7
+// An interface that declares one val twice.
+package refused
+
+interface Counted {
+    val count: Int
+    val count: Int
+}

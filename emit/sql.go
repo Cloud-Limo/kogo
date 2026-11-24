@@ -120,10 +120,11 @@ func (e *emitter) fill(q *check.Query, t check.Type, path []int, absent bool, de
 // its value as the type t, and a test for null where it may be null.
 // A column that t or absent lets be null is read as a pointer; a list
 // is read by the prelude's Array, which refuses what a List cannot
-// hold, and is null for a NULL; any other is read as it is, and the driver refuses a null, as one in a
-// column named "name!" (spec.md 10.5). A composite type is read field
-// by field, in Postgres's order, into the properties of their names:
-// null as a whole, and never absent field by field.
+// hold, and is null for a NULL; any other is read as it is, and the
+// driver refuses a null, as one in a column named "name!" (spec.md
+// 10.5). A composite type is read field by field, in Postgres's
+// order, into the properties of their names: null as a whole, and
+// never absent field by field.
 func (e *emitter) column(name string, ct sqlpass.Type, t check.Type, absent bool, dest *string) (code string, nulls []string) {
 	kogo := e.use(preludePath + "kogo")
 	elem, null := bare(t)

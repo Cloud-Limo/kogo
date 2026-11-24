@@ -169,6 +169,7 @@ func TestLimits(t *testing.T) {
 		{`t.Tags(db)`, "[a, b] [Fold] null"},
 		{`t.Keep(db, "a\x00b", nil)`, zero},
 		{`t.Keep(db, "a", []string{"b", "\x00"})`, zero},
+		{`t.KeepOrNull(db, []*string{nil, rt.Ptr("\x00")})`, zero},
 		{`t.Keep(db, "a\u0001b", []string{""})`, "2"},
 	}
 	if os.Getenv("KOGO_STRESS_SLOW") != "" { // two minutes: Postgres counts 2,200,000,000 rows
@@ -198,6 +199,7 @@ fun tags(db: Db): String = db.tx { tx ->
 fun keep(db: Db, name: String, more: List<String>): Int = db.tx { tx ->
     tx.execute(sql"select from unnest(array[$name] || $more::text[])")
 }
+fun keepOrNull(db: Db, more: List<String?>): Int = db.tx { tx -> tx.execute(sql"select from unnest($more::text[])") }
 fun many(db: Db): Int = db.tx { tx -> tx.execute(sql"select from generate_series(1, 50000) a, generate_series(1, 44000) b") }
 `)
 }

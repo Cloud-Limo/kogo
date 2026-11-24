@@ -1,0 +1,9 @@
+package kt
+
+fun g(): Int = 1
+
+fun f(): Int {
+    val _ = g()
+    for (_ in 1..3) {}
+    return 0
+}

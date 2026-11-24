@@ -1,0 +1,4 @@
+package kt
+
+fun foo() = bar()
+fun bar() = foo()

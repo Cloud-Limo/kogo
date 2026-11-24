@@ -1,0 +1,9 @@
+package kt
+
+fun f(n: Int): String {
+    when (n) {
+        0 -> return "zero"
+        -> return "empty"
+        else -> return "else"
+    }
+}

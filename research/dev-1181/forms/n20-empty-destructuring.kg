@@ -1,0 +1,8 @@
+package kt
+
+data class Person(val name: String, val age: Int)
+
+fun f(p: Person): Int {
+    val () = p
+    return 1
+}

@@ -1,0 +1,9 @@
+package kt
+
+sealed interface Nothing2
+
+fun f(x: Nothing2): Int {
+    when (x) {
+    }
+    return 1
+}

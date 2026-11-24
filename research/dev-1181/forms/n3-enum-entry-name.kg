@@ -1,0 +1,5 @@
+package kt
+
+enum class Field { name, ordinal, entries }
+
+fun f(): String = Field.ordinal.name

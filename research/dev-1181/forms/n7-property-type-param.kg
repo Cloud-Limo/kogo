@@ -1,0 +1,3 @@
+package kt
+
+val <T, U> List<U>.size2: Int get() = 2

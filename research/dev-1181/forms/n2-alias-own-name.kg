@@ -1,0 +1,7 @@
+package kt
+
+import kt.Money as Cents
+
+data class Money(val amount: Long)
+
+fun f(c: Cents): Money = c

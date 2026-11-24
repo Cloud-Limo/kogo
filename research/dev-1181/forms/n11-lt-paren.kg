@@ -1,0 +1,8 @@
+package kt
+
+fun f(x: Int, y: Int): Boolean {
+    if (x < (if (y > 115) 1 else 2)) {
+        return true
+    }
+    return false
+}

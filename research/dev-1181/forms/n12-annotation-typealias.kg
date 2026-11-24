@@ -1,0 +1,6 @@
+package kt
+
+@Nowhere
+typealias Name = String
+
+fun f(n: Name): Name = n

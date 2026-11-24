@@ -1,0 +1,5 @@
+package kt
+
+fun bar(x: Int = 1, y: Int = 1, z: String): String = "$x $y $z"
+
+fun f(): String = bar(z = "z", 5)

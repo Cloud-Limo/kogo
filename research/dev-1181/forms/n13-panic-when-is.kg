@@ -1,0 +1,7 @@
+package kt
+
+fun f(): Int =
+    when {
+        is Int -> 33
+        else -> 34
+    }

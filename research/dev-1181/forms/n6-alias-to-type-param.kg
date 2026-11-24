@@ -1,0 +1,5 @@
+package kt
+
+typealias Same<T> = T
+
+fun f(x: Same<Int>): Int = x + 1

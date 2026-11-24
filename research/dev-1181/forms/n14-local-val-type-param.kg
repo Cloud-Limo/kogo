@@ -1,0 +1,6 @@
+package kt
+
+fun f(): Int {
+    val <T> x = 1
+    return x
+}

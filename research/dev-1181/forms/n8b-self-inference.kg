@@ -1,0 +1,6 @@
+package kt
+
+fun f(): Int {
+    fun g() = g()
+    return 1
+}

@@ -1,0 +1,3 @@
+package kt
+
+fun f(_: Int): Int = 0

@@ -1,0 +1,6 @@
+package kt
+
+fun f(b: Boolean, c: Boolean): Int = when (b) {
+    c && b -> 1
+    else -> 2
+}

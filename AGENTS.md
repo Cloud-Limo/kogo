@@ -239,7 +239,8 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   a dependency release at least seven days old.
 - Postgres 18 runs in this VM; `sudo -n -u postgres psql` is the
   superuser. Tests use their own database and a schema kept in this repo:
-  `mise run testdb` creates it, then `mise exec -- go test ./...`.
+  `mise run testdb` creates it, then `mise exec -- go test ./...`. Each
+  worktree `kogo-dev-NNN` has its own, `kogo_test_NNN` (`.mise.toml`).
   `cusoon` and `cusoon_b` belong to cusoon2's two stacks and are
   re-created all the time. Reading them is fine; for anything that
   writes, cleans or migrates, use a database of your own and pass its

@@ -4798,6 +4798,24 @@ for the two tables in spec 15.5; the new rows were the agent's to choose.
   does not read it, which does not matter, since `main` is merged in the worktree.
   Reopens if two kept versions of one rewritten entry reach `main`.
 
+## A test database for each worktree (DEV-1204), 24 Nov 2026
+
+- **The name is derived once, in `.mise.toml`**: a template on mise's `config_root`
+  gives `KOGO_TEST_DATABASE_URL`, and `mise-tasks/testdb` takes the database's name from
+  its end, refusing one not `kogo_test` or `kogo_test_NNN`. Not taken: the rule in the
+  script too, or a script `.mise.toml` sources, which is two places or a third file.
+- **The sweep looks beside the worktree** (`../kogo-dev-NNN`), not in a fixed `~/Dev`, so
+  it holds wherever the worktrees live. A `kogo-dev-NNN` made in another directory on the
+  same Postgres loses its database at the next `testdb` beside the others, even while its
+  tests run: they hold no connection between packages, so the drop goes through and the
+  next package fails. The dev VM is safe, since Pickup, `lin local` and `lin merge-check`
+  make every `kogo-dev-NNN` in `~/Dev`. A drop refused, a database in use at that moment,
+  is reported and the script goes on. Not taken: `with (force)`; keeping each database
+  `git worktree list` shows, wherever it lives (about 2 lines), which nothing needs yet.
+- **The pools that never connect keep `kogo_test` in their URL** (`TestPool`,
+  `TestCheckPool`, `TestRunChecksPool`): they are refused before connecting, so the name
+  is not read. Reopens if one of them comes to connect.
+
 ## The clerk goes on past a spec.md change the Scope asked for (DEV-1203), 24 Nov 2026
 
 - **A `spec.md` change is handed on only where the Scope did not ask for it** (Greg, on

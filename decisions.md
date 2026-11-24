@@ -4716,8 +4716,9 @@ limits). Where each of DEV-1144's findings 4 to 8 is refused is the agent's.
   the element is a domain, which misses a domain over an array; telling the driver at
   the read from the row's description, by when the result's format is already asked for.
 - **An array of a domain over an array is `sql-unmapped-type`**: it is a list of lists,
-  the catalog tells, and it was typed `List<T>` and could not be read. Found by the
-  test's table, not by DEV-1144.
+  the catalog tells, and it was typed `List<T>` and could not be read. Found by a probe
+  while the test's table was built, not by DEV-1144, as was a `List` sent to a parameter
+  of a domain's array type, which the driver could not send.
 - **The standing test (`emit`'s `TestShapes`) sends each value back** and compares the
   text Postgres makes of what came back with the text it makes of the value: Kogo's
   `toString()` is Kotlin's and not Postgres's, so the two texts cannot be compared

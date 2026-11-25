@@ -1,6 +1,7 @@
 package check
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -166,7 +167,7 @@ func (c *checker) row(lit *syntax.SQL, q *Query) {
 		// Where a data class had no column at all, a column left over
 		// of the name of one of its properties is likely its own, as b.*
 		// gives a business's: its error says what to select instead.
-		missed := c.fill(lit, d, "", nil, present, cols, q.Paths, new([]string))
+		missed := c.fill(lit, d, "", nil, present, cols, q.Paths, nil)
 		for i, path := range q.Paths {
 			owned := slices.ContainsFunc(missed, func(m *Named) bool {
 				return slices.ContainsFunc(m.Decl.Props, func(p *Var) bool { return Snake(p.Name) == cols[i].Name })
@@ -211,17 +212,16 @@ func dataClass(t Type) *Named {
 // lead to d from R. Inside a nullable data class, absent, a column
 // null only through an outer join fills a property that may not be
 // null, since the class is null where those columns are; one that may
-// be null even where the join finds a row does not, nor one that other
-// outer joins can null than the first such column, "name!" too. by
-// holds that column's joins, for the nullable data class that d is or
-// lies in, and is nil where it has none; a nullable data class needs
-// one, in itself or in a data class it holds that is not nullable.
+// be null even where the join finds a row does not. tells gathers
+// those columns for the nullable data class that d is or lies in, as
+// tell sees; a nullable data class needs one, in itself or in a data
+// class it holds that is not nullable.
 // missed holds the data classes that had no column at all.
 // A nullable data class none of whose columns an outer join can null
 // is refused all the same, with messages that name no join.
 // A column that a property of d takes by name, as business_id, does
 // not count as one with the prefix of a sibling, business.
-func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, absent absence, cols []sqlpass.Column, paths [][]int, by *[]string) (missed []*Named) {
+func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, absent absence, cols []sqlpass.Column, paths [][]int, tells *[]teller) (missed []*Named) {
 	c.builds(lit, d.Decl)
 	b := bind(d.Decl.Params, d.Args)
 	prefixed := func(name string) bool {
@@ -245,20 +245,25 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 			c.errorf(lit, "sql-columns", "%s holds data classes nested too deep to fill from columns", d)
 			return missed
 		case j < 0 && n != nil:
-			inner, own := absent, by
+			inner, own := absent, tells
 			if null {
-				inner, own = alone, new([]string)
-				if slices.ContainsFunc(cols, func(col sqlpass.Column) bool { return col.Joins != nil && strings.HasPrefix(col.Name, name+"_") }) {
+				inner, own = alone, new([]teller)
+				if slices.ContainsFunc(cols, func(col sqlpass.Column) bool {
+					return (col.Joined || col.Joins != nil) && strings.HasPrefix(col.Name, name+"_")
+				}) {
 					inner = outer
 				}
 			}
 			more := c.fill(lit, n, name+"_", here, inner, cols, paths, own)
 			missed = append(missed, more...)
-			if null && *own == nil && more == nil && inner == alone {
+			if null {
+				c.tell(lit, *own)
+			}
+			if null && len(*own) == 0 && more == nil && inner == alone {
 				c.errorf(lit, "sql-absent", "%s, a %s, is filled by columns that may each be null on their own: "+
 					"read each as a T? property of %s in its place, and build the %s from them in Kogo",
 					what, t, d, n)
-			} else if null && *own == nil && more == nil {
+			} else if null && len(*own) == 0 && more == nil {
 				c.errorf(lit, "sql-absent", "%s, a %s, has no property that is not nullable filled by a column null only through an outer join, "+
 					"so a row of nulls would read as no %s: select a NOT NULL column of the joined table for one, as in t.id as %s_id, or the table's whole row, as in select t as %s",
 					what, t, n, name, name)
@@ -270,25 +275,48 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 		default:
 			paths[j] = here
 			c.column(lit, cols[j], t, absent, what, "")
-			if col := cols[j]; absent == outer && col.Joined && !null {
-				if *by == nil {
-					*by = col.Joins
-				} else if !slices.Equal(*by, col.Joins) {
-					c.errorf(lit, "sql-nullable", "column %s may be null through %s, and fills %s, a %s, in a nullable data class that is null where %s finds no row: make that a %s?",
-						col.Name, joinsOf(col.Joins), what, t, joinsOf(*by), t)
-				}
+			if absent == outer && cols[j].Joined && !null {
+				*tells = append(*tells, teller{cols[j], what, t})
 			}
 		}
 	}
 	return missed
 }
 
-// joinsOf names outer joins, as a Column's Joins gives them.
-func joinsOf(joins []string) string {
-	if len(joins) == 1 {
-		return "the outer join to " + joins[0]
+// A teller is a column null only through an outer join that fills a
+// property that may not be null, what, of the type t, in a nullable
+// data class: the class is null where it is.
+type teller struct {
+	col  sqlpass.Column
+	what string
+	t    Type
+}
+
+// tell refuses each column of one nullable data class's tellers that
+// other outer joins can null than the class is null by, "name!" too:
+// those of the one with the fewest joins, then the earliest in the
+// statement, which has the lowest key, then property order; or the
+// first where none has joins kogo check can follow.
+func (c *checker) tell(lit *syntax.SQL, tells []teller) {
+	key := func(a, b string) int { return cmp.Or(cmp.Compare(len(a), len(b)), strings.Compare(a, b)) }
+	by := 0
+	for i, x := range tells {
+		joins := tells[by].col.Joins
+		if x.col.Joins != nil && (joins == nil || cmp.Or(cmp.Compare(len(x.col.Joins), len(joins)), slices.CompareFunc(x.col.Joins, joins, key)) < 0) {
+			by = i
+		}
 	}
-	return "the outer joins to " + strings.Join(joins[:len(joins)-1], ", ") + " and " + joins[len(joins)-1]
+	for i, x := range tells {
+		switch {
+		case i == by:
+		case x.col.Joins == nil:
+			c.errorf(lit, "sql-nullable", "column %s may be null through an outer join kogo check cannot follow, where the class is there by %s: make %s a %s?",
+				x.col.Name, tells[by].col.Name, x.what, x.t)
+		case !slices.Equal(x.col.Joins, tells[by].col.Joins):
+			c.errorf(lit, "sql-nullable", "column %s may be null through another outer join than %s's, where the class is there: make %s a %s?",
+				x.col.Name, tells[by].col.Name, x.what, x.t)
+		}
+	}
 }
 
 // column checks that a column, or a field of column of, can fill a

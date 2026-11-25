@@ -5046,20 +5046,33 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
 - **A column carries the outer joins that can null it** (`Column.Joins`, which replaces
   `Outer`), read from `varnullingrels` at each query level `source` passes through,
   outermost first and in range table order within a level, so two columns nulled alike
-  have equal lists. A join is named by the aliases on its nullable side (a left join's
-  right, a right join's left, a full join's both), as Postgres's `eref` gives them, and
-  `in s` for each subquery it lies in: `d`, `d in s`. Not taken: the range table index
-  alone as the Review sketched, which compares as well but leaves the message nothing to
-  name; the table's own name beside its alias (`tenant_driver d`), which needs a
-  catalog query per join for words the statement already shows. Two joins whose
-  nullable sides are the same tables, as a full join under a left join, share a name;
-  every column they null is nulled by both, so they never tell columns apart.
-- **The class's joins are its first column's**, in property order, of those null only
-  through an outer join that fill a property that may not be null; each later one with
-  other joins gets `sql-nullable`, which names both and says to write `T?`. Not taken:
-  choosing the column with the fewest joins, which reads better where the second
-  column comes first, at the cost of a second pass; ordering the properties is the
-  author's fix there.
+  have equal lists. A join is keyed by the range table indexes of the subqueries it lies
+  in and its own, `2.3`, and a full join by the side the reference lies on too, `5l` or
+  `5r`, since each side is nulled where the other has no row (the Code review of PR 190,
+  Fix 2). Not taken: naming a join by the aliases on its nullable side, which the first
+  attempt did, since a full join's two sides, or an alias reused under a join alias,
+  share a name while nulling different columns.
+- **`source` steps through the casts `notNull` steps through**, at each level, so that
+  `d.driver_id::text` has `d`'s join, as it is `Joined` through it (Fix 1); `notNull`
+  lost its own cast cases with that. A column `Joined` but with no `Joins`, as
+  `coalesce(d.driver_id, d.tenant_id)`, is one whose joins `kogo check` cannot follow:
+  it tells the class where no column has joins, and is refused, with a message that
+  names no join, beside one that has. Not taken: following `coalesce`'s arguments,
+  which is more analysis than the case needs.
+- **The class is told by its column with the fewest joins, then the one with the lowest
+  key, which is the join the statement writes first, then property order** (Fix 3).
+  Each other one with other joins gets `sql-nullable`. Comparing happens once the
+  class's `fill` ends. Fewest alone, the Review's rule, is right for a subquery
+  (`[3]` against `[3, 2.3]`), but in `b left join tenant t … left join tenant_driver d`
+  `t.id` and `d.driver_id` have one join each, and property order would keep `driverId`
+  and refuse `id`, whose advice, followed, makes a shop with no driver read as no shop.
+  Not taken: the first column in property order, the first attempt's, for that reason.
+- **`sql-nullable` names the column that tells the class, not the joins**: "column
+  shop_driver_id may be null through another outer join than shop_id's, where the class
+  is there: make Shop.driverId a Uuid?" (the lead's Ruling on Fix 4, 25 Nov 2026, over
+  the Scope's "naming the two joins' tables"). The statement shows both columns, and the
+  key gives the names nothing else to serve. Not taken: keeping the names beside the
+  key, about +5 code.
 - **`"name!"` takes part** in the comparison, as in the absence: an asserted column with
   other joins would still tell the class there where its own join found none, and panic
   naming another column. Not taken: leaving it out of both, which changes what tells a

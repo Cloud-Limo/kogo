@@ -46,9 +46,8 @@ func (t Type) String() string {
 // through an outer join: it would be non-null by spec.md 10.5 were the
 // join inner, as a NOT NULL column of the joined table is, and one
 // that may be null even where the join finds a row is not; nor is one
-// the author names "name?". Joins names the outer joins that can null
-// it as a reference, Joined or not, each by what lies on its nullable
-// side ("d", or "d in s" for one in subquery s); two columns that
+// the author names "name?". Joins keys the outer joins that can null
+// it as a reference, through casts, Joined or not: two columns that
 // outer joins null alike have the same Joins.
 type Column struct {
 	Name     string

@@ -228,16 +228,6 @@ func (c *Checker) notNull(ctx context.Context, q, expr *node, constant, joins bo
 				break
 			}
 		}
-	case expr.tag == "RELABELTYPE" || expr.tag == "COERCEVIAIO":
-		notNull, _, err = c.notNull(ctx, q, expr.field("arg"), constant, joins)
-	case expr.tag == "FUNCEXPR" && (expr.num("funcformat") == 1 || expr.num("funcformat") == 2) &&
-		expr.num("funcid") < 16384 && !jsonbCasts[expr.num("funcid")]:
-		// a cast function of Postgres's own (below FirstNormalObjectId),
-		// explicit or implicit: its first argument is the value, any
-		// others a type modifier
-		if args := expr.field("args").items(); len(args) > 0 {
-			notNull, _, err = c.notNull(ctx, q, args[0], constant, joins)
-		}
 	}
 	return notNull, whole, err
 }
@@ -245,16 +235,18 @@ func (c *Checker) notNull(ctx context.Context, q, expr *node, constant, joins bo
 // source follows expr, an expression of query q, through references
 // to a subquery's column or a grouped column, to what they name: an
 // expression of the query it ends in, and when that is a reference to
-// a table, the table's range table entry. joins names the outer joins
-// that can null a reference on the way, and nulled is whether a
-// grouping set or returning's old or new can: Postgres marks a
-// reference with the outer joins and grouping sets that null it
-// (varnullingrels), by their range table entries. A join is named by
-// what lies on its nullable side, as the statement names it, and the
-// subqueries it lies in: "d in s".
+// a table, the table's range table entry, and through the casts
+// uncast steps through. joins keys the outer joins that can null a
+// reference on the way, and nulled is whether a grouping set or
+// returning's old or new can: Postgres marks a reference with the
+// outer joins and grouping sets that null it (varnullingrels), by
+// their range table entries. A join's key is the indexes of the
+// subqueries it lies in and its own, "2.4", and for a full join the
+// side the reference lies on, "4l" or "4r", since each side is nulled
+// where the other has no row.
 func source(q, expr *node) (endQ, endExpr, rte *node, joins []string, nulled bool) {
 	within := ""
-	for expr != nil && expr.tag == "VAR" && expr.num("varlevelsup") == 0 {
+	for expr = uncast(expr); expr != nil && expr.tag == "VAR" && expr.num("varlevelsup") == 0; {
 		rtable, att, no := q.field("rtable").items(), expr.num("varattno"), expr.num("varno")
 		rels := expr.field("varnullingrels").items() // (b 3 5), or (b) for none
 		nulled = nulled || expr.num("varreturningtype") != 0 || len(rels) == 0
@@ -262,7 +254,11 @@ func source(q, expr *node) (endQ, endExpr, rte *node, joins []string, nulled boo
 			if i, err := strconv.Atoi(by.text()); err != nil || i < 1 || i > len(rtable) || rtable[i-1].num("rtekind") != rteJoin {
 				nulled = true
 			} else {
-				joins = append(joins, strings.Join(q.field("jointree").side(rtable, i), ", ")+within)
+				key := within + strconv.Itoa(i)
+				if j := q.field("jointree").find(i); j.num("jointype") == 2 { // JOIN_FULL
+					key += map[bool]string{true: "l", false: "r"}[j.field("larg").find(no) != nil]
+				}
+				joins = append(joins, key)
 			}
 		}
 		if no < 1 || no > len(rtable) || att < 0 {
@@ -275,57 +271,56 @@ func source(q, expr *node) (endQ, endExpr, rte *node, joins []string, nulled boo
 		case rteSubquery:
 			in = rte.field("subquery")
 			exprs = outputs(in)
-			within = " in " + rte.field("eref").field("aliasname").text() + within
+			within += strconv.Itoa(no) + "."
 		case rteGroup:
 			exprs = rte.field("groupexprs").items()
 		}
 		if att < 1 || att > len(exprs) {
 			break
 		}
-		q, expr = in, exprs[att-1]
+		q, expr = in, uncast(exprs[att-1])
 	}
 	return q, expr, nil, joins, nulled
 }
 
-// side gives the names of what lies on the nullable side of the outer
-// join that is range table entry i, found in n, a query's jointree or
-// a part of it: a left join's right, a right join's left, a full
-// join's both. A name is the alias Postgres gives an entry, its own
-// name where the statement gives none.
-func (n *node) side(rtable []*node, i int) (names []string) {
+// find gives the part of n, a query's jointree or a part of it, that
+// is range table entry i, or nil where n holds none.
+func (n *node) find(i int) *node {
 	switch {
 	case n == nil:
-	case n.tag == "JOINEXPR" && n.num("rtindex") == i:
-		t := n.num("jointype") // Postgres's JoinType: 1 left, 2 full, 3 right
-		if t >= 2 {
-			names = n.field("larg").leaves(rtable)
-		}
-		if t <= 2 {
-			names = append(names, n.field("rarg").leaves(rtable)...)
-		}
+	case (n.tag == "JOINEXPR" || n.tag == "RANGETBLREF") && n.num("rtindex") == i:
+		return n
 	case n.tag == "JOINEXPR":
-		if names = n.field("larg").side(rtable, i); names == nil {
-			names = n.field("rarg").side(rtable, i)
+		if f := n.field("larg").find(i); f != nil {
+			return f
 		}
+		return n.field("rarg").find(i)
 	case n.tag == "FROMEXPR":
 		for _, v := range n.field("fromlist").items() {
-			if names = v.side(rtable, i); names != nil {
-				break
+			if f := v.find(i); f != nil {
+				return f
 			}
 		}
 	}
-	return names
+	return nil
 }
 
-// leaves gives the names of the range table entries that n, a part of
-// a jointree, joins.
-func (n *node) leaves(rtable []*node) []string {
-	switch i := n.num("rtindex"); {
-	case n == nil:
-	case n.tag == "RANGETBLREF" && i >= 1 && i <= len(rtable):
-		return []string{rtable[i-1].field("eref").field("aliasname").text()}
-	case n.tag == "JOINEXPR":
-		return append(n.field("larg").leaves(rtable), n.field("rarg").leaves(rtable)...)
+// uncast gives what expr casts, through the casts notNull steps
+// through, and expr itself where it is no such cast.
+func uncast(expr *node) *node {
+	for expr != nil {
+		switch {
+		case expr.tag == "RELABELTYPE" || expr.tag == "COERCEVIAIO":
+			expr = expr.field("arg")
+		case expr.tag == "FUNCEXPR" && (expr.num("funcformat") == 1 || expr.num("funcformat") == 2) &&
+			expr.num("funcid") < 16384 && !jsonbCasts[expr.num("funcid")] && len(expr.field("args").items()) > 0:
+			// a cast function of Postgres's own (below FirstNormalObjectId),
+			// explicit or implicit: its first argument is the value, any
+			// others a type modifier
+			expr = expr.field("args").items()[0]
+		default:
+			return expr
+		}
 	}
 	return nil
 }

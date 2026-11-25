@@ -803,9 +803,11 @@ column.
   column of the joined table, or its whole row. Such a column fills a
   property of it that may not be null; any other column that may be
   null fills only a `T?` there, as a field of a whole row does (10.5).
-  Those columns share their outer joins: one that an outer join can
-  null other than the first's, or besides them, fills only a `T?`
-  there, `"name!"` or not. Over `business b left join tenant t on
+  Those columns share their outer joins, a full join's two sides
+  counting as two: the class is told by the one with the fewest, then
+  the one whose join the statement writes first, and any other that
+  other outer joins can null, or whose joins `kogo check` cannot follow,
+  as through `coalesce`, fills only a `T?` there, `"name!"` or not. Over `business b left join tenant t on
   t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id`,
   `t.id as shop_id` tells a `Shop?` and `d.driver_id as shop_driver_id`
   fills only a `Uuid?` of it, as through a subquery on the nullable

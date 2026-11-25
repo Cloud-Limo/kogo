@@ -219,20 +219,24 @@ func TestJoined(t *testing.T) {
 }
 
 // A column carries the outer joins that can null it on the way,
-// nullable in its table or not, each named by its nullable side and
-// the subqueries it lies in; a table's own column, as returning *
-// gives, has none.
+// nullable in its table or not, each keyed by the subqueries it lies
+// in and its range table entry, and a full join by its side too; a
+// table's own column, as returning * gives, has none.
 func TestJoins(t *testing.T) {
 	c := connect(t)
 	for literal, want := range map[string]string{
-		`select b.id, t.id as tenant_id, t.slug, c.abn from business b left join tenant t on t.business_id = b.id left join business c on c.id = b.id`: "tenant_id[t] slug[t] abn[c]",
+		`select b.id, t.id as tenant_id, t.slug, c.abn from business b left join tenant t on t.business_id = b.id left join business c on c.id = b.id`: "tenant_id[3] slug[3] abn[5]",
 		`update business set abn = $abn where id = $id returning *`:                                                                                    "",
 		`select t.id as shop_id, d.driver_id as shop_driver_id
-			from business b left join tenant t on t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id`: "shop_id[t] shop_driver_id[d]",
+			from business b left join tenant t on t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id`: "shop_id[3] shop_driver_id[5]",
 		`select s.tid as shop_id, s.did as shop_driver_id from business b left join (select t.business_id, t.id as tid, d.driver_id as did
-			from tenant t left join tenant_driver d on d.tenant_id = t.id) s on s.business_id = b.id`: "shop_id[s] shop_driver_id[s | d in s]",
-		`select g.person_id, b.id from business b full join (admin_grant g join person p on p.id = g.person_id) on g.business_id = b.id`: "person_id[b, g, p] id[b, g, p]",
+			from tenant t left join tenant_driver d on d.tenant_id = t.id) s on s.business_id = b.id`: "shop_id[3] shop_driver_id[3 | 2.3]",
+		`select g.person_id, b.id from business b full join (admin_grant g join person p on p.id = g.person_id) on g.business_id = b.id`: "person_id[5r] id[5l]",
 		`select t.id from tenant_driver d right join tenant t on t.id = d.tenant_id`:                                                     "",
+		`select a.id as a_id, t.id as t_id from person x left join (business a full join tenant t on t.business_id = a.id) on true`:      "a_id[4l | 5] t_id[4r | 5]",
+		`select j1.tid as a, j2.tid as b
+			from (business b1 left join (select t.business_id, t.id as tid from tenant t) t on t.business_id = b1.id) j1
+			cross join (business b2 left join (select t.business_id, t.id as tid from tenant t) t on t.business_id = b2.id and false) j2`: "a[3] b[6]",
 	} {
 		st, err := check(c, literal)
 		if err != nil {

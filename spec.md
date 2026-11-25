@@ -162,9 +162,10 @@ through the same types, since Kotlin compares a `ByteArray` by identity
 and a data class by its properties': compare the other properties, or
 what the bytes were made from. Comparing with `null` is allowed. Where
 check cannot see one compared, behind a type parameter or in
-`contains`, `in`, `distinct` or a `Set`'s or `Map`'s keys, `==` panics
-on reaching it, as on a function, where Kotlin would answer `false` for
-two arrays of the same bytes. In a template it is an error
+`contains`, `in`, `distinct` or a `Set`'s or `Map`'s keys, `==`
+compares it as Kotlin does, by identity: an array is equal to itself
+and to no other of the same bytes. Two of no bytes are equal, where
+Kotlin's two made apart are not. In a template it is an error
 (`bytes-text`): Kotlin writes its identity, `[B@` and a number that
 changes every run. Inside a data class's text it is written as Kotlin's
 `toString` writes it, its bytes signed: `F(name=x, data=[97, 0, -1])`.
@@ -1199,6 +1200,8 @@ and not a promise that it is all:
   | `(?U)\w` matches | `é` | true | false: Kotlin's Unicode classes; Go's ungreedy flag |
   | replace `$` with `!` | `ab\n` | `ab!\n!` | `ab\n!`: Kotlin's `$` also stands before a final line break |
 - A `String` never holds half of a surrogate pair (section 3).
+- Two `ByteArray`s of no bytes are equal where `==` reaches them
+  (section 3), where Kotlin's two made apart are not.
 - `lowercase()` does not read the letters either side: a final `Σ`
   becomes `σ` where Kotlin's is `ς`.
 - `replace(regex, text)` skips an empty match that starts where a match
@@ -1332,8 +1335,11 @@ each form.
   `lookup(method, before, id, after)`, and so for `action`. The parts
   are joined as written and the id alone is escaped, so one that holds
   a `/` or a `?` stays one piece of the path. It panics (section 8)
-  where `before` does not end in `/`, where `after` does not begin
-  with one, and for an id that is empty, `.` or `..`. A written part
+  where `before` does not end in `/` or `after` does not begin with
+  one. An id that is empty, `.` or `..`, which would name the path it
+  sits in or the one above and may come from a caller or a row, is no
+  panic: `ask` and `perform` of that endpoint send nothing and give
+  `NotSent`, `an id in a path is not ".."`. A written part
   of a path is written as it is sent: one that holds what a path
   escapes (a `?`, a space, a `%`) panics, with or without an id.
 - A field is a name and a value: `field(name, value)` of a `String`, a
@@ -1410,11 +1416,11 @@ Where Go's HTTP client would decide, Kogo states it:
 | A time limit | The handle's own, which `main` must state, from the call's start to the end of its answer; past it a call that left is `Unknown`. |
 
 Every call that `ask` or `perform` ends in an `HttpFailure` is logged
-in Go, with its method, its path, its status where an answer came and
-why; a 3xx or a 4xx with its body too, the body's first 4 KiB with a
-mark where it is cut. So is every `logRefusal`, with its method, its
-path and its `why`, cut as a body is: no status and no body. A
-handle's own headers and query fields are never logged.
+in Go, with its method, its path, its status where an answer came,
+why, and the length of the body read; never the body, which may echo
+what was sent. So is every `logRefusal`, with its method, its path
+and its `why`, its first 4 KiB with a mark where it is cut: no status
+and no body. A handle's own headers and query fields are never logged.
 
 **Mail** (`kogo.mail`). A message is data that Kogo builds, and
 `eml(mail: Mail): ByteArray` writes it as the bytes of an EML file, for
@@ -1877,10 +1883,13 @@ Inputs and answers are JSON.
 - A string is written as Kotlin's `kotlinx.serialization` writes one:
   `"` and `\` escaped, a character below U+0020 as `\b`, `\t`, `\n`,
   `\f`, `\r` or `\u00xx` in lower-case hex, and every other character
-  as itself in UTF-8, `&`, `<`, `>` and U+2028 among them. A `String`
-  never holds half of a surrogate pair (section 3): an input's
-  `"\ud800"` reads as U+FFFD, which an answer then writes, where
-  Kotlin's answer differs.
+  as itself in UTF-8, `&`, `<`, `>` and U+2028 among them.
+- A body is UTF-8, and a `String` never holds half of a surrogate pair
+  (section 3): a body that is not UTF-8, or an input's `"a\ud800b"`,
+  is a 400, `the input is not UTF-8` or `the input holds half of a
+  surrogate pair`, and the operation does not run. Read on, either
+  would hold U+FFFD in its place, and store another text than was
+  sent.
 - A `String` on the wire holds no U+0000, which Postgres's `text`
   cannot hold (10.4): an input's `"a\u0000b"` is a 400, `input.name
   holds U+0000`, whether or not the operation would send it to
@@ -1962,8 +1971,9 @@ with its trace, so one a caller could cause at will would fill the
 log and bury the real faults. What a caller can send wrongly is
 answered so:
 
-- a body that does not read as the input, a `String` that holds
-  U+0000 among it (15.4): the reader's 400; one past the limit, 413;
+- a body that does not read as the input, one not UTF-8, a `String`
+  that holds U+0000 or half of a surrogate pair among it (15.4): the
+  reader's 400; one past the limit, 413;
 - a header the program reads that is not UTF-8: 400;
 - a name no operation has: 404; another method than `POST`: 405;
 - no session, a forged or stale cookie, an Origin or a token missing

@@ -152,7 +152,7 @@ func TestNoRedirectIsFollowed(t *testing.T) {
 	if followed.Load() != 0 {
 		t.Errorf("%d redirects were followed", followed.Load())
 	}
-	if !strings.Contains(log.String(), `msg="kogo.http: failed" method=POST path=/thing status=302 why="the service answered 302" body=`) {
+	if !strings.Contains(log.String(), `msg="kogo.http: failed" method=POST path=/thing status=302 why="the service answered 302" bytes=`) || strings.Contains(log.String(), "body=") {
 		t.Errorf("the redirect is not logged as one:\n%s", log)
 	}
 }
@@ -236,15 +236,30 @@ func TestStrings(t *testing.T) {
 	}
 }
 
+// An id that is empty, . or .. would name the path it sits in or the
+// one above, and may come from a caller or a row: ask and perform give
+// NotSent naming it, log it as a failed call, and send nothing.
+func TestBadId(t *testing.T) {
+	var sent atomic.Int32
+	h, log := serve(t, Service{}, func(w http.ResponseWriter, r *http.Request) { sent.Add(1); io.WriteString(w, "{}") })
+	for _, id := range []string{"", ".", ".."} {
+		notSent := fmt.Sprintf("Either.Left(NotSent(why=an id in a path is not %q))", id)
+		want(t, "ask", rt.ToString(Http_Ask(h, Lookup_String_String_String("GET", "/v1/things/", id), nil)), notSent)
+		want(t, "ask, then a part", rt.ToString(Http_Ask(h, Lookup_String_String_String_String("GET", "/v1/things/", id, "/parts"), nil)), notSent)
+		want(t, "perform", rt.ToString(Http_Perform(h, Action_String_String_String("DELETE", "/v1/things/", id), nil)), notSent)
+		want(t, "perform, then a part", rt.ToString(Http_Perform(h, Action_String_String_String_String("POST", "/v1/things/", id, "/parts"), nil)), notSent)
+	}
+	if sent.Load() != 0 || strings.Count(log.String(), `msg="kogo.http: failed"`) != 12 || !strings.Contains(log.String(), `path=/v1/things/.. why="an id in a path is not \"..\""`) {
+		t.Errorf("%d sent, logged:\n%s", sent.Load(), log)
+	}
+}
+
 func TestPath(t *testing.T) {
 	want(t, "an id", Action_String_String_String_String("POST", "/v1/things/", "a/b?c d", "/parts").Path, "/v1/things/a%2Fb%3Fc%20d/parts")
 	want(t, "an id last", Lookup_String_String_String("GET", "/v1/things/", "id_1").Path, "/v1/things/id_1")
 	panics(t, `the path before an id ends in /: "/v1/things"`, func() { Lookup_String_String_String("GET", "/v1/things", "id_1") })
 	panics(t, `the path after an id begins with /: "parts"`, func() { Action_String_String_String_String("POST", "/v1/things/", "id_1", "parts") })
 	panics(t, `the path after an id begins with /: ""`, func() { Action_String_String_String_String("POST", "/v1/things/", "id_1", "") })
-	panics(t, `an id in a path is not ".."`, func() { Action_String_String_String("DELETE", "/v1/things/", "..") })
-	panics(t, `an id in a path is not "."`, func() { Action_String_String_String("DELETE", "/v1/things/", ".") })
-	panics(t, `an id in a path is not ""`, func() { Action_String_String_String("DELETE", "/v1/things/", "") })
 	panics(t, `an endpoint's method is GET, POST, PUT, PATCH or DELETE, not "get"`, func() { Lookup_String_String("get", "/a") })
 	panics(t, `an endpoint's path begins with /: "a"`, func() { Lookup_String_String("GET", "a") })
 	// A written part with something to escape would have Go escape
@@ -364,34 +379,28 @@ func TestFailures(t *testing.T) {
 		asked, performed := both(h)
 		want(t, "ask", asked, c.want)
 		want(t, "perform", performed, c.want)
-		// Every call that fails is logged, once, with its status; a 4xx
-		// with its body, a 5xx and a 2xx without.
-		refused, failed := c.status >= 400 && c.status < 500, strings.HasPrefix(c.want, "Either.Left")
+		// Every call that fails is logged, once, with its status and its
+		// body's length, never its body: a 4xx's may echo what was sent.
+		failed := strings.HasPrefix(c.want, "Either.Left")
 		if got := strings.Count(log.String(), `msg="kogo.http: failed" method=`); got != map[bool]int{true: 2}[failed] {
 			t.Errorf("%d: %d failed calls are logged:\n%s", c.status, got, log)
 		}
 		if failed && !strings.Contains(log.String(), "path=/thing status="+strconv.Itoa(c.status)+" why=") {
 			t.Errorf("%d: the status is not logged:\n%s", c.status, log)
 		}
-		if refused != strings.Contains(log.String(), "body=") || refused && !strings.Contains(log.String(), "body="+strconv.Quote(c.body)) {
-			t.Errorf("%d: the body is logged %v, want %v:\n%s", c.status, !refused, refused, log)
+		if failed && !strings.Contains(log.String(), " bytes="+strconv.Itoa(len(c.body))+"\n") || c.body != "" && strings.Contains(log.String(), c.body) {
+			t.Errorf("%d: the body is logged, or not its length:\n%s", c.status, log)
 		}
 		if strings.Contains(log.String(), "secret") {
 			t.Errorf("the handle's query or headers are logged:\n%s", log)
 		}
 	}
-	// A long refusal is logged to 4 KiB, and says so.
+	// A refusal past the limit is logged with the length read.
 	long := `{"echo": "` + strings.Repeat("x", 5000) + `"}`
-	h, log := serve(t, Service{MaxAnswer: 1 << 13}, answer(400, long))
-	want(t, "a long refusal", rt.ToString(Http_Ask(h, look, nil)), "Either.Left(Refused(status=400, body="+long+"))")
-	if !strings.Contains(log.String(), strings.Repeat("x", 4086)+" [cut: the first 4096 of 5012 bytes]") {
-		t.Errorf("a long refused body is not cut at 4096 bytes:\n%s", log)
-	}
-	// A refusal past the limit is logged, with what was read.
-	h, log = serve(t, Service{MaxAnswer: 1 << 10}, answer(404, long))
+	h, log := serve(t, Service{MaxAnswer: 1 << 10}, answer(404, long))
 	want(t, "a refusal past the limit", rt.ToString(Http_Perform(h, post, nil)), "Either.Left(Unknown(why=the answer is longer than 1024 bytes))")
-	if !strings.Contains(log.String(), `msg="kogo.http: failed" method=POST path=/thing status=404 why="the answer is longer than 1024 bytes" body="{\"echo\": \"xxx`) {
-		t.Errorf("a refusal past the limit is not logged:\n%s", log)
+	if !strings.HasSuffix(log.String(), `msg="kogo.http: failed" method=POST path=/thing status=404 why="the answer is longer than 1024 bytes" bytes=1025`+"\n") {
+		t.Errorf("a refusal past the limit is not logged with its length alone:\n%s", log)
 	}
 	// A slow service: the call left, so its end is unknown.
 	slow, log := serve(t, Service{Timeout: 50 * time.Millisecond, Query: map[string]string{"key": "secret"}}, func(w http.ResponseWriter, r *http.Request) { time.Sleep(200 * time.Millisecond) })
@@ -415,7 +424,7 @@ func TestFailures(t *testing.T) {
 }
 
 // A no inside a 2xx, which the client read, is logged as a failed call
-// is, with the client's why cut as a refused body is.
+// is, with the client's why cut at 4 KiB.
 func TestLogRefusal(t *testing.T) {
 	h, log := serve(t, Service{Query: map[string]string{"key": "secret"}, Headers: map[string]string{"Authorization": "secret"}}, answer(200, "{}"))
 	Http_LogRefusal_Lookup_String(h, look, "REQUEST_DENIED")

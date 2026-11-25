@@ -20,14 +20,16 @@ data class SignIn(val name: String)
 
 data class Greeting(val text: String)
 
-// The application's own: which cookie, its name, path and flags. A
-// real one holds a session's token, not a name.
+// The application's own: which cookie, its name, path and flags. It
+// holds a token, never what a caller typed: a cookie's value is a
+// token's letters and digits, and a name such as Zoë is no cookie's
+// (spec.md 15.2). A real one keeps the token in a session's row.
 fun sessionCookie(value: String, maxAgeSeconds: Long, env: SessionEnv): Cookie =
     Cookie("session", value, "/", maxAgeSeconds, SameSite.Lax, env.secure, true)
 
 fun signIn(tx: Tx, env: SessionEnv, request: Request, input: SignIn): Either<String, Reply<Greeting>> = either {
     ensure(!input.name.isBlank()) { "Say who you are." }
-    Reply(Greeting("Hello, ${input.name}."), listOf(sessionCookie(input.name, 3600L, env)))
+    Reply(Greeting("Hello, ${input.name}."), listOf(sessionCookie(randomString(32), 3600L, env)))
 }
 
 // A Max-Age of 0 ends the cookie.

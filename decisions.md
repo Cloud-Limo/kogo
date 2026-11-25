@@ -1323,10 +1323,13 @@ Each entry: what was decided, why, and what would reopen it.
   no word from the application, and what is stored for the payer stays fixed words.
   - To settle when built: what of a refused body is safe to log for every service.
     Built on 19 Nov 2026 (DEV-978) with the body's first 4 KiB, by the lead's Ruling on
-    PR 97: see "Taken building `kogo.http`". What is safe to log at all stays open.
+    PR 97: see "Taken building `kogo.http`". What is safe to log at all: no body, its
+    length alone (DEV-1225, the lead's call).
   - Not taken: `Act.Refused(words, detail)`, with the runner storing `detail` in
     `last_error`: it widens `Act` for one caller.
   - No reopen condition was given.
+  - Reopened and settled as b on 25 Nov 2026 (Greg): see "Five faults DEV-1198's trials
+    found, mended (DEV-1225)".
 - **A proof's transaction may also be passed to a proof's constructor, as that proof's
   marked `tx`** (18 Nov 2026, Greg; `doc/charge.md`, Q10; `doc/gates.md`, "A proof's
   transaction is used only before the dot"). It is written in two places: as the receiver
@@ -2487,6 +2490,12 @@ Each entry: what was decided, why, and what would reopen it.
   disagreement makes `contains` answer false for a key that is there. `==` of two sets or
   maps still walks both; reopen that when a port compares two large ones, and the rest when
   a large collection keyed by another kind is needed.
+  DEV-1198's trial T10 timed the walk over data-class keys at 6.71 s for 5,000 and
+  111.27 s for 20,000, and a request's `Limit` does not cut it. Greg ruled on 25 Nov 2026
+  that nothing changes, since no port keys a set or a map by a data class. Not taken: a Go
+  map for a data class made of plain kinds, about 20 / 15 lines, which still leaves a key
+  with a nullable field, a `Decimal` or a list walking; and a warning from `kogo check`,
+  which stays pass or fail.
 - **`rt`'s `==` compares a Go type that embeds `rt.Unordered` by its `Keys()` regardless
   of order**, each key once. `rt` knows no prelude type by name, and `Unordered`'s
   unexported method means no data class can be taken for a set by a member's name; `Map`
@@ -3268,7 +3277,8 @@ Each entry: what was decided, why, and what would reopen it.
   the browser's session.
 - **A cookie HTTP cannot carry panics** (500, and a `Tx` operation rolls back, since the
   answer is written inside its transaction). Not taken: Go's `http.SetCookie`, which
-  drops it with a log line, so the browser silently goes without it.
+  drops it with a log line, so the browser silently goes without it. The example puts a
+  token in its cookie, never a caller's text (DEV-1225).
 - **A cookie a browser refuses panics too** (review of PR 89): `SameSite.None`, or a
   `__Secure-` name, without `secure`, and a `__Host-` name without `secure` or the path
   `/`. The prefixes are read in any case, as browsers read them. Not taken: only
@@ -3487,7 +3497,8 @@ Each entry: what was decided, why, and what would reopen it.
   sends a path the declaration does not show. The Scope names two panics, for the
   text around an id. `..` from a browser is escaped to itself and names the path above:
   the same hole the escaping closes. An endpoint is made where the program starts or
-  from an id, so a wrong one is found at once.
+  from an id, so a wrong one is found at once. Since DEV-1225 the id is no panic but
+  `NotSent` from `ask` and `perform`: see that section.
 - **A header is set once**: `withHeader` panics on one that an earlier `withHeader` set,
   as on one of `main`'s. Not taken: the later value wins.
 - **A form's and a query's fields keep the order written**, and `main`'s query fields go
@@ -3502,8 +3513,8 @@ Each entry: what was decided, why, and what would reopen it.
   long it was (Ruling on PR 97, the lead, 19 Nov 2026; it narrows the "status and body"
   of Q9 above), at `Warn`, with the method, the path and the status. Not taken: whole,
   which puts up to `MaxAnswer` of a service's echo of personal data in one log line; a
-  choice for each handle, which no application has asked for. What of a body is safe
-  to log at all stays open in `doc/work.md`. The query is not logged, nor any header: a
+  choice for each handle, which no application has asked for. Since DEV-1225 no body is
+  logged, only its length: see that section. The query is not logged, nor any header: a
   credential may be in either. A 4xx is logged as `kogo.http: refused` and a 3xx as
   `kogo.http: redirect not followed` (the lead's Ruling on PR 97, 20 Nov 2026; both
   became `kogo.http: failed` with DEV-1050, below), since
@@ -3654,7 +3665,8 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   finds a function (`function-equality`), since what to change differs. Where the checker
   cannot see one, behind a type parameter or in `contains`, `in` or a `Set`, `rt.Equal`
   panics on reaching it, as on a function (Review 1 on PR 103: the bytes answered `true`
-  where Kotlin answers `false`). Not taken: comparing the bytes there.
+  where Kotlin answers `false`). Not taken: comparing the bytes there. Since DEV-1225
+  `rt.Equal` compares it by identity instead of panicking: see that section.
 - **A `ByteArray` in a template is refused, `bytes-text`**, since Kotlin writes its
   identity; inside a data class's text it is Kotlin's signed bytes, `[97, 0, -1]`, checked
   against kotlinc 2.4.21 by hand. Not taken: a form in `kotlin/`, which cannot make a
@@ -3902,9 +3914,9 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
 
 From Greg's rulings of 21 Nov 2026 on DEV-1049; these are the calls they left open.
 
-- **A 5xx's body is not logged**; a 3xx's and a 4xx's still are, their first 4 KiB. A
-  4xx's body is logged for what support reads in it, a decline's code and request id
-  (Q9); a 5xx's is the service's own trouble, often an error page, which no client acts
+- **A 5xx's body is not logged** (since DEV-1225 no body is, only its length); a 3xx's
+  and a 4xx's were, their first 4 KiB, until then. A 4xx's body is logged for what support
+  reads in it, a decline's code and request id (Q9); a 5xx's is the service's own trouble, often an error page, which no client acts
   on and which may echo what was sent. Nor is the body of a 2xx that is `Unreadable`,
   which may be a whole answer of personal data. Not taken: a 5xx's body logged as a
   4xx's is, more of what `doc/work.md`'s Open asks whether it is safe to log, for no
@@ -4038,8 +4050,8 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   generic `ask`; general logging, which stays open under "Printing is an action" (19 Nov
   2026) and is not reopened here.
 - **Its line is `kogo.http: refused in a 2xx`, with `method`, `path` and `why`**, at WARN
-  to the handle's logger, the one a failed call is written to; `why` is cut at 4 KiB as
-  a refused body is. Not taken: `kogo.http: failed`, the failed call's message, which
+  to the handle's logger, the one a failed call is written to; `why` is cut at 4 KiB, as
+  a refused body was until DEV-1225. Not taken: `kogo.http: failed`, the failed call's message, which
   would count with the failures a call that `ask` ended as a success, and gives no way
   to tell the two apart; `kogo.http: refused`, the message DEV-1050 retired for a 4xx,
   which a search of old logs would mix with these. It has no `status`: the binding is
@@ -4534,7 +4546,8 @@ The lead ruled the encoder changes, not the comparison; the agent's, for the res
   a string holding a backslash then `u2028` breaks.
 - **A lone surrogate stays a limit, stated in spec 15.4**: Go reads one as U+FFFD, where
   Kotlin's answer differs. A Kogo string holds no half of a surrogate pair (spec section 3),
-  and no row of Postgres holds one.
+  and no row of Postgres holds one. Since DEV-1225 an input's lone surrogate is a 400,
+  not U+FFFD: see that section.
 - **No case in `mise run kotlin`**: its cases call Kogo built-ins from `.kg` source, and
   `quote` is none, so the check has no form for this case.
   The test holds the bytes Kotlin wrote instead. Reopen if the wire gets a check of its own
@@ -5040,6 +5053,56 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
 - **`!in` stays out**, as the brief allowed: DEV-1184, the check a widening of the
   subset brings, is about 350 code lines, far above the brief's 20. `!(x in c)` says it.
   Reopens with DEV-1184.
+
+## Five faults DEV-1198's trials found, mended (DEV-1225), 25 Nov 2026
+
+- **A body that is not UTF-8, or holds half of a surrogate pair, is a 400** (spec 15.4):
+  `encoding/json` reads either as U+FFFD before `rpc`'s reader sees the string, so
+  `caf\xe9` was stored as `caf�` and `"a\ud800b"` as `a�b`, both answered 200 (DEV-1198's
+  trial T1). `readBody` keeps the bytes it decoded and asks `utf8.Valid`, then walks
+  each `\u` escape for a surrogate without its other half. The error names the input,
+  not a key: the walk is over the text, before any key is read. Not taken: decoding with
+  `encoding/json/v2`, which refuses both itself and is still behind `GOEXPERIMENT` in Go
+  1.27; naming the key, which needs a decoder of our own. Settings are left as they are:
+  a file the operator writes, which no caller reaches.
+- **A failed call is logged with its status and the length of the body read, never the
+  body** (spec 12, `kogo.http`), the lead's call on DEV-1198's trial T8: a 422 echoing a
+  person's email and birth date was logged whole at WARN. It holds for every status
+  and an `Unreadable` 2xx alike, as a key `bytes`, so one rule is stated and no status
+  is looked at. It closes `doc/work.md`'s open question of what of a body is safe to
+  log, and reopens Q9 (18 Nov 2026), settled again as the next entry has it. Not taken: logging
+  only the keys the `Service` names, a new thing for an author to write; the length of
+  a 3xx's and a 4xx's alone, which keeps a rule by status for no reader.
+- **A decline's code and request id are stored on the charge's row, not logged:
+  `doc/charge.md` Q9 is settled again as b** (Greg, 25 Nov 2026), `Act.Refused(words,
+  detail)`, with the runner storing `detail` in `last_error`. With no body logged, the
+  log was no longer a home for them, and nothing in the operator-money designs or the
+  schema stored one; `doc/work.md` had already said on 18 Nov that a logged body may
+  echo what was sent. It is built with the charge's port, not in DEV-1225, which adds no
+  code to `Act`. Not taken: taking the length-only log back out and keeping Q9's a, the
+  body logged in Go.
+- **`rt.Equal` compares two `ByteArray`s by identity** (spec 3), Kotlin's own answer,
+  where it panicked behind a type parameter, in `listOf`'s `contains` and in `setOf`
+  (DEV-1198's trial T2, row 56: a caller's data could reach a 500). Identity is the
+  same backing array and length; two arrays of no bytes are equal, since Go gives
+  them no address to tell apart, where Kotlin's two made apart are not, and the same
+  empty one must equal itself. `bytes-equality` stays where the checker sees one. Not
+  taken: comparing the bytes, which Review 1 on PR 103 refused for answering `true`
+  where Kotlin answers `false`.
+- **`examples/25_reply.kg` sets a token, `randomString(32)`, as its cookie**, not the
+  caller's name, which answered 500 for `Zoë`, `Ann "A"` or `a;b` (trial T9, row 58):
+  a cookie HTTP cannot carry still panics, and the example is the program an author
+  copies. The driver prints the token as `<token>`, since it differs every run. Not
+  taken: a session's row as `28_session.kg` keeps one, more than the example is about.
+- **An id that is empty, `.` or `..` is `NotSent` from `ask` and `perform`**, naming
+  it, `an id in a path is not ".."`, logged as a failed call, and nothing is sent
+  (spec 12; trial T9, row 60): an id from a caller or a row reached a panic, a 500 no
+  program could ask about first. The endpoint carries why it cannot be sent, in a
+  field `==` does not compare, so `lookup` and `action` still give a value and the
+  call is where the failure is, as for any other that never left. A method, a
+  `before`, an `after` or a written part that is wrong still panics: the author wrote
+  each. Not taken: `lookup` and `action` giving an `Either` or a null, which every
+  caller unwraps for the rare id.
 
 ## A second outer join in a nullable nested data class (DEV-1211), 24 Nov 2026
 

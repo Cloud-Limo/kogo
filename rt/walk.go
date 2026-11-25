@@ -33,11 +33,13 @@ type unordered interface {
 // is nil, a T? holding a value is equal to that T, lists and data
 // classes are compared part by part, sets regardless of order, and a
 // Double as Kotlin's equals compares it, so NaN is equal to NaN and
-// 0.0 is not equal to -0.0. A function, a ByteArray, a Regex or a
-// handle panics, as Kotlin compares none by what it holds: the checker
-// refuses == where it sees one of the first three, and cannot see one
-// behind a type parameter or in a contains, an in, or a Set's or a
-// Map's keys.
+// 0.0 is not equal to -0.0. A ByteArray is equal only to itself, as
+// Kotlin compares one by identity: the same bytes in memory, and any
+// two of no bytes, which Go cannot tell apart. A function, a Regex or
+// a handle panics, as Kotlin compares none by what it holds. The
+// checker refuses == where it sees any of the first three, and cannot
+// see one behind a type parameter or in a contains, an in, or a Set's
+// or a Map's keys.
 func Equal(a, b any) bool { return equal(reflect.ValueOf(a), reflect.ValueOf(b)) }
 
 // EqualDouble is a == b for two Double? values as Kotlin compares
@@ -96,7 +98,7 @@ func equal(a, b reflect.Value) bool {
 		panic("a function cannot be compared")
 	}
 	if isBytes(a) || isBytes(b) {
-		panic("a ByteArray cannot be compared: Kotlin compares it by identity")
+		return isBytes(a) && isBytes(b) && a.Len() == b.Len() && (a.Len() == 0 || a.Pointer() == b.Pointer())
 	}
 	if a.Kind() != b.Kind() {
 		return false

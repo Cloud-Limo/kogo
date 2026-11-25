@@ -142,6 +142,7 @@ func TestRows(t *testing.T) {
 		{`t.WholeSites(db)`, sites},
 		{`t.HalfSites(db)`, "panics: column shop_slug is null, and fills a property that is not nullable"},
 		{`t.Notes(db)`, "[Noted(legalName=Acme, note=Note(id=00000000-0000-0000-0000-000000000004, text=Acme-Store)), Noted(legalName=Bolt, note=null)]"},
+		{`t.Stores(db)`, "[Stored(legalName=Acme, store=Store(id=00000000-0000-0000-0000-000000000004, owner=Acme)), Stored(legalName=Bolt, store=null)]"},
 		{`t.Largest(db, 1000)`, "2000"},
 		{`t.Largest(db, 5000)`, "panics: can't scan into dest[0] (col: m!): cannot scan NULL into *int64"},
 		{`t.NoNames(db)`, "panics: column names is null, and fills a property that is not nullable"},
@@ -194,6 +195,18 @@ fun notes(db: Db): List<Noted> = db.tx { tx ->
     tx.query<Noted>(sql"""
         select b.legal_name, t.id as note_id, coalesce(t.slug::text, '') as note_text
         from business b left join tenant t on t.business_id = b.id order by b.legal_name
+    """)
+}
+
+// A class told there by its id alone: a column that another outer
+// join nulls fills only a T? of it, and does not tell.
+data class Store(val id: Uuid, val owner: String?)
+data class Stored(val legalName: String, val store: Store?)
+
+fun stores(db: Db): List<Stored> = db.tx { tx ->
+    tx.query<Stored>(sql"""
+        select b.legal_name, t.id as store_id, c.legal_name as store_owner
+        from business b left join tenant t on t.business_id = b.id left join business c on c.id = b.id order by b.legal_name
     """)
 }
 

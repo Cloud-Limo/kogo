@@ -207,7 +207,8 @@ var jsonbCasts = map[int]bool{3556: true, 3449: true, 3450: true, 3451: true, 34
 // answer as if no outer join nulled anything: a column not null then,
 // and nullable otherwise, is null only through an outer join.
 func (c *Checker) notNull(ctx context.Context, q, expr *node, constant, joins bool) (notNull, whole bool, err error) {
-	q, expr, rte, joined, nulled := source(q, expr)
+	q, expr, rte, by, nulled := source(q, expr)
+	joined := len(by) > 0
 	whole = rte != nil && expr.num("varattno") == 0
 	switch {
 	case nulled || joined && !joins || expr == nil:
@@ -227,16 +228,6 @@ func (c *Checker) notNull(ctx context.Context, q, expr *node, constant, joins bo
 				break
 			}
 		}
-	case expr.tag == "RELABELTYPE" || expr.tag == "COERCEVIAIO":
-		notNull, _, err = c.notNull(ctx, q, expr.field("arg"), constant, joins)
-	case expr.tag == "FUNCEXPR" && (expr.num("funcformat") == 1 || expr.num("funcformat") == 2) &&
-		expr.num("funcid") < 16384 && !jsonbCasts[expr.num("funcid")]:
-		// a cast function of Postgres's own (below FirstNormalObjectId),
-		// explicit or implicit: its first argument is the value, any
-		// others a type modifier
-		if args := expr.field("args").items(); len(args) > 0 {
-			notNull, _, err = c.notNull(ctx, q, args[0], constant, joins)
-		}
 	}
 	return notNull, whole, err
 }
@@ -244,13 +235,18 @@ func (c *Checker) notNull(ctx context.Context, q, expr *node, constant, joins bo
 // source follows expr, an expression of query q, through references
 // to a subquery's column or a grouped column, to what they name: an
 // expression of the query it ends in, and when that is a reference to
-// a table, the table's range table entry. joined is whether an outer
-// join can null a reference on the way, and nulled whether a grouping
-// set or returning's old or new can: Postgres marks a reference with
-// the outer joins and grouping sets that null it (varnullingrels), by
-// their range table entries.
-func source(q, expr *node) (endQ, endExpr, rte *node, joined, nulled bool) {
-	for expr != nil && expr.tag == "VAR" && expr.num("varlevelsup") == 0 {
+// a table, the table's range table entry, and through the casts
+// uncast steps through. joins keys the outer joins that can null a
+// reference on the way, and nulled is whether a grouping set or
+// returning's old or new can: Postgres marks a reference with the
+// outer joins and grouping sets that null it (varnullingrels), by
+// their range table entries. A join's key is the indexes of the
+// subqueries it lies in and its own, "2.4", and for a full join the
+// side the reference lies on, "4l" or "4r", since each side is nulled
+// where the other has no row.
+func source(q, expr *node) (endQ, endExpr, rte *node, joins []string, nulled bool) {
+	within := ""
+	for expr = uncast(expr); expr != nil && expr.tag == "VAR" && expr.num("varlevelsup") == 0; {
 		rtable, att, no := q.field("rtable").items(), expr.num("varattno"), expr.num("varno")
 		rels := expr.field("varnullingrels").items() // (b 3 5), or (b) for none
 		nulled = nulled || expr.num("varreturningtype") != 0 || len(rels) == 0
@@ -258,7 +254,11 @@ func source(q, expr *node) (endQ, endExpr, rte *node, joined, nulled bool) {
 			if i, err := strconv.Atoi(by.text()); err != nil || i < 1 || i > len(rtable) || rtable[i-1].num("rtekind") != rteJoin {
 				nulled = true
 			} else {
-				joined = true
+				key := within + strconv.Itoa(i)
+				if j := q.field("jointree").find(i); j.num("jointype") == 2 { // JOIN_FULL
+					key += map[bool]string{true: "l", false: "r"}[j.field("larg").find(no) != nil]
+				}
+				joins = append(joins, key)
 			}
 		}
 		if no < 1 || no > len(rtable) || att < 0 {
@@ -267,17 +267,60 @@ func source(q, expr *node) (endQ, endExpr, rte *node, joined, nulled bool) {
 		in, exprs := q, []*node(nil)
 		switch rte := rtable[no-1]; rte.num("rtekind") {
 		case rteRelation:
-			return q, expr, rte, joined, nulled
+			return q, expr, rte, joins, nulled
 		case rteSubquery:
 			in = rte.field("subquery")
 			exprs = outputs(in)
+			within += strconv.Itoa(no) + "."
 		case rteGroup:
 			exprs = rte.field("groupexprs").items()
 		}
 		if att < 1 || att > len(exprs) {
 			break
 		}
-		q, expr = in, exprs[att-1]
+		q, expr = in, uncast(exprs[att-1])
 	}
-	return q, expr, nil, joined, nulled
+	return q, expr, nil, joins, nulled
+}
+
+// find gives the part of n, a query's jointree or a part of it, that
+// is range table entry i, or nil where n holds none.
+func (n *node) find(i int) *node {
+	switch {
+	case n == nil:
+	case (n.tag == "JOINEXPR" || n.tag == "RANGETBLREF") && n.num("rtindex") == i:
+		return n
+	case n.tag == "JOINEXPR":
+		if f := n.field("larg").find(i); f != nil {
+			return f
+		}
+		return n.field("rarg").find(i)
+	case n.tag == "FROMEXPR":
+		for _, v := range n.field("fromlist").items() {
+			if f := v.find(i); f != nil {
+				return f
+			}
+		}
+	}
+	return nil
+}
+
+// uncast gives what expr casts, through the casts notNull steps
+// through, and expr itself where it is no such cast.
+func uncast(expr *node) *node {
+	for expr != nil {
+		switch {
+		case expr.tag == "RELABELTYPE" || expr.tag == "COERCEVIAIO":
+			expr = expr.field("arg")
+		case expr.tag == "FUNCEXPR" && (expr.num("funcformat") == 1 || expr.num("funcformat") == 2) &&
+			expr.num("funcid") < 16384 && !jsonbCasts[expr.num("funcid")] && len(expr.field("args").items()) > 0:
+			// a cast function of Postgres's own (below FirstNormalObjectId),
+			// explicit or implicit: its first argument is the value, any
+			// others a type modifier
+			expr = expr.field("args").items()[0]
+		default:
+			return expr
+		}
+	}
+	return nil
 }

@@ -550,6 +550,81 @@ func TestErrors(t *testing.T) {
 	}
 }
 
+// In a nullable nested data class, a column that another outer join
+// can null than the class's own fills only a T?: through a join of
+// the statement, through one in a subquery on the nullable side,
+// asserted with "name!", through a cast, and a full join's other side.
+// The class is told by the column with the fewest joins, then the
+// earliest, across subquery levels too; a cast over the class's one join passes; and a column
+// whose joins kogo check cannot follow is refused naming none.
+func TestSecondJoin(t *testing.T) {
+	testDB(t)
+	code, out := kogo(t, map[string]string{"a.kg": `package a
+
+data class Shop(val id: Uuid, val driverId: Uuid)
+data class Row(val legalName: String, val shop: Shop?)
+
+fun f(tx: Tx): List<Row> = tx.query<Row>(sql"""select b.legal_name, t.id as shop_id, d.driver_id as shop_driver_id
+    from business b left join tenant t on t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id""")
+
+fun g(tx: Tx): List<Row> = tx.query<Row>(sql"""select b.legal_name, s.tid as shop_id, s.did as shop_driver_id
+    from business b left join (select t.business_id, t.id as tid, d.driver_id as did
+        from tenant t left join tenant_driver d on d.tenant_id = t.id) s on s.business_id = b.id""")
+
+fun h(tx: Tx): List<Row> = tx.query<Row>(sql"""select b.legal_name, t.id as shop_id, d.driver_id as "shop_driver_id!"
+    from business b left join tenant t on t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id""")
+
+data class Cast(val id: Uuid, val driverId: String)
+data class Casts(val legalName: String, val shop: Cast?)
+
+fun i(tx: Tx): List<Casts> = tx.query<Casts>(sql"""select b.legal_name, t.id as shop_id, d.driver_id::text as shop_driver_id
+    from business b left join tenant t on t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id""")
+
+data class Back(val driverId: String, val id: Uuid)
+data class Backs(val legalName: String, val shop: Back?)
+
+fun j(tx: Tx): List<Backs> = tx.query<Backs>(sql"""select b.legal_name, t.id as shop_id, d.driver_id::text as shop_driver_id
+    from business b left join tenant t on t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id""")
+
+data class Tag(val id: String)
+data class Tagged(val legalName: String, val tag: Tag?)
+
+fun k(tx: Tx): List<Tagged> = tx.query<Tagged>(sql"""select b.legal_name, t.id::text as tag_id
+    from business b left join tenant t on t.business_id = b.id""")
+
+data class Deep(val driverId: Uuid, val id: Uuid)
+data class Deeps(val legalName: String, val shop: Deep?)
+
+fun l(tx: Tx): List<Deeps> = tx.query<Deeps>(sql"""select b.legal_name, s.tid as shop_id, s.did as shop_driver_id
+    from business b left join (select t.business_id, t.id as tid, d.driver_id as did
+        from tenant t left join tenant_driver d on d.tenant_id = t.id) s on s.business_id = b.id""")
+
+data class Pair(val aId: Uuid, val bId: Uuid)
+data class Paired(val p: Pair?)
+
+fun m(tx: Tx): List<Paired> = tx.query<Paired>(sql"""select b.id as p_a_id, t.id as p_b_id from business b full join tenant t on false""")
+
+fun n(tx: Tx): List<Row> = tx.query<Row>(sql"""select b.legal_name, t.id as shop_id, coalesce(d.driver_id, d.tenant_id) as shop_driver_id
+    from business b left join tenant t on t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id""")
+
+fun o(tx: Tx): List<Row> = tx.query<Row>(sql"""select s.bid::text as legal_name, s.tid as shop_id, d.driver_id as shop_driver_id
+    from (select b.id as bid, t.id as tid from business b left join tenant t on t.business_id = b.id) s left join tenant_driver d on d.tenant_id = s.tid""")
+`})
+	want := `{"file":"a.kg","line":6,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through another outer join than shop_id's, where the class is there: make Shop.driverId a Uuid?"}
+{"file":"a.kg","line":9,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through another outer join than shop_id's, where the class is there: make Shop.driverId a Uuid?"}
+{"file":"a.kg","line":13,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through another outer join than shop_id's, where the class is there: make Shop.driverId a Uuid?"}
+{"file":"a.kg","line":19,"column":46,"code":"sql-nullable","message":"column shop_driver_id may be null through another outer join than shop_id's, where the class is there: make Cast.driverId a String?"}
+{"file":"a.kg","line":25,"column":46,"code":"sql-nullable","message":"column shop_driver_id may be null through another outer join than shop_id's, where the class is there: make Back.driverId a String?"}
+{"file":"a.kg","line":37,"column":46,"code":"sql-nullable","message":"column shop_driver_id may be null through another outer join than shop_id's, where the class is there: make Deep.driverId a Uuid?"}
+{"file":"a.kg","line":44,"column":48,"code":"sql-nullable","message":"column p_b_id may be null through another outer join than p_a_id's, where the class is there: make Pair.bId a Uuid?"}
+{"file":"a.kg","line":46,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through an outer join kogo check cannot follow, where the class is there by shop_id: make Shop.driverId a Uuid?"}
+{"file":"a.kg","line":49,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through another outer join than shop_id's, where the class is there: make Shop.driverId a Uuid?"}
+`
+	if code != 1 || out != want {
+		t.Errorf("exit %d, want 1\n got %s\nwant %s", code, out, want)
+	}
+}
+
 // A <dir> that is a link to a program's directory is that directory:
 // its errors are found and name each file under the link as given.
 func TestLinkedDir(t *testing.T) {

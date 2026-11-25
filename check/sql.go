@@ -295,10 +295,16 @@ type teller struct {
 // tell refuses each column of one nullable data class's tellers that
 // other outer joins can null than the class is null by, "name!" too:
 // those of the one with the fewest joins, then the earliest in the
-// statement, which has the lowest key, then property order; or the
-// first where none has joins kogo check can follow.
+// statement, whose key is lowest compared element by element as
+// numbers, then property order; or the first where none has joins
+// kogo check can follow.
 func (c *checker) tell(lit *syntax.SQL, tells []teller) {
-	key := func(a, b string) int { return cmp.Or(cmp.Compare(len(a), len(b)), strings.Compare(a, b)) }
+	key := func(a, b string) int { // "2.3" before "4", "5l" before "5r"
+		return slices.CompareFunc(strings.Split(a, "."), strings.Split(b, "."), func(x, y string) int {
+			nx, ny := strings.TrimRight(x, "lr"), strings.TrimRight(y, "lr")
+			return cmp.Or(cmp.Compare(len(nx), len(ny)), strings.Compare(x, y))
+		})
+	}
 	by := 0
 	for i, x := range tells {
 		joins := tells[by].col.Joins

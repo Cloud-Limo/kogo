@@ -554,7 +554,7 @@ func TestErrors(t *testing.T) {
 // the statement, through one in a subquery on the nullable side,
 // asserted with "name!", through a cast, and a full join's other side.
 // The class is told by the column with the fewest joins, then the
-// earliest; a cast over the class's one join passes; and a column
+// earliest, across subquery levels too; a cast over the class's one join passes; and a column
 // whose joins kogo check cannot follow is refused naming none.
 func TestSecondJoin(t *testing.T) {
 	testDB(t)
@@ -605,6 +605,9 @@ fun m(tx: Tx): List<Paired> = tx.query<Paired>(sql"""select b.id as p_a_id, t.id
 
 fun n(tx: Tx): List<Row> = tx.query<Row>(sql"""select b.legal_name, t.id as shop_id, coalesce(d.driver_id, d.tenant_id) as shop_driver_id
     from business b left join tenant t on t.business_id = b.id left join tenant_driver d on d.tenant_id = t.id""")
+
+fun o(tx: Tx): List<Row> = tx.query<Row>(sql"""select s.bid::text as legal_name, s.tid as shop_id, d.driver_id as shop_driver_id
+    from (select b.id as bid, t.id as tid from business b left join tenant t on t.business_id = b.id) s left join tenant_driver d on d.tenant_id = s.tid""")
 `})
 	want := `{"file":"a.kg","line":6,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through another outer join than shop_id's, where the class is there: make Shop.driverId a Uuid?"}
 {"file":"a.kg","line":9,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through another outer join than shop_id's, where the class is there: make Shop.driverId a Uuid?"}
@@ -614,6 +617,7 @@ fun n(tx: Tx): List<Row> = tx.query<Row>(sql"""select b.legal_name, t.id as shop
 {"file":"a.kg","line":37,"column":46,"code":"sql-nullable","message":"column shop_driver_id may be null through another outer join than shop_id's, where the class is there: make Deep.driverId a Uuid?"}
 {"file":"a.kg","line":44,"column":48,"code":"sql-nullable","message":"column p_b_id may be null through another outer join than p_a_id's, where the class is there: make Pair.bId a Uuid?"}
 {"file":"a.kg","line":46,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through an outer join kogo check cannot follow, where the class is there by shop_id: make Shop.driverId a Uuid?"}
+{"file":"a.kg","line":49,"column":42,"code":"sql-nullable","message":"column shop_driver_id may be null through another outer join than shop_id's, where the class is there: make Shop.driverId a Uuid?"}
 `
 	if code != 1 || out != want {
 		t.Errorf("exit %d, want 1\n got %s\nwant %s", code, out, want)

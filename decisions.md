@@ -5067,6 +5067,9 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   `t.id` and `d.driver_id` have one join each, and property order would keep `driverId`
   and refuse `id`, whose advice, followed, makes a shop with no driver read as no shop.
   Not taken: the first column in property order, the first attempt's, for that reason.
+  Keys compare element by element as numbers, so `2.3` (a join in subquery 2) comes
+  before `4` (the lead's Ruling, 25 Nov 2026). Not taken: by length and then as text,
+  which put `4` first and refused `id` over a subquery, the same wrong advice.
 - **`sql-nullable` names the column that tells the class, not the joins**: "column
   shop_driver_id may be null through another outer join than shop_id's, where the class
   is there: make Shop.driverId a Uuid?" (the lead's Ruling on Fix 4, 25 Nov 2026, over

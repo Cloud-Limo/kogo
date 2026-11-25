@@ -214,7 +214,7 @@ func (p *parser) file() {
 		f.OptIn = append(f.OptIn, a)
 	}
 	if !p.at("package") {
-		p.fail(p.tok.pos, "syntax", "a file begins with its package line, as package cusoon.model")
+		p.fail(p.tok.pos, "syntax", "a file begins with its package line, as package example.ops")
 	}
 	p.next()
 	f.Package = p.path()

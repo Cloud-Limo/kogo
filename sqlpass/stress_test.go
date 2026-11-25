@@ -112,6 +112,20 @@ func TestStressNotNullNoInherit(t *testing.T) {
 	wantSignature(t, c, `select id, v from only par`, "() -> id: Int, v: String")
 }
 
+// A foreign table's NOT NULL is the word of whoever made it, which
+// Postgres does not enforce (CREATE FOREIGN TABLE), so its columns may
+// be null, and a table's that reads a foreign child's rows too.
+func TestForeignNotNull(t *testing.T) {
+	c := stressed(t, `
+		create foreign table ft (id integer not null, v text) server kogo_none;
+		create table par (id integer not null);
+		create foreign table kid () inherits (par) server kogo_none;`)
+	wantSignature(t, c, `select id from ft`, "() -> id: Int?")
+	wantSignature(t, c, `select f as row from ft f`, "() -> row: ft(id: Int?, v: String?)")
+	wantSignature(t, c, `select id from par`, "() -> id: Int?")
+	wantSignature(t, c, `select id from only par`, "() -> id: Int")
+}
+
 // Finding 10: the tree Postgres logs is the statement before its
 // rules are applied, and a rule replaces returning's list with its
 // own.

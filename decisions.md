@@ -5154,6 +5154,46 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   class it holds has its own joins, and a whole row (spec 10.5), a CTE, a view or a union
   is left as it was (the Scope's Not here).
 
+## The SQL pass's smaller faults from the stress run (DEV-1177), 25 Nov 2026
+
+- **A foreign table's `NOT NULL` column is nullable**, and so is one of a table that
+  reads a foreign child's rows (inheritance or a partition), unless read with `only`:
+  Postgres does not enforce a foreign table's `NOT NULL` (`create foreign table`, "Notes"),
+  so it is the word of whoever made the table, and `"name!"` is how an author gives that
+  word in Kogo. The fault lies in `validNotNull`, so a whole row's fields follow it too.
+  Not taken: refusing a statement that reads a foreign table, which leaves an author no
+  way to read one that Postgres serves, where nullable leaves `"name!"`. Tested on a
+  foreign server with no wrapper behind it, `kogo_none`, which `mise run testdb` makes as
+  the superuser: Postgres prepares a statement on its tables and never runs one.
+- **An empty literal, or one of comments alone, is `sql-empty`** at the literal. Postgres
+  sends no parse tree for it, as for a pooler that drops the tree; the two are told apart
+  by preparing `select`, which has one, only when the tree is missing. Not taken: reading
+  the literal for a token, which needs Postgres's lexer for comments and `;`.
+- **`$cart.id`, where `cart` is a data class, is told to write `${cart.id}`**, whatever
+  Postgres would make of the dot: `$cart.name` too, which Postgres reads as a cast to
+  `name` (the lead's ruling of 25 Nov 2026 on PR 194). No parameter is a data class
+  (spec 10.3), so this changes a message and no refusal; it needs a name after the dot,
+  so `$cart."id"` keeps Postgres's 42809. It replaces this PR's first reading, a hint on
+  Postgres's 42809 alone, which missed `$cart.name`. `$s.text` on a `String` stays the
+  cast it is. Not taken: refusing every `$name.` in the literal, which refuses `$s.text`
+  and so changes what `kogo check` refuses.
+- **A table dropped and made again under a live connection is not mended here**: since
+  DEV-1194 a whole row is read by its fields' names and no composite type is loaded, so
+  that read no longer panics. `Tx_Known` still holds an array type Postgres does not
+  ship, and since DEV-1208 an array of a domain, by the oid it loaded; a domain dropped
+  and made again keeps the old one on that connection. That is a change to the schema a
+  program was checked against, which Kogo does not promise to follow (DEV-1195, spec
+  10), so nothing changes for it (the lead's ruling of 25 Nov 2026).
+- **`syntax`'s example package is `example.ops`, not `cusoon.model`**, in the message for
+  a file with no package line and in `File`'s comment (the lead's ruling of 25 Nov
+  2026): a diagnostic every user reads names nothing of cusoon2, while `examples/` and
+  `cmd/kogo/testdata/driver.go` keep theirs as a worked example. Not taken: an issue of
+  its own.
+- **A property whose column name passes 63 bytes is `sql-column-missing` naming the
+  limit**, and the column of that name cut to 63 bytes, which Postgres gives for it, is
+  taken as that property's, not also reported unused. Not taken: leaving the unused
+  report, whose advice is to add a property of the cut name.
+
 ## A rule of the data written twice goes to the schema (DEV-1227), 25 Nov 2026
 
 - **A port that would write an expression over a row's own columns a third time, or

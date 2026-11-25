@@ -5153,3 +5153,27 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
 - **The rule compares only within one nullable class filled by prefix**; a nullable
   class it holds has its own joins, and a whole row (spec 10.5), a CTE, a view or a union
   is left as it was (the Scope's Not here).
+
+## The SQL pass's smaller faults from the stress run (DEV-1177), 25 Nov 2026
+
+- **A foreign table's `NOT NULL` column is nullable**, and so is one of a table that
+  reads a foreign child's rows (inheritance or a partition), unless read with `only`:
+  Postgres does not enforce a foreign table's `NOT NULL` (`create foreign table`, "Notes"),
+  so it is the word of whoever made the table, and `"name!"` is how an author gives that
+  word in Kogo. The fault lies in `validNotNull`, so a whole row's fields follow it too.
+  Not taken: refusing a statement that reads a foreign table, which leaves an author no
+  way to read one that Postgres serves, where nullable leaves `"name!"`. Tested on a
+  foreign server with no wrapper behind it, `kogo_none`, which `mise run testdb` makes as
+  the superuser: Postgres prepares a statement on its tables and never runs one.
+- **An empty literal, or one of comments alone, is `sql-empty`** at the literal. Postgres
+  sends no parse tree for it, as for a pooler that drops the tree; the two are told apart
+  by preparing `select`, which has one, only when the tree is missing. Not taken: reading
+  the literal for a token, which needs Postgres's lexer for comments and `;`.
+- **`$cart.id` is told about `${cart.id}` only where Postgres refuses it with 42809**,
+  at a parameter followed by `.`. Not taken: refusing every `$name.` in the literal,
+  which would also refuse `$s.text`, a cast Postgres takes today: that changes what
+  `kogo check` refuses, beyond the Scope.
+- **A property whose column name passes 63 bytes is `sql-column-missing` naming the
+  limit**, and the column of that name cut to 63 bytes, which Postgres gives for it, is
+  taken as that property's, not also reported unused. Not taken: leaving the unused
+  report, whose advice is to add a property of the cut name.

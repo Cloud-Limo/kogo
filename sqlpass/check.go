@@ -626,12 +626,17 @@ func pascal(s string) string {
 // NOT NULL constraint that holds where inherited says, a SQL boolean
 // that is whether the reference reads child tables too. Postgres 18
 // also sets attnotnull for one NOT VALID, and for one NO INHERIT,
-// which a child's rows need not keep.
+// which a child's rows need not keep, and for a foreign table's
+// column, which it does not enforce: none holds where the table, or a
+// child it reads, is foreign.
 func validNotNull(inherited string) string {
 	return `a.attnotnull and not exists (
 	select from pg_constraint k
 	where k.conrelid = a.attrelid and k.contype = 'n' and k.conkey = array[a.attnum]
-		and (not k.convalidated or k.connoinherit and ` + inherited + `))`
+		and (not k.convalidated or k.connoinherit and ` + inherited + `)) and not exists (
+	with recursive t(oid) as (select a.attrelid
+		union select i.inhrelid from pg_inherits i join t on i.inhparent = t.oid and ` + inherited + `)
+	select from t join pg_class r using (oid) where r.relkind = 'f')`
 }
 
 // columnNotNull reports whether a table's column has a validated NOT

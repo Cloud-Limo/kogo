@@ -944,7 +944,9 @@ of the base type is.
 
 - A result column is non-null only when Postgres can never make it
   null: a reference to a `NOT NULL` column of a table or to a table's
-  whole row, `count(...)`, `exists (...)`, a `coalesce(...)` with an
+  whole row (not a foreign table's, nor a table's that reads a foreign
+  child's rows, since Postgres does not enforce a foreign table's
+  `NOT NULL`), `count(...)`, `exists (...)`, a `coalesce(...)` with an
   argument non-null by this rule or a constant other than `null`, or a
   cast of any of these other than from `jsonb` or by a function of the
   schema's; and none of it on the nullable side of an outer

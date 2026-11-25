@@ -222,14 +222,13 @@ func sorted(answer *Json, f *failed) kogo.Either[HttpFailure, Json] {
 	return kogo.Either_Left[HttpFailure]{Value: HttpFailure_Unknown{Why: f.why}}
 }
 
-// maxLogged is the most of a refused body that is logged: it may echo
-// what was sent, a person's name or email with it.
+// maxLogged is the most of a client's why that is logged.
 const maxLogged = 4 << 10
 
 // A failed send: refused, a 4xx, with the service's body; or why,
 // with whether it left and whether a 2xx came that is not a JSON
-// object. status is the answer's, 0 when none came, and logged what
-// of its body is logged.
+// object. status is the answer's, 0 when none came, and length the
+// bytes of its body read.
 type failed struct {
 	refused    bool
 	status     int32
@@ -237,13 +236,13 @@ type failed struct {
 	left       bool
 	unreadable bool
 	why        string
-	logged     *string
+	length     int
 }
 
 // send makes the call and logs it when it fails: its method, path,
-// status when an answer came, and why, with the body of a 3xx or a
-// 4xx. Never the query or the handle's headers: the path is the
-// endpoint's, which holds no query.
+// status when an answer came, why, and the length of the body read.
+// Never the body, which may echo what was sent, nor the query or the
+// handle's headers: the path is the endpoint's, which holds no query.
 func (h Http) send(e Endpoint, fields kogo.List[Field], again bool) (*Json, *failed) {
 	answer, f := h.call(e, fields, again)
 	if f != nil {
@@ -252,8 +251,8 @@ func (h Http) send(e Endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 			args = append(args, "status", f.status)
 		}
 		args = append(args, "why", f.why)
-		if f.logged != nil {
-			args = append(args, "body", *f.logged)
+		if f.status != 0 {
+			args = append(args, "bytes", f.length)
 		}
 		h.s.Log.Warn("kogo.http: failed", args...)
 	}
@@ -263,7 +262,7 @@ func (h Http) send(e Endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 // Http_LogRefusal_Lookup_String and its Action twin log a no that a
 // service said inside a 2xx, which its client read and raised: the
 // endpoint's method and path, as a failed call is logged, and why,
-// the client's word, cut as a refused body is. It is no action, as
+// the client's word, cut at 4 KiB. It is no action, as
 // ask's own logging is not.
 func Http_LogRefusal_Lookup_String(this Http, endpoint Lookup, why string) rt.Unit {
 	return this.refused(endpoint.Endpoint, why)
@@ -358,32 +357,23 @@ func (h Http) call(e Endpoint, fields kogo.List[Field], again bool) (*Json, *fai
 	defer resp.Body.Close()
 	text, err := io.ReadAll(io.LimitReader(resp.Body, h.s.MaxAnswer+1))
 	status := resp.StatusCode
-	// The body of a 3xx or a 4xx is logged, a refusal past the limit or
-	// broken off too, with what was read: then the cut mark's "of N
-	// bytes" counts what was read, not the whole. A 5xx's is not
-	// (decisions.md).
-	var logged *string
-	if status >= 300 && status < 500 {
-		l := cut(string(text))
-		logged = &l
-	}
 	answered := fmt.Sprintf("the service answered %d", status)
 	switch {
 	case err != nil:
-		return nil, &failed{left: true, status: int32(status), logged: logged, why: "the answer broke off: " + reason(err)}
+		return nil, &failed{left: true, status: int32(status), length: len(text), why: "the answer broke off: " + reason(err)}
 	case int64(len(text)) > h.s.MaxAnswer:
-		return nil, &failed{left: true, status: int32(status), logged: logged, why: fmt.Sprintf("the answer is longer than %d bytes", h.s.MaxAnswer)}
+		return nil, &failed{left: true, status: int32(status), length: len(text), why: fmt.Sprintf("the answer is longer than %d bytes", h.s.MaxAnswer)}
 	}
 	answer := Json_Parse(string(text))
 	switch {
 	case status >= 400 && status < 500:
-		return nil, &failed{refused: true, status: int32(status), body: answer, logged: logged, why: answered}
+		return nil, &failed{refused: true, status: int32(status), body: answer, length: len(text), why: answered}
 	case status < 200 || status >= 300:
-		return nil, &failed{left: true, status: int32(status), logged: logged, why: answered}
+		return nil, &failed{left: true, status: int32(status), length: len(text), why: answered}
 	case len(bytes.TrimSpace(text)) == 0:
 		return &Json{"{}"}, nil // done, with nothing to say
 	case answer == nil:
-		return nil, &failed{left: true, unreadable: true, status: int32(status), why: "the answer is not a JSON object"}
+		return nil, &failed{left: true, unreadable: true, status: int32(status), length: len(text), why: "the answer is not a JSON object"}
 	}
 	return answer, nil
 }

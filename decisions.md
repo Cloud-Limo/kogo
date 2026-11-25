@@ -1323,7 +1323,8 @@ Each entry: what was decided, why, and what would reopen it.
   no word from the application, and what is stored for the payer stays fixed words.
   - To settle when built: what of a refused body is safe to log for every service.
     Built on 19 Nov 2026 (DEV-978) with the body's first 4 KiB, by the lead's Ruling on
-    PR 97: see "Taken building `kogo.http`". What is safe to log at all stays open.
+    PR 97: see "Taken building `kogo.http`". What is safe to log at all: no body, its
+    length alone (DEV-1225, the lead's call).
   - Not taken: `Act.Refused(words, detail)`, with the runner storing `detail` in
     `last_error`: it widens `Act` for one caller.
   - No reopen condition was given.
@@ -3502,8 +3503,8 @@ Each entry: what was decided, why, and what would reopen it.
   long it was (Ruling on PR 97, the lead, 19 Nov 2026; it narrows the "status and body"
   of Q9 above), at `Warn`, with the method, the path and the status. Not taken: whole,
   which puts up to `MaxAnswer` of a service's echo of personal data in one log line; a
-  choice for each handle, which no application has asked for. What of a body is safe
-  to log at all stays open in `doc/work.md`. The query is not logged, nor any header: a
+  choice for each handle, which no application has asked for. Since DEV-1225 no body is
+  logged, only its length: see that section. The query is not logged, nor any header: a
   credential may be in either. A 4xx is logged as `kogo.http: refused` and a 3xx as
   `kogo.http: redirect not followed` (the lead's Ruling on PR 97, 20 Nov 2026; both
   became `kogo.http: failed` with DEV-1050, below), since
@@ -3902,9 +3903,9 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
 
 From Greg's rulings of 21 Nov 2026 on DEV-1049; these are the calls they left open.
 
-- **A 5xx's body is not logged**; a 3xx's and a 4xx's still are, their first 4 KiB. A
-  4xx's body is logged for what support reads in it, a decline's code and request id
-  (Q9); a 5xx's is the service's own trouble, often an error page, which no client acts
+- **A 5xx's body is not logged** (since DEV-1225 no body is, only its length); a 3xx's
+  and a 4xx's still are, their first 4 KiB. A 4xx's body is logged for what support
+  reads in it, a decline's code and request id (Q9); a 5xx's is the service's own trouble, often an error page, which no client acts
   on and which may echo what was sent. Nor is the body of a 2xx that is `Unreadable`,
   which may be a whole answer of personal data. Not taken: a 5xx's body logged as a
   4xx's is, more of what `doc/work.md`'s Open asks whether it is safe to log, for no
@@ -4038,8 +4039,8 @@ From Greg's rulings of 21 Nov 2026 on DEV-1053, and the calls they left open.
   generic `ask`; general logging, which stays open under "Printing is an action" (19 Nov
   2026) and is not reopened here.
 - **Its line is `kogo.http: refused in a 2xx`, with `method`, `path` and `why`**, at WARN
-  to the handle's logger, the one a failed call is written to; `why` is cut at 4 KiB as
-  a refused body is. Not taken: `kogo.http: failed`, the failed call's message, which
+  to the handle's logger, the one a failed call is written to; `why` is cut at 4 KiB, as
+  a refused body was until DEV-1225. Not taken: `kogo.http: failed`, the failed call's message, which
   would count with the failures a call that `ask` ended as a success, and gives no way
   to tell the two apart; `kogo.http: refused`, the message DEV-1050 retired for a 4xx,
   which a search of old logs would mix with these. It has no `status`: the binding is
@@ -5053,3 +5054,12 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   `encoding/json/v2`, which refuses both itself and is still behind `GOEXPERIMENT` in Go
   1.27; naming the key, which needs a decoder of our own. Settings are left as they are:
   a file the operator writes, which no caller reaches.
+- **A failed call is logged with its status and the length of the body read, never the
+  body** (spec 12, `kogo.http`), the lead's call on DEV-1198's trial T8: a 422 echoing a
+  person's email and birth date was logged whole at WARN. It holds for every status
+  and an `Unreadable` 2xx alike, as a key `bytes`, so one rule is stated and no status
+  is looked at. It closes `doc/work.md`'s open question of what of a body is safe to
+  log, and narrows Q9 (18 Nov 2026): a decline's code reaches support by the
+  application's own words from `Refused`'s body, not by the log. Not taken: logging
+  only the keys the `Service` names, a new thing for an author to write; the length of
+  a 3xx's and a 4xx's alone, which keeps a rule by status for no reader.

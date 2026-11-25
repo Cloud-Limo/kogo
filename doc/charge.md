@@ -137,7 +137,7 @@ action fun chargeInvoice(env: Env, key: EffectKey, fields: ChargeFields): Act<Ch
                 is HttpFailure.Unreadable -> Act.Unknown("Stripe charged, and ${failure.why}")
                 is HttpFailure.Refused ->
                     if (failure.status == 409 || stripeError(failure.body) == "idempotency_error") Act.Unknown("Stripe may have charged")
-                    else if (stripeError(failure.body) == "card_error") Act.Refused("Your card was declined")   // the binding logs Stripe's body (Q9)
+                    else if (stripeError(failure.body) == "card_error") Act.Refused("Your card was declined")   // the binding logs its status and length (Q9)
                     else Act.NotMade("Stripe did not process it: ${failure.status}")
             }
         },
@@ -418,6 +418,7 @@ code has no log.
 - b. `Act.Refused(words, detail)`, and the runner stores `detail` in
   `last_error`.
 - **Settled: a** (Greg, 18 Nov 2026): `kogo.http` logs every refused send.
+  Narrowed by DEV-1225 (the lead): its status and length, never its body.
 
 **Q10. "Making a thing gives its proof" breaks "used only before the
 dot".** A model function that makes the new row's proof must pass the

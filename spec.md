@@ -1406,11 +1406,11 @@ Where Go's HTTP client would decide, Kogo states it:
 | A time limit | The handle's own, which `main` must state, from the call's start to the end of its answer; past it a call that left is `Unknown`. |
 
 Every call that `ask` or `perform` ends in an `HttpFailure` is logged
-in Go, with its method, its path, its status where an answer came and
-why; a 3xx or a 4xx with its body too, the body's first 4 KiB with a
-mark where it is cut. So is every `logRefusal`, with its method, its
-path and its `why`, cut as a body is: no status and no body. A
-handle's own headers and query fields are never logged.
+in Go, with its method, its path, its status where an answer came,
+why, and the length of the body read; never the body, which may echo
+what was sent. So is every `logRefusal`, with its method, its path
+and its `why`, its first 4 KiB with a mark where it is cut: no status
+and no body. A handle's own headers and query fields are never logged.
 
 **Mail** (`kogo.mail`). A message is data that Kogo builds, and
 `eml(mail: Mail): ByteArray` writes it as the bytes of an EML file, for

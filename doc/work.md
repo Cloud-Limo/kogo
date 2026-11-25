@@ -462,12 +462,11 @@ handler and the prelude) and `kogo.mail`. Agreed with Greg on 17 Nov
 
 **Every failed call is logged.** The binding logs each call that
 ends in an `HttpFailure` in Go, with its method, path, status where an
-answer came and why, so a month's failed calls can be counted. A 3xx
-or a 4xx is logged with its body too (the body's first 4 KiB, with a
-mark that says it was cut and how long it was: it may echo what was
-sent), so a decline's code and request id reach support and what a
-queue stores for a payer stays fixed words (Q9, `decisions.md`). A
-5xx's body is not logged (DEV-1050, `decisions.md`).
+answer came, why and the length of the body read, so a month's failed
+calls can be counted. No body is logged, a 4xx's included: it may echo
+what was sent (DEV-1225, `decisions.md`). So a decline's code and
+request id no longer reach support by the log, as Q9's answer had
+them; what a queue stores for a payer stays fixed words.
 
 ## Workers
 
@@ -1326,9 +1325,6 @@ built once. Agreed with Greg on 17 Nov 2026.
 
 ## Open
 
-- What of a refused body is safe to log at all, for every service:
-  `kogo.http` logs the first 4 KiB of a 3xx's or a 4xx's, and none of
-  a 5xx's ("What Go would decide, Kogo states").
 - The name of the column a waiting payer's charge is stamped with:
   cusoon2's to choose. `payer_waiting_since` is the sketches' name.
 - Reading Postgres's idle limit at start, as the role is set there.

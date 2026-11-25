@@ -3489,7 +3489,8 @@ Each entry: what was decided, why, and what would reopen it.
   sends a path the declaration does not show. The Scope names two panics, for the
   text around an id. `..` from a browser is escaped to itself and names the path above:
   the same hole the escaping closes. An endpoint is made where the program starts or
-  from an id, so a wrong one is found at once.
+  from an id, so a wrong one is found at once. Since DEV-1225 the id is no panic but
+  `NotSent` from `ask` and `perform`: see that section.
 - **A header is set once**: `withHeader` panics on one that an earlier `withHeader` set,
   as on one of `main`'s. Not taken: the later value wins.
 - **A form's and a query's fields keep the order written**, and `main`'s query fields go
@@ -5078,3 +5079,12 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   a cookie HTTP cannot carry still panics, and the example is the program an author
   copies. The driver prints the token as `<token>`, since it differs every run. Not
   taken: a session's row as `28_session.kg` keeps one, more than the example is about.
+- **An id that is empty, `.` or `..` is `NotSent` from `ask` and `perform`**, naming
+  it, `an id in a path is not ".."`, logged as a failed call, and nothing is sent
+  (spec 12; trial T9, row 60): an id from a caller or a row reached a panic, a 500 no
+  program could ask about first. The endpoint carries why it cannot be sent, in a
+  field `==` does not compare, so `lookup` and `action` still give a value and the
+  call is where the failure is, as for any other that never left. A method, a
+  `before`, an `after` or a written part that is wrong still panics: the author wrote
+  each. Not taken: `lookup` and `action` giving an `Either` or a null, which every
+  caller unwraps for the rare id.

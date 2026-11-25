@@ -1329,8 +1329,11 @@ each form.
   `lookup(method, before, id, after)`, and so for `action`. The parts
   are joined as written and the id alone is escaped, so one that holds
   a `/` or a `?` stays one piece of the path. It panics (section 8)
-  where `before` does not end in `/`, where `after` does not begin
-  with one, and for an id that is empty, `.` or `..`. A written part
+  where `before` does not end in `/` or `after` does not begin with
+  one. An id that is empty, `.` or `..`, which would name the path it
+  sits in or the one above and may come from a caller or a row, is no
+  panic: `ask` and `perform` of that endpoint send nothing and give
+  `NotSent`, `an id in a path is not ".."`. A written part
   of a path is written as it is sent: one that holds what a path
   escapes (a `?`, a space, a `%`) panics, with or without an id.
 - A field is a name and a value: `field(name, value)` of a `String`, a

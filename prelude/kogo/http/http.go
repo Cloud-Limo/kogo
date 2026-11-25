@@ -107,8 +107,13 @@ func Http_WithHeader(this Http, name, value string) Http {
 }
 
 // An Endpoint is a method and a path, with any id in it escaped. Its
-// fields are exported, as Field's are, for rt's == to compare.
-type Endpoint struct{ Method, Path string }
+// fields are exported, as Field's are, for rt's == to compare. notSent
+// is why it cannot be sent, an id that names no resource of its own,
+// which ask and perform give as NotSent.
+type Endpoint struct {
+	Method, Path string
+	notSent      string
+}
 
 // A Lookup asks and changes nothing; an Action changes something
 // outside. They are two types so that ask takes only the one and
@@ -135,17 +140,19 @@ func path(method, before string, id *string, after string) Endpoint {
 		panic(fmt.Sprintf("an endpoint's path begins with /: %q", before))
 	}
 	if id == nil {
-		return Endpoint{method, before}
+		return Endpoint{Method: method, Path: before}
 	}
 	switch {
 	case !strings.HasSuffix(before, "/"):
 		panic(fmt.Sprintf("the path before an id ends in /: %q", before))
 	case after != "" && !strings.HasPrefix(after, "/"):
 		panic(fmt.Sprintf("the path after an id begins with /: %q", after))
-	case *id == "" || *id == "." || *id == "..":
-		panic(fmt.Sprintf("an id in a path is not %q", *id))
 	}
-	return Endpoint{method, before + url.PathEscape(*id) + after}
+	e := Endpoint{Method: method, Path: before + url.PathEscape(*id) + after}
+	if *id == "" || *id == "." || *id == ".." { // from a caller or a row, so no panic
+		e.notSent = fmt.Sprintf("an id in a path is not %q", *id)
+	}
+	return e
 }
 
 func Lookup_String_String(method, path_ string) Lookup { return Lookup{path(method, path_, nil, "")} }
@@ -286,6 +293,9 @@ func cut(s string) string {
 }
 
 func (h Http) call(e Endpoint, fields kogo.List[Field], again bool) (*Json, *failed) {
+	if e.notSent != "" {
+		return nil, &failed{why: e.notSent}
+	}
 	u := *h.base
 	u.RawPath = e.Path // keeps an escaped id as it was written
 	u.Path, _ = url.PathUnescape(e.Path)

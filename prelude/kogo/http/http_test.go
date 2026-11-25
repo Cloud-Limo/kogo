@@ -236,15 +236,30 @@ func TestStrings(t *testing.T) {
 	}
 }
 
+// An id that is empty, . or .. would name the path it sits in or the
+// one above, and may come from a caller or a row: ask and perform give
+// NotSent naming it, log it as a failed call, and send nothing.
+func TestBadId(t *testing.T) {
+	var sent atomic.Int32
+	h, log := serve(t, Service{}, func(w http.ResponseWriter, r *http.Request) { sent.Add(1); io.WriteString(w, "{}") })
+	for _, id := range []string{"", ".", ".."} {
+		notSent := fmt.Sprintf("Either.Left(NotSent(why=an id in a path is not %q))", id)
+		want(t, "ask", rt.ToString(Http_Ask(h, Lookup_String_String_String("GET", "/v1/things/", id), nil)), notSent)
+		want(t, "ask, then a part", rt.ToString(Http_Ask(h, Lookup_String_String_String_String("GET", "/v1/things/", id, "/parts"), nil)), notSent)
+		want(t, "perform", rt.ToString(Http_Perform(h, Action_String_String_String("DELETE", "/v1/things/", id), nil)), notSent)
+		want(t, "perform, then a part", rt.ToString(Http_Perform(h, Action_String_String_String_String("POST", "/v1/things/", id, "/parts"), nil)), notSent)
+	}
+	if sent.Load() != 0 || strings.Count(log.String(), `msg="kogo.http: failed"`) != 12 || !strings.Contains(log.String(), `path=/v1/things/.. why="an id in a path is not \"..\""`) {
+		t.Errorf("%d sent, logged:\n%s", sent.Load(), log)
+	}
+}
+
 func TestPath(t *testing.T) {
 	want(t, "an id", Action_String_String_String_String("POST", "/v1/things/", "a/b?c d", "/parts").Path, "/v1/things/a%2Fb%3Fc%20d/parts")
 	want(t, "an id last", Lookup_String_String_String("GET", "/v1/things/", "id_1").Path, "/v1/things/id_1")
 	panics(t, `the path before an id ends in /: "/v1/things"`, func() { Lookup_String_String_String("GET", "/v1/things", "id_1") })
 	panics(t, `the path after an id begins with /: "parts"`, func() { Action_String_String_String_String("POST", "/v1/things/", "id_1", "parts") })
 	panics(t, `the path after an id begins with /: ""`, func() { Action_String_String_String_String("POST", "/v1/things/", "id_1", "") })
-	panics(t, `an id in a path is not ".."`, func() { Action_String_String_String("DELETE", "/v1/things/", "..") })
-	panics(t, `an id in a path is not "."`, func() { Action_String_String_String("DELETE", "/v1/things/", ".") })
-	panics(t, `an id in a path is not ""`, func() { Action_String_String_String("DELETE", "/v1/things/", "") })
 	panics(t, `an endpoint's method is GET, POST, PUT, PATCH or DELETE, not "get"`, func() { Lookup_String_String("get", "/a") })
 	panics(t, `an endpoint's path begins with /: "a"`, func() { Lookup_String_String("GET", "a") })
 	// A written part with something to escape would have Go escape

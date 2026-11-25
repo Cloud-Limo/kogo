@@ -91,7 +91,7 @@ brief.md`, which then adds `agent`. The first line is `Start: <step> ·
 async · <directive>`, as `Start: Fix · async · pr opus medium 40m`;
 the launcher takes the newest such line as the brief, so a note after
 it changes nothing. The rest follows "The launch comment" in cusoon2's
-`doc/plans/async-agent-runs.md`. The launcher runs three at once and
+`doc/plans/async-agent-runs.md`. The launcher runs six at once and
 queues the rest. Then exit: the run's comment starts the next clerk.
 
 | Step | Directive | The brief adds |

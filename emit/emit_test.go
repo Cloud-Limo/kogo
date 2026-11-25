@@ -1,6 +1,7 @@
 package emit
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
@@ -16,6 +17,14 @@ import (
 	"github.com/Cloud-Limo/kogo/sqlpass"
 	"github.com/Cloud-Limo/kogo/syntax"
 )
+
+// $DATABASE_URL names the test database to emit and to the programs
+// build runs. It is set once here, since t.Setenv panics in a test
+// that runs in parallel.
+func TestMain(m *testing.M) {
+	os.Setenv("DATABASE_URL", cmp.Or(os.Getenv("KOGO_TEST_DATABASE_URL"), "postgres://kogo:kogo@127.0.0.1/kogo_test"))
+	os.Exit(m.Run())
+}
 
 func must[T any](v T, err error) T {
 	if err != nil {
@@ -46,13 +55,8 @@ func emit(t *testing.T, root string, sources ...string) (*emitter, map[string][]
 	// driver then runs it against: $DATABASE_URL names it to both.
 	var sigs check.Signatures
 	if slices.ContainsFunc(program, func(f *syntax.File) bool { return f.SQL != nil }) {
-		url := os.Getenv("KOGO_TEST_DATABASE_URL")
-		if url == "" {
-			url = "postgres://kogo:kogo@127.0.0.1/kogo_test"
-		}
-		t.Setenv("DATABASE_URL", url)
 		ctx := context.Background()
-		db, err := sqlpass.Connect(ctx, url)
+		db, err := sqlpass.Connect(ctx, os.Getenv("DATABASE_URL"))
 		if err != nil {
 			t.Fatalf("no test database, create it with `mise run testdb`: %v", err)
 		}
@@ -163,6 +167,7 @@ func expectWith(t *testing.T, more, setup string, cases [][2]string, sources ...
 // arguments in the order of the parameters, not as they are written.
 // x in c is c.contains(x), and Kotlin reads c first.
 func TestOrder(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{"t.ReadThenCall()", "11"},
 		{"t.Named()", "12 21"},
@@ -214,6 +219,7 @@ fun copied(): String {
 // == is structural for every type: Go would compare a T? by its
 // address and refuses to compare a list.
 func TestEquality(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Same(t.Leg{From: "A", Via: rt.Ptr("B"), Stops: []int32{1, 2}}, t.Leg{From: "A", Via: rt.Ptr("B"), Stops: []int32{1, 2}})`, "true"},
 		{`t.Same(t.Leg{From: "A", Via: rt.Ptr("B")}, t.Leg{From: "A"})`, "false"},
@@ -264,6 +270,7 @@ fun mixed(): String {
 // driver reads x through a function that is not inlined, so the
 // compiler cannot work the sum out exactly instead.
 func TestFused(t *testing.T) {
+	t.Parallel()
 	out := build(t, func(root string) map[string][]byte {
 		_, files, errs := emit(t, root, `package t
 
@@ -296,6 +303,7 @@ fmt.Println(t.Inline(x(), x(), -1) == 1.0/(1<<29), t.Across(x(), x(), -1) == 1.0
 }
 
 func TestWidening(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{"t.Oks()", "3"},
 		{"t.NoNulls()", "0"},
@@ -346,6 +354,7 @@ fun maybe(c: Boolean): Int? {
 // A String counts UTF-16 units, and half of a surrogate pair is
 // U+FFFD (spec.md section 3).
 func TestStrings(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{"t.FaceLength()", "2"},
 		{"t.HalfFace()", "a\uFFFD"},
@@ -371,6 +380,7 @@ fun units(): String {
 // A function of a kogo. package is imported by name and called as
 // any other (spec.md section 12).
 func TestPreludeImport(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{{"t.Percent(12.5)", "12.5%"}, {"t.Percent(5.0)", "5%"}}, `package t
 
 import kogo.text.plain
@@ -381,6 +391,7 @@ fun percent(rate: Double): String = "${plain(rate)}%"
 
 // The rest of sections 3 to 6, each through the Go it becomes.
 func TestLanguage(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{"t.Fares()", "Fare(base=100, tip=0, note=none) Fare(base=100, tip=5, note=none) 105 true"},
 		{"t.Greetings()", "Hello, AnnH Hello, Bob! Yo, CyY"},
@@ -553,6 +564,7 @@ fun other(): Int = helper()
 // A jump may stand where a value goes straight into a val (spec 6),
 // and a destructuring val is one.
 func TestDestructuringJump(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{"t.Swap(nil)", "P(a=7, b=8)"},
 		{"t.Swap(&t.P{A: 1, B: 2})", "P(a=2, b=1)"},
@@ -587,6 +599,7 @@ fun sums(): String {
 // A constructor's default is written at the call, with the call's
 // type arguments for the class's type parameters.
 func TestGenericDefault(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{"t.Page1()", "Page(items=[], n=2)"},
 		{"t.Page2()", "Page(items=[a], n=0)"},
@@ -603,6 +616,7 @@ fun page2(): Page<String> = Page(listOf("a"))
 // as == null does (spec 5.1), and a fun that only carries its T takes
 // a nullable one.
 func TestGenericNull(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{"t.Nulls()", "7 0 9 null null"},
 		{"t.Values()", "3 1 4 2 2"},
@@ -625,6 +639,7 @@ fun values(): String = "${orElse(3L, 7L)} ${has(3L)} ${Wrap(4L).valueOr(9L)} ${c
 // A type parameter without a Go name in scope is the emitter's own
 // mistake: it stops, rather than write a type with no name.
 func TestForeignTypeParam(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if recover() == nil {
 			t.Error("a type parameter with no Go name gave a type")
@@ -639,6 +654,7 @@ func TestForeignTypeParam(t *testing.T) {
 // the overflow. A minus on a literal is one literal, so Int.MIN_VALUE
 // is written as Kotlin writes it, and -0.0 keeps its sign.
 func TestConstants(t *testing.T) {
+	t.Parallel()
 	e200 := "1" + strings.Repeat("0", 200) + ".0" // Kogo writes no exponent
 	expect(t, [][2]string{
 		{"t.Big()", "-2147483648"},
@@ -664,6 +680,7 @@ fun negZero(): Double = -0.0
 // as in Kotlin: NaN is not equal to itself and 0.0 is equal to -0.0.
 // Inside a data class it is Kotlin's equals, which says the opposite.
 func TestDoubleEquality(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{"t.Nz(rt.Ptr(0.0))", "true"},
 		{"t.Nz(nil)", "false"},
@@ -700,6 +717,7 @@ fun boxed(): String = "${D(0.0 / 0.0) == D(0.0 / 0.0)} ${D(0.0) == D(-0.0)}"
 // compared (spec.md 3): == panics once it reaches the function, and
 // answers false where an earlier part differs.
 func TestFunctionEquality(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{"t.Same()", "panics: a function cannot be compared"},
 		{"t.Holds()", "panics: a function cannot be compared"},
@@ -734,6 +752,7 @@ fun plain(): Boolean = eq(listOf("a"), listOf("a"))
 // line of a statement, and the line of a call that is further down
 // than the statement begins.
 func TestLine(t *testing.T) {
+	t.Parallel()
 	out := build(t, func(root string) map[string][]byte {
 		_, files, errs := emit(t, root, "package t\n\nfun explode(p: String?): String =\n    \"x\" +\n        requireNotNull(p) { \"no p\" }\n\nfun divide(a: Int, b: Int): Int {\n    val q = a / b\n    return q\n}\n")
 		if errs != nil {
@@ -770,6 +789,7 @@ trace(func() { t.Divide(1, 0) })
 // starts each line's code at one column, after the line's directive,
 // indented a tab for each block or closure it is in.
 func TestLayout(t *testing.T) {
+	t.Parallel()
 	_, files, errs := emit(t, "x", "package t\n\n\n\n\n\n\nfun f(n: Int): Int {\n    val g = { x: Int ->\n        x + n\n    }\n    return g(2)\n}\n")
 	if errs != nil {
 		t.Fatalf("%v", errs)
@@ -804,6 +824,7 @@ func TestLayout(t *testing.T) {
 // a scope inside it. That a failure passes a scope it is raised inside
 // but not on, which no program can write, is prelude/kogo's test.
 func TestFailures(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Total("12")`, "Either.Right(3)"},
 		{`t.Total("1x2")`, "Either.Left(no digit x)"},
@@ -851,6 +872,7 @@ fun lifted(n: Int): Either<String, Int> = either { n.right().bind() }
 // A panic that is not a failure is a bug (spec.md 8): it passes every
 // raise scope untouched, and its trace names the line it began at.
 func TestBugInScope(t *testing.T) {
+	t.Parallel()
 	out := build(t, func(root string) map[string][]byte {
 		_, files, errs := emit(t, root, "package t\n\nfun inner(n: Int): Either<String, Int> = either {\n    check(n > 0) { \"broken\" }\n    n\n}\n\nfun outer(): Either<String, Int> = either { inner(0).bind() }\n")
 		if errs != nil {
@@ -877,6 +899,7 @@ t.Outer()
 // A set compares its keys as == does, and two sets regardless of
 // order; xs + ys and x in set are their bindings' calls.
 func TestCollections(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{"t.Counted(rt.Ptr[int64](9), []t.Line{{Kind: t.Kind_item, Cents: 5}, {Kind: t.Kind_voucher, Cents: 7}})", "[9, 5]"},
 		{"t.Counted(nil, nil)", "[]"},
@@ -916,6 +939,7 @@ fun taken(stock: Long, amount: Long): Long {
 
 // What the stage-1 ports call, through the Go each becomes.
 func TestPortCalls(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Handle(" Blue Heron Draft ")`, "blue-heron"},
 		{`t.Handle("!!")`, "untitled"},
@@ -940,6 +964,7 @@ fun tally(words: List<String>): Pair<Int, String> {
 // Uuid.parseOrNull is the prelude's object fun: a good text gives its id,
 // and a bad one null.
 func TestUuidParseOrNull(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Id("01934f2a-bcde-7f01-89ab-CDEF01234567")`, "01934f2a-bcde-7f01-89ab-cdef01234567"},
 		{`t.Id("01934f2a-bcde-7f01-89ab")`, "null"},
@@ -952,6 +977,7 @@ fun id(text: String): Uuid? = Uuid.parseOrNull(text)
 // atStartOfDay gives a zoned time, as java.time's does, and toInstant
 // its instant: here the end of a skipped midnight.
 func TestAtStartOfDay(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Start(1541340000)`, "2018-11-04T01:00-02:00[America/Sao_Paulo] 2018-11-04T03:00:00Z"},
 	}, `package t
@@ -970,6 +996,7 @@ fun start(second: Long): String {
 // An enum's valueOf gives its constant, and panics for another name
 // with Kotlin's message, which names the enum with its package.
 func TestValueOf(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Pick("green")`, "green true"},
 		{`t.Pick("Green")`, "panics: No enum constant t.Light.Green"},
@@ -985,6 +1012,7 @@ fun pick(name: String): String = "${Light.valueOf(name)} ${Light.valueOf(name) =
 // is read by map[k], writes itself as Kotlin's does, compares its
 // entries in any order and widens as a List does.
 func TestGroupBy(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Groups([]int64{3, 1, 4, 1, 5})`, "{1=[3, 1, 1, 5], 0=[4]} [4] null true"},
 		{`t.Groups(nil)`, "{} null null true"},
@@ -1006,6 +1034,7 @@ fun wide(xs: List<Long>): String {
 
 // The second firstOrNull and contains sit beside the first.
 func TestOverloads(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Named(rt.Ptr(" "), "a@b")`, "false true"},
 		{`t.Named(nil, "ab")`, "false false"},
@@ -1023,6 +1052,7 @@ fun over(xs: List<Long>): String = "${xs.firstOrNull { it > 2L }} ${xs.firstOrNu
 // each panic's message, and a call whose T is settled as Nothing,
 // orThrow(what, left), which never returns.
 func TestLoginsNames(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Texts(" ", "https://a.b/c")`, "[x, a.b/c, https://a.b/c, https:, \tab, , 😀]"},
 		{`t.Take(-1)`, "panics: Requested character count -1 is less than zero."},
@@ -1069,6 +1099,7 @@ fun fail(left: Boolean): Int {
 
 // split, padStart, toIntOrNull and toLongOrNull, checked, emitted and run.
 func TestSplitPadParse(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Names(",a,,b,")`, "[[, a, , b, ], 00,a,,b,, <  7>, null, null]"},
 		{`t.Names("-2147483648")`, "[[-2147483648], -2147483648, <  7>, -2147483648, -2147483648]"},
@@ -1082,6 +1113,7 @@ fun names(s: String): List<String> =
 
 // toString on a number writes what a template of it writes (spec 12).
 func TestNumberToString(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Texts(-2147483648, 9223372036854775807, 1.0, "1.50")`, "[-2147483648, 9223372036854775807, 1.0, 1.50]"},
 	}, `package t
@@ -1094,6 +1126,7 @@ fun texts(n: Int, x: Long, d: Double, m: Decimal): List<String> =
 // joinToString writes its separator between the elements, ", " when
 // the call gives none (spec 12).
 func TestJoinToString(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{`t.Joined([]int64{1, -2})`, "[a,b, 1, -2, <1>|<-2>, , ]"},
 	}, `package t
@@ -1108,6 +1141,7 @@ fun joined(ns: List<Long>): List<String> =
 // wrongly, and so are two declarations that Go cannot tell apart,
 // an enum's entries among them.
 func TestRefused(t *testing.T) {
+	t.Parallel()
 	for _, c := range [][3]string{
 		{"enum class Kind { in_house, outside }\nfun f(tx: Tx, kinds: List<Kind>): Int = tx.execute(sql\"delete from invite where kind = any($kinds)\")", "2:93: not-yet-emitted", "a parameter that is a list of an enum"},
 		{"enum class Kind { in_house, outside }\nfun f(tx: Tx): List<Kind>? = tx.querySingle<List<Kind>?>(sql\"select array_agg(kind) as kinds from invite\")", "2:30: not-yet-emitted", "column kinds, which holds a list of an enum,"},
@@ -1142,6 +1176,7 @@ func TestRefused(t *testing.T) {
 // the naming rule gives it and the type that its declaration states:
 // a Go file that uses each one compiles.
 func TestPrelude(t *testing.T) {
+	t.Parallel()
 	out := build(t, func(string) map[string][]byte {
 		pre, err := prelude.Files()
 		if err != nil {
@@ -1224,6 +1259,7 @@ func TestPrelude(t *testing.T) {
 // handler takes. A table whose name a type or a fun has takes _api,
 // and a val named as an enum's entries takes _val.
 func TestTables(t *testing.T) {
+	t.Parallel()
 	expect(t, [][2]string{
 		{"fmt.Sprint([]string{t.Ops.Operations[0].Name, t.Ops.Operations[1].Name, t.Ops.Operations[2].Name, t.Ops.Operations[3].Name, t.Ops.Operations[4].Name}, t.Ops.Enums, t.Ops.Check != nil)", "[me f held sent rung] [[Alone Shared] [Open Done]] true"},
 		{"fmt.Sprint([]string{t.Other_api.Operations[0].Name}, t.Other_api.Enums)", "[g] [[S M]]"},
@@ -1286,7 +1322,8 @@ fun g(tx: Tx, env: Env, request: Request, input: List<Size?>): Either<String, Un
 // mistake that must not compile is main with one edit, or the Kogo
 // with a property renamed, and go build's own error.
 func TestHandWrittenMain(t *testing.T) {
-	try := func(source string, edits ...string) string {
+	t.Parallel()
+	try := func(t *testing.T, source string, edits ...string) string {
 		return build(t, func(root string) map[string][]byte {
 			_, files, errs := emit(t, root, source)
 			if errs != nil {
@@ -1312,14 +1349,18 @@ func TestHandWrittenMain(t *testing.T) {
 		{"calls served to a browser", "cannot convert calls", []string{"in))", "in))\n\tfmt.Println((*rpc.Handler[t.Env])(calls))"}, routes},
 		{"a checked list's operation", "undefined: t.Note_op", []string{"(t.Routes,", "(rpc.NewUnserved(t.Routes.Operations, t.Routes.Enums),"}, strings.Replace(routes, "unchecked", "checkedBy allow", 1) + "fun allow(tx: Tx, env: Env, request: Request): Either<String, Unit> = either { }\n"},
 	} {
-		if got := try(c.source, c.edits...); !strings.Contains(got, c.want) || c.edits == nil && c.source == routes && got != c.want {
-			t.Errorf("%s gives\n%s\nwant %s", c.what, got, c.want)
-		}
+		t.Run(c.what, func(t *testing.T) {
+			t.Parallel()
+			if got := try(t, c.source, c.edits...); !strings.Contains(got, c.want) || c.edits == nil && c.source == routes && got != c.want {
+				t.Errorf("%s gives\n%s\nwant %s", c.what, got, c.want)
+			}
+		})
 	}
 }
 
 // newId() gives the ids of the maker a hand-written main hands over.
 func TestIdsHandedOver(t *testing.T) {
+	t.Parallel()
 	got := build(t, func(root string) map[string][]byte {
 		_, files, errs := emit(t, root, "package t\nfun id(): Uuid = newId()\n")
 		if errs != nil {
@@ -1387,6 +1428,7 @@ func main() {
 // program lacks, in each form it is written in; a statement when over
 // an Int, which need not cover every case, runs on.
 func TestWhenNoBranch(t *testing.T) {
+	t.Parallel()
 	const want = "panics: when: no branch for InviteType Partner"
 	p := `t.InviteType("Partner")`
 	expect(t, [][2]string{

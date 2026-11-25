@@ -43,6 +43,7 @@ insert into every_type values (true, -7, 9000000000, 2.5, 12.50, 'b', 'Fold', 'c
 // refuses it for a conflict; a savepoint rolls back alone (spec.md
 // 10.7). The rows that are there afterwards say which happened.
 func TestTransactions(t *testing.T) {
+	t.Parallel()
 	expectWith(t, withDB+between, seed, [][2]string{
 		{`t.Failing(db, "ok")`, "Either.Right(1)"},
 		{`t.Failing(db, "bad")`, "Either.Left(refused bad)"},
@@ -136,6 +137,7 @@ fun token(db: Db): String = db.tx { tx ->
 // a list among them, and a composite type fills a data class by its
 // fields, whatever its name.
 func TestRows(t *testing.T) {
+	t.Parallel()
 	sites := "[Site(legalName=Acme, shop=Shop(id=00000000-0000-0000-0000-000000000004, businessId=00000000-0000-0000-0000-000000000001, slug=Acme-Store)), Site(legalName=Bolt, shop=null)]"
 	expectWith(t, withDB, seed, [][2]string{
 		{`t.Sites(db)`, sites},
@@ -258,6 +260,7 @@ fun has(db: Db, slug: String): Boolean = db.tx { tx -> tx.exists(sql"select 1 fr
 // read again is equal to the first. A T? is sent as NULL and an empty
 // List as an empty array.
 func TestValues(t *testing.T) {
+	t.Parallel()
 	expectWith(t, withDB, seed, [][2]string{
 		{`t.Everything(db)`, "[Every(flag=true, small=-7, big=9000000000, ratio=2.5, amount=12.50, body=b, folded=Fold, code=c8, " +
 			"id=00000000-0000-0000-0000-00000000000a, at=2026-11-15T14:30:00.123456Z, day=2026-02-28, clock=09:05, span=PT26H0.5S, " +
@@ -318,6 +321,7 @@ fun zeros(db: Db): List<Decimal> = db.tx { tx -> tx.querySingle<List<Decimal>>(s
 // byte and none at all included; a ByteArray? is NULL, and a NULL is
 // refused where a ByteArray is read (spec.md 10.4).
 func TestBytes(t *testing.T) {
+	t.Parallel()
 	expectWith(t, withDB, "defer drop()\n", [][2]string{
 		{`t.Keep(db, kogo.NewId(), kogo.ByteArray("a\x00\xff"), nil)`, "1"},
 		{`t.Keep(db, kogo.NewId(), kogo.ByteArray(nil), rt.Ptr(kogo.ByteArray("d")))`, "1"}, // as a binding may give none
@@ -343,6 +347,7 @@ fun drafts(db: Db): List<ByteArray> = db.tx { tx -> tx.query<ByteArray>(sql"""se
 // Inside a data class's text it is Kotlin's signed bytes (spec.md 3;
 // kotlinc 2.4.21 gives F(name=x, data=[97, 0, -1])).
 func TestBytesIdentity(t *testing.T) {
+	t.Parallel()
 	const bytes = "\nimport \"github.com/Cloud-Limo/kogo/prelude/kogo\"\nvar a, b = kogo.ByteArray(\"a\\x00\\xff\"), kogo.ByteArray(\"a\\x00\\xff\")\n"
 	expectWith(t, bytes, "", [][2]string{
 		{"t.InList(a, b)", "false"},
@@ -376,6 +381,7 @@ fun text(a: ByteArray): String = "${F("x", a)}"
 // payee. Each alter runs on the schema the program reads, not the one
 // checked.
 func TestMovedColumns(t *testing.T) {
+	t.Parallel()
 	alter := `
 func alter(sql string) string {
 if _, err := pool.Exec(ctx, sql); err != nil {

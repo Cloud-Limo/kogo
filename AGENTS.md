@@ -239,8 +239,13 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   a dependency release at least seven days old.
 - Postgres 18 runs in this VM; `sudo -n -u postgres psql` is the
   superuser. Tests use their own database and a schema kept in this repo:
-  `mise run testdb` creates it, then `mise exec -- go test ./...`. Each
-  worktree `kogo-dev-NNN` has its own, `kogo_test_NNN` (`.mise.toml`).
+  `mise run testdb` creates it. Always run `mise exec -- go test
+  -count=1`, since Go's test cache sees neither the Go a test builds
+  against nor the database: while iterating, on the packages touched,
+  with `./emit/... ./cmd/kogo/...` too whenever `rt`, the prelude's Go
+  or the schema changed; before the handoff, `mise run testdb` and then
+  `./...`. Each worktree `kogo-dev-NNN` has its own database,
+  `kogo_test_NNN` (`.mise.toml`).
   `cusoon` and `cusoon_b` belong to cusoon2's two stacks and are
   re-created all the time. Reading them is fine; for anything that
   writes, cleans or migrates, use a database of your own and pass its

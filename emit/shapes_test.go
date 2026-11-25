@@ -58,6 +58,7 @@ var shapes = [][5]string{
 // a refusal when the program is emitted, and for a composite type's
 // one of kogo check.
 func TestShapes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, testURL())
 	if err != nil {
@@ -163,6 +164,7 @@ func calls(cases [][2]string) (calls []string) {
 // the cases of DEV-1144's findings 4 to 8: each is the value Postgres
 // holds or a panic that names the limit, never another value.
 func TestLimits(t *testing.T) {
+	t.Parallel()
 	zero := "panics: a String that holds U+0000 cannot be sent to Postgres, whose text holds none (spec.md 10.4)"
 	cases := [][2]string{
 		{`t.Grid(db)`, "panics: can't scan into dest[0] (col: x!): an array of 2 dimensions is not a List, which has one (spec.md 10.4)"},

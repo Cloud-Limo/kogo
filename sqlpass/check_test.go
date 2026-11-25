@@ -343,6 +343,8 @@ func TestErrors(t *testing.T) {
 			`«with gone as (delete from session returning id) select count(*) from gone`, "sql-writing-with", "move the writing with into a statement of its own"},
 		{"two columns of one name, which the wrap cannot name apart",
 			`«select b.id, t.id from business b join tenant t on t.business_id = b.id`, "sql-duplicate-column", "two columns are named id"},
+		{"an empty literal", `«`, "sql-empty", "this literal holds no statement"},
+		{"a literal of a comment alone", "«  -- later\n", "sql-empty", "this literal holds no statement"},
 		{"a parameter of a type outside the table",
 			`select id from business where created_at::timestamp = «$at`, "sql-unmapped-type", "parameter $at has the Postgres type timestamp without time zone"},
 	} {

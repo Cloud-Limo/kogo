@@ -156,6 +156,12 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 	}
 	query := parseTree(c.tree) // before a catalog query replaces it
 	if query.tag != "QUERY" {
+		// A literal of no statement has no tree either: told from a
+		// lost tree by one statement that has one.
+		c.tree = ""
+		if _, err := c.conn.PgConn().Prepare(ctx, "", "select", nil); err == nil && c.tree != "" {
+			return nil, &Error{0, "sql-empty", "this literal holds no statement: write the one to run, or remove the call"}
+		}
 		return nil, errors.New("Postgres sent no parse tree for the statement, so what can be null is unknown: " +
 			"connect to it directly, since a pooler can drop the session's debug_print_parse and client_min_messages")
 	}

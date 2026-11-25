@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
@@ -86,10 +87,13 @@ func bad(at, why string, args ...any) error {
 }
 
 // readBody reads one JSON value of type t from body, and nothing after
-// it. Its error names the key, never the value, or is body's
+// it, UTF-8 with each surrogate escape paired: encoding/json reads
+// anything else as U+FFFD, which would store another text than was
+// sent. Its error names the key, never the value, or is body's
 // *http.MaxBytesError, let through for the Handler's 413.
 func (r reader) readBody(t reflect.Type, body io.Reader) (reflect.Value, error) {
-	d := json.NewDecoder(body)
+	var text bytes.Buffer
+	d := json.NewDecoder(io.TeeReader(body, &text))
 	d.UseNumber()
 	var j any
 	var tooLarge *http.MaxBytesError
@@ -104,8 +108,34 @@ func (r reader) readBody(t reflect.Type, body io.Reader) (reflect.Value, error) 
 		return reflect.Value{}, bad("the input", "holds more than one JSON value")
 	} else if err != io.EOF {
 		return reflect.Value{}, bad("the input", "is not JSON")
+	} else if !utf8.Valid(text.Bytes()) {
+		return reflect.Value{}, bad("the input", "is not UTF-8: send its text as UTF-8")
+	} else if !paired(text.Bytes()) {
+		return reflect.Value{}, bad("the input", "holds half of a surrogate pair, which no String may: send both halves or neither")
 	}
 	return r.read(t, j, "input")
+}
+
+// paired says whether each \u escape of a surrogate in text, which is
+// JSON, is a high one followed by a low one.
+func paired(text []byte) bool {
+	unit := func(i int) rune {
+		n, _ := strconv.ParseUint(string(text[i:i+4]), 16, 16)
+		return rune(n)
+	}
+	for i := 0; i < len(text); i++ {
+		if text[i] != '\\' {
+			continue
+		}
+		i++ // the escaped character
+		if text[i] != 'u' || !utf16.IsSurrogate(unit(i+1)) {
+			continue
+		} else if !bytes.HasPrefix(text[i+5:], []byte(`\u`)) || utf16.DecodeRune(unit(i+1), unit(i+7)) == utf8.RuneError {
+			return false
+		}
+		i += 10 // the pair's last digit
+	}
+	return true
 }
 
 // read gives j, as encoding/json decoded it, as a value of type t. at

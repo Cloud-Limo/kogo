@@ -111,11 +111,23 @@ func TestStrict(t *testing.T) {
 		{`{"done"`, `[{"done"`, "the input is not JSON"},
 		{`"nothing":{}}`, `"nothing":{}} {}`, "the input holds more than one JSON value"},
 		{`"nothing":{}}`, `"nothing":{}} x`, "the input is not JSON"},
+		// Go's decoder reads each as U+FFFD, which would store another text.
+		{`"a \"b\""`, "\"caf\xe9\"", "the input is not UTF-8"},
+		{`"a \"b\""`, `"a\ud800b"`, "the input holds half of a surrogate pair"},
+		{`"a \"b\""`, `"\udc00\ud800"`, "the input holds half of a surrogate pair"},
+		{`"a \"b\""`, `"\ud83d\u0041"`, "the input holds half of a surrogate pair"},
+		{`"a \"b\""`, `"\ud83d"`, "the input holds half of a surrogate pair"},
 	} {
 		text := strings.Replace(job, c[0], c[1], 1)
 		if _, err := read(text); err == nil || !strings.HasPrefix(err.Error(), c[2]) || strings.Contains(err.Error(), "Secret") {
 			t.Errorf("%s is refused with %v, want %s", text, err, c[2])
 		}
+	}
+	// A pair, an escaped backslash before a u, and U+FFFD itself read
+	// as they were sent.
+	text := strings.Replace(job, `"a \"b\""`, `"\\ud800 \ud83d\ude00 \ufffd \\\ud83d\ude00"`, 1)
+	if j, err := read(text); err != nil || j.Notes != "\\ud800 😀 \ufffd \\😀" {
+		t.Errorf("%s reads as %q (%v)", text, j.Notes, err)
 	}
 }
 

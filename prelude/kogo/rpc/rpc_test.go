@@ -289,6 +289,8 @@ func TestHandler(t *testing.T) {
 		{"POST", "add", `{"name":"secret","more":1}`, `400 add: input.more is not a key of Person`},
 		// Postgres's text holds no U+0000, so the reader refuses it.
 		{"POST", "add", `{"name":"a\u0000secret"}`, `400 add: input.name holds U+0000, which no input or setting may: leave it out`},
+		// Nor bytes that are not UTF-8, which Go's decoder reads as U+FFFD.
+		{"POST", "add", "{\"name\":\"caf\xe9 secret\"}", `400 add: the input is not UTF-8: send its text as UTF-8`},
 		{"POST", "add", `{"name":"asecret"}`, `200 {"type":"ok","value":"secret answer"}`},
 		{"POST", "login", `{"name":"kept"}`, `200 {"type":"refused","message":"secret refusal"}`},
 		{"POST", "who", `not read`, `200 {"type":"ok","value":{"header":"me","cookie":"crumb","missing":null,"host":"example.com","address":"192.0.2.1"}}`},
@@ -435,7 +437,7 @@ func TestHandler(t *testing.T) {
 	if len(readOnly) != 4 || !readOnly["INSERT"] || !readOnly["UPDATE"] || !readOnly["SELECT"] || !readOnly["nextval()"] {
 		t.Errorf("a check that writes, or a gate that writes, locks or counts, is not refused by Postgres: %v", readOnly)
 	}
-	if len(ids) != 48 || strings.Contains(log.String(), "secret") {
+	if len(ids) != 49 || strings.Contains(log.String(), "secret") {
 		t.Errorf("the log has %d requests, or holds an input, an answer or a refusal:\n%s", len(ids), log.String())
 	}
 	// Each rerun pauses first, so a request that conflicts every time

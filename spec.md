@@ -1873,10 +1873,13 @@ Inputs and answers are JSON.
 - A string is written as Kotlin's `kotlinx.serialization` writes one:
   `"` and `\` escaped, a character below U+0020 as `\b`, `\t`, `\n`,
   `\f`, `\r` or `\u00xx` in lower-case hex, and every other character
-  as itself in UTF-8, `&`, `<`, `>` and U+2028 among them. A `String`
-  never holds half of a surrogate pair (section 3): an input's
-  `"\ud800"` reads as U+FFFD, which an answer then writes, where
-  Kotlin's answer differs.
+  as itself in UTF-8, `&`, `<`, `>` and U+2028 among them.
+- A body is UTF-8, and a `String` never holds half of a surrogate pair
+  (section 3): a body that is not UTF-8, or an input's `"a\ud800b"`,
+  is a 400, `the input is not UTF-8` or `the input holds half of a
+  surrogate pair`, and the operation does not run. Read on, either
+  would hold U+FFFD in its place, and store another text than was
+  sent.
 - A `String` on the wire holds no U+0000, which Postgres's `text`
   cannot hold (10.4): an input's `"a\u0000b"` is a 400, `input.name
   holds U+0000`, whether or not the operation would send it to
@@ -1958,8 +1961,9 @@ with its trace, so one a caller could cause at will would fill the
 log and bury the real faults. What a caller can send wrongly is
 answered so:
 
-- a body that does not read as the input, a `String` that holds
-  U+0000 among it (15.4): the reader's 400; one past the limit, 413;
+- a body that does not read as the input, one not UTF-8, a `String`
+  that holds U+0000 or half of a surrogate pair among it (15.4): the
+  reader's 400; one past the limit, 413;
 - a header the program reads that is not UTF-8: 400;
 - a name no operation has: 404; another method than `POST`: 405;
 - no session, a forged or stale cookie, an Origin or a token missing

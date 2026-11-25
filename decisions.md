@@ -4534,7 +4534,8 @@ The lead ruled the encoder changes, not the comparison; the agent's, for the res
   a string holding a backslash then `u2028` breaks.
 - **A lone surrogate stays a limit, stated in spec 15.4**: Go reads one as U+FFFD, where
   Kotlin's answer differs. A Kogo string holds no half of a surrogate pair (spec section 3),
-  and no row of Postgres holds one.
+  and no row of Postgres holds one. Since DEV-1225 an input's lone surrogate is a 400,
+  not U+FFFD: see that section.
 - **No case in `mise run kotlin`**: its cases call Kogo built-ins from `.kg` source, and
   `quote` is none, so the check has no form for this case.
   The test holds the bytes Kotlin wrote instead. Reopen if the wire gets a check of its own
@@ -5040,3 +5041,15 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
 - **`!in` stays out**, as the brief allowed: DEV-1184, the check a widening of the
   subset brings, is about 350 code lines, far above the brief's 20. `!(x in c)` says it.
   Reopens with DEV-1184.
+
+## Five faults DEV-1198's trials found, mended (DEV-1225), 25 Nov 2026
+
+- **A body that is not UTF-8, or holds half of a surrogate pair, is a 400** (spec 15.4):
+  `encoding/json` reads either as U+FFFD before `rpc`'s reader sees the string, so
+  `caf\xe9` was stored as `caf�` and `"a\ud800b"` as `a�b`, both answered 200 (DEV-1198's
+  trial T1). `readBody` keeps the bytes it decoded and asks `utf8.Valid`, then walks
+  each `\u` escape for a surrogate without its other half. The error names the input,
+  not a key: the walk is over the text, before any key is read. Not taken: decoding with
+  `encoding/json/v2`, which refuses both itself and is still behind `GOEXPERIMENT` in Go
+  1.27; naming the key, which needs a decoder of our own. Settings are left as they are:
+  a file the operator writes, which no caller reaches.

@@ -5193,3 +5193,15 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   limit**, and the column of that name cut to 63 bytes, which Postgres gives for it, is
   taken as that property's, not also reported unused. Not taken: leaving the unused
   report, whose advice is to add a property of the cut name.
+
+## A rule of the data written twice goes to the schema (DEV-1227), 25 Nov 2026
+
+- **A port that would write an expression over a row's own columns a third time, or
+  hold in code what a constraint could, names the schema change instead** (Greg's
+  ruling of 25 Nov 2026, met in DEV-1214's port, which wrote `split_part(domain, '://',
+  2)` twice more since a list's check cannot call the function that held it): a
+  paragraph of `doc/porting.md` after "Mend the Kotlin first, never the port", pointing
+  to cusoon2's `AGENTS.md`, "Backend", where DEV-1226 puts the rule in full. Postgres
+  holds what is true of the data; Kogo holds what is decided. Not taken: a ninth
+  principle in `doc/design.md`, whose principles settle questions of the language,
+  where Kogo checks nothing of this seam. Reopens if Kogo comes to check that seam.

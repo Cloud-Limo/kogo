@@ -72,6 +72,12 @@ it stands; never in the port alone, since the side-by-side run is the
 check and a port that differs on purpose has nothing beside it. Any
 other oddity the port keeps, and moves on.
 
+For one, the storefront's `bookerProfile` answers a visitor null, and
+the page's only use of the null is "No booker. Please log in.": ported
+as it is, its row sits under a gate that never refuses, so the change
+is proposed in the Kotlin. `pastPassengers` answers a visitor an empty
+list, which is what the wizard really does, and is ported as it is.
+
 **A rule of the data written twice goes to the schema.** When the port
 would repeat an expression the Kotlin already has over a row's own
 columns, or hold in code what a constraint could, it does not copy it a
@@ -79,12 +85,6 @@ third time: the handoff's Next step names the schema change (a
 generated column, a constraint) with its size, made Kotlin first as
 above. Postgres holds what is true of the data; Kogo holds what is
 decided. cusoon2's `AGENTS.md`, "Backend", has the rule in full.
-
-For one, the storefront's `bookerProfile` answers a visitor null, and
-the page's only use of the null is "No booker. Please log in.": ported
-as it is, its row sits under a gate that never refuses, so the change
-is proposed in the Kotlin. `pastPassengers` answers a visitor an empty
-list, which is what the wizard really does, and is ported as it is.
 
 **Read each pattern as Go's.** A `Regex`'s pattern is Go's (`spec.md`
 section 12), so the port reads each one against that section's list and

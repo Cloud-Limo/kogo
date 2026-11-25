@@ -171,16 +171,27 @@ again only for a Question still unanswered.
 
 ## Merging
 
-Read the Handoff, the Review, its Rulings and the Fixed on the PR, and
-the fix commits against them: `git fetch origin`, then `git log -p <the
-Review's sha>..origin/<branch>`, in `~/Dev/kogo` for a Kogo PR and with
-`git -C ~/Dev/cusoon2-tasks` for a cusoon2 one. Hand on unless both
-hold: the fix commits make every Fix the Review and its Rulings left
-standing, and change no `spec.md` but as a Fix or a Ruling said; the
-Fixed has nothing under Open that a later Ruling has not answered.
+First `git fetch origin` and `git rev-parse origin/<branch>`, in
+`~/Dev/kogo` for a Kogo PR and with `git -C ~/Dev/cusoon2-tasks` for a
+cusoon2 one: that sha is the head whose fix commits you read. Then
+start `lin merge-check DEV-NNN`, with a PR after it only as the next
+paragraph says, as a background command, the Bash tool's
+`run_in_background`, and read while it runs: the Handoff, the Review,
+its Rulings and the Fixed on the PR, and the fix commits against them,
+`git log -p <the Review's sha>..<that head>` in the same place. Hand on unless both hold: the fix commits make every Fix the
+Review and its Rulings left standing, and change no `spec.md` but as a
+Fix or a Ruling said; the Fixed has nothing under Open that a later
+Ruling has not answered.
 
-Then `lin merge-check DEV-NNN`, and nothing between it and what its
-first line asks. It takes the PR and the branch from the newest Handoff,
+When the read is done, take the check's output, waiting for it to end
+if it has not, and do nothing between reading its first line and doing
+what it asks. When the read says hand on, the check's line asks
+nothing: hand on with whatever it answered, and when the line under it
+says it `merged origin/main` or `origin/renew`, say in the `Clerk:`
+comment that the branch now holds that merge, a commit the Review did
+not read.
+
+The check takes the PR and the branch from the newest Handoff,
 its first PR; when the Handoff names two, a line after all the others
 names the other: check that one only from the `Ready to merge:` row,
 with the PR after `DEV-NNN`, as for the Kogo PR a `Checked:` named

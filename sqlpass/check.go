@@ -150,6 +150,17 @@ func (c *Checker) check(ctx context.Context, literal string, spans []Span, disca
 		if pgErr.Code == "42601" && slices.ContainsFunc(spans, func(s Span) bool { return s.Start == fault.Offset }) {
 			fault.Message += "; " + dollarText
 		}
+		// wrong object type at $cart.id: Postgres reads .id as a field of $1
+		for _, s := range spans {
+			if pgErr.Code == "42809" && s.Start == fault.Offset && strings.HasPrefix(literal[s.End:], ".") {
+				j := s.End + 1
+				for j < len(literal) && isNameByte(literal[j]) {
+					j++
+				}
+				name, field := strings.Trim(literal[s.Start+1:s.End], "{}"), literal[s.End+1:j]
+				fault.Message += fmt.Sprintf("; write ${%s.%s} for the property %s of %s", name, field, field, name)
+			}
+		}
 		return nil, fault
 	} else if err != nil {
 		return nil, err

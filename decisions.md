@@ -664,7 +664,10 @@ Each entry: what was decided, why, and what would reopen it.
     run's handoff has no worktree in this VM, a cusoon2 worktree has no `doc/clerk.md`,
     and a branch's copy may be stale. It makes the worktree when it merges.
   - One clerk at a time: two merges would share `kogo_test`. Not taken: a lock for each
-    issue, as DEV-1000 first said.
+    issue, as DEV-1000 first said. Reopened 26 Nov 2026 (DEV-1234): a `Handoff:`'s
+    clerk, and a `Review:`'s that counts a fix or a question, run beside the others,
+    since neither reaches Merging; every other clerk still runs alone, and an issue
+    never has two.
   - What is handed on takes the place of the step, and is raised once, on the Review: the
     review is always launched, and a Budget outgrown, a `spec.md` change and new work are
     all in one `Clerk:` comment with the Questions, which one Ruling answers. Not taken:

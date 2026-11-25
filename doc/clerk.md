@@ -26,8 +26,12 @@ DEV-NNN" starts no clerk at its merge, and an issue moved to Done by
 hand starts one, which fits no row and is handed on.
 It pulls `~/Dev/kogo` before it starts a clerk, so this file is
 `main`'s, and its first poll records what is there and starts none.
-It runs one clerk at a time, so each merge is checked on the `main`
-the one before it left.
+It runs the clerk for a `Handoff:`, and for a `Review:` that counts a
+fix or a question, beside any others, since neither reaches Merging.
+Every other clerk runs alone, one at a time, so each merge is checked
+on the `main` the one before it left. An issue never has two clerks.
+It does not pull `~/Dev/kogo` while a clerk runs alone, so a clerk
+started beside that one reads this file as the last pull left it.
 It leaves alone an issue labelled `lead` or `agent`, but for a merge,
 and takes it up from its newest event when the label goes. For a
 clerk that fails, the cap included, it labels the issue `lead` under
@@ -161,7 +165,9 @@ Read the Handoff and the Review on the PR, and `gh pr diff <PR url>
 - the Handoff's Next step names new work or a choice left open.
 
 Otherwise launch a Fix when the Review has one to make, and go to
-Merging when it has none. A Budget outgrown's sizes go in your
+Merging when it has none. A Review with a fix or a question has its
+clerk running beside others, so it launches a Fix or hands on, and
+never goes to Merging. A Budget outgrown's sizes go in your
 `Merged:` or `Checked:` comment.
 
 A `Ruling:` answers what the `Clerk:` comment before it raised: raise

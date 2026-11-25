@@ -90,6 +90,18 @@ func (c *checker) sql(e *syntax.Call, lit *syntax.SQL) Type {
 	for i, p := range lit.Params {
 		types[i] = c.expr(p.Expr, nil)
 	}
+	// $cart.id: no parameter is a data class (10.3), so its property
+	// was meant, whatever Postgres would make of the dot
+	for i, p := range lit.Params {
+		start, end := p.Offset-lit.TextPos.Offset, p.End.Offset-lit.TextPos.Offset
+		rest, dot := strings.CutPrefix(lit.Text[end:], ".")
+		field := rest[:strings.IndexFunc(rest+" ", func(r rune) bool { return r != '_' && !unicode.IsLetter(r) && !unicode.IsDigit(r) })]
+		if dataClass(types[i]) != nil && dot && strings.IndexFunc(field, unicode.IsDigit) != 0 && field != "" {
+			x := strings.Trim(lit.Text[start+1:end], "{}")
+			c.errorf(p, "sql-parameter-type", "%s is a %s, which no parameter can be: write ${%s.%s} for its property %s", lit.Text[start:end], types[i], x, field, field)
+			return result
+		}
+	}
 	if c.signer == nil {
 		c.errorf(lit, "sql-check", "there is no database to check this literal against")
 		return result
@@ -237,6 +249,11 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 		_, null := t.(*Nullable)
 		j := slices.IndexFunc(cols, func(col sqlpass.Column) bool { return col.Name == name })
 		switch {
+		case j < 0 && len(name) > 63:
+			c.errorf(lit, "sql-column-missing", "no column fills %s: its column would be named %s, which passes the 63 bytes Postgres keeps of a name: shorten the name of a property on its path", what, name)
+			if k := slices.IndexFunc(cols, func(col sqlpass.Column) bool { return col.Name == name[:63] }); k >= 0 && paths[k] == nil {
+				paths[k] = here // the name cut, not a column of its own
+			}
 		case j < 0 && n != nil && !prefixed(name+"_"):
 			c.errorf(lit, "sql-column-missing", "no column fills %s, a %s: select a table's whole row as %s, as in select b as %s, or columns with the prefix %s_",
 				what, t, name, name, name)
@@ -267,11 +284,6 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 				c.errorf(lit, "sql-absent", "%s, a %s, has no property that is not nullable filled by a column null only through an outer join, "+
 					"so a row of nulls would read as no %s: select a NOT NULL column of the joined table for one, as in t.id as %s_id, or the table's whole row, as in select t as %s",
 					what, t, n, name, name)
-			}
-		case j < 0 && len(name) > 63:
-			c.errorf(lit, "sql-column-missing", "no column fills %s: its column would be named %s, which passes the 63 bytes Postgres keeps of a name: shorten the name of a property on its path", what, name)
-			if k := slices.IndexFunc(cols, func(col sqlpass.Column) bool { return col.Name == name[:63] }); k >= 0 && paths[k] == nil {
-				paths[k] = here // the name cut, not a column of its own
 			}
 		case j < 0:
 			c.errorf(lit, "sql-column-missing", "no column fills %s: select one named %s, with as %s if need be", what, name, name)

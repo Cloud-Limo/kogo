@@ -343,8 +343,6 @@ func TestErrors(t *testing.T) {
 			`«with gone as (delete from session returning id) select count(*) from gone`, "sql-writing-with", "move the writing with into a statement of its own"},
 		{"two columns of one name, which the wrap cannot name apart",
 			`«select b.id, t.id from business b join tenant t on t.business_id = b.id`, "sql-duplicate-column", "two columns are named id"},
-		{"a property of a parameter, written without braces",
-			`select id from business where id = «$cart.id`, "sql-rejected", "not a composite type (Postgres 42809); write ${cart.id} for the property id of cart"},
 		{"an empty literal", `«`, "sql-empty", "this literal holds no statement"},
 		{"a literal of a comment alone", "«  -- later\n", "sql-empty", "this literal holds no statement"},
 		{"a parameter of a type outside the table",

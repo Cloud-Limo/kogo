@@ -986,7 +986,10 @@ fun f(tx: Tx, kind: Kind?, ids: List<Uuid?>, p: P, active: Boolean?, total: Cent
 ---
 package kogo.time
 external class Instant`,
+		// $s.text on a String is a cast Postgres takes, not a property.
+		`fun f(tx: Tx, s: String): Int = tx.execute(sql"$s.text: String")`,
 	)
+	cart := "data class Cart(val id: Uuid, val name: String)\n"
 	refused(t, [][3]string{
 		{"data class Row(val id: Uuid)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> id: Uuid, legal_name: String\")", "sql-column-unused",
 			"column legal_name fills no property of Row: add a property legalName, or leave the column out"},
@@ -998,6 +1001,8 @@ external class Instant`,
 		// Postgres cuts: the column given is the name cut.
 		{"data class C(val legalNameAsTheRegistryWritesIt: String)\ndata class Row(val businessThatHoldsTheStorefront: C)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> business_that_holds_the_storefront_legal_name_as_the_registry_w: String\")", "sql-column-missing",
 			"no column fills C.legalNameAsTheRegistryWritesIt: its column would be named business_that_holds_the_storefront_legal_name_as_the_registry_writes_it, which passes the 63 bytes Postgres keeps of a name: shorten the name of a property on its path"},
+		{"data class B(val id: Uuid)\ndata class Row(val businessThatHoldsTheStorefrontAndTheRegistryWritesItAsSuchAndMore: B)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> business_that_holds_the_storefront_and_the_registry_writes_it_a: b(id: Uuid)\")", "sql-column-missing",
+			"its column would be named business_that_holds_the_storefront_and_the_registry_writes_it_as_such_and_more, which passes the 63 bytes"},
 		{"data class Row(val id: Uuid)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> id: Long\")", "sql-column-type",
 			"column id is a Long, and fills Row.id, a Uuid: make that a Long, or cast the column in the statement"},
 		{"enum class Kind { a, b }\nfun f(tx: Tx): Kind = tx.querySingle<Kind>(‸sql\" -> kind: K{a c}\")", "sql-column-type",
@@ -1034,6 +1039,11 @@ external class Instant`,
 			"this statement gives 2 columns, and a Long is one: read them into a data class with a property for each, or select one column"},
 		{"fun f(tx: Tx): List<Long> = tx.query<Long>(‸sql\"\")", "sql-columns", "this statement gives no columns: call execute, or add returning"},
 		{"data class Row(val n: Long)\nfun f(tx: Tx): Row? = tx.queryOne<Row?>(‸sql\" -> n: Long\")", "sql-columns", "a row is never null: write Row, not Row?"},
+		// No parameter is a data class (10.3): $cart.id meant ${cart.id}.
+		{cart + "fun f(tx: Tx, cart: Cart): Int = tx.execute(sql\"where id = ‸$cart.id\")", "sql-parameter-type",
+			"$cart is a Cart, which no parameter can be: write ${cart.id} for its property id"},
+		{cart + "fun f(tx: Tx, cart: Cart?): Int = tx.execute(sql\"where name = ‸$cart.name\")", "sql-parameter-type", "write ${cart.name} for its property name"},
+		{cart + "fun f(tx: Tx, cart: Cart): Int = tx.execute(sql\"\"\"where id = ‸«$cart.\"id\"\"\"\")", "sql-rejected", "Postgres refused this"},
 		{"fun f(tx: Tx, id: String): Int = tx.execute(sql\"‸$id: Uuid, $id\")", "sql-parameter-type",
 			"$id is a String, and Postgres takes a Uuid there: pass a Uuid, or cast it in the statement, as $id::type"},
 		{"fun f(tx: Tx, ids: List<Int>): Int = tx.execute(sql\"‸${ids}: List<Long>\")", "sql-parameter-type", "${ids} is a List<Int>, and Postgres takes a List<Long> there"},

@@ -268,6 +268,11 @@ func (c *checker) fill(lit *syntax.SQL, d *Named, prefix string, path []int, abs
 					"so a row of nulls would read as no %s: select a NOT NULL column of the joined table for one, as in t.id as %s_id, or the table's whole row, as in select t as %s",
 					what, t, n, name, name)
 			}
+		case j < 0 && len(name) > 63:
+			c.errorf(lit, "sql-column-missing", "no column fills %s: its column would be named %s, which passes the 63 bytes Postgres keeps of a name: shorten the name of a property on its path", what, name)
+			if k := slices.IndexFunc(cols, func(col sqlpass.Column) bool { return col.Name == name[:63] }); k >= 0 && paths[k] == nil {
+				paths[k] = here // the name cut, not a column of its own
+			}
 		case j < 0:
 			c.errorf(lit, "sql-column-missing", "no column fills %s: select one named %s, with as %s if need be", what, name, name)
 		case paths[j] != nil:

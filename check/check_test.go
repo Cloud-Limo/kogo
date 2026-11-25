@@ -994,6 +994,10 @@ external class Instant`,
 			"no column fills Row.legalName: select one named legal_name, with as legal_name if need be"},
 		{"data class T(val id: Uuid, val slug: String)\ndata class Row(val tenant: T?)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> tenant_id: Uuid??\")", "sql-column-missing",
 			"no column fills T.slug: select one named tenant_slug"},
+		// A nested property whose column name passes 63 bytes, which
+		// Postgres cuts: the column given is the name cut.
+		{"data class C(val legalNameAsTheRegistryWritesIt: String)\ndata class Row(val businessThatHoldsTheStorefront: C)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> business_that_holds_the_storefront_legal_name_as_the_registry_w: String\")", "sql-column-missing",
+			"no column fills C.legalNameAsTheRegistryWritesIt: its column would be named business_that_holds_the_storefront_legal_name_as_the_registry_writes_it, which passes the 63 bytes Postgres keeps of a name: shorten the name of a property on its path"},
 		{"data class Row(val id: Uuid)\nfun f(tx: Tx): List<Row> = tx.query<Row>(‸sql\" -> id: Long\")", "sql-column-type",
 			"column id is a Long, and fills Row.id, a Uuid: make that a Long, or cast the column in the statement"},
 		{"enum class Kind { a, b }\nfun f(tx: Tx): Kind = tx.querySingle<Kind>(‸sql\" -> kind: K{a c}\")", "sql-column-type",

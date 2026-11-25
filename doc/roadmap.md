@@ -2,7 +2,8 @@
 
 Agreed with Greg on 19 Nov 2026, from three research runs: DEV-928 (what
 Kogo lacks, ops site first), DEV-929 and DEV-938 (the test form) and
-DEV-930 (moving piece by piece). Every size is an estimate in code /
+DEV-930 (moving piece by piece, restated on 26 Nov 2026 for dev and
+CI only, DEV-1252). Every size is an estimate in code /
 test lines, from counting the Kotlin a piece replaces or from the
 designs' own guesses; nothing was built to measure it. The ops
 site's table marks each piece built, with its PR, or not; Linear holds
@@ -51,18 +52,33 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   transaction's kind: a read with no lock, and whatever calls one,
   takes a `SerializableTx`, as the Kotlin runs it; a one-statement
   write and the list's check stay on a `Tx`.
-- **Piece by piece, never one switch** (DEV-930): Go serves each ported
-  list beside the JVM, on one database, one session table and one
-  config file. A list moves in one release; nginx's routes travel with
-  the release, a whole list at a time. The session and config formats
-  are frozen while both serve. Effect queues get a per-queue lock
-  before the first one moves.
+- **Piece by piece in dev and CI, one switch at launch** (DEV-930;
+  Greg, 26 Nov 2026): Go serves each ported list beside the JVM, on
+  one database, one session table and one config file, in dev, CI and
+  agent runs only; Vite sends a moved list to `GO_URL` (DEV-1248).
+  Staging is stood up once the whole port is done, and staging and
+  production get the finished system once, with no JVM beside it.
+  The session and config formats are frozen while both serve. Effect
+  queues get a per-queue lock before the first one moves.
+  - *Fallen away*: a list moving in its own release, with nginx's
+    route travelling with it and a rollback by deploy (cusoon2 PR
+    1646, closed unmerged; DEV-1219 cancelled); a queue moved by a
+    two-line commit on a box; the Go unit dark beside the JVM as a
+    state of staging; both `check-config`s run on a box.
+  - *Kept*: the comparison of every answer and row with the Kotlin;
+    the Kotlin first for a change `kogo/run.sh` can see; the recorded
+    answers before an area's Kotlin is deleted (DEV-894). With no
+    weeks in production beside the JVM, these are the only guard
+    against a wrong Go answer found at launch. Kept too, since the
+    finished system has them: the Go unit, its health probe and Go's
+    `migrate`; and in dev and CI, Vite's second target and `GO_URL`.
 - **An area's Kotlin goes once its Go has proven itself** (19 Nov
   2026, a): measured where it can be, but mostly time in use, in dev,
-  CI, agent runs and staging before launch, two weeks as a guideline
-  that may be one or four; about four weeks in prod after launch.
-  Its answers are recorded first (DEV-894), and its Kotlin, pins and
-  JVM route go in one PR.
+  CI and agent runs, two weeks as a guideline that may be one or
+  four. No area's Go serves production before its Kotlin goes:
+  production gets the finished system. Its answers are recorded first
+  (DEV-894), and its Kotlin, pins and dev's route to the JVM go in
+  one PR.
 - **cusoon2 commits its emitted Go** (19 Nov 2026, a), checked by CI
   re-emitting it as jOOQ's code is. Kogo is to be public under
   Apache-2.0, its history kept: it has its `LICENSE` (DEV-941, PR 78)
@@ -97,7 +113,8 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   2026, and the loop over tenants kept ("A worker keeps the loop over
   tenants", `decisions.md`).
 - **The lead's calls, Greg not objecting:** `updateJob`'s hours rounded
-  in SQL; the 21 operations switch together once all 21 compare clean;
+  in SQL; the 21 operations move to Go together, in dev and CI, once
+  all 21 compare clean;
   a PDF compared by its marks (text, positions to 0.01 pt); only Go
   writes log lines for now; Go's port has a key of its own; the
   printed table's command is named when it is built.
@@ -147,21 +164,28 @@ issue where there is one.
 | 13l | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13l's: ~1,600 / 850) | cusoon2 PR 1597, 1600, 1603, 1604, 1605, 1608 |
 | 18 | cusoon2 | Kotlin first: ten keys move into `settings`; `deployment.goPort` | ~60 / 50 | cusoon2 PR 1609 |
 | 19 | cusoon2 | The ops site's Go `main` | 150 / 80 | cusoon2 PR 1611 |
-| 20 | cusoon2 | Serve the ops site from Go; waits on the release work below, DEV-1055 (the Go unit's memory and build), the mends DEV-1208 and DEV-1211, and the lead's reading of the entries DEV-1198 marked wrong value or outage | | no |
+| 20 | cusoon2 | Serve the ops site from Go; what that now means is under Open | | no |
 
 Row 20's earlier waits are over: the second stress of the Go `main`
 (DEV-1139), the trial of generated worlds (DEV-1162), and the invite's
 email queued by the port (DEV-885, cusoon2 PR 1612), so `sendInvite`
-compares its `outbound_message` rows like any other.
+compares its `outbound_message` rows like any other. So are its later
+ones, by 26 Nov 2026: DEV-1055's lines in the Go unit (DEV-1218,
+cusoon2 PR 1638), the mends DEV-1208, DEV-1211 and DEV-1225, and the
+lead's reading of the entries DEV-1198 marked wrong value or outage.
+Its route on a box (DEV-1219) went with the ruling of that day.
 
 Beside 13b to 13l, as tests in the Kotlin: the probes of each second id
 and admin-only field, the storefront's (DEV-1031, cusoon2 PR 1563)
 and then the ops site's (DEV-1038, 0 / 40).
 
-Beside it, before the first list goes live (DEV-930, about 290 / 220,
-not filed): the release carries Go; units, health and CI; routing and
-the port key; migrations from Go's `migrate`; the batch lock and the
-concurrency test.
+Beside it, DEV-930's pieces (about 290 / 220 as it sized them): in
+dev and CI, Go started beside the JVM and Vite's second target
+(DEV-1248); for the finished system, the release carrying Go, its
+unit and health probe (DEV-1218), the port key and migrations from
+Go's `migrate`; before the first queue moves, the concurrency test
+and the batch lock (whether the lock is still wanted is under Open).
+nginx's route from the release fell away on 26 Nov 2026.
 
 ### 2. The rest of cusoon2
 
@@ -273,8 +297,9 @@ In Kogo, beside it:
 - Mail's prelude and the PDF writer, before mail and the PDFs.
 
 No slice puts Go in front of a user or deletes Kotlin, so none waits
-on a research run. Each switch-over does, and names its runs when it
-is next.
+on a research run. There is one switch-over, at launch, when staging
+and then production get the finished system: it does, and names its
+runs when it is next.
 
 ### 3. Operator money
 
@@ -293,3 +318,14 @@ longest lead time and can go out early.
   Settled on 23 Nov 2026 ("A worker keeps the loop over tenants").
 - The login design's details, in a sitting with Greg before Stripe's
   client and slices 15 to 17.
+- Left open by the ruling of 26 Nov 2026 (DEV-1252), for Greg, each
+  with DEV-930's cost:
+  - Whether the session, cookie and config formats stay frozen while
+    dev and CI serve both: each change lands in both in one commit,
+    and one `run.sh` case compares `Set-Cookie` (0 / 20).
+  - Whether the per-queue lock is still wanted (30 / 40): DEV-930's
+    reason was dev stacks on mixed branches and a JVM left running by
+    hand, since the two-line commit kept prod right.
+  - Whether row 20 is now "the ops site on Go in dev and CI", done
+    with DEV-1248: DEV-930 sized it as dev and e2e routing (10 / 0),
+    CI (30 / 0) and dev stacks and agent runs (15 / 0).

@@ -174,22 +174,28 @@ again only for a Question still unanswered.
 First `git fetch origin` and `git rev-parse origin/<branch>`, in
 `~/Dev/kogo` for a Kogo PR and with `git -C ~/Dev/cusoon2-tasks` for a
 cusoon2 one: that sha is the head whose fix commits you read. Then
-start `lin merge-check DEV-NNN`, with a PR after it only as the next
-paragraph says, as a background command, the Bash tool's
-`run_in_background`, and read while it runs: the Handoff, the Review,
-its Rulings and the Fixed on the PR, and the fix commits against them,
-`git log -p <the Review's sha>..<that head>` in the same place. Hand on unless both hold: the fix commits make every Fix the
-Review and its Rulings left standing, and change no `spec.md` but as a
-Fix or a Ruling said; the Fixed has nothing under Open that a later
-Ruling has not answered.
+start the check with the Bash tool's `run_in_background`, `<dir>` from
+`mktemp -d`, with a PR after `DEV-NNN` only as the third paragraph
+says:
+`lin merge-check DEV-NNN > <dir>/check 2>&1; touch <dir>/done`.
+Read while it runs: the Handoff, the Review, its Rulings and the Fixed
+on the PR, and the fix commits against them,
+`git log -p <the Review's sha>..<that head>` in the same place. Hand
+on unless both hold: the fix commits make every Fix the Review and its
+Rulings left standing, and change no `spec.md` but as a Fix or a
+Ruling said; the Fixed has nothing under Open that a later Ruling has
+not answered.
 
-When the read is done, take the check's output, waiting for it to end
-if it has not, and do nothing between reading its first line and doing
-what it asks. When the read says hand on, the check's line asks
-nothing: hand on with whatever it answered, and when the line under it
-says it `merged origin/main` or `origin/renew`, say in the `Clerk:`
-comment that the branch now holds that merge, a commit the Review did
-not read.
+When the read is done, run
+`until [ -e <dir>/done ]; do sleep 5; done; cat <dir>/check` as a
+command of its own with a 10-minute timeout, and do not end your turn
+before it: a headless clerk that ends its turn to wait ends the
+session. Do nothing between reading the check's first line and doing
+what it asks. When the read says hand on, that line asks nothing: hand
+on with whatever the check answered, and when `origin/<branch>`,
+fetched again, is no longer the head you read, say in the `Clerk:`
+comment what it now holds that the Review did not read: the check's
+merge of the base, or another push.
 
 The check takes the PR and the branch from the newest Handoff,
 its first PR; when the Handoff names two, a line after all the others

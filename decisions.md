@@ -5222,3 +5222,22 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   literal did, and none reads it unless it opens a database. `t.Setenv` panics in a
   parallel test. Not taken: setting it on the program's `exec.Cmd` in `build()`, which
   needs the URL worked out there as well as in `emit()`, so a line or two more.
+
+## Side by side in dev and CI only (DEV-1252), 26 Nov 2026
+
+- **Go and the JVM serve side by side in dev, CI and agent runs only;
+  staging is stood up once the whole port is done, and staging and
+  production get the finished system once** (Greg, 26 Nov 2026),
+  restating DEV-930's "piece by piece, never one switch" in
+  `doc/roadmap.md`. DEV-930 was written for a site with users, where a
+  list moves in its own release and a rollback is a deploy; nobody uses
+  the site before the port is done, so that was robustness nobody
+  needs. Fallen away: nginx's route from the release (cusoon2 PR 1646,
+  closed; DEV-1219 cancelled), a queue moved on a box, Go dark beside
+  the JVM on staging, an area's weeks in production before its Kotlin
+  goes. Kept: the comparison, Kotlin first, and the recorded answers
+  (DEV-894), now the only guard against a wrong Go answer at launch.
+  Not taken: DEV-930 as it stood. Left open for Greg, in the roadmap's
+  Open: the frozen formats, the per-queue lock, and what row 20 now
+  means. Reopens if users come onto the site before the port is
+  complete.

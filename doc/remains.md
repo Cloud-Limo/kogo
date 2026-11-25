@@ -188,7 +188,9 @@ Agreed subject to this review:
 - **The order of the migration.** Settled 19 Nov 2026
   (`doc/roadmap.md`, "How it moves"): two steps per area, GraphQL to
   Kotlin RPC and then to Kogo (DEV-893); piece by piece, Go serving
-  each ported list beside the JVM on one database (DEV-930); an area's
+  each ported list beside the JVM on one database (DEV-930), in dev,
+  CI and agent runs only, staging and production getting the finished
+  system once (Greg, 26 Nov 2026, DEV-1252); an area's
   Kotlin deleted once its Go has proven itself.
 - **What is built first.** Settled 19 Nov 2026 (`doc/roadmap.md`, "The
   work, in order"; DEV-914): Kogo is built by the first port, the ops

@@ -162,9 +162,10 @@ through the same types, since Kotlin compares a `ByteArray` by identity
 and a data class by its properties': compare the other properties, or
 what the bytes were made from. Comparing with `null` is allowed. Where
 check cannot see one compared, behind a type parameter or in
-`contains`, `in`, `distinct` or a `Set`'s or `Map`'s keys, `==` panics
-on reaching it, as on a function, where Kotlin would answer `false` for
-two arrays of the same bytes. In a template it is an error
+`contains`, `in`, `distinct` or a `Set`'s or `Map`'s keys, `==`
+compares it as Kotlin does, by identity: an array is equal to itself
+and to no other of the same bytes. Two of no bytes are equal, where
+Kotlin's two made apart are not. In a template it is an error
 (`bytes-text`): Kotlin writes its identity, `[B@` and a number that
 changes every run. Inside a data class's text it is written as Kotlin's
 `toString` writes it, its bytes signed: `F(name=x, data=[97, 0, -1])`.

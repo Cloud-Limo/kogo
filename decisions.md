@@ -3655,7 +3655,8 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
   finds a function (`function-equality`), since what to change differs. Where the checker
   cannot see one, behind a type parameter or in `contains`, `in` or a `Set`, `rt.Equal`
   panics on reaching it, as on a function (Review 1 on PR 103: the bytes answered `true`
-  where Kotlin answers `false`). Not taken: comparing the bytes there.
+  where Kotlin answers `false`). Not taken: comparing the bytes there. Since DEV-1225
+  `rt.Equal` compares it by identity instead of panicking: see that section.
 - **A `ByteArray` in a template is refused, `bytes-text`**, since Kotlin writes its
   identity; inside a data class's text it is Kotlin's signed bytes, `[97, 0, -1]`, checked
   against kotlinc 2.4.21 by hand. Not taken: a form in `kotlin/`, which cannot make a
@@ -5063,3 +5064,11 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   application's own words from `Refused`'s body, not by the log. Not taken: logging
   only the keys the `Service` names, a new thing for an author to write; the length of
   a 3xx's and a 4xx's alone, which keeps a rule by status for no reader.
+- **`rt.Equal` compares two `ByteArray`s by identity** (spec 3), Kotlin's own answer,
+  where it panicked behind a type parameter, in `listOf`'s `contains` and in `setOf`
+  (DEV-1198's trial T2, row 56: a caller's data could reach a 500). Identity is the
+  same backing array and length; two arrays of no bytes are equal, since Go gives
+  them no address to tell apart, where Kotlin's two made apart are not, and the same
+  empty one must equal itself. `bytes-equality` stays where the checker sees one. Not
+  taken: comparing the bytes, which Review 1 on PR 103 refused for answering `true`
+  where Kotlin answers `false`.

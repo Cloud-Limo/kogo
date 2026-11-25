@@ -325,19 +325,21 @@ fun drafts(db: Db): List<ByteArray> = db.tx { tx -> tx.query<ByteArray>(sql"""se
 }
 
 // A ByteArray where check cannot see it compared, in a contains, an in,
-// a Set or behind a type parameter, panics, since Kotlin compares it by
-// identity and the bytes would answer otherwise; inside a data class's
-// text it is Kotlin's signed bytes (spec.md 3; kotlinc 2.4.21 gives
-// F(name=x, data=[97, 0, -1])).
+// a Set or behind a type parameter, is compared by identity, as Kotlin
+// compares it: equal to itself and not to another of the same bytes.
+// Inside a data class's text it is Kotlin's signed bytes (spec.md 3;
+// kotlinc 2.4.21 gives F(name=x, data=[97, 0, -1])).
 func TestBytesIdentity(t *testing.T) {
 	const bytes = "\nimport \"github.com/Cloud-Limo/kogo/prelude/kogo\"\nvar a, b = kogo.ByteArray(\"a\\x00\\xff\"), kogo.ByteArray(\"a\\x00\\xff\")\n"
-	identity := "panics: a ByteArray cannot be compared: Kotlin compares it by identity"
 	expectWith(t, bytes, "", [][2]string{
-		{"t.InList(a, b)", identity},
-		{"t.Contains(a, b)", identity},
-		{"t.InSet(a, b)", identity},
-		{"t.Same(a, b)", identity},
-		{"t.Boxed(a, b)", identity},
+		{"t.InList(a, b)", "false"},
+		{"t.Contains(a, b)", "false"},
+		{"t.InSet(a, b)", "false"},
+		{"t.Same(a, b)", "false"},
+		{"t.Boxed(a, b)", "false"},
+		{"t.InList(a, a)", "true"},
+		{"t.InSet(a, a)", "true"},
+		{"t.Boxed(a, a)", "true"},
 		{"t.Text(a)", "F(name=x, data=[97, 0, -1])"},
 	}, `package t
 

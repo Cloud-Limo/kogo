@@ -35,10 +35,11 @@ type unordered interface {
 // Double as Kotlin's equals compares it, so NaN is equal to NaN and
 // 0.0 is not equal to -0.0. A ByteArray is equal only to itself, as
 // Kotlin compares one by identity: the same bytes in memory, and any
-// two of no bytes, which Go cannot tell apart. A function, a Regex or a handle panics, as Kotlin compares none
-// by what it holds. The checker refuses == where it sees any of the
-// first three, and cannot see one behind a type parameter or in a
-// contains, an in, or a Set's or a Map's keys.
+// two of no bytes, which Go cannot tell apart. A function, a Regex or
+// a handle panics, as Kotlin compares none by what it holds. The
+// checker refuses == where it sees any of the first three, and cannot
+// see one behind a type parameter or in a contains, an in, or a Set's
+// or a Map's keys.
 func Equal(a, b any) bool { return equal(reflect.ValueOf(a), reflect.ValueOf(b)) }
 
 // EqualDouble is a == b for two Double? values as Kotlin compares

@@ -1196,6 +1196,8 @@ and not a promise that it is all:
   | `(?U)\w` matches | `é` | true | false: Kotlin's Unicode classes; Go's ungreedy flag |
   | replace `$` with `!` | `ab\n` | `ab!\n!` | `ab\n!`: Kotlin's `$` also stands before a final line break |
 - A `String` never holds half of a surrogate pair (section 3).
+- Two `ByteArray`s of no bytes are equal where `==` reaches them
+  (section 3), where Kotlin's two made apart are not.
 - `lowercase()` does not read the letters either side: a final `Σ`
   becomes `σ` where Kotlin's is `ς`.
 - `replace(regex, text)` skips an empty match that starts where a match

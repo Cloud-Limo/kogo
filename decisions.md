@@ -2488,6 +2488,12 @@ Each entry: what was decided, why, and what would reopen it.
   disagreement makes `contains` answer false for a key that is there. `==` of two sets or
   maps still walks both; reopen that when a port compares two large ones, and the rest when
   a large collection keyed by another kind is needed.
+  DEV-1198's trial T10 timed the walk over data-class keys at 6.71 s for 5,000 and
+  111.27 s for 20,000, and a request's `Limit` does not cut it. Greg ruled on 25 Nov 2026
+  that nothing changes, since no port keys a set or a map by a data class. Not taken: a Go
+  map for a data class made of plain kinds, about 20 / 15 lines, which still leaves a key
+  with a nullable field, a `Decimal` or a list walking; and a warning from `kogo check`,
+  which stays pass or fail.
 - **`rt`'s `==` compares a Go type that embeds `rt.Unordered` by its `Keys()` regardless
   of order**, each key once. `rt` knows no prelude type by name, and `Unordered`'s
   unexported method means no data class can be taken for a set by a member's name; `Map`
@@ -3907,7 +3913,7 @@ The three entries of 18 Nov 2026 are built as they say. What they left open:
 From Greg's rulings of 21 Nov 2026 on DEV-1049; these are the calls they left open.
 
 - **A 5xx's body is not logged** (since DEV-1225 no body is, only its length); a 3xx's
-  and a 4xx's still are, their first 4 KiB. A 4xx's body is logged for what support
+  and a 4xx's were, their first 4 KiB, until then. A 4xx's body is logged for what support
   reads in it, a decline's code and request id (Q9); a 5xx's is the service's own trouble, often an error page, which no client acts
   on and which may echo what was sent. Nor is the body of a 2xx that is `Unreadable`,
   which may be a whole answer of personal data. Not taken: a 5xx's body logged as a

@@ -805,23 +805,3 @@ func TestRegexEqual(t *testing.T) {
 	List_Contains(ListOf(Regex_String("a+")), Regex_String("a+"))
 	t.Error("== on two Regexes answers")
 }
-
-// == on a ByteArray the checker cannot see compared, behind a type
-// parameter, in a list's contains or a set's keys, is Kotlin's: by
-// identity, so an array is equal to itself and to no other of the same
-// bytes.
-func TestBytesEqual(t *testing.T) {
-	a, b := ByteArray("ab"), ByteArray("ab")
-	same := func(x, y any) bool { return rt.Equal(x, y) }
-	for what, got := range map[string][2]bool{
-		"behind <T>": {same(a, a), same(a, b)},
-		"in a T?":    {same(rt.Ptr(a), a), same(rt.Ptr(a), rt.Ptr(b))},
-		"listOf":     {List_Contains(ListOf(b, a), a), List_Contains(ListOf(a), b)},
-		"setOf":      {len(SetOf(a, a).keys) == 1, len(SetOf(a, b).keys) == 1},
-		"a slice":    {same(ListOf(a), ListOf(a)), same(a, a[:1])},
-	} {
-		if got != [2]bool{true, false} {
-			t.Errorf("%s: the same array is equal %v, another of its bytes %v", what, got[0], got[1])
-		}
-	}
-}

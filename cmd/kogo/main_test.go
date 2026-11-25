@@ -208,7 +208,8 @@ mark paid again: 200 {"type":"refused","message":"Invoice INV-1 cannot be change
 status: 200 {"type":"ok","value":"paid"}
 with 0 transactions open, front: a test page for 192.0.2.1
 work that is an action: 200 {"type":"ok","value":"front"}
-sign in: 200 ["session=Ann; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax"] {"type":"ok","value":{"text":"Hello, Ann."}}
+sign in: 200 ["session=<token>; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax"] {"type":"ok","value":{"text":"Hello, Ann."}}
+sign in as Zoë: 200 ["session=<token>; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax"] {"type":"ok","value":{"text":"Hello, Zoë."}}
 sign in refused: 200 [] {"type":"refused","message":"Say who you are."}
 sign out: 200 ["session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"] {"type":"ok","value":{}}
 sign out refused: 200 [] {"type":"refused","message":"You are not signed in."}

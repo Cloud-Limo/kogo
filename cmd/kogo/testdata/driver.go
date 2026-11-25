@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -268,17 +269,24 @@ func main() {
 	post("status", "statusOf", `{"number": "INV-1"}`)
 	post("work that is an action", "testPrinter", "")
 
-	// 25: an answer that sets cookies, and refusals that set none.
+	// 25: an answer that sets cookies, and refusals that set none. A
+	// token is random, so its 32 letters and digits print as <token>.
 	h2 := rpc.NewHandler(reply.Session, pool, reply.SessionEnv{Secure: true}, slog.New(slog.DiscardHandler))
+	token := regexp.MustCompile(`^session=[0-9A-Za-z]{32};`)
 	cookies := func(what, op, cookie, body string) {
 		w, r := httptest.NewRecorder(), httptest.NewRequest("POST", "/"+op, strings.NewReader(body))
 		if cookie != "" {
 			r.Header.Set("Cookie", cookie)
 		}
 		h2.ServeHTTP(w, r)
-		fmt.Printf("%s: %d %q %s\n", what, w.Code, w.Header().Values("Set-Cookie"), strings.TrimSpace(w.Body.String()))
+		set := w.Header().Values("Set-Cookie")
+		for i := range set {
+			set[i] = token.ReplaceAllString(set[i], "session=<token>;")
+		}
+		fmt.Printf("%s: %d %q %s\n", what, w.Code, set, strings.TrimSpace(w.Body.String()))
 	}
 	cookies("sign in", "signIn", "", `{"name": "Ann"}`)
+	cookies("sign in as Zoë", "signIn", "", `{"name": "Zoë"}`)
 	cookies("sign in refused", "signIn", "", `{"name": " "}`)
 	cookies("sign out", "signOut", "session=Ann", "")
 	cookies("sign out refused", "signOut", "", "")

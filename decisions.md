@@ -3269,7 +3269,8 @@ Each entry: what was decided, why, and what would reopen it.
   the browser's session.
 - **A cookie HTTP cannot carry panics** (500, and a `Tx` operation rolls back, since the
   answer is written inside its transaction). Not taken: Go's `http.SetCookie`, which
-  drops it with a log line, so the browser silently goes without it.
+  drops it with a log line, so the browser silently goes without it. The example puts a
+  token in its cookie, never a caller's text (DEV-1225).
 - **A cookie a browser refuses panics too** (review of PR 89): `SameSite.None`, or a
   `__Secure-` name, without `secure`, and a `__Host-` name without `secure` or the path
   `/`. The prefixes are read in any case, as browsers read them. Not taken: only
@@ -5072,3 +5073,8 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   empty one must equal itself. `bytes-equality` stays where the checker sees one. Not
   taken: comparing the bytes, which Review 1 on PR 103 refused for answering `true`
   where Kotlin answers `false`.
+- **`examples/25_reply.kg` sets a token, `randomString(32)`, as its cookie**, not the
+  caller's name, which answered 500 for `Zoë`, `Ann "A"` or `a;b` (trial T9, row 58):
+  a cookie HTTP cannot carry still panics, and the example is the program an author
+  copies. The driver prints the token as `<token>`, since it differs every run. Not
+  taken: a session's row as `28_session.kg` keeps one, more than the example is about.

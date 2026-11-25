@@ -5205,3 +5205,12 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   holds what is true of the data; Kogo holds what is decided. Not taken: a ninth
   principle in `doc/design.md`, whose principles settle questions of the language,
   where Kogo checks nothing of this seam. Reopens if Kogo comes to check that seam.
+
+## The clerk starts the merge check before it reads (DEV-1236), 25 Nov 2026
+
+- **The head whose fix commits the clerk reads is `origin/<branch>` taken before the
+  check starts**, and the read is `git log -p <the Review's sha>..<that head>`: the
+  check may push a merge of the base while the clerk reads, and a read of
+  `..origin/<branch>` fetched after it would take in the base's commits and leave no
+  head to hold `pass <sha>` against. Not taken: fetching after the check ends, which
+  waits for the check before the read and so saves nothing.

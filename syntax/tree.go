@@ -42,7 +42,7 @@ type Type interface {
 type File struct {
 	Name    string
 	OptIn   []*Annotation // the @file:OptIn(...) lines
-	Package *Ident        // a dotted name, as cusoon.model
+	Package *Ident        // a dotted name, as example.ops
 	Imports []*Import
 	Decls   []Decl
 	APIs    []*API   // the api lists

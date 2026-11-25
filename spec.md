@@ -943,20 +943,20 @@ of the base type is.
 ### 10.5 Nullability
 
 - A result column is non-null only when Postgres can never make it
-  null: a reference to a `NOT NULL` column of a table or to a table's
-  whole row (not a foreign table's, nor a table's that reads a foreign
-  child's rows, since Postgres does not enforce a foreign table's
-  `NOT NULL`), `count(...)`, `exists (...)`, a `coalesce(...)` with an
-  argument non-null by this rule or a constant other than `null`, or a
-  cast of any of these other than from `jsonb` or by a function of the
-  schema's; and none of it on the nullable side of an outer
-  join. Every other column (other functions and aggregates, as `sum`,
+  null: a reference to a `NOT NULL` column of a table (not of a
+  foreign table, nor of a table that reads a foreign child's rows,
+  since Postgres does not enforce a foreign table's `NOT NULL`) or to
+  a table's whole row, `count(...)`, `exists (...)`, a `coalesce(...)`
+  with an argument non-null by this rule or a constant other than
+  `null`, or a cast of any of these other than from `jsonb` or by a
+  function of the schema's; and none of it on the nullable side of an
+  outer join. Every other column (other functions and aggregates, as `sum`,
   operators, scalar subqueries, outer-joined columns) is nullable.
 - A composite value is null as a whole, never field by field: the whole
   row of an outer-joined table is null where the table is absent. Where
   it is there, a field that may be null fills only a `T?` property. A
   field of a table's whole row is non-null where the table's column is
-  `NOT NULL`; every field of any other composite value (a column of a
+  `NOT NULL` and neither it nor a child is foreign; every field of any other composite value (a column of a
   composite type, a cast, a function's result) may be null, since
   Postgres cannot declare a field of a type `NOT NULL`, and a table's
   constraints do not cover its row type stored elsewhere.

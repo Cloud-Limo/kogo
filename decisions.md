@@ -5169,10 +5169,26 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   sends no parse tree for it, as for a pooler that drops the tree; the two are told apart
   by preparing `select`, which has one, only when the tree is missing. Not taken: reading
   the literal for a token, which needs Postgres's lexer for comments and `;`.
-- **`$cart.id` is told about `${cart.id}` only where Postgres refuses it with 42809**,
-  at a parameter followed by `.`. Not taken: refusing every `$name.` in the literal,
-  which would also refuse `$s.text`, a cast Postgres takes today: that changes what
-  `kogo check` refuses, beyond the Scope.
+- **`$cart.id`, where `cart` is a data class, is told to write `${cart.id}`**, whatever
+  Postgres would make of the dot: `$cart.name` too, which Postgres reads as a cast to
+  `name` (the lead's ruling of 25 Nov 2026 on PR 194). No parameter is a data class
+  (spec 10.3), so this changes a message and no refusal; it needs a name after the dot,
+  so `$cart."id"` keeps Postgres's 42809. It replaces this PR's first reading, a hint on
+  Postgres's 42809 alone, which missed `$cart.name`. `$s.text` on a `String` stays the
+  cast it is. Not taken: refusing every `$name.` in the literal, which refuses `$s.text`
+  and so changes what `kogo check` refuses.
+- **A table dropped and made again under a live connection is not mended here**: since
+  DEV-1194 a whole row is read by its fields' names and no composite type is loaded, so
+  that read no longer panics. `Tx_Known` still holds an array type Postgres does not
+  ship, and since DEV-1208 an array of a domain, by the oid it loaded; a domain dropped
+  and made again keeps the old one on that connection. That is a change to the schema a
+  program was checked against, which Kogo does not promise to follow (DEV-1195, spec
+  10), so nothing changes for it (the lead's ruling of 25 Nov 2026).
+- **`syntax`'s example package is `example.ops`, not `cusoon.model`**, in the message for
+  a file with no package line and in `File`'s comment (the lead's ruling of 25 Nov
+  2026): a diagnostic every user reads names nothing of cusoon2, while `examples/` and
+  `cmd/kogo/testdata/driver.go` keep theirs as a worked example. Not taken: an issue of
+  its own.
 - **A property whose column name passes 63 bytes is `sql-column-missing` naming the
   limit**, and the column of that name cut to 63 bytes, which Postgres gives for it, is
   taken as that property's, not also reported unused. Not taken: leaving the unused

@@ -464,9 +464,11 @@ handler and the prelude) and `kogo.mail`. Agreed with Greg on 17 Nov
 ends in an `HttpFailure` in Go, with its method, path, status where an
 answer came, why and the length of the body read, so a month's failed
 calls can be counted. No body is logged, a 4xx's included: it may echo
-what was sent (DEV-1225, `decisions.md`). So a decline's code and
-request id no longer reach support by the log, as Q9's answer had
-them; what a queue stores for a payer stays fixed words.
+what was sent (DEV-1225, `decisions.md`). A decline's code and
+request id are stored instead on the effect's row: `Act.Refused(words,
+detail)` puts `detail` in `last_error` (`doc/charge.md` Q9, b, Greg,
+25 Nov 2026), built with the charge's port; what a payer is shown
+stays fixed words.
 
 ## Workers
 

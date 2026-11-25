@@ -1328,6 +1328,8 @@ Each entry: what was decided, why, and what would reopen it.
   - Not taken: `Act.Refused(words, detail)`, with the runner storing `detail` in
     `last_error`: it widens `Act` for one caller.
   - No reopen condition was given.
+  - Reopened and settled as b on 25 Nov 2026 (Greg): see "Five faults DEV-1198's trials
+    found, mended (DEV-1225)".
 - **A proof's transaction may also be passed to a proof's constructor, as that proof's
   marked `tx`** (18 Nov 2026, Greg; `doc/charge.md`, Q10; `doc/gates.md`, "A proof's
   transaction is used only before the dot"). It is written in two places: as the receiver
@@ -5068,10 +5070,17 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   person's email and birth date was logged whole at WARN. It holds for every status
   and an `Unreadable` 2xx alike, as a key `bytes`, so one rule is stated and no status
   is looked at. It closes `doc/work.md`'s open question of what of a body is safe to
-  log, and narrows Q9 (18 Nov 2026): a decline's code reaches support by the
-  application's own words from `Refused`'s body, not by the log. Not taken: logging
+  log, and reopens Q9 (18 Nov 2026), settled again as the next entry has it. Not taken: logging
   only the keys the `Service` names, a new thing for an author to write; the length of
   a 3xx's and a 4xx's alone, which keeps a rule by status for no reader.
+- **A decline's code and request id are stored on the charge's row, not logged:
+  `doc/charge.md` Q9 is settled again as b** (Greg, 25 Nov 2026), `Act.Refused(words,
+  detail)`, with the runner storing `detail` in `last_error`. With no body logged, the
+  log was no longer a home for them, and nothing in the operator-money designs or the
+  schema stored one; `doc/work.md` had already said on 18 Nov that a logged body may
+  echo what was sent. It is built with the charge's port, not in DEV-1225, which adds no
+  code to `Act`. Not taken: taking the length-only log back out and keeping Q9's a, the
+  body logged in Go.
 - **`rt.Equal` compares two `ByteArray`s by identity** (spec 3), Kotlin's own answer,
   where it panicked behind a type parameter, in `listOf`'s `contains` and in `setOf`
   (DEV-1198's trial T2, row 56: a caller's data could reach a 500). Identity is the

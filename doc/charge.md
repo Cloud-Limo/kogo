@@ -137,7 +137,7 @@ action fun chargeInvoice(env: Env, key: EffectKey, fields: ChargeFields): Act<Ch
                 is HttpFailure.Unreadable -> Act.Unknown("Stripe charged, and ${failure.why}")
                 is HttpFailure.Refused ->
                     if (failure.status == 409 || stripeError(failure.body) == "idempotency_error") Act.Unknown("Stripe may have charged")
-                    else if (stripeError(failure.body) == "card_error") Act.Refused("Your card was declined")   // the binding logs its status and length (Q9)
+                    else if (stripeError(failure.body) == "card_error") Act.Refused("Your card was declined")   // Stripe's code and request id go in a detail the runner stores in last_error, built with this port (Q9)
                     else Act.NotMade("Stripe did not process it: ${failure.status}")
             }
         },
@@ -418,7 +418,14 @@ code has no log.
 - b. `Act.Refused(words, detail)`, and the runner stores `detail` in
   `last_error`.
 - **Settled: a** (Greg, 18 Nov 2026): `kogo.http` logs every refused send.
-  Narrowed by DEV-1225 (the lead): its status and length, never its body.
+- **Reopened and settled: b** (Greg, 25 Nov 2026). DEV-1225 logs a
+  refused send with its status and the length of its body, never the
+  body, so a decline's code and request id are read on the charge's
+  row: `Act.Refused(words, detail)`, and the runner stores `detail` in
+  `last_error`. Built with the charge's port. Weighed: nothing in the
+  operator-money designs or the schema stored a decline's code, so
+  the log was its only home, and the logged body could echo what was
+  sent. Not taken: keeping a, with the body logged.
 
 **Q10. "Making a thing gives its proof" breaks "used only before the
 dot".** A model function that makes the new row's proof must pass the

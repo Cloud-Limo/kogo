@@ -5214,3 +5214,11 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   `..origin/<branch>` fetched after it would take in the base's commits and leave no
   head to hold `pass <sha>` against. Not taken: fetching after the check ends, which
   waits for the check before the read and so saves nothing.
+
+## emit's tests run in parallel (DEV-1241), 25 Nov 2026
+
+- **`DATABASE_URL` is set once, in emit's `TestMain`**, and `emit()` reads it from
+  there; every program a test builds now has it, where before only one with a sql
+  literal did, and none reads it unless it opens a database. `t.Setenv` panics in a
+  parallel test. Not taken: setting it on the program's `exec.Cmd` in `build()`, which
+  needs the URL worked out there as well as in `emit()`, so a line or two more.

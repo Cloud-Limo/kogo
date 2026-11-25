@@ -59,7 +59,8 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   Staging is stood up once the whole port is done, and staging and
   production get the finished system once, with no JVM beside it.
   The session and config formats are frozen while both serve. Effect
-  queues get a per-queue lock before the first one moves.
+  queues get a per-queue lock before the first one moves (both
+  under Open).
   - *Fallen away*: a list moving in its own release, with nginx's
     route travelling with it and a rollback by deploy (cusoon2 PR
     1646, closed unmerged; DEV-1219 cancelled); a queue moved by a
@@ -69,9 +70,7 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
     the Kotlin first for a change `kogo/run.sh` can see; the recorded
     answers before an area's Kotlin is deleted (DEV-894). With no
     weeks in production beside the JVM, these are the only guard
-    against a wrong Go answer found at launch. Kept too, since the
-    finished system has them: the Go unit, its health probe and Go's
-    `migrate`; and in dev and CI, Vite's second target and `GO_URL`.
+    against a wrong Go answer found at launch.
 - **An area's Kotlin goes once its Go has proven itself** (19 Nov
   2026, a): measured where it can be, but mostly time in use, in dev,
   CI and agent runs, two weeks as a guideline that may be one or
@@ -180,12 +179,12 @@ and admin-only field, the storefront's (DEV-1031, cusoon2 PR 1563)
 and then the ops site's (DEV-1038, 0 / 40).
 
 Beside it, DEV-930's pieces (about 290 / 220 as it sized them): in
-dev and CI, Go started beside the JVM and Vite's second target
-(DEV-1248); for the finished system, the release carrying Go, its
-unit and health probe (DEV-1218), the port key and migrations from
-Go's `migrate`; before the first queue moves, the concurrency test
-and the batch lock (whether the lock is still wanted is under Open).
-nginx's route from the release fell away on 26 Nov 2026.
+dev and CI, Go started beside the JVM, the port key and Vite's
+second target (DEV-1248); for the finished system, the release
+carrying Go, its unit and health probe (DEV-1218) and migrations
+from Go's `migrate`; before the first queue moves, the concurrency
+test and the batch lock (whether the lock is still wanted is under
+Open).
 
 ### 2. The rest of cusoon2
 
@@ -298,8 +297,8 @@ In Kogo, beside it:
 
 No slice puts Go in front of a user or deletes Kotlin, so none waits
 on a research run. There is one switch-over, at launch, when staging
-and then production get the finished system: it does, and names its
-runs when it is next.
+and then production get the finished system; it waits on research
+runs, and names them when it is next.
 
 ### 3. Operator money
 

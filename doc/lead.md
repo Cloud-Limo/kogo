@@ -288,7 +288,9 @@ him, as `doc/clerk.md` says, and you do not wait for it.
   under it, and its unit a `Launched: step-dev-nnn · local · <where>`
   as the session starts, so a `Start:` with nothing under it is not
   running yet; the clerk starts each later step the same way, in that
-  `<where>`. A stack's clone is one issue's from Pickup to merge:
+  `<where>`. A step that lands in both repositories makes a PR in
+  each, both with "Fixes DEV-NNN", so the issue closes at the last
+  merge. A stack's clone is one issue's from Pickup to merge:
   with both held, `lin local` refuses, and the issue waits in Todo.
   For a cusoon2 step whose folder's `AGENTS.md` lacks the `Workflow,
   shared` markers, the phrase goes on with "Read the Workflow in `git

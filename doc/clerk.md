@@ -22,8 +22,8 @@ It says it when an issue's newest event becomes `Handoff:`,
 merge, the issue turning Done or, not Done, the cusoon2 PR of its
 newest `Ready to merge:` merging, it runs After a merge itself, and
 says it only when that tidy does not pass, on `fail:`, `hand on:` or
-an error, or, with no tidy, when the `Checked:` names a Kogo PR
-waiting on the merge. So a PR without "Fixes
+an error, or, with no tidy, when the `Checked:` holds a
+`Waiting on this merge:` line. So a PR without "Fixes
 DEV-NNN" starts no clerk at its merge, and an issue moved to Done by
 hand starts one, which fits no row and is handed on.
 It pulls `~/Dev/kogo` before it starts a clerk, so this file is
@@ -209,8 +209,8 @@ The check takes the PR and the branch from the newest Handoff,
 its first PR; when the Handoff names two, both carrying "Fixes DEV-NNN"
 so the issue closes at the last merge, a line after all the others
 names the other: check that one only from the `Ready to merge:` row,
-with the PR after `DEV-NNN`, as for the Kogo PR a `Checked:` named
-waiting. For a Kogo PR it makes or moves
+with the PR after `DEV-NNN`, as for the Kogo PR of a `Checked:`'s
+`Waiting on this merge:` line. For a Kogo PR it makes or moves
 `~/Dev/kogo-dev-NNN`, merges `main` into a PR that fell behind and
 pushes it (a clean merge of the base changes nothing the Review read, so
 it is yours though you write no code), runs the tests, `leaks` and,
@@ -245,9 +245,10 @@ three:
   outgrown, and, when the Handoff names a Kogo PR too, a line holding
   `Waiting on this merge: <Kogo PR url> at <sha>`: `lin clerk`'s watch
   starts that PR's Merging from those words and from nothing else.
-  When the pin is that PR's head, the check prints the line, as
-  `Cloud-Limo/kogo#N: <title> · Waiting on this merge: <url> at <sha>`:
-  post it as printed; else write it, `<sha>` that PR's head. Then
+  The check prints it, as `Cloud-Limo/kogo#N: <title> · Waiting on
+  this merge: <url> at <sha>`, when the pin is that PR's head, and it
+  is then among those lines: post it as printed; when none holds those
+  words, write it, `<sha>` that PR's head. Then
   exit: it is whole on the issue and takes no label. Do not
   wait for Cloud CI, which runs `mise run check-all` and the tests: `lin
   clerk` watches that sha's run; on green it requests Greg's review on

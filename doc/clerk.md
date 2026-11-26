@@ -18,10 +18,11 @@ Auto mode refuses a merge no person approved unless a rule allows it,
 and this rule allows Kogo's PRs only: a cusoon2 PR stays Greg's.
 
 It says it when an issue's newest event becomes `Handoff:`,
-`Review:`, `Ruling:` or `Fixed:`, from a run or a session alike,
-and when the issue turns Done, which is how it sees a PR merge, or,
-not Done, when the cusoon2 PR of its newest `Ready to merge:` merges,
-as for an issue whose Kogo PR waits on it. So a PR without "Fixes
+`Review:`, `Ruling:` or `Fixed:`, from a run or a session alike; at a
+merge, the issue turning Done or, not Done, the cusoon2 PR of its
+newest `Ready to merge:` merging, it runs After a merge itself, and
+says it only when that tidy answers `fail:` or `hand on:`, or when the
+`Checked:` names a Kogo PR waiting on the merge. So a PR without "Fixes
 DEV-NNN" starts no clerk at its merge, and an issue moved to Done by
 hand starts one, which fits no row and is handed on.
 It pulls `~/Dev/kogo` before it starts a clerk, so this file is

@@ -21,8 +21,9 @@ It says it when an issue's newest event becomes `Handoff:`,
 `Review:`, `Ruling:` or `Fixed:`, from a run or a session alike; at a
 merge, the issue turning Done or, not Done, the cusoon2 PR of its
 newest `Ready to merge:` merging, it runs After a merge itself, and
-says it only when that tidy answers `fail:` or `hand on:`, or when the
-`Checked:` names a Kogo PR waiting on the merge. So a PR without "Fixes
+says it only when that tidy does not pass, on `fail:`, `hand on:` or
+an error, or, with no tidy, when the `Checked:` names a Kogo PR
+waiting on the merge. So a PR without "Fixes
 DEV-NNN" starts no clerk at its merge, and an issue moved to Done by
 hand starts one, which fits no row and is handed on.
 It pulls `~/Dev/kogo` before it starts a clerk, so this file is

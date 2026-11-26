@@ -801,10 +801,9 @@ func TestUniqueRerun(t *testing.T) {
 	ctx := context.Background()
 	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
 	defer drop()
-	// Enough rows that each test reads the key by its index: on one
-	// page Postgres answers 40001, which is rerun already.
-	if _, err := pool.Exec(ctx, `insert into person (id, name, email) select gen_random_uuid(), 'filler', 'filler ' || n from generate_series(1, 20000) n;
-		insert into person (id, name, email) values (gen_random_uuid(), 'renamed', 'old'), (gen_random_uuid(), 'kept', 'kept'); analyze person`); err != nil {
+	// The insert that rename meets reads nothing, so at SERIALIZABLE
+	// Postgres has no read to fail it on and answers 23505, not 40001.
+	if _, err := pool.Exec(ctx, `insert into person (id, name, email) values (gen_random_uuid(), 'renamed', 'old'), (gen_random_uuid(), 'kept', 'kept')`); err != nil {
 		t.Fatal(err)
 	}
 	var log bytes.Buffer

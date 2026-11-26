@@ -1831,9 +1831,9 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   A refusal rolls it back, so a refused request has changed nothing. A
   panic rolls it back (section 8). On a serialization failure or a
   deadlock, which at READ COMMITTED is a deadlock alone, and once on
-  a unique violation at either, the server rolls back and calls the operation again from the start, so it must
-  have no effect outside the transaction, as the block of `db.tx`
-  must not (10.7).
+  a unique violation at either, the server rolls back and calls the
+  operation again from the start, so it must have no effect outside
+  the transaction, as the block of `db.tx` must not (10.7).
 - An operation that takes a `Db` runs in no transaction and opens its
   own with `db.tx` (10.7). Each ends with its block, which answers
   facts and nothing that holds a transaction (15.7). Write one where

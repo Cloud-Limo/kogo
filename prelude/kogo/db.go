@@ -87,11 +87,12 @@ func Db_Tx_Boolean_TxToA[A any](this Db, serializable *bool, block func(Tx) A) A
 // is run again from the start for as long as Postgres ends it with a
 // serialization failure or a deadlock and again, told which, says to
 // go on, and once in one call on a unique violation, which may be a
-// writer that took the key after block tested it; after a random pause, up to 5 ms after the first conflict
-// and 5 ms more after each, to 50, so that the two that conflicted
-// do not meet again in step; db's context ends the pause. Where again
-// says not to, or a second unique violation, Postgres's error is a
-// panic.
+// writer that took the key after block tested it, where again says
+// to go on too; after a random pause, up to 5 ms after the first
+// conflict and 5 ms more after each, to 50, so that the two that
+// conflicted do not meet again in step; db's context ends the pause.
+// Where again says not to, or on a second unique violation,
+// Postgres's error is a panic.
 func InTx[A any](db Db, serializable bool, again func(conflict *pgconn.PgError) bool, block func(Tx) A) A {
 	level := pgx.ReadCommitted
 	if serializable {

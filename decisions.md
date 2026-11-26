@@ -5274,6 +5274,6 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   table of their own, not rows of `TestHandler`, whose counts of
   requests and reruns would all move. In the SERIALIZABLE race the
   insert is a `db.tx(serializable = true)` that the update's first
-  attempt runs between its test and its update, on 20,000 rows, not a
-  second request stepped by channels: the order is then certain. Not
+  attempt runs between its test and its update, not a second request
+  stepped by channels: the order is then certain. Not
   taken: stepping two requests, which needs a hook in each.

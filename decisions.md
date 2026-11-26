@@ -5244,3 +5244,36 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   Open: the frozen formats, the per-queue lock, and what row 20 now
   means. Reopens if users come onto the site before the port is
   complete.
+
+## Rerun once on a unique violation (DEV-1278), 26 Nov 2026
+
+- **Every transaction Kogo opens reruns once on a unique violation
+  (23505), at SERIALIZABLE and at READ COMMITTED; a second in one call
+  is a panic** (Greg, DEV-1276's guide). A write that tested the key
+  can still meet 23505 when the other writer did not read it, as an
+  `insert ... on conflict do nothing` does; on Postgres 18.7 that is
+  23505, not 40001, at both levels. Run again, the test sees the other
+  row and the operation answers in words. Not taken: Postgres's
+  protocol of every writer checking first (a convention, and the
+  writer who skips it is not the one who panics); a lock demanded of
+  every writer (at SERIALIZABLE it adds nothing); accepting the panic;
+  a refused statement as a value outside tests; `merge` or `on
+  conflict do update` (both still give 23505 on a key they do not
+  name); 23P01 (no exclusion constraint yet: add it with the first),
+  23503 (at SERIALIZABLE a foreign-key race is already 40001), check
+  and not null; more than one rerun. A test's transaction still runs
+  once (`RolledBack`). Reopens if a program meets a second 23505 that
+  is a race and not a bug.
+- **The first 23505 goes through the caller's `again`**, so the
+  server counts it among the request's reruns and does not rerun a
+  request whose time has run out; `db.tx` at READ COMMITTED says yes
+  to it beside 40P01. Not taken: the brief's sketch, which reruns it
+  before `again` is asked and so neither counts it nor sees the
+  deadline, which the brief's own bullet asks for.
+- **The tests**: the server's three are `TestUniqueRerun`, with a
+  table of their own, not rows of `TestHandler`, whose counts of
+  requests and reruns would all move. In the SERIALIZABLE race the
+  insert is a `db.tx(serializable = true)` that the update's first
+  attempt runs between its test and its update, on 20,000 rows, not a
+  second request stepped by channels: the order is then certain. Not
+  taken: stepping two requests, which needs a hook in each.

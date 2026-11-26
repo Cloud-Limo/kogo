@@ -805,3 +805,20 @@ func TestRegexEqual(t *testing.T) {
 	List_Contains(ListOf(Regex_String("a+")), Regex_String("a+"))
 	t.Error("== on two Regexes answers")
 }
+
+// db.tx, both forms, reruns once on a unique violation (spec.md 10.7).
+func TestTxRerunsUniqueOnce(t *testing.T) {
+	ctx, pool := testPool(t)
+	for _, serializable := range []*bool{nil, new(true)} {
+		runs := 0
+		got := Db_Tx_Boolean_TxToA(NewDb(ctx, pool), serializable, func(Tx) int {
+			if runs++; runs == 1 {
+				panic(&pgconn.PgError{Code: "23505"})
+			}
+			return runs
+		})
+		if got != 2 {
+			t.Errorf("db.tx(serializable = %v) that met a unique violation once gave %d, want its second run's 2", serializable != nil, got)
+		}
+	}
+}

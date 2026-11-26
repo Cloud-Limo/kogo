@@ -206,10 +206,10 @@ comment what it now holds that the Review did not read: the check's
 merge of the base, or another push.
 
 The check takes the PR and the branch from the newest Handoff,
-its first PR; when the Handoff names two, each carrying "Fixes
-DEV-NNN" so that the issue closes at the last merge, a line after all
-the others names the other: check that one only from the `Ready to
-merge:` row, with the PR after `DEV-NNN`, as for the Kogo PR a `Checked:` named
+its first PR; when the Handoff names two, both carrying "Fixes DEV-NNN"
+so the issue closes at the last merge, a line after all the others
+names the other: check that one only from the `Ready to merge:` row,
+with the PR after `DEV-NNN`, as for the Kogo PR a `Checked:` named
 waiting. For a Kogo PR it makes or moves
 `~/Dev/kogo-dev-NNN`, merges `main` into a PR that fell behind and
 pushes it (a clean merge of the base changes nothing the Review read, so

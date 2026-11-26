@@ -770,6 +770,8 @@ func TestStatements(t *testing.T) {
 		{"fun f(n: Int): Int = ‸when (n) {\n    1 -> 1\n}", "when-needs-else", "a when over a Int that is used as a value needs an else branch"},
 		{"fun f(n: Int): Int = when (n) {\n    ‸\"a\" -> 1\n    else -> 2\n}", "type-mismatch", "this String is never equal to the when's subject, a Int"},
 		{"fun f(n: Int, xs: List<Int>): Int = when (n) {\n    ‸in xs -> 1\n    else -> 2\n}", "range-not-value", "a when's in takes a range: in a..b"},
+		{"fun f(n: Int, xs: List<Int>): Int = when (n) {\n    ‸!in xs -> 1\n    else -> 2\n}", "range-not-value", "a when's in takes a range: in a..b"},
+		{"fun f(s: String): Int = when (s) {\n    ‸!in 1..2 -> 1\n    else -> 2\n}", "type-mismatch", "a range holds Ints or Longs"},
 		{"fun f(c: Boolean): Int = ‸if (c) 1", "if-needs-else", "an if that is used as a value needs an else"},
 		{"fun f(c: Int): Int = if (‸c) 1 else 2", "type-mismatch", "this is a Int where a Boolean is wanted"},
 		{"fun f(n: Int) {\n    val x = 1\n    ‸x = n\n}", "val-assigned", "x is not a local var: declare it with var"},

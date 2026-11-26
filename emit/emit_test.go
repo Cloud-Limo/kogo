@@ -377,6 +377,24 @@ fun units(): String {
 `)
 }
 
+// x !in c is !(x in c), on a Set, a List, a range and a when's branch.
+func TestNotIn(t *testing.T) {
+	t.Parallel()
+	expect(t, [][2]string{
+		{"t.NotIn(3)", "true true true true out"},
+		{"t.NotIn(1)", "false false false false low"},
+	}, `package t
+
+fun notIn(n: Int): String {
+    val w = when (n) {
+        !in 0..2 -> "out"
+        else -> "low"
+    }
+    return "${n !in setOf(1, 2)} ${n !in listOf(1)} ${n !in 0 until 3} ${n.toLong() !in 0L..2L} $w"
+}
+`)
+}
+
 // A function of a kogo. package is imported by name and called as
 // any other (spec.md section 12).
 func TestPreludeImport(t *testing.T) {

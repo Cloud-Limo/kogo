@@ -26,6 +26,7 @@ fun constructs(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, 
     "whenNullable" -> "${nullable(n.takeIf { it % 3 != 0 })} ${nullable(m.takeIf { it > 0 })}"
     "whenDouble" -> "${dbl(d)} ${dbl(-d)} ${dbl(d * 0.0)} ${dblN(d.takeIf { n > 0 })} ${dblN(-d)}"
     "whenOrder" -> "${order(n)} ${order(m)} ${order(n % 5)}"
+    "whenNotIn" -> "${outside(n)} ${outside(m)} ${outside(n % 12)} ${outsideLong(x)} ${outsideLong(y % 12L)}"
     "whenSubject" -> "${subjectOnce(n)} ${subjectOnce(m)}"
     "whenCondOrder" -> "${condOrder(n)} ${condOrder(m)}"
     "hInOrder" -> inOrder(n)
@@ -73,6 +74,18 @@ fun bandLong(n: Long): String = when (n) {
     in 1L..9L -> "some"
     -1L, -2L -> "low"
     else -> "many"
+}
+
+fun outside(n: Int): String = when (n) {
+    !in 0..9 -> "out"
+    in 0 until 5 -> "low"
+    else -> "high"
+}
+
+fun outsideLong(n: Long): String = when (n) {
+    0L, 1L -> "bit"
+    !in -9L..9L -> "far"
+    else -> "near"
 }
 
 fun word(s: String): Int = when (s) { "a" -> 1; "b", "c" -> 2; "" -> 0; else -> -1 }
@@ -143,7 +156,9 @@ fun inOrder(n: Int): String {
     val b = at("y", 1) in at("lo", 0)..at("hi", 2)
     val c = i in listOf(bump())
     val e = i in bump()..bump()
-    return "$a $b $c $e $log"
+    val g = at("z", 1) !in listOf(at("d", 2))
+    val h = at("w", 1) !in at("l", 0) until at("u", 2)
+    return "$a $b $c $e $g $h $log"
 }
 
 fun subjectOnce(n: Int): String {

@@ -950,7 +950,7 @@ func (c *checker) cond(cond *syntax.Cond, st Type, subject *Var, covered map[str
 				holds = facts{subject: n}
 			}
 		}
-	case cond.Op == "in":
+	case cond.Op == "in" || cond.Op == "!in":
 		if r := c.rangeOf(cond.X); r == nil {
 			c.expr(cond.X, nil)
 			c.errorf(cond, "range-not-value", "a when's in takes a range: in a..b")

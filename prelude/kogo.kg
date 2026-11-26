@@ -62,6 +62,8 @@ external fun <T, K, V> List<T>.associate(transform: (T) -> Pair<K, V>): Map<K, V
 
 external fun <T> setOf(vararg elements: T): Set<T>
 external fun <T> Set<T>.contains(element: T): Boolean
+external fun <T> Set<T>.none(predicate: (T) -> Boolean): Boolean
+external fun <T> Set<T>.all(predicate: (T) -> Boolean): Boolean
 external fun <T, R> Set<T>.mapNotNull(transform: (T) -> R?): List<R>
 external fun <T> Set<T>.plus(element: T): Set<T>
 external fun <T> Set<T>.plus(elements: List<T>): Set<T>

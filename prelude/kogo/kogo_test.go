@@ -197,6 +197,24 @@ func TestSets(t *testing.T) {
 	}
 }
 
+// A set's none and all ask the predicate of each key, as a list's do.
+func TestSetNoneAll(t *testing.T) {
+	big := func(x int32) bool { return x > 2 }
+	for _, c := range []struct {
+		s         Set[int32]
+		none, all bool
+	}{
+		{SetOf[int32](), true, true},
+		{SetOf[int32](1, 2), true, false},
+		{SetOf[int32](1, 3), false, false},
+		{SetOf[int32](3, 4), false, true},
+	} {
+		if Set_None(c.s, big) != c.none || Set_All(c.s, big) != c.all {
+			t.Errorf("%s.none and .all of > 2 are %v and %v", rt.ToString(c.s), Set_None(c.s, big), Set_All(c.s, big))
+		}
+	}
+}
+
 type shade string
 
 type point struct{ X, Y int32 }

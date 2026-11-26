@@ -5277,3 +5277,26 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   attempt runs between its test and its update, not a second request
   stepped by channels: the order is then certain. Not
   taken: stepping two requests, which needs a hook in each.
+
+## A Set's `none` and the operator `!in` (DEV-1283), 26 Nov 2026
+
+- **`!in` is Kotlin's form, `a !in c` meaning `!(a in c)`**: approved
+  on DEV-1146 (the lead's call 3, 24 Nov 2026) and built on Greg's word
+  of 27 Nov 2026, for the booker's write check (`state !in states`).
+  `!is` stays refused. Reopens if `!is` is wanted too.
+- **The parser makes `a !in c` the tree `!(a in c)` gives**, a `Unary`
+  `!` over the `Binary` `in`, so the checker and the emitter learn
+  nothing for it. A `when` branch `!in a..b` is a `Cond` with `Op`
+  `"!in"`, and the checker and the emitter treat it as `in` negated:
+  the subject is read once, so it cannot be rewritten into an
+  expression that names it. Not taken: a `Binary` `"!in"` (every pass
+  that knows `in` would learn it), or a `Not` flag on `Cond` (a field
+  for one case).
+- **`!in` is one token only with nothing between `!` and `in`**, as
+  Kotlin's lexer has it; `a ! in c` is refused with "write !in, with
+  no space", and `kotlin/refused/not-in-space.kg` checks that kotlinc
+  refuses it on the same line. `!inside` stays `!` before a name.
+- **A `Set` gains `all` beside `none`**: a `List` had both and a `Set`
+  neither, and the issue asks for `all` where a `Set` lacks one a
+  `List` has. A `List` has no `any`, so neither gets one. Not taken:
+  `none` alone.

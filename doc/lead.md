@@ -285,8 +285,10 @@ him, as `doc/clerk.md` says, and you do not wait for it.
   project, Kogo for Kogo and cusoon2 for any other. Words after the
   phrase change the model, effort or cap, as `fable high` for a heavy
   design. `lin local` posts a `Start:` on the issue with the phrase
-  under it, and the clerk starts each later step the same way, in
-  that `<where>`. A stack's clone is one issue's from Pickup to merge:
+  under it, and its unit a `Launched: step-dev-nnn · local · <where>`
+  as the session starts, so a `Start:` with nothing under it is not
+  running yet; the clerk starts each later step the same way, in that
+  `<where>`. A stack's clone is one issue's from Pickup to merge:
   with both held, `lin local` refuses, and the issue waits in Todo.
   For a cusoon2 step whose folder's `AGENTS.md` lacks the `Workflow,
   shared` markers, the phrase goes on with "Read the Workflow in `git

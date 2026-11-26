@@ -206,7 +206,10 @@ go into `main`; cusoon2's are in Cloud Limo Relaunch and go into
   starts it with `lin local DEV-NNN <where> "<phrase>"`, which returns
   at once, once it has posted `Start: <step> · local · <where> ·
   <model> <effort> $<cap>` on the issue with the phrase under it: the
-  clerk starts each later step the way the newest `Start:` ran. It
+  clerk starts each later step the way the newest `Start:` ran. Its
+  unit posts `Launched: step-dev-nnn · local · <where>` as the session
+  starts, as the launcher does for an async run, so a `Start:` with
+  nothing under it is a step not yet running. It
   works in `~/Dev/<where>`, made first when that is a missing issue
   worktree, with an async run's model and effort, a $25 cap and no
   time limit, and ends with its step's comment as any

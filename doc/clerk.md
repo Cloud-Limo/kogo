@@ -84,7 +84,7 @@ Take the first row that fits:
 | Todo | async `Start:`, no label | a research run, Greg's to start, the lead labelling on his word: exit |
 | In Progress | `Taken` | the session's: exit |
 | Backlog | `Parked:`, or an older `Lead:` line of what brings it back | After a merge moves it, when that is a merge; else the lead's |
-| any | `Start:` | the step's, running: exit |
+| any | `Start:`, or a local run's `Launched:` | the step's, running: exit |
 | any | `Held:`, `Released:` or `Walkthrough:` | Greg's walkthrough, the lead's: exit |
 | In Review | `Checked:` | `lin clerk` watches its Cloud CI: exit |
 | any | `Ready to merge:` | Greg's merge: exit |

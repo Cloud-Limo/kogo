@@ -1,6 +1,9 @@
 package emit
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // What the driver of a program that takes a Db declares: db, over a
 // schema of its own in the test database (internal/testdb).
@@ -431,4 +434,33 @@ fun joined(db: Db): List<Maybe> = db.tx { tx ->
     tx.query<Maybe>(sql"""select n as "n!", a as account from generate_series(1, 2) n left join account a on a.id = n order by n""")
 }
 `)
+}
+
+// A statement is written as a Go raw string, which holds it as it is,
+// backslashes and newlines in its literals included, unless it holds
+// what a raw string cannot, such as a backtick, when it is quoted.
+// Either way Postgres gets the statement as written.
+func TestStatementText(t *testing.T) {
+	t.Parallel()
+	src := `package t
+
+fun escapes(db: Db): String = db.tx { tx -> tx.querySingle<String>(sql"""select 'a\nb
+c' || E'\\' as "s!" """) }
+
+fun tick(db: Db): String = db.tx { tx -> tx.querySingle<String>(sql"""select 'a` + "`" + `b' as "s!" """) }
+`
+	_, files, errs := emit(t, "x", src)
+	if errs != nil {
+		t.Fatalf("%v", errs)
+	}
+	text := string(files["t/kogo.go"])
+	for _, want := range []string{"Tx_QuerySingle(tx_, `select \"s!\" from (select 'a\\nb\nc' || E'\\\\'", `Tx_QuerySingle(tx_, "select \"s!\" from (select 'a` + "`" + `b'`} {
+		if !strings.Contains(text, want) {
+			t.Errorf("no %s in:\n%s", want, text)
+		}
+	}
+	expectWith(t, withDB, "defer drop()\n", [][2]string{
+		{`fmt.Sprintf("%q", t.Escapes(db))`, `"a\\nb\nc\\"`},
+		{`t.Tick(db)`, "a`b"},
+	}, src)
 }

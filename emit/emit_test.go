@@ -767,12 +767,15 @@ fun plain(): Boolean = eq(listOf("a"), listOf("a"))
 }
 
 // A panic's trace names the Kogo file and line (principle 5): the
-// line of a statement, and the line of a call that is further down
-// than the statement begins.
+// line of a statement, the line of a call that is further down than
+// the statement begins, and that of a parameter of SQL that runs on
+// to further lines, whose Go comes after the newlines of the
+// statement's raw string.
 func TestLine(t *testing.T) {
 	t.Parallel()
 	out := build(t, func(root string) map[string][]byte {
-		_, files, errs := emit(t, root, "package t\n\nfun explode(p: String?): String =\n    \"x\" +\n        requireNotNull(p) { \"no p\" }\n\nfun divide(a: Int, b: Int): Int {\n    val q = a / b\n    return q\n}\n")
+		_, files, errs := emit(t, root, "package t\n\nfun explode(p: String?): String =\n    \"x\" +\n        requireNotNull(p) { \"no p\" }\n\nfun divide(a: Int, b: Int): Int {\n    val q = a / b\n    return q\n}\n"+
+			"\nfun remove(tx: Tx, a: Int, b: Int): Int =\n    tx.execute(sql\"\"\"delete from person where ${a / b} > 0\n        and false\"\"\")\n")
 		if errs != nil {
 			t.Fatalf("%v", errs)
 		}
@@ -780,6 +783,7 @@ func TestLine(t *testing.T) {
 import (
 "os"
 "runtime/debug"
+"github.com/Cloud-Limo/kogo/prelude/kogo"
 "ROOT/t"
 )
 func trace(f func()) {
@@ -789,6 +793,7 @@ f()
 func main() {
 trace(func() { t.Explode(nil) })
 trace(func() { t.Divide(1, 0) })
+trace(func() { t.Remove(kogo.Tx{}, 1, 0) })
 }
 `)
 		return files
@@ -796,7 +801,7 @@ trace(func() { t.Divide(1, 0) })
 	// The Go is in <out>/t/, two directories below t1.kg, which it
 	// names by a relative path that Go resolves from there.
 	src := regexp.QuoteMeta(must(filepath.Abs("t1.kg")))
-	for _, line := range []string{"5", "8"} {
+	for _, line := range []string{"5", "8", "13"} {
 		if !regexp.MustCompile(src + `:` + line + `\D`).MatchString(out) {
 			t.Errorf("no trace names t1.kg:%s:\n%s", line, out)
 		}

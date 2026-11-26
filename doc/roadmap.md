@@ -8,8 +8,8 @@ test lines, from counting the Kotlin a piece replaces or from the
 designs' own guesses; nothing was built to measure it. The ops
 site's table marks each piece built, with its PR, or not; Linear holds
 the state of what is not. This file holds the order and the reasons,
-and is rewritten when either moves. Last rewritten 24 Nov 2026
-(DEV-1215), with section 2's order as Greg agreed it that day.
+and is rewritten when either moves. Last rewritten 26 Nov 2026
+(DEV-1271), with row 20 built as Greg ruled that day.
 
 ## The goal
 
@@ -163,7 +163,7 @@ issue where there is one.
 | 13l | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13l's: ~1,600 / 850) | cusoon2 PR 1597, 1600, 1603, 1604, 1605, 1608 |
 | 18 | cusoon2 | Kotlin first: ten keys move into `settings`; `deployment.goPort` | ~60 / 50 | cusoon2 PR 1609 |
 | 19 | cusoon2 | The ops site's Go `main` | 150 / 80 | cusoon2 PR 1611 |
-| 20 | cusoon2 | Serve the ops site from Go; what that now means is under Open | | no |
+| 20 | cusoon2 | The ops site on Go in dev, the browser tests and CI | | cusoon2 PR 1649, 1658; the Lima stacks' origin and `GO_URL` a chore with no PR (DEV-1257) |
 
 Row 20's earlier waits are over: the second stress of the Go `main`
 (DEV-1139), the trial of generated worlds (DEV-1162), and the invite's
@@ -172,7 +172,9 @@ compares its `outbound_message` rows like any other. So are its later
 ones, by 26 Nov 2026: DEV-1055's lines in the Go unit (DEV-1218,
 cusoon2 PR 1638), the mends DEV-1208, DEV-1211 and DEV-1225, and the
 lead's reading of the entries DEV-1198 marked wrong value or outage.
-Its route on a box (DEV-1219) went with the ruling of that day.
+Its route on a box (DEV-1219) went with the ruling of that day, and
+Greg answered that the row is now the ops site on Go in dev and CI
+("yes", 26 Nov 2026): it is built.
 
 Beside 13b to 13l, as tests in the Kotlin: the probes of each second id
 and admin-only field, the storefront's (DEV-1031, cusoon2 PR 1563)
@@ -180,11 +182,11 @@ and then the ops site's (DEV-1038, 0 / 40).
 
 Beside it, DEV-930's pieces (about 290 / 220 as it sized them): in
 dev and CI, Go started beside the JVM, the port key and Vite's
-second target (DEV-1248); for the finished system, the release
-carrying Go, its unit and health probe (DEV-1218) and migrations
-from Go's `migrate`; before the first queue moves, the concurrency
-test and the batch lock (whether the lock is still wanted is under
-Open).
+second target, built with row 20; for the finished system, Go's unit
+and health probe, built (DEV-1218), and the release carrying Go and
+migrations from Go's `migrate`, left; before the first queue moves,
+the concurrency test and the batch lock (whether the lock is still
+wanted is under Open).
 
 ### 2. The rest of cusoon2
 
@@ -325,6 +327,3 @@ longest lead time and can go out early.
   - Whether the per-queue lock is still wanted (30 / 40): DEV-930's
     reason was dev stacks on mixed branches and a JVM left running by
     hand, since the two-line commit kept prod right.
-  - Whether row 20 is now "the ops site on Go in dev and CI", done
-    with DEV-1248: DEV-930 sized it as dev and e2e routing (10 / 0),
-    CI (30 / 0) and dev stacks and agent runs (15 / 0).

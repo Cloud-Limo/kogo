@@ -49,7 +49,9 @@ PRs.
 `lin X` below is short for `mise -C ~/Dev/cusoon2-tasks run linear-X`,
 a cusoon2 checkout kept on `renew` for these tasks alone: other
 sessions switch branches in `~/Dev/cusoon2`, and the tasks go missing
-with them. `$LINEAR_API_KEY` is already in the shell.
+with them. Since DEV-1261's switch on 26 Nov 2026 `lin` posts as the
+Linear app "Cloud Limo VM", from `~/.config/linear_vm_app`, and Greg's
+personal key is to be revoked.
 
 <!-- Workflow, shared: begin -->
 Linear holds the state of every piece of work and GitHub holds its

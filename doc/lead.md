@@ -161,8 +161,10 @@ against the code before passing it on.
 - A move of Greg's (a Zed step, a walkthrough) goes in You can do
   now. A cusoon2 PR ready to merge does not, unless he asks for it:
   once Cloud CI passes on the sha of the clerk's `Checked:`, `lin
-  clerk` tells him in his Linear inbox with `Ready to merge:`, with
-  any order the line gave, so the merge is his from there. When CI
+  clerk`'s watch requests his review on the PR, which reaches his
+  Linear inbox, and posts `Ready to merge:` on the issue as the
+  record, with any order the line gave, so the merge is his from
+  there. When CI
   fails, its `Failed: <PR> at <sha> · Cloud CI ...` puts `lead` on:
   tell Greg the cause, as for a step that failed.
 - Then take the label off, `lin label DEV-NNN lead --remove`, once

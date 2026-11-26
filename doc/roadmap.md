@@ -8,8 +8,9 @@ test lines, from counting the Kotlin a piece replaces or from the
 designs' own guesses; nothing was built to measure it. The ops
 site's table marks each piece built, with its PR, or not; Linear holds
 the state of what is not. This file holds the order and the reasons,
-and is rewritten when either moves. Last rewritten 24 Nov 2026
-(DEV-1215), with section 2's order as Greg agreed it that day.
+and is rewritten when either moves. Last rewritten 26 Nov 2026
+(DEV-1271), with row 20 built and the ruling's questions answered
+as Greg ruled that day.
 
 ## The goal
 
@@ -56,11 +57,18 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   Greg, 26 Nov 2026): Go serves each ported list beside the JVM, on
   one database, one session table and one config file, in dev, CI and
   agent runs only; Vite sends a moved list to `GO_URL` (DEV-1248).
-  Staging is stood up once the whole port is done, and staging and
-  production get the finished system once, with no JVM beside it.
-  The session and config formats are frozen while both serve. Effect
-  queues get a per-queue lock before the first one moves (both
-  under Open).
+  `renew` serves nobody until the whole port is done, staging is not
+  stood up before then, and the Kotlin changes only as the port needs
+  (Greg, 26 Nov 2026: "take the path of least resistance" on what
+  guards both serving); then staging and production get the finished
+  system once, with no JVM beside it. The session row, cookies and
+  config file stay alike by what is there, with no freeze ("this
+  looks fine", Greg): `kogo/pins` with `kogo/drift.sh` in CI refuses
+  a Kotlin change the port has not followed, `kogo/run.sh` compares
+  each cookie's fields and session row, and CI's browser job starts
+  both servers on one config file. No per-queue lock is built: it
+  needs a JVM daemon and a Go runner on one queue, which nothing
+  outside a dev stack on mixed branches gives before launch.
   - *Fallen away*: a list moving in its own release, with nginx's
     route travelling with it and a rollback by deploy (cusoon2 PR
     1646, closed unmerged; DEV-1219 cancelled); a queue moved by a
@@ -163,7 +171,7 @@ issue where there is one.
 | 13l | cusoon2 | The six job operations: `driverOperators`, `operatorJobs`, `driverJob`, `updateJob` with `settle`, `jobOffer`, `giveJob` | (13a's and 13l's: ~1,600 / 850) | cusoon2 PR 1597, 1600, 1603, 1604, 1605, 1608 |
 | 18 | cusoon2 | Kotlin first: ten keys move into `settings`; `deployment.goPort` | ~60 / 50 | cusoon2 PR 1609 |
 | 19 | cusoon2 | The ops site's Go `main` | 150 / 80 | cusoon2 PR 1611 |
-| 20 | cusoon2 | Serve the ops site from Go; what that now means is under Open | | no |
+| 20 | cusoon2 | The ops site on Go in dev, the browser tests and CI | | cusoon2 PR 1649, 1658; the Lima stacks' origin and `GO_URL`, a chore with no PR (DEV-1257) |
 
 Row 20's earlier waits are over: the second stress of the Go `main`
 (DEV-1139), the trial of generated worlds (DEV-1162), and the invite's
@@ -172,19 +180,20 @@ compares its `outbound_message` rows like any other. So are its later
 ones, by 26 Nov 2026: DEV-1055's lines in the Go unit (DEV-1218,
 cusoon2 PR 1638), the mends DEV-1208, DEV-1211 and DEV-1225, and the
 lead's reading of the entries DEV-1198 marked wrong value or outage.
-Its route on a box (DEV-1219) went with the ruling of that day.
+Its route on a box (DEV-1219) went with the ruling of that day, and
+Greg answered that the row is now the ops site on Go in dev and CI
+("yes", 26 Nov 2026): it is built.
 
 Beside 13b to 13l, as tests in the Kotlin: the probes of each second id
 and admin-only field, the storefront's (DEV-1031, cusoon2 PR 1563)
 and then the ops site's (DEV-1038, 0 / 40).
 
 Beside it, DEV-930's pieces (about 290 / 220 as it sized them): in
-dev and CI, Go started beside the JVM, the port key and Vite's
-second target (DEV-1248); for the finished system, the release
-carrying Go, its unit and health probe (DEV-1218) and migrations
-from Go's `migrate`; before the first queue moves, the concurrency
-test and the batch lock (whether the lock is still wanted is under
-Open).
+dev and CI, Go started beside the JVM and Vite's second target,
+built with row 20, and the port key, with row 18; for the finished
+system, the release carrying Go (DEV-1217, cusoon2 PR 1636), its
+unit, health probe and migrations from Go's `migrate` (DEV-1218),
+built; before the first queue moves, the concurrency test.
 
 ### 2. The rest of cusoon2
 
@@ -317,14 +326,3 @@ longest lead time and can go out early.
   Settled on 23 Nov 2026 ("A worker keeps the loop over tenants").
 - The login design's details, in a sitting with Greg before Stripe's
   client and slices 15 to 17.
-- Left open by the ruling of 26 Nov 2026 (DEV-1252), for Greg, each
-  with DEV-930's cost:
-  - Whether the session, cookie and config formats stay frozen while
-    dev and CI serve both: each change lands in both in one commit,
-    and one `run.sh` case compares `Set-Cookie` (0 / 20).
-  - Whether the per-queue lock is still wanted (30 / 40): DEV-930's
-    reason was dev stacks on mixed branches and a JVM left running by
-    hand, since the two-line commit kept prod right.
-  - Whether row 20 is now "the ops site on Go in dev and CI", done
-    with DEV-1248: DEV-930 sized it as dev and e2e routing (10 / 0),
-    CI (30 / 0) and dev stacks and agent runs (15 / 0).

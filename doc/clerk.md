@@ -244,8 +244,9 @@ three:
   outgrown, and the Kogo PR with its head sha when one waits on this
   merge, and exit: it is whole on the issue and takes no label. Do not
   wait for Cloud CI, which runs `mise run check-all` and the tests: `lin
-  clerk` watches that sha's run, tells Greg in his inbox on green, and
-  posts a `Failed:` with `lead` on red.
+  clerk` watches that sha's run; on green it requests Greg's review on
+  the PR, which reaches his Linear inbox, and posts `Ready to merge:`
+  on the issue as the record; on red, a `Failed:` with `lead`.
 - `fix: <why>`. The base moved and the command could not merge it (a
   conflict, or a port's cusoon2 PR), or a port's cusoon2 PR left its
   line of `kogo/pins` behind (`fix: kogo/pins`). Merge nothing and post

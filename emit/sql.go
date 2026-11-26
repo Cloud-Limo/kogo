@@ -60,12 +60,14 @@ func (e *emitter) sql(x *syntax.Call) string {
 // backtick, no \r, which Go drops from one, nor anything else Go
 // refuses in its source, such as a byte order mark. Else it is quoted.
 // After a raw string that runs over several lines, a directive puts
-// the rest of the call back on line, the call's.
+// what follows back on the call's line: in a write, the rest of the
+// call; in a read, the start of the reader, whose lines carry their
+// own directives.
 func (e *emitter) statement(sql string, line int) string {
 	if !strconv.CanBackquote(strings.ReplaceAll(sql, "\n", "")) {
 		return strconv.Quote(sql)
 	}
-	if !strings.Contains(sql, "\n") || e.line == 0 {
+	if !strings.Contains(sql, "\n") {
 		return "`" + sql + "`"
 	}
 	return fmt.Sprintf("`%s`/*line %s:%d*/", sql, e.path, line)

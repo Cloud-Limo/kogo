@@ -448,6 +448,8 @@ fun escapes(db: Db): String = db.tx { tx -> tx.querySingle<String>(sql"""select 
 c' || E'\\' as "s!" """) }
 
 fun tick(db: Db): String = db.tx { tx -> tx.querySingle<String>(sql"""select 'a` + "`" + `b' as "s!" """) }
+
+fun bom(db: Db): String = db.tx { tx -> tx.querySingle<String>(sql"""select 'a` + "\ufeff" + `b' as "s!" """) }
 `
 	_, files, errs := emit(t, "x", src)
 	if errs != nil {

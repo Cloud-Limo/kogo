@@ -5320,7 +5320,9 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   issue's own example quoted. Go counts the newlines inside a raw
   string, so without the directive the parameters after it, and the
   call's close, would be traced to a later line (`TestLine` checks
-  one). The lines after the first start at column 0, with no
+  one). That holds for a write; in a read the reader comes between
+  the directive and the call's close, and its lines carry their own
+  directives. The lines after the first start at column 0, with no
   directive, which no position needs: they are inside the string.
   gofmt parses the result and leaves the string as it is. Not taken:
   quoting multi-line statements, which keeps every read escaped; a

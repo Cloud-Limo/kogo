@@ -237,7 +237,10 @@ three:
   and Done says the same on the issue. When the merge is refused because
   the head moved, hand on. For a cusoon2 PR, which is Greg's to merge,
   that line is `Checked: <PR url> at <sha>`: post it with `lin step
-  DEV-NNN < checked.md`, the sizes under it when the Budget was
+  DEV-NNN < checked.md`, under it the lines the check prints after it,
+  up to any line naming the Handoff's other PR (for a PR that moves
+  `kogo/go/go.mod`'s pin, the move and each Kogo PR it brings, as
+  `Cloud-Limo/kogo#N: <title>`), the sizes when the Budget was
   outgrown, and the Kogo PR with its head sha when one waits on this
   merge, and exit: it is whole on the issue and takes no label. Do not
   wait for Cloud CI, which runs `mise run check-all` and the tests: `lin

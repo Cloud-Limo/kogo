@@ -978,8 +978,8 @@ func (p *parser) binary(min int) Expr {
 			continue
 		}
 		if op == "!in" { // !(a in c), the tree that form gives
-			in := p.want("in")
-			x = &Unary{t.pos, "!", &Binary{in, "in", x, p.binary(level + 1)}}
+			p.want("in")
+			x = &Unary{t.pos, "!", &Binary{t.pos, "in", x, p.binary(level + 1)}}
 			continue
 		}
 		x = &Binary{t.pos, t.text, x, p.binary(level + 1)}

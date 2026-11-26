@@ -985,7 +985,9 @@ of the base type is.
   `insert ... on conflict do nothing returning *` under `queryOne`
   gives `null` when a unique constraint stood in the way, and where
   there are two, one `tx.exists` says which. An `update` has no
-  `on conflict`: test with `tx.exists` first.
+  `on conflict`: test each key with `tx.exists` first, then write
+  plainly. A writer that takes the key between the test and the write
+  is met by the rerun (10.7).
 
 ### 10.7 Transactions
 
@@ -1005,10 +1007,15 @@ fun checkout(db: Db, cart: Cart): Either<OrderError, Order> =
   that `E`, and `db.tx` then gives an `Either<E, A>` of the block's value
   `A`, wherever it is written; elsewhere it gives the block's value. It
   commits when the block finishes, and rolls back on a failure or a
-  panic. It reruns the block from the start on a deadlock, as a
-  server's `Tx` (15.3) is, and on nothing else.
+  panic. It reruns the block from the start on a deadlock and, once,
+  on a unique violation, as a server's `Tx` (15.3) is, and on nothing
+  else.
 - `db.tx(serializable = true) { ... }` runs at SERIALIZABLE and reruns the
-  block from the start on a serialization failure or deadlock.
+  block from the start on a serialization failure or deadlock, and
+  once on a unique violation.
+- A unique violation may be a writer that took the key after the
+  block tested it, which the second run's test sees. A second one, in
+  the run after the first, is a bug and a panic (section 8).
 - A rerun comes after a short random pause, and either form may rerun,
   so the block must have no effect outside the transaction
   (`action-in-tx`, section 7).
@@ -1823,10 +1830,10 @@ fun signOut(tx: Tx, env: SessionEnv, request: Request, input: Unit): Either<Stri
   transaction, which the server opens as above. An answer commits it.
   A refusal rolls it back, so a refused request has changed nothing. A
   panic rolls it back (section 8). On a serialization failure or a
-  deadlock, which at READ COMMITTED is a deadlock alone, the server
-  rolls back and calls the operation again from the start, so it must
-  have no effect outside the transaction, as the block of `db.tx`
-  must not (10.7).
+  deadlock, which at READ COMMITTED is a deadlock alone, and once on
+  a unique violation at either, the server rolls back and calls the
+  operation again from the start, so it must have no effect outside
+  the transaction, as the block of `db.tx` must not (10.7).
 - An operation that takes a `Db` runs in no transaction and opens its
   own with `db.tx` (10.7). Each ends with its block, which answers
   facts and nothing that holds a transaction (15.7). Write one where

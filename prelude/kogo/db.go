@@ -73,12 +73,12 @@ func must[T any](v T, err error) T {
 // Db_Tx_Boolean_TxToA is db.tx { } where the enclosing fun returns no
 // Either: it commits when block returns and rolls back when block
 // panics, with a failure of a raise scope around it or with a bug.
-// It is at READ COMMITTED, and rerun on a deadlock alone, as the
-// server's Tx is; db.tx(serializable = true) is at SERIALIZABLE, and
-// rerun on each conflict.
+// It is at READ COMMITTED, and rerun on a deadlock, and once on a
+// unique violation, as the server's Tx is; db.tx(serializable = true)
+// is at SERIALIZABLE, and rerun on each conflict.
 func Db_Tx_Boolean_TxToA[A any](this Db, serializable *bool, block func(Tx) A) A {
 	s := serializable != nil && *serializable
-	return InTx(this, s, func(c *pgconn.PgError) bool { return s || c.Code == "40P01" }, block)
+	return InTx(this, s, func(c *pgconn.PgError) bool { return s || c.Code == "40P01" || c.Code == "23505" }, block)
 }
 
 // InTx is db.tx { }, for the server too, which limits its reruns: at
@@ -86,23 +86,29 @@ func Db_Tx_Boolean_TxToA[A any](this Db, serializable *bool, block func(Tx) A) A
 // where not, as stated and not left to the database's default. block
 // is run again from the start for as long as Postgres ends it with a
 // serialization failure or a deadlock and again, told which, says to
-// go on, after a random pause, up to 5 ms after the first conflict
-// and 5 ms more after each, to 50, so that the two that conflicted
-// do not meet again in step; db's context ends the pause. Where again
-// says not to, Postgres's error is a panic.
+// go on, and once in one call on a unique violation, which may be a
+// writer that took the key after block tested it, where again says
+// to go on too; after a random pause, up to 5 ms after the first
+// conflict and 5 ms more after each, to 50, so that the two that
+// conflicted do not meet again in step; db's context ends the pause.
+// Where again says not to, or on a second unique violation,
+// Postgres's error is a panic.
 func InTx[A any](db Db, serializable bool, again func(conflict *pgconn.PgError) bool, block func(Tx) A) A {
 	level := pgx.ReadCommitted
 	if serializable {
 		level = pgx.Serializable
 	}
+	clashed := false
 	for n := 1; ; n++ {
 		a, conflict := attempt(db, pgx.TxOptions{IsoLevel: level}, block)
 		if conflict == nil {
 			return a
 		}
-		if !again(conflict) {
+		unique := conflict.Code == "23505"
+		if unique && clashed || !again(conflict) {
 			panic(conflict)
 		}
+		clashed = clashed || unique
 		pause := time.NewTimer(rand.N(time.Duration(min(n, 10)) * 5 * time.Millisecond))
 		select {
 		case <-pause.C:
@@ -135,7 +141,7 @@ func attempt[A any](db Db, opts pgx.TxOptions, block func(Tx) A) (a A, conflict 
 		p := recover()
 		tx.Rollback(db.ctx)
 		if err, ok := p.(error); !ok || !errors.As(err, &conflict) ||
-			conflict.Code != "40001" && conflict.Code != "40P01" {
+			conflict.Code != "40001" && conflict.Code != "40P01" && conflict.Code != "23505" {
 			panic(p)
 		}
 	}()

@@ -749,3 +749,100 @@ func TestPool(t *testing.T) {
 	}()
 	NewHandler(table, pool, env{}, slog.New(slog.DiscardHandler))
 }
+
+// labels is the env of the unique-key operations: a person's email is
+// the label. between runs once, in rename's first attempt, after its
+// test and before its update.
+type labels struct {
+	ready    *sync.WaitGroup
+	attempts *atomic.Int32
+	between  func()
+}
+
+// take tests a label and inserts it, its first two attempts each
+// waiting until both have tested, as race does.
+func take(tx kogo.Tx, e labels, _ Request, p Person) kogo.Either[string, string] {
+	if kogo.Tx_Exists(tx, "select 1 from person where email = $1", p.Name) {
+		return kogo.Either_Left[string]{Value: "taken"}
+	}
+	if e.attempts.Add(1) <= 2 {
+		e.ready.Done()
+		e.ready.Wait()
+	}
+	kogo.Tx_Execute(tx, "insert into person (id, name, email) values ($1, 'take', $2)", kogo.NewId(), p.Name)
+	return kogo.Either_Right[string]{Value: "took"}
+}
+
+// rename tests a label and then gives it to the person named "renamed".
+func rename(tx kogo.Tx, e labels, _ Request, p Person) kogo.Either[string, string] {
+	if kogo.Tx_Exists(tx, "select 1 from person where email = $1", p.Name) {
+		return kogo.Either_Left[string]{Value: "taken"}
+	}
+	if e.attempts.Add(1) == 1 {
+		e.between()
+	}
+	kogo.Tx_Execute(tx, "update person set email = $1 where name = 'renamed'", p.Name)
+	return kogo.Either_Right[string]{Value: "renamed"}
+}
+
+// clash inserts a label that is always there.
+func clash(tx kogo.Tx, e labels, _ Request, _ rt.Unit) kogo.Either[string, string] {
+	e.attempts.Add(1)
+	kogo.Tx_Execute(tx, "insert into person (id, name, email) values ($1, 'clash', 'kept')", kogo.NewId())
+	return kogo.Either_Right[string]{Value: "clashed"}
+}
+
+// A unique violation reruns the operation once (spec.md 15.3): a
+// writer that took the key after the test is seen by the second run's
+// test, at READ COMMITTED and at SERIALIZABLE, and a second one is a
+// bug.
+func TestUniqueRerun(t *testing.T) {
+	t.Setenv("DATABASE_URL", cmp.Or(os.Getenv("KOGO_TEST_DATABASE_URL"), "postgres://kogo:kogo@127.0.0.1/kogo_test"))
+	ctx := context.Background()
+	pool, drop := testdb.Open(ctx, "../../../testdata/schema.sql")
+	defer drop()
+	// The insert that rename meets reads nothing, so at SERIALIZABLE
+	// Postgres has no read to fail it on and answers 23505, not 40001.
+	if _, err := pool.Exec(ctx, `insert into person (id, name, email) values (gen_random_uuid(), 'renamed', 'old'), (gen_random_uuid(), 'kept', 'kept')`); err != nil {
+		t.Fatal(err)
+	}
+	var log bytes.Buffer
+	e := labels{&sync.WaitGroup{}, &atomic.Int32{}, func() {
+		kogo.Db_Tx_Boolean_TxToA(kogo.NewDb(ctx, pool), new(true), func(tx kogo.Tx) int32 {
+			return kogo.Tx_Execute(tx, "insert into person (id, name, email) values ($1, 'inserted', 'sought') on conflict do nothing", kogo.NewId())
+		})
+	}}
+	h := NewHandler(Table[labels]{Check: func(kogo.Tx, labels, Request) kogo.Either[string, rt.Unit] { return kogo.Either_Right[rt.Unit]{} }, Operations: []Operation[labels]{Tx("take", false, take), Tx("rename", true, rename), Tx("clash", true, clash)}},
+		pool, e, slog.New(slog.NewJSONHandler(&log, nil)))
+	post := func(name, body string) string {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("POST", "/"+name, strings.NewReader(body)))
+		return fmt.Sprint(w.Code, " ", w.Body.String())
+	}
+	e.ready.Add(2)
+	var wg sync.WaitGroup
+	answers := make([]string, 2)
+	for i := range answers {
+		wg.Go(func() { answers[i] = post("take", `{"name":"race"}`) })
+	}
+	wg.Wait()
+	reruns := 0.0
+	for _, l := range strings.Split(strings.TrimSpace(log.String()), "\n") {
+		var m map[string]any
+		json.Unmarshal([]byte(l), &m)
+		n, _ := m["reruns"].(float64)
+		reruns += n
+	}
+	if got := strings.Join(answers, " | "); !strings.Contains(got, `200 {"type":"ok","value":"took"}`) ||
+		!strings.Contains(got, `200 {"type":"refused","message":"taken"}`) || reruns != 1 {
+		t.Errorf("two takes of one label at READ COMMITTED answer %s, with %v reruns", got, reruns)
+	}
+	e.attempts.Store(0)
+	if got := post("rename", `{"name":"sought"}`); got != `200 {"type":"refused","message":"taken"}` {
+		t.Errorf("a rename at SERIALIZABLE that lost its label to an insert answers %s", got)
+	}
+	e.attempts.Store(0)
+	if got := post("clash", "{}"); !strings.HasPrefix(got, "500 ") || e.attempts.Load() != 2 {
+		t.Errorf("an operation that meets a unique violation every run answers %s after %d runs, want 500 after 2", got, e.attempts.Load())
+	}
+}

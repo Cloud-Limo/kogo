@@ -215,6 +215,9 @@ func TestExpressions(t *testing.T) {
 		{"a ?: b == c", `[(Binary == (Binary ?: (Ident a) (Ident b)) (Ident c))]`},
 		{"a to b ?: c", `[(Binary ?: (Binary to (Ident a) (Ident b)) (Ident c))]`},
 		{"0 until n - 1", `[(Binary until (Literal Int 0) (Binary - (Ident n) (Literal Int 1)))]`},
+		// a !in c is the tree !(a in c) gives, at in's precedence.
+		{"x + 1 !in a..b == c", `[(Binary == (Unary ! (Binary in (Binary + (Ident x) (Literal Int 1)) (Binary .. (Ident a) (Ident b)))) (Ident c))]`},
+		{"x !in xs ?: ys && !inside", `[(Binary && (Unary ! (Binary in (Ident x) (Binary ?: (Ident xs) (Ident ys)))) (Unary ! (Ident inside)))]`},
 		{"x is T && !y", `[(Binary && (Is (Ident x) (NamedType T)) (Unary ! (Ident y)))]`},
 		{"-a * - -b", `[(Binary * (Unary - (Ident a)) (Unary - (Unary - (Ident b))))]`},
 		{"a?.b.c(d)[e]", `[(Index (Call (Select (Select (Ident a) Safe b) c) [(Arg (Ident d))]) (Ident e))]`},
@@ -263,6 +266,7 @@ func TestStatements(t *testing.T) {
 			`[(If (Ident a) (Block [(Literal Int 1)]) (Block [(If (Ident b) (Block [(Literal Int 2)]) (Block [(Literal Int 3)]))]))]`},
 		{"when (x) {\n    is A.B, in 0..9 -> 1\n    c -> if (d) 2\n    else -> { 3 }\n}",
 			`[(When (Ident x) [(Branch [(Cond is (NamedType A.B)) (Cond in (Binary .. (Literal Int 0) (Literal Int 9)))] (Block [(Literal Int 1)])) (Branch [(Cond (Ident c))] (Block [(If (Ident d) (Block [(Literal Int 2)]))])) (Branch (Block [(Literal Int 3)]))])]`},
+		{"when (x) { !in 0..9 -> 1; else -> 2 }", `[(When (Ident x) [(Branch [(Cond !in (Binary .. (Literal Int 0) (Literal Int 9)))] (Block [(Literal Int 1)])) (Branch (Block [(Literal Int 2)]))])]`},
 		{"when { a -> 1; else -> 2 }", `[(When [(Branch [(Cond (Ident a))] (Block [(Literal Int 1)])) (Branch (Block [(Literal Int 2)]))])]`},
 		// data, enum, sealed and the refused modifiers are names where
 		// no declaration follows.

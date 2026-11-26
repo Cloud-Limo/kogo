@@ -459,7 +459,8 @@ interface `fun` before an extension of the same name.
   cover every case or have `else`; the compiler rejects a missing case.
   `when { cond -> ... else -> ... }` requires `else`. Over any other type
   `when (x)` needs `else` where it is used as a value. Branch conditions:
-  constants, `is Type`, `in range`, comma-separated alternatives.
+  constants, `is Type`, `in range`, `!in range`, comma-separated
+  alternatives.
 - `is` checks and smart casts work on sealed interfaces.
 - Loops: `for (x in list)`, `for (i in 0 until n)`, `for ((k, v) in map)`,
   `while`. `break` and `continue` without labels.
@@ -477,7 +478,8 @@ interface `fun` before an extension of the same name.
   other type an operator is a binding (section 13), and the prelude says
   which types have it: `a + b` is `plus`, and so `minus`, `times`, `div`
   and `rem`; `a < b` and the other three are `compareTo`; `x in c` is
-  `c.contains(x)`; `c[i]` is `c.get(i)`. Only a binding counts:
+  `c.contains(x)`, and `x !in c` is `!(x in c)`, written with no space
+  inside `!in`; `c[i]` is `c.get(i)`. Only a binding counts:
   application code defines no operator.
 - Scope functions: `let`, `also` and `takeIf` only. `apply`, `run`, `with`
   and `takeUnless` do not exist.
@@ -509,10 +511,10 @@ the parser.
   lambda starts on the line of what it applies to.
 - Precedence, tightest first, as in Kotlin: postfix (`.`, `?.`, a call,
   `[i]`); prefix `-` and `!`; `* / %`; `+ -`; `..`; `until` and `to`;
-  `?:`; `in` and `is`; `< <= > >=`; `== !=`; `&&`; `||`. Binary
+  `?:`; `in`, `!in` and `is`; `< <= > >=`; `== !=`; `&&`; `||`. Binary
   operators group to the left; comparisons do not chain (`a < b < c` is
   an error). Unary minus is an operator, so `-1` is `-` applied to `1`.
-  There is no unary `+`, `++`, `--`, `!in`, `!is`, `as` or `===`.
+  There is no unary `+`, `++`, `--`, `!is`, `as` or `===`.
 - After a name, `<` opens type arguments when what follows reads as
   types closed by `>` and then `(` or `{`, as in `tx.query<Row>(...)`
   and `either<E, A> { }`; otherwise it is less than. As in Kotlin,

@@ -286,6 +286,8 @@ func (e *emitter) when(x *syntax.When, d dest) {
 				conds = append(conds, e.is(subject, st, e.info.Types[c.Type]))
 			case c.Op == "in":
 				conds = append(conds, e.inRange(subject, c.X.(*syntax.Binary)))
+			case c.Op == "!in":
+				conds = append(conds, "!"+e.inRange(subject, c.X.(*syntax.Binary)))
 			default:
 				conds = append(conds, e.equals(subject, st, c.X))
 			}

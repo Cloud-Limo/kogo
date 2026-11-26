@@ -386,7 +386,7 @@ type Branch struct {
 }
 
 // A Cond is one condition of a branch: Op "" with X, a value or with
-// no subject a Boolean; "in" with X; "is" with Type.
+// no subject a Boolean; "in" or "!in" with X; "is" with Type.
 type Cond struct {
 	Pos
 	Op   string

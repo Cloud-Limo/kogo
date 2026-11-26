@@ -1,0 +1,5 @@
+// kotlinc refuses line 5
+// a ! in c: Kotlin's !in is one token, with no space inside.
+package kt
+
+fun f(x: Int, xs: List<Int>): Boolean = x ! in xs

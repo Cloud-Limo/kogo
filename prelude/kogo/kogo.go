@@ -494,6 +494,14 @@ func SetOf[T any](elements ...T) Set[T] {
 
 func Set_Contains[T any](this Set[T], element T) bool { return this.index(element) >= 0 }
 
+func Set_None[T any](this Set[T], predicate func(T) bool) bool {
+	return List_None(this.keys, predicate)
+}
+
+func Set_All[T any](this Set[T], predicate func(T) bool) bool {
+	return List_All(this.keys, predicate)
+}
+
 func Set_MapNotNull[T, R any](this Set[T], transform func(T) *R) List[R] {
 	return List_MapNotNull(this.keys, transform)
 }

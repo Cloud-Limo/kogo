@@ -1,0 +1,8 @@
+// kotlinc refuses line 6
+// !in as a branch of a when with no subject, where Kotlin has no in.
+package kt
+
+fun f(): Int = when {
+    !in 0..9 -> 1
+    else -> 2
+}

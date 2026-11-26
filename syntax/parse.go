@@ -944,7 +944,7 @@ func (p *parser) forStmt() *For {
 // Binary operators by precedence, as Kotlin's: a higher number binds
 // tighter. Comparison (4) does not chain.
 var precedence = map[string]int{
-	"||": 1, "&&": 2, "==": 3, "!=": 3, "<": 4, ">": 4, "<=": 4, ">=": 4, "in": 5, "is": 5,
+	"||": 1, "&&": 2, "==": 3, "!=": 3, "<": 4, ">": 4, "<=": 4, ">=": 4, "in": 5, "!in": 5, "is": 5,
 	"?:": 6, "until": 7, "to": 7, "..": 8, "+": 9, "-": 9, "*": 10, "/": 10, "%": 10,
 }
 
@@ -960,9 +960,13 @@ func (p *parser) binary(min int) Expr {
 		if !p.nl() {
 			p.refuseOperator()
 		}
-		level := precedence[t.text]
+		op := t.text
+		if p.notIn() {
+			op = "!in"
+		}
+		level := precedence[op]
 		if t.kind != tOp && t.kind != tIdent || level == 0 || level < min ||
-			p.nl() && t.text != "?:" && t.text != "&&" && t.text != "||" {
+			p.nl() && op != "?:" && op != "&&" && op != "||" {
 			return x
 		}
 		p.next()
@@ -971,6 +975,11 @@ func (p *parser) binary(min int) Expr {
 		}
 		if t.text == "is" {
 			x = &Is{t.pos, x, p.typ()}
+			continue
+		}
+		if op == "!in" { // !(a in c), the tree that form gives
+			p.want("in")
+			x = &Unary{t.pos, "!", &Binary{t.pos, "in", x, p.binary(level + 1)}}
 			continue
 		}
 		x = &Binary{t.pos, t.text, x, p.binary(level + 1)}
@@ -1020,10 +1029,21 @@ func (p *parser) refuseOperator() {
 	}
 }
 
-// refuseNot rejects !in and !is.
+// notIn reports whether the token is the ! of !in: as in Kotlin, one
+// with no space before the in.
+func (p *parser) notIn() bool {
+	next := p.peek(1)
+	return p.at("!") && next.kind == tIdent && next.text == "in" && next.pos.Offset == p.tok.pos.Offset+1
+}
+
+// refuseNot rejects !is, and a ! apart from the in after it.
 func (p *parser) refuseNot() {
-	if next := p.peek(1); p.at("!") && (next.text == "in" || next.text == "is") && !next.nl {
-		p.fail(p.tok.pos, "syntax", "there is no !%s: write !(x %s y)", next.text, next.text)
+	switch next := p.peek(1); {
+	case !p.at("!") || next.nl || p.notIn():
+	case next.text == "is":
+		p.fail(p.tok.pos, "syntax", "there is no !is: write !(x is y)")
+	case next.text == "in":
+		p.fail(p.tok.pos, "syntax", "kotlinc reads ! and in apart: write !in, with no space")
 	}
 }
 
@@ -1369,6 +1389,10 @@ func (p *parser) when() *When {
 							c.Op, c.Type = "is", p.typ()
 						case p.got("in"):
 							c.Op, c.X = "in", p.expr()
+						case p.notIn():
+							p.next()
+							p.next()
+							c.Op, c.X = "!in", p.expr()
 						default:
 							c.X = p.expr()
 						}

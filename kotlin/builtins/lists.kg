@@ -54,6 +54,8 @@ fun lists(f: String, xs: List<Long>, ys: List<Long>, n: Int, m: Int): String? = 
     "keys" -> keys(xs, ys, n)
     "setPlus" -> "${xs.toSet() + n.toLong()} ${xs.toSet() + ys} ${xs.toSet() + ys.toSet()} ${setOf<Long>() + xs} ${xs.toSet() + xs} ${xs.toSet() + ys == ys.toSet() + xs}"
     "setMinus" -> "${xs.toSet() - n.toLong()} ${xs.toSet() - ys} ${xs.toSet() - ys.toSet()} ${xs.toSet() - listOf<Long>()} ${setOf<Long>() - xs} ${(xs + ys).toSet() - xs - ys}"
+    "setNoneAll" -> "${setOf(1, 2).none { it > 2 }} ${setOf<Long>().none { it > 0L }} ${xs.toSet().none { it > n }} ${setOf<Long>().all { it > 0L }} ${ys.toSet().all { it % 2L == 0L }}"
+    "notIn" -> "${3 !in setOf(1, 2)} ${n.toLong() !in xs.toSet()} ${m.toLong() !in ys} ${n !in 0..m} ${n !in 0 until m} ${xs.size !in 1..2 == n.toLong() !in xs}"
     "setInPlusMinus" -> "${n.toLong() in xs.toSet() + ys} ${m.toLong() in (xs + ys).toSet() - ys} ${xs.toSet() - n.toLong() + n.toLong()}"
     "takePlus" -> takePlus(xs, ys, n, m)
     "dropMap" -> "${xs.drop(n).map { it + 1L }} ${xs.drop(n).take(m)} $xs"

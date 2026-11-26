@@ -72,7 +72,7 @@ Take the first row that fits:
 
 | State | Newest event | Next |
 | --- | --- | --- |
-| not Done | `Ready to merge:`, its cusoon2 PR merged | `git -C ~/Dev/cusoon2-tasks pull --ff-only`, then Merging for the Kogo PR the `Checked:` names as waiting; its Done does After a merge for both; when the `Checked:` names none, After a merge |
+| not Done | `Ready to merge:`, its cusoon2 PR merged | `git -C ~/Dev/cusoon2-tasks pull --ff-only`, then Merging for the Kogo PR of the `Checked:`'s `Waiting on this merge:` line; its Done does After a merge for both; when the `Checked:` has none, After a merge |
 | any | any, the PR merged | After a merge |
 | any | any, labelled `lead` | the lead's: exit |
 | In Review | `Handoff:` | start a Code review |
@@ -239,11 +239,16 @@ three:
   the head moved, hand on. For a cusoon2 PR, which is Greg's to merge,
   that line is `Checked: <PR url> at <sha>`: post it with `lin step
   DEV-NNN < checked.md`, under it the lines the check prints after it,
-  up to any line naming the Handoff's other PR (for a PR that moves
+  up to the line `the Handoff names <PR url> too` (for a PR that moves
   `kogo/go/go.mod`'s pin, the move and each Kogo PR it brings, as
   `Cloud-Limo/kogo#N: <title>`), the sizes when the Budget was
-  outgrown, and the Kogo PR with its head sha when one waits on this
-  merge, and exit: it is whole on the issue and takes no label. Do not
+  outgrown, and, when the Handoff names a Kogo PR too, a line holding
+  `Waiting on this merge: <Kogo PR url> at <sha>`: `lin clerk`'s watch
+  starts that PR's Merging from those words and from nothing else.
+  When the pin is that PR's head, the check prints the line, as
+  `Cloud-Limo/kogo#N: <title> · Waiting on this merge: <url> at <sha>`:
+  post it as printed; else write it, `<sha>` that PR's head. Then
+  exit: it is whole on the issue and takes no label. Do not
   wait for Cloud CI, which runs `mise run check-all` and the tests: `lin
   clerk` watches that sha's run; on green it requests Greg's review on
   the PR, which reaches his Linear inbox, and posts `Ready to merge:`

@@ -2,7 +2,7 @@
 // (spec.md 15.4) to java.time's parse and toString (kotlin/README.md).
 //
 //	wire gen                 the texts, one a line: date or time, a tab, the text
-//	wire diff <texts> <kotlin> each text the reader and java.time read apart; exits 1 if any
+//	wire diff <texts> <kotlin> each text the reader and java.time read apart; exits 1 if any, or if none was compared
 //
 // A date java.time reads that the reader refuses is the limit when it
 // is outside YYYY-MM-DD, and a difference when it is inside.
@@ -104,6 +104,10 @@ func diff(texts, kotlin string) {
 	if differ > 0 {
 		os.Exit(1)
 	}
+	if same+limit+differ == 0 {
+		fmt.Fprintln(os.Stderr, "wire: no text was compared; check that wire gen wrote its texts")
+		os.Exit(1)
+	}
 }
 
 func lines(file string) []string {
@@ -111,6 +115,9 @@ func lines(file string) []string {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
+	}
+	if len(text) == 0 {
+		return nil
 	}
 	return strings.Split(strings.TrimSuffix(string(text), "\n"), "\n")
 }

@@ -25,13 +25,13 @@ for f in builtins/*.kg; do cp "$f" "_work/$(basename "$f" .kg).kt"; done
 kotlinc -nowarn -cp "$arrow" _work/*.kt main.kt kogo.kt time.kt math.kt round.kt arrow.kt wire.kt -d _work/kotlin.jar
 kotlin -cp "_work/kotlin.jar:$arrow" MainKt _work/cases > _work/kotlin
 
-go run ./cases diff _work/cases _work/kogo _work/kotlin
-
 # The wire's text of a LocalDate and a LocalTime, read and written as
 # java.time's parse and toString read and write it (spec.md 15.4).
 go run ./wire gen > _work/wire
 kotlin -cp _work/kotlin.jar wire.WireKt _work/wire > _work/wire-kotlin
 go run ./wire diff _work/wire _work/wire-kotlin
+
+go run ./cases diff _work/cases _work/kogo _work/kotlin
 
 # refuses f: kotlinc must refuse the file f with an error on the line
 # its first line names, "// kotlinc refuses line N", and with

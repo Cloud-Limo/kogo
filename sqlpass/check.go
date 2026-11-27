@@ -454,8 +454,8 @@ func rejected(e *pgconn.PgError, sql string, params []Param, edits []edit) *Erro
 }
 
 var scalars = map[string]string{
-	"bool": "Boolean", "int4": "Int", "int8": "Long", "float8": "Double", "numeric": "Decimal",
-	"text": "String", "citext": "String", "varchar": "String", "uuid": "Uuid",
+	"bool": "Boolean", "int4": "Int", "int8": "Long", "float8": "Double", "float4": "Double", "numeric": "Decimal",
+	"text": "String", "citext": "String", "varchar": "String", "bpchar": "String", "uuid": "Uuid",
 	"timestamptz": "Instant", "date": "LocalDate", "time": "LocalTime", "interval": "Duration",
 	"bytea": "ByteArray",
 }

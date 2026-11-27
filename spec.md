@@ -1145,8 +1145,9 @@ what Kotlin's means. Where a Kotlin program would reach into Java's
 library, for times or for printing a number, Kogo has a function or a
 type of its own in a package `kogo.<name>`, imported by name as
 `kogo.time` is, and so for input and output, where Kotlin's are
-global functions and Kogo's an effect (section 7). So a file's imports
-show what in it is not Kotlin's.
+global functions and Kogo's an effect (section 7), and for `kogo.math`,
+whose functions are Go's. So a file's imports show what in it is not
+Kotlin's.
 `Uuid`, `newId`, `randomString` and `Decimal` are Kogo's own and need
 no import;
 `ByteArray` (section 3) is Kotlin's name and needs none either.
@@ -1239,12 +1240,17 @@ and not a promise that it is all:
   `Empty list doesn't contain element at index 0.` there and `Index 0
   out of bounds for length 0` here, as for every list; and a `replace`
   whose text names no group says so in Kogo's words.
+- `sin`, `cos` and `asin` (`kogo.math`, below) are Go's.
 - A `Decimal` writes the digits Postgres sent, where Java's `BigDecimal`
   writes an exponent for a small number: `0.0000001` is `1E-7` in
   Kotlin.
 
 **Numbers.** `coerceAtLeast`, `coerceAtMost`, `coerceIn`, `abs`, `max`,
-`min`, `toInt`, `toLong`, `toDouble`, `toString`. A `Decimal` holds what
+`min`, `toInt`, `toLong`, `roundToLong`, `toDouble`, `toString`.
+`roundToLong` is Kotlin's: the nearest `Long`, a tie toward positive
+infinity (`2.5` is 3, `-2.5` is -2, `0.49999999999999994` is 0), and
+a value past either end of `Long` that end; `NaN` is a bug, and it
+panics with Kotlin's message, `Cannot round NaN value.` A `Decimal` holds what
 Postgres sent, exactly: it has `toDouble` (the closest `Double`),
 `toString` (Postgres's text, as `1.50`), `==` and `< <= > >=`, and no
 arithmetic in v0. Its `==` is Java's `equals`, which counts the scale:
@@ -1277,6 +1283,20 @@ of three digits and none when it is zero; a `LocalDate` as
 `2026-11-15`; a `ZonedDateTime` as
 `2026-11-16T01:30:00.120+11:00[Australia/Sydney]`, without the seconds
 when they and the fraction are zero.
+
+**Mathematics** (`kogo.math`). Kotlin's `kotlin.math` names, each
+imported from `kogo.math` (`import kogo.math.sin`): `PI`, and `sqrt`,
+`sin`, `cos` and `asin`, each of a `Double`, in radians for the last
+three, and giving one. Degrees are `degrees * (PI / 180.0)`. `PI` and
+`sqrt` are Kotlin's to the bit, as `+`, `-`, `*` and `/` are. `NaN`
+is what Kotlin gives too: outside `asin`'s domain, of a negative to
+`sqrt`, and of an infinity to `sin` or `cos`. `sin`, `cos` and `asin`
+give Go's result, which may differ from Kotlin's in the last place:
+by one unit in it for an argument of ordinary size, and by more, no
+more than one part in 10^13 in the cases checked, for `asin` near 1
+or -1 and for `sin` and `cos` of an argument past 10^9. Round such a
+result before comparing it for equality or showing it, as
+`(metres * 100.0).roundToLong()` does, or compare what it chose.
 
 **Input and output** (`kogo.io`). A `Console` is a program's standard
 input and output, passed to the function that uses it as `Db` is:
@@ -1588,6 +1608,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `a == b` on a handle (`Db`, `Clock`, ...), or on a value that holds one (`handle-equality`), which Kotlin compares by identity | compare the other properties; where check cannot see one, `==` panics (section 3) |
 | `java.time.*`, `java.util.UUID`, `BigDecimal` | `kogo.time.*`, `Uuid`, `Decimal` |
 | `kotlin.test.*` | `kogo.test.*` |
+| `kotlin.math.*`, `Math.toRadians(d)` | `kogo.math.*`, `d * (PI / 180.0)` |
 | `BigDecimal.valueOf(x).stripTrailingZeros().toPlainString()` | `plain(x)`, from `kogo.text`, not `Decimal` |
 | `OffsetDateTime`, `LocalDateTime` | `Instant`, or `ZonedDateTime` with a named zone |
 | jOOQ (`ctx.select...`, records, `.store()`, `into(X::class.java)`) | `sql"""` and a data class |

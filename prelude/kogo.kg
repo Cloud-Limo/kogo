@@ -115,6 +115,7 @@ external fun Long.coerceAtLeast(minimumValue: Long): Long
 external fun Long.coerceAtMost(maximumValue: Long): Long
 external fun abs(n: Long): Long
 external fun Double.toLong(): Long
+external fun Double.roundToLong(): Long
 external fun Double.toInt(): Int
 external fun Decimal.toDouble(): Double
 external fun Int.toString(): String

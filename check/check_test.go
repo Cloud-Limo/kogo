@@ -240,6 +240,7 @@ func TestNames(t *testing.T) {
 		{"package a\nimport ‸arrow.core.Either", "unknown-import", "Either needs no import: remove this one"},
 		{"package a\nimport ‸arrow.core.raise.ensure", "unknown-import", "ensure needs no import: remove this one"},
 		{"package a\nimport ‸kotlin.math.abs\n---\npackage kogo\nexternal fun abs(n: Long): Long", "unknown-import", "abs needs no import: remove this one"},
+		{"package a\nimport ‸kotlin.math.sin\n---\npackage kogo.math\nexternal fun sin(x: Double): Double", "unknown-import", "no package kotlin.math in Kogo: import kogo.math.sin instead"},
 		// Section 12: an offset ID written as a literal is outside the subset.
 		{"package a\nimport kogo.time.ZoneId\nfun f(): ZoneId = ZoneId.of(‸\"+05:30\")\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}", "zone-offset", "ZoneId.of takes a region name, such as Australia/Melbourne; offsets are not supported (spec 12)"},
 		{"package a\nimport kogo.time.ZoneId\nfun f(): ZoneId = ZoneId.of(‸\"Z\")\n---\npackage kogo.time\nexternal class ZoneId\nexternal object ZoneId {\n    fun of(name: String): ZoneId\n}", "zone-offset", "offsets are not supported"},

@@ -1,0 +1,11 @@
+// Kotlin's kotlin.math, for the names a program has asked for.
+// sin, cos and asin are Go's, which may differ from Kotlin's in the
+// last place (spec.md section 12); sqrt and PI are Kotlin's exactly.
+package kogo.math
+
+external val PI: Double
+
+external fun sin(x: Double): Double
+external fun cos(x: Double): Double
+external fun asin(x: Double): Double
+external fun sqrt(x: Double): Double

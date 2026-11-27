@@ -5331,3 +5331,46 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   and a directive per line of SQL. Reopens if a trace names a line
   that is wrong around a statement, or the emitted Go is run through
   a tool that moves comments inside a call.
+
+## `kogo.math` and `roundToLong` (DEV-1299), 27 Nov 2026
+
+- **`sin`, `cos` and `asin` are Go's `math.Sin`, `math.Cos` and
+  `math.Asin`** (Greg, 24 Nov 2026, on DEV-1146: Kogo does not fight
+  Go on floating point). `PI`, `sqrt`, `roundToLong` and the
+  arithmetic are Kotlin's to the bit. `mise run kotlin` keeps the
+  three as a difference, rounding each number in both results to ten
+  significant digits. Of its 250 inputs each, `sin` differed on 71,
+  `cos` on 68, `asin` on 30 and the great-circle case on 242 (its
+  fixed Melbourne to Sydney distance by one unit in the last place).
+  The largest: `asin` 536 units in the last place (7.6e-14 of it),
+  of an argument near 1; `cos` 37 and `sin` 25, of an argument past
+  10^9; one unit for `sin` and `cos` of an ordinary one. So the spec
+  says more than "the last place": DEV-1146's probe was of `sin` and
+  `cos` alone. Not taken: Java's tables, or a `sin` written in Go.
+  Reopens if a program needs more than twelve digits of one of them,
+  or a comparison of a port meets a result that rounds apart.
+- **`PI` is a top-level `external val`**, `var PI = math.Pi` in Go.
+  The checker and the emitter already had the form: a top-level val
+  needs no value when it is external, and a program reads it as it
+  reads any package's val. A Go variable and not a constant, since
+  Go works a constant expression such as `PI / 180.0` out exactly
+  where Kotlin divides two `Double`s. Not taken: a `const val` in the
+  prelude, which reads the same and would let a binding hold a body.
+- **A `kogo.math` name is imported by name**, `import kogo.math.sin`,
+  as the issue has it, where `abs` needs no import: what a file
+  imports is what in it is not Kotlin's, and these three are Go's.
+  `import kotlin.math.sin` says to import `kogo.math.sin` instead.
+- **`roundToLong` is `floor(d)`, plus one when `d - floor(d)` is at
+  least a half**, then `toLong`'s ends. The subtraction is exact for
+  every `d` but a negative above -1, where its rounding cannot cross
+  the half; `floor(d + 0.5)` is wrong for 0.49999999999999994 and
+  past 2^52, and `math.Round` for a negative tie. No product is
+  followed by an addition. NaN panics with Kotlin's words, `Cannot
+  round NaN value.`
+- **The check's edges grow by ten Doubles** (the ties, 0.49999999999999994,
+  1 and the next Double, 2^52 and its neighbours, 2^53 + 2 and the last
+  Double below 2^63), and the first inputs walk every one of them, so
+  the walk is 43 inputs long where it was 40. In `kotlin/`, `math.kt`
+  names `kotlin.math`'s functions `kogo.math`'s and `round.kt` gives
+  the shared source `roundToLong` without the import kotlinc needs,
+  as `time.kt` does for `java.time`.

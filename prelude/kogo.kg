@@ -25,6 +25,7 @@ external fun <T> List<T>.getOrNull(index: Int): T?
 external fun <T> List<T>.isEmpty(): Boolean
 external fun <T> List<T>.isNotEmpty(): Boolean
 external fun <T> List<T>.contains(element: T): Boolean
+external fun <T> List<T>.count(predicate: (T) -> Boolean): Int
 external fun <T> List<T>.none(predicate: (T) -> Boolean): Boolean
 external fun <T> List<T>.all(predicate: (T) -> Boolean): Boolean
 external fun <T> List<T>.first(): T
@@ -62,6 +63,9 @@ external fun <T, K> List<T>.associateBy(keySelector: (T) -> K): Map<K, T>
 external fun <T, K, V> List<T>.associate(transform: (T) -> Pair<K, V>): Map<K, V>
 
 external fun <T> setOf(vararg elements: T): Set<T>
+external val <T> Set<T>.size: Int
+external fun <T> Set<T>.isEmpty(): Boolean
+external fun <T> Set<T>.isNotEmpty(): Boolean
 external fun <T> Set<T>.contains(element: T): Boolean
 external fun <T> Set<T>.none(predicate: (T) -> Boolean): Boolean
 external fun <T> Set<T>.all(predicate: (T) -> Boolean): Boolean
@@ -113,6 +117,7 @@ external fun Regex(pattern: String): Regex
 external fun Regex.matches(input: String): Boolean
 
 external fun Int.toLong(): Long
+external fun Int.toDouble(): Double
 external fun Long.toDouble(): Double
 external fun Long.toInt(): Int
 external fun Long.coerceAtLeast(minimumValue: Long): Long

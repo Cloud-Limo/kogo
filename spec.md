@@ -1170,9 +1170,10 @@ no import;
 `map`, `mapIndexed`, `mapNotNull`, `flatMap`, `filter`, `filterNot`,
 `filterNotNull`, `any`, `all`, `none`, `count`, `sum`, `sumOf`,
 `maxOrNull`, `minOrNull`, `sortedBy`, `sortedByDescending`, `sorted`,
-`reversed`, `distinct`, `distinctBy`, `take`, `drop`, `zip`, `plus`
-(`+`), a `Set`'s `plus` (`+`) and `minus` (`-`) of an element, a `List`
-or a `Set`, `groupBy`, `associateBy`, `associate`, `toSet`, `toList`,
+`reversed`, `distinct`, `distinctBy`, `take`, `drop`, `zip`, a
+`List`'s `plus` (`+`) of an element or a `List`, giving a new `List`,
+a `Set`'s `plus` (`+`) and `minus` (`-`) of an element, a `List` or a
+`Set`, `groupBy`, `associateBy`, `associate`, `toSet`, `toList`,
 `joinToString`, `forEach`, `keys`, `values`, `listOfNotNull`, a
 `Pair`'s `first` and `second`. A `Map` and a `Set` iterate in
 insertion order and compare keys as `==` does, by value, so any type
@@ -1270,7 +1271,8 @@ arithmetic in v0. Its `==` is Java's `equals`, which counts the scale:
 `1.50 == 1.5` is false.
 
 **Time** (`kogo.time`). `Instant` (`Instant.ofEpochSecond(seconds,
-nanos)`, `isBefore`, `isAfter`, `plus(duration)`, `minus(duration)`),
+nanos)`, `isBefore`, `isAfter`, `< <= > >=` (`compareTo`),
+`plus(duration)`, `minus(duration)`),
 `LocalDate` (`plusDays`, `year`, `monthValue`, `dayOfMonth`,
 `atStartOfDay(zone): ZonedDateTime`), `LocalTime`, `ZoneId.of(name)`,
 `ZonedDateTime` (`instant.atZone(zone)`, `hour`, `minute`,

@@ -2,6 +2,7 @@ package ts
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/Cloud-Limo/kogo/check"
@@ -44,10 +45,10 @@ fun ping(tx: Tx, env: Env, request: Request, input: Unit): Either<String, Unit> 
 // that holds itself, and the types in the order of their names, not
 // the order reached.
 func TestFile(t *testing.T) {
-	got := files(t, head+`api ops unchecked { ping ungated, tree ungated, job ungated }
+	got := files(t, strings.Replace(head, "\n", "\nimport kogo.time.LocalDate\nimport kogo.time.LocalTime\n", 1)+`api ops unchecked { ping ungated, tree ungated, job ungated }
 fun job(db: Db, env: Env, request: Request, input: Ask): Either<String, Job?> = either { raise("no") }
 fun tree(tx: Tx, env: Env, request: Request, input: Unit): Either<String, List<Tree>> = either { raise("no") }
-data class Ask(val id: Uuid, val n: Int, val big: Long, val x: Double, val ok: Boolean)
+data class Ask(val id: Uuid, val n: Int, val big: Long, val x: Double, val ok: Boolean, val day: LocalDate, val at: LocalTime?)
 data class Job(val state: State, val none: None, val notes: String?, val tags: List<String?>, val also: List<Int>?)
 enum class State { Offered, Confirmed }
 enum class None { }
@@ -63,6 +64,8 @@ export type Ask = {
   big: number
   x: number
   ok: boolean
+  day: string
+  at: string | null
 }
 export type Job = {
   state: State

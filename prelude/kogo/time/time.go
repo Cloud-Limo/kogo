@@ -85,6 +85,48 @@ func (t LocalTime) String() string {
 	return text
 }
 
+// The texts the wire reads (spec.md 15.4): a date as YYYY-MM-DD, four
+// digits of year, and a time as java.time's LocalTime.parse reads one,
+// HH:mm, HH:mm:ss or HH:mm:ss and a fraction of up to nine digits.
+// Each field is checked here: a pattern lets 2026-02-30 and 24:00 by.
+var dateText = regexp.MustCompile(`^([0-9]{4})-([0-9]{2})-([0-9]{2})$`)
+var timeText = regexp.MustCompile(`^([0-9]{2}):([0-9]{2})(?::([0-9]{2})(?:\.([0-9]{0,9}))?)?$`)
+
+// ReadLocalDate gives the day s names, or false where s is no day of
+// that form, as 2026-02-30 and 2026-2-3 are. A signed or longer year,
+// which LocalDate.parse reads, is outside the form: so every date read
+// is one Postgres holds.
+func ReadLocalDate(s string) (LocalDate, bool) {
+	m := dateText.FindStringSubmatch(s)
+	if m == nil {
+		return LocalDate{}, false
+	}
+	y, _ := strconv.Atoi(m[1])
+	mo, _ := strconv.Atoi(m[2])
+	d, _ := strconv.Atoi(m[3])
+	if mo < 1 || mo > 12 || d < 1 || gotime.Date(y, gotime.Month(mo), d, 0, 0, 0, 0, gotime.UTC).Day() != d {
+		return LocalDate{}, false
+	}
+	return LocalDate{int32(y), int32(mo), int32(d)}, true
+}
+
+// ReadLocalTime gives the time of day s names, or false where s is
+// none, as 24:00 and 10:60 are.
+func ReadLocalTime(s string) (LocalTime, bool) {
+	m := timeText.FindStringSubmatch(s)
+	if m == nil {
+		return LocalTime{}, false
+	}
+	h, _ := strconv.Atoi(m[1])
+	mi, _ := strconv.Atoi(m[2])
+	sec, _ := strconv.Atoi(m[3]) // 0 where there is none
+	nanos, _ := strconv.Atoi((m[4] + "000000000")[:9])
+	if h > 23 || mi > 59 || sec > 59 {
+		return LocalTime{}, false
+	}
+	return LocalTime{(int64(h*3600+mi*60+sec))*1e9 + int64(nanos)}, true
+}
+
 // A Duration is a length of time: seconds, and the nanoseconds past
 // that second, from 0 up, as java.time holds one.
 type Duration struct {

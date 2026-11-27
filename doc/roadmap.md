@@ -236,9 +236,9 @@ In cusoon2, in this order:
    in the same PR.
 3. Slices 2, 3 and 4.
 4. Slices 5 to 8, with the pricing (slice 10) beside them.
-5. Kotlin first, one PR with the frontend: a time on the wire as its
-   parts (a date, an hour, a minute), so the reader's own 400 covers
-   one that does not read; `bookingStatus`'s 500; and the Kotlin's
+5. Kotlin first, one PR with the frontend: a time on the wire as a
+   `LocalDate` and a `LocalTime` (Kogo's DEV-1302), so the reader's
+   own 400 covers one that does not read; `bookingStatus`'s 500; and the Kotlin's
    `bookingTime` onto `pickup()`, which ends the port's deviation
    from DEV-1178. It lands before slice 9, the first to read a time
    from a caller.
@@ -264,11 +264,11 @@ of row types in `schema.kg` make the area's total.
 | 6 | The booking's one-field writes | `cancelBooking`, `uncancelBooking`, `setBookingsHidden`, `setBookingPromotion`, `setBookingNotes`, `setBookingDriver`, `setBookingBooker`, `bookingDriverUpdate` | 135 / 200 | 5 |
 | 7 | The invoices | `invoice`, `invoiceByNumber`, `recordInvoicePayment`, `voidInvoice`, `resendInvoice`, `resendInvoiceStatus`, `createStripeCharge`, `stripeCharge`, `invoiceBookings` | 260 / 220 | 5 |
 | 8 | The cards and the payment link | `stripeCards`, `stripeCard`, `createStripeCard`, `bookingPaymentLink`, `useBookingPaymentLink` | 110 / 90 | 4 |
-| 9 | The lists | `bookings`, `bookingsSummary`, `bookers` | 200 / 160 | 5; the time on the wire as its parts |
+| 9 | The lists | `bookings`, `bookingsSummary`, `bookers` | 200 / 160 | 5; the time on the wire as a `LocalDate` and a `LocalTime` |
 | 10 | The pricing, as functions compared by generated cases | none | 330 / 150 | `kogo.math` |
-| 11 | The wizard's quotes | `charges`, `discountedTotal`, `loyaltyProgramDiscount` | 295 / 200 | 5, 10; the time on the wire as its parts |
+| 11 | The wizard's quotes | `charges`, `discountedTotal`, `loyaltyProgramDiscount` | 295 / 200 | 5, 10; the time on the wire as a `LocalDate` and a `LocalTime` |
 | 12 | The price and the payment details | `setBookingPrice`, `setPaymentDetails` | 185 / 170 | 6, 10 |
-| 13 | The journeys and the place search | `ensureJourney`, `bookingStatus`, `placeSuggest` | 280 / 220 | 3; the time on the wire as its parts; Google's Directions and Autocomplete |
+| 13 | The journeys and the place search | `ensureJourney`, `bookingStatus`, `placeSuggest` | 280 / 220 | 3; the time on the wire as a `LocalDate` and a `LocalTime`; Google's Directions and Autocomplete |
 | 14 | Submitting and editing a booking | `submitBooking`, `setBookingDetails` | 335 / 260 | 11, 13; `submitBooking` builds its own caller's `ViewerCall` in `call.kg` for `bookingAnswer`, which keeps its signature (DEV-1286's Ruling) |
 | 15 | The customer's logins | `startEmailLogin`, `completeEmailLogin`, `startPasskeyLogin`, `completePasskeyLogin` | 225 / 200 | 2; the login design |
 | 16 | The customer's passkeys | `hasPasskey`, `passkeys`, `startPasskeyRegistration`, `completePasskeyRegistration`, `deletePasskey` | 70 / 80 | 15 |

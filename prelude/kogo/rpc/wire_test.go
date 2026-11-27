@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	ktime "github.com/Cloud-Limo/kogo/prelude/kogo/time"
 	"github.com/Cloud-Limo/kogo/rt"
 )
 
@@ -29,27 +30,30 @@ type Stop struct {
 }
 
 type Job struct {
-	_       struct{}  `kogo:"Job"`
-	Done    bool      `kogo:"done"`
-	Number  int32     `kogo:"number"`
-	Cents   int64     `kogo:"cents"`
-	Rate    float64   `kogo:"rate"`
-	Notes   string    `kogo:"notes"`
-	Id      kogo.Uuid `kogo:"id"`
-	State   State     `kogo:"state"`
-	Stops   []Stop    `kogo:"stops"`
-	Tip     *int32    `kogo:"tip"`
-	Nothing rt.Unit   `kogo:"nothing"`
+	_       struct{}        `kogo:"Job"`
+	Done    bool            `kogo:"done"`
+	Number  int32           `kogo:"number"`
+	Cents   int64           `kogo:"cents"`
+	Rate    float64         `kogo:"rate"`
+	Notes   string          `kogo:"notes"`
+	Id      kogo.Uuid       `kogo:"id"`
+	Day     ktime.LocalDate `kogo:"day"`
+	At      ktime.LocalTime `kogo:"at"`
+	State   State           `kogo:"state"`
+	Stops   []Stop          `kogo:"stops"`
+	Tip     *int32          `kogo:"tip"`
+	Nothing rt.Unit         `kogo:"nothing"`
 }
 
 var wire = newReader([]any{State_entries})
 
 const job = `{"done":true,"number":-2147483648,"cents":-9007199254740991,"rate":0.1,"notes":"a \"b\"",` +
-	`"id":"0195a3c4-5b6d-7e8f-9a0b-1c2d3e4f5a6b","state":"Confirmed",` +
+	`"id":"0195a3c4-5b6d-7e8f-9a0b-1c2d3e4f5a6b","day":"2028-02-29","at":"10:30:45.100","state":"Confirmed",` +
 	`"stops":[{"name":"x","back":null},{"name":"y","back":{"name":"z","back":null}}],"tip":7,"nothing":{}}`
 
 var jobValue = Job{Done: true, Number: math.MinInt32, Cents: -maxLong, Rate: 0.1, Notes: `a "b"`,
-	Id:    kogo.Uuid{0x01, 0x95, 0xa3, 0xc4, 0x5b, 0x6d, 0x7e, 0x8f, 0x9a, 0x0b, 0x1c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b},
+	Id:  kogo.Uuid{0x01, 0x95, 0xa3, 0xc4, 0x5b, 0x6d, 0x7e, 0x8f, 0x9a, 0x0b, 0x1c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b},
+	Day: ktime.LocalDate{Year: 2028, Month: 2, Day: 29}, At: ktime.LocalTime{NanoOfDay: (37845*1000 + 100) * 1e6},
 	State: State_Confirmed, Stops: []Stop{{Name: "x"}, {Name: "y", Back: &Stop{Name: "z"}}},
 	Tip: rt.Ptr[int32](7)}
 
@@ -62,13 +66,24 @@ func read(text string) (Job, error) {
 }
 
 // Each row of the table reads and writes, Unit as {} among them, and
-// the largest Int and Long too.
+// the largest Int and Long too, and the first and last LocalDate and
+// LocalTime the reader reads.
 func TestWire(t *testing.T) {
 	for text, want := range map[string]Job{
 		job: jobValue,
 		strings.NewReplacer(`-2147483648`, `2147483647`, `-9007199254740991`, `9007199254740991`).Replace(job): func() Job {
 			j := jobValue
 			j.Number, j.Cents = math.MaxInt32, maxLong
+			return j
+		}(),
+		strings.NewReplacer(`2028-02-29`, `9999-12-31`, `10:30:45.100`, `23:59:59.999999999`).Replace(job): func() Job {
+			j := jobValue
+			j.Day, j.At = ktime.LocalDate{Year: 9999, Month: 12, Day: 31}, ktime.LocalTime{NanoOfDay: 86400e9 - 1}
+			return j
+		}(),
+		strings.NewReplacer(`2028-02-29`, `0000-01-01`, `10:30:45.100`, `00:00`).Replace(job): func() Job {
+			j := jobValue
+			j.Day, j.At = ktime.LocalDate{Year: 0, Month: 1, Day: 1}, ktime.LocalTime{}
 			return j
 		}(),
 	} {
@@ -102,6 +117,19 @@ func TestStrict(t *testing.T) {
 		{`0195a3c4-5b6d`, `0195a3c45-b6d`, "input.id is not a Uuid"},
 		{`3e4f5a6b`, `3e4f5a--`, "input.id is not a Uuid"},
 		{`"Confirmed"`, `"Secret"`, "input.state is not one of Offered, Confirmed"},
+		{`"2028-02-29"`, `"2026-02-29"`, "input.day is not a LocalDate, a day written YYYY-MM-DD"},
+		{`"2028-02-29"`, `"2026-02-30"`, "input.day is not a LocalDate"},
+		{`"2028-02-29"`, `"2026-2-3"`, "input.day is not a LocalDate"},
+		{`"2028-02-29"`, `"+2026-02-03"`, "input.day is not a LocalDate"},
+		{`"2028-02-29"`, `"20260-02-03"`, "input.day is not a LocalDate"},
+		{`"2028-02-29"`, `20260203`, "input.day is not a string"},
+		{`"2028-02-29"`, `null`, "input.day is null"},
+		{`"10:30:45.100"`, `"24:00"`, "input.at is not a LocalTime, written HH:mm, HH:mm:ss or HH:mm:ss.SSS"},
+		{`"10:30:45.100"`, `"10:60"`, "input.at is not a LocalTime"},
+		{`"10:30:45.100"`, `"9:30"`, "input.at is not a LocalTime"},
+		{`"10:30:45.100"`, `"10:30:45.1234567890"`, "input.at is not a LocalTime"},
+		{`"10:30:45.100"`, `1030`, "input.at is not a string"},
+		{`"10:30:45.100"`, `null`, "input.at is null"},
 		{`"name":"z"`, `"name":"z","secret":1`, "input.stops[1].back.secret is not a key of Stop"},
 		{`"name":"y"`, `"name":null`, "input.stops[1].name is null"},
 		{`"tip":7`, `"tip":[7]`, "input.tip is not a number"},

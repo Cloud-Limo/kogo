@@ -4,11 +4,14 @@
 package example.ops
 
 import kogo.rpc.Request
+import kogo.time.LocalDate
+import kogo.time.LocalTime
 
 api ops checkedBy notFromAnotherSite {
     invoices   ungated
     setStatus  ungated
     lookUp     ungated
+    pickup     ungated
 }
 
 data class OpsEnv(val maxLooks: Int)
@@ -58,6 +61,16 @@ fun lookUp(db: Db, env: OpsEnv, request: Request, input: LookUp): Either<String,
         found
     }.bind()
     invoice ?: raise("There is no invoice ${input.number}.")
+}
+
+// A date and a time cross the wire as their text (spec.md 15.4). The
+// reader refuses one that names no day or no time, 2026-02-30 or
+// 24:00, with a 400, and the operation does not run; Postgres gets
+// the pair the caller sent.
+data class Pickup(val day: LocalDate, val at: LocalTime)
+
+fun pickup(tx: Tx, env: OpsEnv, request: Request, input: Pickup): Either<String, Pickup> = either {
+    tx.querySingle<Pickup>(sql"""select ${input.day}::date + 1 as "day!", ${input.at}::time + interval '90 minutes' as "at!" """)
 }
 
 // A list that is served names its check, which runs before each

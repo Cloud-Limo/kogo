@@ -1865,6 +1865,8 @@ Inputs and answers are JSON.
 | `Int`, `Long`, `Double` | a number | `number` |
 | `String` | a string | `string` |
 | `Uuid` | a string, as `toString()` writes it | `string` |
+| `LocalDate` | a string, `YYYY-MM-DD`, as `toString()` writes it | `string` |
+| `LocalTime` | a string, `10:30`, `10:30:45` or with a fraction, as `toString()` writes it | `string` |
 | an enum | its constant's name | `"Offered" \| "Confirmed"` |
 | a data class | an object with a key for each property, under its name | an object type |
 | `List<T>` | an array | `T[]` |
@@ -1872,8 +1874,9 @@ Inputs and answers are JSON.
 | `Unit` | `{}` | `{[k: string]: never}` |
 
 - Any other type in an input or an answer is a compile error: a `Map`,
-  a `Set`, a `Pair`, a `Decimal`, a type of `kogo.time`, a function, an
-  external class. Send text that the server has formatted. A
+  a `Set`, a `Pair`, a `Decimal`, any other type of `kogo.time` (an
+  `Instant`, a `Duration`, a zone), a function, an external class.
+  Send text that the server has formatted. A
   `ByteArray` is one too: bytes stay in a row, and an operation answers
   what the page shows of them.
 - A sealed interface, or a variant of one, is a compile error too: send
@@ -1891,6 +1894,19 @@ Inputs and answers are JSON.
 - A wire type's name begins with an upper-case letter, so it is none
   of the names TypeScript keeps for its own, as `string` and `never`.
 - Nothing is optional: a property that may be `null` is still a key.
+- A `LocalDate` is read in one form, `YYYY-MM-DD` with a year of four
+  digits, and only as a day of the calendar: `2026-02-30`, `2027-02-29`
+  and `2026-2-3` do not read. Kotlin's `LocalDate.parse` reads a
+  signed or longer year too, `+10000-01-01` or `-0001-01-01`; the
+  reader refuses it, a limit of the subset, so every date that reads
+  is one Postgres holds and sending it cannot panic (10.4). An answer
+  writes any `LocalDate` as `toString()` does, a sign and all.
+- A `LocalTime` is read as Kotlin's `LocalTime.parse` reads one: two
+  digits each of hour and minute, then seconds, then a fraction of up
+  to nine digits, each optional after the one before, as `10:30`,
+  `10:30:45`, `10:30:45.5`. `24:00`, `10:60`, `23:59:60` and `9:30` do
+  not read. `toString()` writes it back, so `10:30:00` comes back
+  `10:30` and `10:30:45.5` comes back `10:30:45.500`.
 - A string is written as Kotlin's `kotlinx.serialization` writes one:
   `"` and `\` escaped, a character below U+0020 as `\b`, `\t`, `\n`,
   `\f`, `\r` or `\u00xx` in lower-case hex, and every other character
@@ -1908,7 +1924,8 @@ Inputs and answers are JSON.
 - Reading is strict. A key that is missing, a key the type does not
   have, a value of another type, a number that is not whole or does
   not fit where an `Int` or a `Long` is wanted, a string that is not a
-  `Uuid` or not one of an enum's names: each is a 400, and the
+  `Uuid`, a `LocalDate` or a `LocalTime`, or not one of an enum's
+  names: each is a 400, and the
   operation does not run. A whole number is written as digits, as
   JavaScript writes one: `1.0` and `1e3` are not whole. Where the
   input is `Unit` the body is not read.
@@ -1930,8 +1947,8 @@ Inputs and answers are JSON.
   `settings.opsOrigin is missing`. It differs from an input
   twice: a key the class does not have is reported and ignored, so
   that one file serves the program before and after a deploy; and an
-  enum or a data class of the prelude is no setting yet, and an error
-  at the start.
+  enum, a data class of the prelude, a `LocalDate` or a `LocalTime`
+  is no setting yet, and an error at the start.
 
 The answer is one of two objects:
 

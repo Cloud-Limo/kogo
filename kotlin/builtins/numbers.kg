@@ -5,6 +5,7 @@ package builtins
 fun numbers(f: String, x: Long, y: Long, d: Double, n: Int): String? = when (f) {
     "toLong" -> "${n.toLong()} ${n.toLong() + x}"
     "toDouble" -> "${x.toDouble()} ${x.toDouble() == y.toDouble()}"
+    "intToDouble" -> "${n.toDouble()} ${(n * n).toDouble()} ${2147483647.toDouble()} ${(-2147483647 - 1).toDouble()} ${n.toDouble() / 3.0}"
     "coerce" -> "${x.coerceAtLeast(y)} ${x.coerceAtMost(y)}"
     "doubleToLong" -> "${d.toLong()} ${(d * 2.0).toLong()}"
     "doubleToInt" -> "${d.toInt()} ${(d / 3.0).toInt()}"

@@ -12,6 +12,7 @@ import kogo.time.ZoneId
 fun time(f: String, s: String, t: String, x: Long, y: Long, n: Int, m: Int): String? = when (f) {
     "ofEpochSecond" -> "${Instant.ofEpochSecond(x, n.toLong())} ${Duration.ofSeconds(y, m.toLong())}"
     "isBefore" -> "${instant(x, n).isBefore(instant(y, m))} ${instant(x, n).isAfter(instant(y, m))} ${instant(x, n).isBefore(instant(x, n))}"
+    "compareInstant" -> "${instant(x, n) < instant(y, m)} ${instant(x, n) <= instant(y, m)} ${instant(x, n) > instant(y, m)} ${instant(x, n) >= instant(y, m)} ${instant(x, n) < instant(x, n)} ${instant(x, n) <= instant(x, n)} ${instant(x, n) >= instant(x, n)} ${instant(x, n).compareTo(instant(y, m))} ${Instant.ofEpochSecond(x % 100000L, 7L).compareTo(Instant.ofEpochSecond(x % 100000L, n.toLong() % 1000L))} ${Instant.ofEpochSecond(x % 100000L, 999999999L) < Instant.ofEpochSecond(x % 100000L + 1L, 0L)} ${Instant.ofEpochSecond(y % 100000L, 1L) > Instant.ofEpochSecond(y % 100000L, 0L)}"
     "plusDuration" -> "${instant(x, n).plus(Duration.ofSeconds(y, m.toLong()))}"
     "minusDuration" -> "${instant(x, n).minus(Duration.ofSeconds(y, m.toLong()))}"
     "atZone" -> "${ZoneId.of(zone(n * 10 + m))} ${instant(x, n).atZone(ZoneId.of(zone(n * 10 + m)))} ${instant(x, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate()}"

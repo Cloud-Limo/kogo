@@ -850,9 +850,9 @@ column.
 | `boolean` | `Boolean` |
 | `integer` | `Int` |
 | `bigint` | `Long` |
-| `double precision` | `Double` |
+| `double precision`, `real` | `Double` |
 | `numeric` | `Decimal` |
-| `text`, `citext`, `varchar` | `String` |
+| `text`, `citext`, `varchar`, `character(n)` | `String` |
 | `uuid` | `Uuid` |
 | `timestamptz` | `Instant` |
 | `date` | `LocalDate` |
@@ -902,7 +902,17 @@ Postgres's range: -4713-11-24 to +294276-12-31 for a `timestamptz`,
 to +5874897-12-31 for a `date`. A `Decimal` holds `NaN` and `Infinity` as well
 as numbers, and a zero keeps its scale: `0.00`. An empty `List` is sent as an
 empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
-`bytea`.
+`bytea`. A `real` is read as a `Double`, widened exactly: 0.1 is read as
+0.10000000149011612. A `Double` sent to a `real` is rounded to one, as
+Kotlin's `toFloat()` rounds it: beyond ±3.4e38 it is stored as an
+infinity of its sign, and below 7e-46 as 0, where Postgres's cast from a
+`double precision` refuses with an overflow or an underflow. A
+`character(n)` is read as Postgres sends it, padded with spaces to n:
+`'A'::character(2)` is read as `"A "`. A `String` sent to one is
+Postgres's to take: compared with a `character(n)` column, a parameter is
+one too and its trailing spaces are ignored, but compared as `$v::text`
+they count, and `$v::character(2)` cuts a longer value where an insert
+refuses it.
 
 Kogo reads a subset of what Postgres can send, and outside it refuses:
 at `kogo check` where the catalog or the statement tells, else by a

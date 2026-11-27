@@ -158,10 +158,11 @@ create table ranked as select n as id, n * 7919 % 5003 as k from generate_series
 -- a composite type, for the table of emit's TestShapes: a type is read
 -- alone, in an array and through its domain.
 create domain d_bool as boolean; create domain d_int as integer; create domain d_long as bigint;
-create domain d_double as double precision; create domain d_numeric as numeric(10, 2); create domain d_text as text;
-create domain d_citext as citext; create domain d_varchar as varchar; create domain d_uuid as uuid;
-create domain d_timestamptz as timestamptz; create domain d_date as date; create domain d_time as time;
-create domain d_interval as interval; create domain d_bytea as bytea; create domain d_kind as invite_kind;
+create domain d_double as double precision; create domain d_real as real; create domain d_numeric as numeric(10, 2);
+create domain d_text as text; create domain d_citext as citext; create domain d_varchar as varchar;
+create domain d_char as character(2); create domain d_uuid as uuid; create domain d_timestamptz as timestamptz;
+create domain d_date as date; create domain d_time as time; create domain d_interval as interval;
+create domain d_bytea as bytea; create domain d_kind as invite_kind;
 create domain d_tags as text[]; create domain d_amount as amount;
 
 -- A composite type with a field of an array type Postgres does not ship.

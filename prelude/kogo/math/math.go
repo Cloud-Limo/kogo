@@ -8,9 +8,8 @@ import gomath "math"
 // such as PI / 180.0 out exactly, where Kotlin divides two Doubles.
 var PI = gomath.Pi
 
-// Sin, Cos and Asin are Go's, which may differ from Java's in the last
-// place (decisions.md, the entry on kogo.math). Outside asin's domain
-// is NaN, as in Kotlin.
+// Sin, Cos and Asin are Go's, which may differ from Kotlin's (spec.md
+// section 12). Outside asin's domain is NaN, as in Kotlin.
 func Sin(x float64) float64  { return gomath.Sin(x) }
 func Cos(x float64) float64  { return gomath.Cos(x) }
 func Asin(x float64) float64 { return gomath.Asin(x) }

@@ -1291,11 +1291,8 @@ three, and giving one. Degrees are `degrees * (PI / 180.0)`. `PI` and
 `sqrt` are Kotlin's to the bit, as `+`, `-`, `*` and `/` are. `NaN`
 is what Kotlin gives too: outside `asin`'s domain, of a negative to
 `sqrt`, and of an infinity to `sin` or `cos`. `sin`, `cos` and `asin`
-give Go's result, which may differ from Kotlin's in the last place:
-by one unit in it for an argument of ordinary size, and by more, no
-more than one part in 10^13 in the cases checked, for `asin` near 1
-or -1 and for `sin` and `cos` of an argument past 10^9. Round such a
-result before comparing it for equality or showing it, as
+give Go's result, which may differ from Kotlin's in its last digits.
+Round such a result before comparing it for equality or showing it, as
 `(metres * 100.0).roundToLong()` does, or compare what it chose.
 
 **Input and output** (`kogo.io`). A `Console` is a program's standard

@@ -5345,8 +5345,11 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   The largest: `asin` 536 units in the last place (7.6e-14 of it),
   of an argument near 1; `cos` 37 and `sin` 25, of an argument past
   10^9; one unit for `sin` and `cos` of an ordinary one. So the spec
-  says more than "the last place": DEV-1146's probe was of `sin` and
-  `cos` alone. Not taken: Java's tables, or a `sin` written in Go.
+  says "in its last digits" where DEV-1146 said "in the last place",
+  from a probe of `sin` and `cos` alone (lead's Ruling, 27 Nov 2026);
+  these figures stay here, since they are one machine's measurement
+  and Go promises no bound. Not taken: Java's tables, or a `sin`
+  written in Go; the measured bound in the spec.
   Reopens if a program needs more than twelve digits of one of them,
   or a comparison of a port meets a result that rounds apart.
 - **`PI` is a top-level `external val`**, `var PI = math.Pi` in Go.
@@ -5356,10 +5359,8 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   Go works a constant expression such as `PI / 180.0` out exactly
   where Kotlin divides two `Double`s. Not taken: a `const val` in the
   prelude, which reads the same and would let a binding hold a body.
-- **A `kogo.math` name is imported by name**, `import kogo.math.sin`,
-  as the issue has it, where `abs` needs no import: what a file
-  imports is what in it is not Kotlin's, and these three are Go's.
-  `import kotlin.math.sin` says to import `kogo.math.sin` instead.
+- **`import kotlin.math.sin` says to import `kogo.math.sin`
+  instead**, as for `java.time`.
 - **`roundToLong` is `floor(d)`, plus one when `d - floor(d)` is at
   least a half**, then `toLong`'s ends. The subtraction is exact for
   every `d` but a negative above -1, where its rounding cannot cross
@@ -5367,10 +5368,6 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   past 2^52, and `math.Round` for a negative tie. No product is
   followed by an addition. NaN panics with Kotlin's words, `Cannot
   round NaN value.`
-- **The check's edges grow by ten Doubles** (the ties, 0.49999999999999994,
+- **The check's ten new Double edges** (the ties, 0.49999999999999994,
   1 and the next Double, 2^52 and its neighbours, 2^53 + 2 and the last
-  Double below 2^63), and the first inputs walk every one of them, so
-  the walk is 43 inputs long where it was 40. In `kotlin/`, `math.kt`
-  names `kotlin.math`'s functions `kogo.math`'s and `round.kt` gives
-  the shared source `roundToLong` without the import kotlinc needs,
-  as `time.kt` does for `java.time`.
+  Double below 2^63) are all in the first inputs' walk, now 43 long.

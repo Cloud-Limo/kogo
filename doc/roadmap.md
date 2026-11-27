@@ -53,10 +53,10 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   transaction's kind: a read with no lock, and whatever calls one,
   takes a `SerializableTx`, as the Kotlin runs it; a one-statement
   write and the list's check stay on a `Tx`.
-- **Go that cusoon2 has emitted changes only when it must** (Greg,
-  27 Nov 2026): a change to it that no slice needs waits for one
-  batch after the port is code complete; one that only adds output
-  for a new form, or mends an emit that is wrong, does not wait.
+- **A change to Go cusoon2 has emitted waits unless a slice needs
+  it** (Greg, 27 Nov 2026): such a change waits for one batch after
+  the port is code complete; one that only adds output for a new
+  form, or mends an emit that is wrong, does not wait.
 - **Piece by piece in dev and CI, one switch at launch** (DEV-930;
   Greg, 26 Nov 2026): Go serves each ported list beside the JVM, on
   one database, one session table and one config file, in dev, CI and
@@ -303,7 +303,7 @@ In Kogo, beside it:
 - The prelude's names are built (DEV-1216, PR 189): spec 12's that it
   lacked (G6) and three of Kotlin's four approved (a `Set`'s `+` and
   `-`, `getOrNull`), the rest written the longer way inside the spec.
-- `!in` is built (DEV-1283).
+- `!in` is built (DEV-1283, PR 205).
 - `kogo.math` is built, with `roundToLong` (DEV-1299, PR 210).
 - The keyed call before Stripe's client, 45 / 90.
 - The runner after "Guide DEV-1141": four of its sketch's twelve gaps

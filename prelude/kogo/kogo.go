@@ -107,6 +107,16 @@ func List_GetOrNull[T any](this List[T], index int32) *T {
 
 func List_IsNotEmpty[T any](this List[T]) bool { return len(this) > 0 }
 
+func List_Count[T any](this List[T], predicate func(T) bool) int32 {
+	var n int32
+	for _, x := range this {
+		if predicate(x) {
+			n++
+		}
+	}
+	return n
+}
+
 // List_Contains compares as == does, by value.
 func List_Contains[T any](this List[T], element T) bool {
 	return slices.ContainsFunc(this, func(x T) bool { return rt.Equal(x, element) })
@@ -510,6 +520,10 @@ func SetOf[T any](elements ...T) Set[T] {
 	return s
 }
 
+func Set_Size[T any](this Set[T]) int32      { return int32(len(this.keys)) }
+func Set_IsEmpty[T any](this Set[T]) bool    { return len(this.keys) == 0 }
+func Set_IsNotEmpty[T any](this Set[T]) bool { return len(this.keys) > 0 }
+
 func Set_Contains[T any](this Set[T], element T) bool { return this.index(element) >= 0 }
 
 func Set_None[T any](this Set[T], predicate func(T) bool) bool {
@@ -577,6 +591,10 @@ func Map_widen[K, A, B any](m Map[K, A], f func(A) B) Map[K, B] {
 
 // Map_Keys shares the map's keys, which nothing adds to (ordered).
 func Map_Keys[K, V any](this Map[K, V]) Set[K] { return Set[K]{ordered: this.ordered} }
+
+func Map_Size[K, V any](this Map[K, V]) int32      { return int32(len(this.keys)) }
+func Map_IsEmpty[K, V any](this Map[K, V]) bool    { return len(this.keys) == 0 }
+func Map_IsNotEmpty[K, V any](this Map[K, V]) bool { return len(this.keys) > 0 }
 
 func Pair_First[A, B any](this Pair[A, B]) A  { return this.First }
 func Pair_Second[A, B any](this Pair[A, B]) B { return this.Second }
@@ -888,6 +906,7 @@ func expand(b *strings.Builder, re *regexp.Regexp, replacement, s string, m []in
 
 func Int_ToLong(this int32) int64      { return int64(this) }
 func Long_ToDouble(this int64) float64 { return float64(this) }
+func Int_ToDouble(this int32) float64  { return float64(this) }
 func Long_ToInt(this int64) int32      { return int32(this) } // the low 32 bits, as Kotlin's
 
 // Abs of Long's least value is that value, as Kotlin's is.

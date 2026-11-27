@@ -5,6 +5,7 @@
 package time
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"math"
@@ -456,6 +457,15 @@ func Instant_IsBefore(this, other Instant) bool {
 }
 
 func Instant_IsAfter(this, other Instant) bool { return Instant_IsBefore(other, this) }
+
+// Instant_CompareTo is java.time's: the seconds' order, or else the
+// difference of the nanoseconds.
+func Instant_CompareTo(this, other Instant) int32 {
+	if c := cmp.Compare(this.Seconds, other.Seconds); c != 0 {
+		return int32(c)
+	}
+	return this.Nanos - other.Nanos
+}
 
 // plus is java.time's Instant.plus(seconds, nanos).
 func (i Instant) plus(seconds, nanos int64) Instant {

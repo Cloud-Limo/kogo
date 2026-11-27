@@ -35,6 +35,7 @@ external val Duration.seconds: Long
 
 external fun Instant.isBefore(otherInstant: Instant): Boolean
 external fun Instant.isAfter(otherInstant: Instant): Boolean
+external fun Instant.compareTo(other: Instant): Int
 external fun Instant.plus(amountToAdd: Duration): Instant
 external fun Instant.minus(amountToSubtract: Duration): Instant
 

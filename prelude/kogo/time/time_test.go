@@ -114,6 +114,33 @@ func TestAtStartOfDay(t *testing.T) {
 	}
 }
 
+// The wire's texts (spec.md 15.4): what reads is written back as
+// java.time writes it, and a date outside YYYY-MM-DD, or a field past
+// its range, does not read. mise run kotlin holds both to java.time.
+func TestReadText(t *testing.T) {
+	for _, c := range [][2]string{
+		{"2026-11-27", "2026-11-27"}, {"2028-02-29", "2028-02-29"}, {"2000-02-29", "2000-02-29"}, {"0000-01-01", "0000-01-01"}, {"9999-12-31", "9999-12-31"},
+		{"2027-02-29", ""}, {"1900-02-29", ""}, {"2026-02-30", ""}, {"2026-04-31", ""}, {"2026-13-01", ""}, {"2026-00-10", ""}, {"2026-01-00", ""},
+		{"2026-2-3", ""}, {"+2026-02-03", ""}, {"-0001-01-01", ""}, {"+10000-01-01", ""}, {"10000-01-01", ""}, {"２026-01-01", ""}, {"2026-01-01 ", ""}, {"", ""},
+	} {
+		d, ok := ReadLocalDate(c[0])
+		if got := rt.ToString(d); ok != (c[1] != "") || ok && got != c[1] {
+			t.Errorf("the date %q reads as %s, %v; want %q", c[0], got, ok, c[1])
+		}
+	}
+	for _, c := range [][2]string{
+		{"10:30", "10:30"}, {"00:00", "00:00"}, {"10:30:00", "10:30"}, {"10:30:45", "10:30:45"}, {"10:30:45.", "10:30:45"}, {"10:30:45.1", "10:30:45.100"},
+		{"10:30:45.0001", "10:30:45.000100"}, {"00:00:00.000000001", "00:00:00.000000001"}, {"23:59:59.999999999", "23:59:59.999999999"},
+		{"24:00", ""}, {"10:60", ""}, {"23:59:60", ""}, {"9:30", ""}, {"10:3", ""}, {"10:30:", ""}, {"10:30.5", ""}, {"10:30:45,5", ""},
+		{"10:30:45.1234567890", ""}, {" 10:30", ""}, {"10:30Z", ""}, {"１0:30", ""}, {"", ""},
+	} {
+		c2, ok := ReadLocalTime(c[0])
+		if got := rt.ToString(c2); ok != (c[1] != "") || ok && got != c[1] {
+			t.Errorf("the time %q reads as %s, %v; want %q", c[0], got, ok, c[1])
+		}
+	}
+}
+
 // A time and a length of time come from Postgres's microseconds and
 // write themselves as java.time does. What Postgres holds and Kogo
 // does not is an error: a null, infinity, an interval with months,

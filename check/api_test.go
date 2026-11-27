@@ -29,8 +29,11 @@ func TestOperations(t *testing.T) {
 			"data class Tree(val label: String, val kids: List<Tree>, val up: Tree?)",
 		// An operation of another package, imported.
 		"package kogo.rpc\nexternal class Request\n---\npackage a\nimport b.me\napi ops unchecked { me ungated }\n---\npackage b\nimport kogo.rpc.Request\ndata class E(val n: Int)\nfun me(db: Db, env: E, request: Request, input: Unit): Either<String, Unit> = either { }",
+		// A LocalDate and a LocalTime cross as their text, in an input and an answer.
+		rpc("import kogo.time.LocalDate\nimport kogo.time.LocalTime\n")+"api ops unchecked { f ungated }\ndata class At(val day: LocalDate, val clock: LocalTime?, val days: List<LocalDate>)\n"+op("At", "LocalTime")+
+			"\n---\npackage kogo.time\nexternal class LocalDate\nexternal class LocalTime",
 	)
-	time := "\n---\npackage kogo.time\nexternal class Instant"
+	time := "\n---\npackage kogo.time\nexternal class Instant\nexternal class Duration"
 	refused(t, [][3]string{
 		{rpc() + "api ops unchecked { ‸nope ungated }", "unknown-name", "nothing named nope"},
 		// The name on the wire is the fun's own, so the list writes it.
@@ -57,6 +60,11 @@ func TestOperations(t *testing.T) {
 		{rpc() + "‸api outcome unchecked { me ungated }", "wire-name", "api outcome's interface in TypeScript would be Outcome, the answer's own type: rename the list"},
 		{rpc("import kogo.time.Instant\n") + "api ops unchecked { ‸f ungated }\ndata class In(val n: Int, val at: Instant)\n" + op("In", "Unit") + time,
 			"wire", "f's input holds In.at: Instant, which does not cross the wire: send text the server has formatted"},
+		{rpc("import kogo.time.Duration\n") + "api ops unchecked { ‸f ungated }\n" + op("Unit", "List<Duration>") + time,
+			"wire", "f's answer holds a Duration, which does not cross the wire"},
+		// Only kogo.time's: another package's LocalDate is an external class like any other.
+		{rpc("import kogo.other.LocalDate\n") + "api ops unchecked { ‸f ungated }\n" + op("LocalDate", "Unit") + "\n---\npackage kogo.other\nexternal class LocalDate",
+			"wire", "f's input is a LocalDate, which does not cross the wire"},
 		{rpc() + "api ops unchecked { ‸f ungated }\n" + op("Unit", "List<Map<String, Int>>"), "wire", "f's answer holds a Map<String, Int>, which does not cross"},
 		{rpc() + "api ops unchecked { ‸f ungated }\n" + op("Unit", "Char"), "wire", "f's answer is a Char, which does not cross"},
 		{rpc() + "api ops unchecked { ‸f ungated }\ndata class In(val logo: ByteArray)\n" + op("In", "Unit"),

@@ -58,11 +58,12 @@ func File(list string, a *check.API) []byte {
 }
 
 // scalars gives the TypeScript of the prelude's types that cross the
-// wire (spec.md 15.4), but List. Unit's names no built-in, which a
-// type of the program's could shadow.
+// wire (spec.md 15.4), kogo.time's two among them, but List. Unit's
+// names no built-in, which a type of the program's could shadow.
 var scalars = map[string]string{
 	"Boolean": "boolean", "Int": "number", "Long": "number", "Double": "number",
 	"String": "string", "Uuid": "string", "Unit": "{[k: string]: never}",
+	"LocalDate": "string", "LocalTime": "string",
 }
 
 // typ gives the TypeScript of t, a type the checker let onto the wire.
@@ -72,7 +73,7 @@ func typ(t check.Type) string {
 	}
 	n := t.(*check.Named)
 	switch d := n.Decl; {
-	case d.Pkg != "kogo":
+	case d.Pkg != "kogo" && d.Pkg != "kogo.time":
 		return d.Simple()
 	case d.Name == "List":
 		s := typ(n.Args[0])

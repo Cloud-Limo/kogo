@@ -5386,3 +5386,32 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   migrate. Reopens if a program depends on Postgres's refusal for a
   `real`, or pgx changes how it encodes a `float64` for a float4
   (`TestRealAndCharacter` would fail).
+
+## A LocalDate and a LocalTime on the wire (DEV-1302), 27 Nov 2026
+
+- **A `LocalDate` and a `LocalTime` cross the wire, each as its text,
+  and the reader refuses one that does not read with its own 400**
+  (Greg, 27 Nov 2026). It replaces the form of his ruling of 24 Nov,
+  a date's text, an hour and a minute, whose reason the parts could
+  not give: a `String` holds `2026-02-30` and an `Int` holds 24, so
+  each operation would have had to refuse them. Not taken: the parts
+  with a refusal in each operation; one string of a local date-time.
+  Every other type of `kogo.time` stays a compile error there.
+  Reopens if a caller must send a moment (an `Instant`) or a length
+  (a `Duration`), or if a page sends a date outside the form.
+- **The reader matches a pattern of ASCII digits and then checks each
+  field's range itself** (spec 15.4 gives the forms). Not taken: Go's
+  `time.Parse`, whose layouts are not java.time's and would each need
+  checking for what they let through. `mise run kotlin` holds both to
+  java.time (`kotlin/wire`).
+- **An answer writes any `LocalDate` as `toString()` does**, sign and
+  all, though the reader refuses `+10000-01-01`: one outside the form
+  can only be made by the program (`plusDays`) or read from Postgres,
+  and is no caller's fault. Not taken: a panic for one, as for a
+  `Long` past 2^53, which would make a date that Postgres holds, as
+  `-0001-01-01`, a 500.
+- **The error says the form**: `input.day is not a LocalDate, a day
+  written YYYY-MM-DD`, `input.at is not a LocalTime, written HH:mm,
+  HH:mm:ss or HH:mm:ss.SSS`, where a `Uuid`'s says only `is not a
+  Uuid`. Not taken: the `Uuid`'s bare form, which leaves a caller to
+  guess which of a time's forms is wanted.

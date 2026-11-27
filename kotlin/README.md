@@ -34,6 +34,14 @@ must refuse. It needs a JVM and is not part of `go test ./...`.
   on such an input. It is counted as refused; the limit on any other
   input differs.
 
+- `wire/main.go` and `wire.kt` hold the wire's text of a `LocalDate`
+  and a `LocalTime` (spec.md 15.4) to `java.time`: `wire gen` writes
+  edges and generated texts, `wire.kt` reads each with `parse` and
+  writes it with `toString`, and `wire diff` compares the reader's
+  results. A date `java.time` reads and the reader refuses is counted
+  as the limit when it is outside `YYYY-MM-DD`, and is a difference
+  inside it.
+
 - `deviations/*.kg` are Kogo's deliberate deviations (spec 1), one
   file each. kotlinc must refuse every one with an error on the line
   its first line names, `// kotlinc refuses line N`, so no Kotlin

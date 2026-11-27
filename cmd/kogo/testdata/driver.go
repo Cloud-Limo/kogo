@@ -240,6 +240,15 @@ func main() {
 	post("look up a missing invoice", "lookUp", `{"number": "INV-9"}`)
 	post("look up another missing invoice", "lookUp", `{"number": "INV-8"}`)
 	post("look up after two misses", "lookUp", `{"number": "INV-1"}`)
+	post("a pickup on a leap day", "pickup", `{"day": "2028-02-29", "at": "23:00"}`)
+	post("a pickup with seconds", "pickup", `{"day": "2026-11-27", "at": "10:30:45.5"}`)
+	post("29 February of a year with none", "pickup", `{"day": "2027-02-29", "at": "10:30"}`)
+	post("30 February", "pickup", `{"day": "2026-02-30", "at": "10:30"}`)
+	post("a month of one digit", "pickup", `{"day": "2026-2-3", "at": "10:30"}`)
+	post("24:00", "pickup", `{"day": "2026-11-27", "at": "24:00"}`)
+	post("minute 60", "pickup", `{"day": "2026-11-27", "at": "10:60"}`)
+	post("a date as a number", "pickup", `{"day": 20261127, "at": "10:30"}`)
+	post("no time", "pickup", `{"day": "2026-11-27", "at": null}`)
 
 	// 24: a checked list of gated rows, each stage refusing in turn.
 	// The address has two looks, which its gate refuses; hooks, an

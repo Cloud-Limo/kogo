@@ -17,17 +17,23 @@ import (
 	"unicode/utf8"
 
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	ktime "github.com/Cloud-Limo/kogo/prelude/kogo/time"
 )
 
 // JSON as spec.md 15.4 has it, by one walk over the Go types the
 // emitter writes: a data class is a struct tagged with its Kogo names
 // (rt), T? a pointer, a List a slice, an enum a named string,
-// Unit an empty struct. Go's reflection does not list an enum's
-// constants, so a table carries those.
+// Unit an empty struct; a Uuid, a LocalDate and a LocalTime cross as
+// their text. Go's reflection does not list an enum's constants, so a
+// table carries those.
 
 const maxLong = 1<<53 - 1 // the whole numbers JavaScript holds exactly
 
 var uuidType = reflect.TypeFor[kogo.Uuid]()
+var dateType, timeType = reflect.TypeFor[ktime.LocalDate](), reflect.TypeFor[ktime.LocalTime]()
+
+// textual says whether t crosses as a string that is not a String's.
+func textual(t reflect.Type) bool { return t == uuidType || t == dateType || t == timeType }
 
 // A reader reads input strictly. It knows each enum's constants. With
 // extra, it reports a key that a data class does not have, by where
@@ -183,8 +189,20 @@ func (r reader) read(t reflect.Type, j any, at string) (reflect.Value, error) {
 			return v, bad(at, "does not fit a Double")
 		}
 		v.SetFloat(f)
-	case (t == uuidType || t.Kind() == reflect.String) && !isString:
+	case (textual(t) || t.Kind() == reflect.String) && !isString:
 		return v, bad(at, "is not a string")
+	case t == dateType:
+		d, ok := ktime.ReadLocalDate(s)
+		if !ok {
+			return v, bad(at, "is not a LocalDate, a day written YYYY-MM-DD")
+		}
+		v.Set(reflect.ValueOf(d))
+	case t == timeType:
+		c, ok := ktime.ReadLocalTime(s)
+		if !ok {
+			return v, bad(at, "is not a LocalTime, written HH:mm, HH:mm:ss or HH:mm:ss.SSS")
+		}
+		v.Set(reflect.ValueOf(c))
 	case t == uuidType:
 		u := kogo.Uuid_ParseOrNull(s)
 		if u == nil {
@@ -301,7 +319,7 @@ func (r reader) check(t reflect.Type, seen map[reflect.Type]bool) {
 	}
 	seen[t] = true
 	switch {
-	case t == uuidType, t == reflect.TypeFor[string]():
+	case textual(t), t == reflect.TypeFor[string]():
 	case t.Kind() == reflect.Bool, t.Kind() == reflect.Int32, t.Kind() == reflect.Int64, t.Kind() == reflect.Float64:
 	case t.Kind() == reflect.String:
 		if _, ok := r.enums[t]; !ok {
@@ -326,6 +344,10 @@ func (r reader) check(t reflect.Type, seen map[reflect.Type]bool) {
 // of op it is.
 func write(b *bytes.Buffer, v reflect.Value, op, at string) {
 	bug := func(what string) { panic(fmt.Sprintf("the answer of %s holds %s at %s", op, what, at)) }
+	if textual(v.Type()) { // as Kotlin's Uuid and java.time write it
+		b.WriteString(quote(v.Interface().(fmt.Stringer).String()))
+		return
+	}
 	switch v.Kind() {
 	case reflect.Pointer:
 		if v.IsNil() {
@@ -348,8 +370,6 @@ func write(b *bytes.Buffer, v reflect.Value, op, at string) {
 		b.Write(text)
 	case reflect.String:
 		b.WriteString(quote(v.String()))
-	case reflect.Array: // a Uuid
-		b.WriteString(quote(v.Interface().(kogo.Uuid).String()))
 	case reflect.Slice:
 		b.WriteByte('[')
 		for i := range v.Len() {

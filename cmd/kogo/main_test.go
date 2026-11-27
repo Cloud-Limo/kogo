@@ -194,6 +194,15 @@ look up again: 200 {"type":"ok","value":{"number":"INV-1","status":"paid","total
 look up a missing invoice: 200 {"type":"refused","message":"There is no invoice INV-9."}
 look up another missing invoice: 200 {"type":"refused","message":"There is no invoice INV-8."}
 look up after two misses: 200 {"type":"refused","message":"Too many looks. Try again later."}
+a pickup on a leap day: 200 {"type":"ok","value":{"day":"2028-03-01","at":"00:30"}}
+a pickup with seconds: 200 {"type":"ok","value":{"day":"2026-11-28","at":"12:00:45.500"}}
+29 February of a year with none: 400 pickup: input.day is not a LocalDate, a day written YYYY-MM-DD
+30 February: 400 pickup: input.day is not a LocalDate, a day written YYYY-MM-DD
+a month of one digit: 400 pickup: input.day is not a LocalDate, a day written YYYY-MM-DD
+24:00: 400 pickup: input.at is not a LocalTime, written HH:mm, HH:mm:ss or HH:mm:ss.SSS
+minute 60: 400 pickup: input.at is not a LocalTime, written HH:mm, HH:mm:ss or HH:mm:ss.SSS
+a date as a number: 400 pickup: input.day is not a string
+no time: 400 pickup: input.at is null
 refused by the check: 403 Open the desk's page first.
 the check before the name: 403 Open the desk's page first.
 refused by a shared gate: 200 {"type":"refused","message":"This address may not use the desk."}

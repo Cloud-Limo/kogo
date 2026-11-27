@@ -337,6 +337,12 @@ func (c *checker) add(id *syntax.Ident, what string, w *reach, d *TypeDecl) {
 	w.Types = append(w.Types, d)
 }
 
+// wireTime says whether d is one of the two types of kogo.time that
+// cross the wire as their text, LocalDate and LocalTime (spec.md 15.4).
+func wireTime(d *TypeDecl) bool {
+	return d.Pkg == "kogo.time" && d.Kind == "external class" && (d.Name == "LocalDate" || d.Name == "LocalTime")
+}
+
 // wire checks that whole, the input or the answer of the operation at
 // id, crosses the wire (spec.md 15.4), and adds the types it reaches
 // to w. An answer does not read a type the list already reached; an
@@ -365,7 +371,7 @@ func (c *checker) wire(id *syntax.Ident, what string, whole Type, w *reach) {
 			return
 		}
 		switch d := n.Decl; {
-		case is(n, tBoolean), number(n), is(n, tString), d == c.prelude("Uuid"):
+		case is(n, tBoolean), number(n), is(n, tString), d == c.prelude("Uuid"), wireTime(d):
 		case d == c.prelude("List"):
 			walk(n.Args[0], path)
 		case d == c.prelude("ByteArray"):

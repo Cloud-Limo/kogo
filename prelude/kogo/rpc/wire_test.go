@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Cloud-Limo/kogo/prelude/kogo"
+	ktime "github.com/Cloud-Limo/kogo/prelude/kogo/time"
 	"github.com/Cloud-Limo/kogo/rt"
 )
 
@@ -29,27 +30,30 @@ type Stop struct {
 }
 
 type Job struct {
-	_       struct{}  `kogo:"Job"`
-	Done    bool      `kogo:"done"`
-	Number  int32     `kogo:"number"`
-	Cents   int64     `kogo:"cents"`
-	Rate    float64   `kogo:"rate"`
-	Notes   string    `kogo:"notes"`
-	Id      kogo.Uuid `kogo:"id"`
-	State   State     `kogo:"state"`
-	Stops   []Stop    `kogo:"stops"`
-	Tip     *int32    `kogo:"tip"`
-	Nothing rt.Unit   `kogo:"nothing"`
+	_       struct{}        `kogo:"Job"`
+	Done    bool            `kogo:"done"`
+	Number  int32           `kogo:"number"`
+	Cents   int64           `kogo:"cents"`
+	Rate    float64         `kogo:"rate"`
+	Notes   string          `kogo:"notes"`
+	Id      kogo.Uuid       `kogo:"id"`
+	Day     ktime.LocalDate `kogo:"day"`
+	At      ktime.LocalTime `kogo:"at"`
+	State   State           `kogo:"state"`
+	Stops   []Stop          `kogo:"stops"`
+	Tip     *int32          `kogo:"tip"`
+	Nothing rt.Unit         `kogo:"nothing"`
 }
 
 var wire = newReader([]any{State_entries})
 
 const job = `{"done":true,"number":-2147483648,"cents":-9007199254740991,"rate":0.1,"notes":"a \"b\"",` +
-	`"id":"0195a3c4-5b6d-7e8f-9a0b-1c2d3e4f5a6b","state":"Confirmed",` +
+	`"id":"0195a3c4-5b6d-7e8f-9a0b-1c2d3e4f5a6b","day":"2028-02-29","at":"10:30:45.100","state":"Confirmed",` +
 	`"stops":[{"name":"x","back":null},{"name":"y","back":{"name":"z","back":null}}],"tip":7,"nothing":{}}`
 
 var jobValue = Job{Done: true, Number: math.MinInt32, Cents: -maxLong, Rate: 0.1, Notes: `a "b"`,
-	Id:    kogo.Uuid{0x01, 0x95, 0xa3, 0xc4, 0x5b, 0x6d, 0x7e, 0x8f, 0x9a, 0x0b, 0x1c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b},
+	Id:  kogo.Uuid{0x01, 0x95, 0xa3, 0xc4, 0x5b, 0x6d, 0x7e, 0x8f, 0x9a, 0x0b, 0x1c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b},
+	Day: ktime.LocalDate{Year: 2028, Month: 2, Day: 29}, At: ktime.LocalTime{NanoOfDay: (37845*1000 + 100) * 1e6},
 	State: State_Confirmed, Stops: []Stop{{Name: "x"}, {Name: "y", Back: &Stop{Name: "z"}}},
 	Tip: rt.Ptr[int32](7)}
 
@@ -102,6 +106,9 @@ func TestStrict(t *testing.T) {
 		{`0195a3c4-5b6d`, `0195a3c45-b6d`, "input.id is not a Uuid"},
 		{`3e4f5a6b`, `3e4f5a--`, "input.id is not a Uuid"},
 		{`"Confirmed"`, `"Secret"`, "input.state is not one of Offered, Confirmed"},
+		{`"2028-02-29"`, `"2026-02-29"`, "input.day is not a LocalDate, a day written YYYY-MM-DD"},
+		{`"2028-02-29"`, `20260203`, "input.day is not a string"},
+		{`"10:30:45.100"`, `"24:00"`, "input.at is not a LocalTime, written HH:mm, HH:mm:ss or HH:mm:ss.SSS"},
 		{`"name":"z"`, `"name":"z","secret":1`, "input.stops[1].back.secret is not a key of Stop"},
 		{`"name":"y"`, `"name":null`, "input.stops[1].name is null"},
 		{`"tip":7`, `"tip":[7]`, "input.tip is not a number"},

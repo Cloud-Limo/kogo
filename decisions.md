@@ -5467,3 +5467,15 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   merge:` whose PR merged and once for the issue turning Done. The
   second clerk finds the caught-up issue's newest event is now the
   `Start:`, so it takes nothing.
+
+## The clerk launches an orphaned brief again (DEV-1319), 28 Nov 2026
+
+- **`doc/lead.md` is unchanged.** Its row "`Clerk:` or `Failed:`, no
+  label: as the comment says" still reads right: the orphan's line
+  says to launch again, a clerk does it first once `lin clerk` starts
+  one, and a second orphan comes to the lead as a `Clerk:`. Not
+  taken: a lead row naming the orphan, which would say what the
+  clerk's table says.
+- **An orphaned Pickup is launched again too**, though a Code run is
+  otherwise the lead's to launch: the brief is the lead's, unchanged.
+  Not taken: handing a Pickup's orphan on, which stalls it as before.

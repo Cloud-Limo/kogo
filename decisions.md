@@ -5418,16 +5418,15 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
 
 ## The pricing's names (DEV-1300), 27 Nov 2026
 
-- **A `Map`'s `values` is a `Collection<V>`, a prelude type of its own
-  with `toList()` alone, and `==` on one is refused**
-  (`collection-equality`), as on a `Regex`. Kotlin's is a `Collection`
-  whose `==` is identity for the maps Kogo makes (a `LinkedHashMap`'s),
-  and which has no `[i]`: a `List` would have taken `values[0]`, which
-  kotlinc refuses, and answered `true` where Kotlin's `==` answers
-  `false`. Not taken: `values: List<V>`, a line shorter and a
-  difference from Kotlin. Its other members (`map`, `sumOf`, a `for`
-  over it) come as a program needs them, `toList()` until then.
-  Reopens if Kogo gains an `Iterable` that a `List` and a `Set` share.
+- **A `Map`'s `values` is left unbound**, since Kotlin's is a
+  `Collection` and no port calls it: the pricing's Kotlin does not, and
+  the one read in cusoon2, in `rpc/typescript.kt`, is replaced by
+  `kogo ts` (Greg's ruling on PR 212). Not taken: a prelude type
+  `Collection<out T>` with `toList()` alone and `==` refused (this PR
+  at `d921117`, reviewed and sound, about 20 code lines), and a
+  `List<V>`, which answers `==` and an index differently from Kotlin.
+  Reopens with a port that must read a map's values and cannot be
+  written with `keys` or the list it grouped.
 - **`max` and `min` are an overload each for `Int`, `Long` and
   `Double`**, in the prelude with no import, as `abs` is, and Go's
   `max` and `min`, which are Java's `Math.max` and `Math.min`: a NaN
@@ -5439,7 +5438,8 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
 - **`plusSeconds` takes `java.time`'s steps**: the seconds are added to
   the local date and time at the old offset, which is then read back
   at the zone's offset for that moment, so it panics where java.time's
-  does with its message (`Invalid value for EpochDay`, `Instant exceeds
-  minimum or maximum instant`). Spec 12's list of the functions that
-  panic so names it. Not taken: `Instant.plus` and `atZone`, the same
-  moment in range, and `long overflow` where java.time names the day.
+  does with its message (`Invalid value for EpochDay`, since a
+  `LocalDate`'s range is checked before an `Instant`'s). Spec 12's list
+  of the functions that panic so names it. Not taken: `Instant.plus`
+  and `atZone`, the same moment in range, and `long overflow` where
+  java.time names the day.

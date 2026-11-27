@@ -578,21 +578,6 @@ func Map_widen[K, A, B any](m Map[K, A], f func(A) B) Map[K, B] {
 // Map_Keys shares the map's keys, which nothing adds to (ordered).
 func Map_Keys[K, V any](this Map[K, V]) Set[K] { return Set[K]{ordered: this.ordered} }
 
-// A Collection is a Map's values, in the map's order. Kotlin's ==
-// compares one by identity, which kogo check refuses (spec.md 12).
-type Collection[T any] struct{ elements []T }
-
-func (c Collection[T]) String() string { return rt.ToString(c.elements) }
-
-func Collection_widen[A, B any](c Collection[A], f func(A) B) Collection[B] {
-	return Collection[B]{List_widen(c.elements, f)}
-}
-
-// Map_Values shares the map's values, which nothing adds to; ToList
-// clips them, so a plus on the list copies.
-func Map_Values[K, V any](this Map[K, V]) Collection[V]   { return Collection[V]{this.values} }
-func Collection_ToList[T any](this Collection[T]) List[T] { return slices.Clip(this.elements) }
-
 func Pair_First[A, B any](this Pair[A, B]) A  { return this.First }
 func Pair_Second[A, B any](this Pair[A, B]) B { return this.Second }
 

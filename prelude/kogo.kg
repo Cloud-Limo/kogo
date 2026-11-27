@@ -7,7 +7,6 @@ external class List<out T>
 external class Pair<out A, out B>
 external class Set<out T>
 external class Map<K, out V>
-external class Collection<out T>
 external class Regex
 external class Uuid
 external class Decimal
@@ -76,8 +75,6 @@ external fun <T> Set<T>.minus(elements: Set<T>): Set<T>
 
 external fun <K, V> Map<K, V>.get(key: K): V?
 external val <K, V> Map<K, V>.keys: Set<K>
-external val <K, V> Map<K, V>.values: Collection<V>
-external fun <T> Collection<T>.toList(): List<T>
 
 external val <A, B> Pair<A, B>.first: A
 external val <A, B> Pair<A, B>.second: B

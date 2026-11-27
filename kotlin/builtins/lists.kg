@@ -53,7 +53,6 @@ fun lists(f: String, xs: List<Long>, ys: List<Long>, n: Int, m: Int): String? = 
     "associateBy" -> "${xs.associateBy { it % 3L }} ${(xs + ys).associateBy { it > n }} ${ys.associateBy { if (it > m) null else it / 2L }} ${xs.associateBy { it % 3L }[ys.firstOrNull() ?: 0L]}"
     "associate" -> "${xs.associate { it % 3L to it * m }} ${(xs + ys).associate { "$it" to (it > n) }} ${listOf<Long>().associate { it to it }} ${xs.associate { it to it } == xs.reversed().associate { it to it }}"
     "keys" -> keys(xs, ys, n)
-    "values" -> values(xs, ys, n)
     "pair" -> "${(n to xs).first} ${(n to xs).second} ${xs.zip(ys).map { it.first - it.second }} ${(xs to ys.zip(xs)).second.map { it.second }}"
     "setPlus" -> "${xs.toSet() + n.toLong()} ${xs.toSet() + ys} ${xs.toSet() + ys.toSet()} ${setOf<Long>() + xs} ${xs.toSet() + xs} ${xs.toSet() + ys == ys.toSet() + xs}"
     "setMinus" -> "${xs.toSet() - n.toLong()} ${xs.toSet() - ys} ${xs.toSet() - ys.toSet()} ${xs.toSet() - listOf<Long>()} ${setOf<Long>() - xs} ${(xs + ys).toSet() - xs - ys}"
@@ -92,15 +91,6 @@ fun keys(xs: List<Long>, ys: List<Long>, n: Int): String {
     val more = m.keys + ys
     val less = m.keys - xs.take(n)
     return "${m.keys} $more $less $m ${m.keys == ys.groupBy { it % 3L }.keys} ${xs.associateBy { it > n }.keys}"
-}
-
-// A map's values, in its order, and a list made from them, leave the
-// map as it was.
-fun values(xs: List<Long>, ys: List<Long>, n: Int): String {
-    val m = xs.groupBy { it % 3L }
-    val vs = m.values.toList()
-    val more = vs + listOf(ys)
-    return "${m.values} $vs $more $m ${xs.associateBy { it > n }.values} ${ys.associate { it to it * 2L }.values.toList()} ${listOf<Long>().associateBy { it }.values}"
 }
 
 // Two lists built from one must not share what each added.

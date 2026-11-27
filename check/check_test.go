@@ -593,13 +593,6 @@ func TestRegexEquality(t *testing.T) {
 	})
 }
 
-// Nor is a Map's values, which Kotlin compares by identity (spec.md 12).
-func TestCollectionEquality(t *testing.T) {
-	values := "\n---\npackage kogo\nexternal class Collection<out T>\nexternal val <K, V> Map<K, V>.values: Collection<V>\nexternal fun <T> Collection<T>.toList(): List<T>"
-	passes(t, "fun f(a: Map<Int, Int>, b: List<Int>): Boolean = a.values.toList() == b && \"${a.values}\" == \"[1]\""+values)
-	refused(t, [][3]string{{"fun f(a: Map<Int, Int>, b: Map<Int, Int>): Boolean = a.values ‸== b.values" + values, "collection-equality", "== compares a Collection<Int>, which Kotlin compares by identity, not by its elements: compare toList() of each"}})
-}
-
 // Nor is a handle, which Kotlin compares by identity (spec.md 3).
 func TestHandleEquality(t *testing.T) {
 	env := "data class Env(val name: String, val clock: Clock)\n"

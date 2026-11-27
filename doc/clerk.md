@@ -217,10 +217,10 @@ it is yours though you write no code), runs the tests, `leaks` and,
 unless the PR changes only `.md` files, the two comparisons with Kotlin.
 For a cusoon2 PR it makes or moves `~/Dev/cusoon2-dev-NNN`, detached at
 the pushed head, merges `renew` into one that fell behind when the
-merge is clean and it is no port, or `renew` brings only paths under
-`doc/`, `infra/`, `frontend/`, `site/` and `mise-tasks/` (`APART` in
-cusoon2's `mise-tasks/linear-merge-check` is the list: change it there
-and here), and pushes it, then runs that checkout's
+merge is clean and either it is no port or `renew` brings only paths
+under `doc/`, `infra/`, `frontend/`, `site/` and `mise-tasks/`
+(`APART` in cusoon2's `mise-tasks/linear-merge-check` is the list:
+change it there and here), and pushes it, then runs that checkout's
 `kogo/drift.sh`, then its `kogo/run.sh`, when the PR touches `kogo/`
 or a file `kogo/pins` names; a pin left behind answers `fix:
 kogo/pins` with the Fix's phrase. It takes a minute or so, and more

@@ -269,7 +269,7 @@ of row types in `schema.kg` make the area's total.
 | 11 | The wizard's quotes | `charges`, `discountedTotal`, `loyaltyProgramDiscount` | 295 / 200 | 5, 10; the time on the wire as its parts |
 | 12 | The price and the payment details | `setBookingPrice`, `setPaymentDetails` | 185 / 170 | 6, 10 |
 | 13 | The journeys and the place search | `ensureJourney`, `bookingStatus`, `placeSuggest` | 280 / 220 | 3; the time on the wire as its parts; Google's Directions and Autocomplete |
-| 14 | Submitting and editing a booking | `submitBooking`, `setBookingDetails` | 335 / 260 | 11, 13 |
+| 14 | Submitting and editing a booking | `submitBooking`, `setBookingDetails` | 335 / 260 | 11, 13; `submitBooking` builds its own caller's `ViewerCall` in `call.kg` for `bookingAnswer`, which keeps its signature (DEV-1286's Ruling) |
 | 15 | The customer's logins | `startEmailLogin`, `completeEmailLogin`, `startPasskeyLogin`, `completePasskeyLogin` | 225 / 200 | 2; the login design |
 | 16 | The customer's passkeys | `hasPasskey`, `passkeys`, `startPasskeyRegistration`, `completePasskeyRegistration`, `deletePasskey` | 70 / 80 | 15 |
 | 17 | The profile | `bookerProfile`, `createBooker`, `updateBooker` | 240 / 180 | 15; Stripe's client; Kotlin first in its PR: `bookerProfile` refuses a visitor, so its row is `gatedBy viewer` |

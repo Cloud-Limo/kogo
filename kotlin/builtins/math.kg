@@ -1,0 +1,31 @@
+// kogo.math and roundToLong (see lists.kg); for Kotlin, math.kt names
+// kotlin.math's functions kogo.math's and round.kt gives roundToLong
+// the import kotlinc needs. sin, cos and asin are Go's: a kept
+// difference in cases/main.go.
+package builtins
+
+import kogo.math.PI
+import kogo.math.asin
+import kogo.math.cos
+import kogo.math.sin
+import kogo.math.sqrt
+
+fun maths(f: String, x: Long, d: Double): String? = when (f) {
+    "sqrt" -> "${sqrt(d)} ${sqrt(-d)} ${sqrt(x.toDouble())}"
+    "pi" -> "$PI ${PI / 180.0} ${d * (PI / 180.0)}"
+    "roundToLong" -> "${d.roundToLong()} ${(-d).roundToLong()} ${(d * 0.5).roundToLong()} ${x.toDouble().roundToLong()}"
+    "sin" -> "${sin(d)} ${sin(d * (PI / 180.0))}"
+    "cos" -> "${cos(d)} ${cos(d * (PI / 180.0))}"
+    "asin" -> "${asin(d)} ${asin(1.0 / (d * d + 1.0))}"
+    "greatCircle" -> "${distance(-37.8136, 144.9631, -33.8688, 151.2093)} ${distance(d, 0.0, 0.0, d)} ${distance(d, 0.0, 0.0, d).roundToLong()}"
+    else -> null
+}
+
+// distance is the great-circle distance in metres between two points
+// given in degrees, by the haversine formula.
+fun distance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = PI / 180.0
+    val a = sin((lat2 - lat1) * r / 2.0)
+    val b = sin((lon2 - lon1) * r / 2.0)
+    return 2.0 * 6371000.0 * asin(sqrt(a * a + cos(lat1 * r) * cos(lat2 * r) * b * b))
+}

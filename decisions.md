@@ -5332,6 +5332,61 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   that is wrong around a statement, or the emitted Go is run through
   a tool that moves comments inside a call.
 
+## `kogo.math` and `roundToLong` (DEV-1299), 27 Nov 2026
+
+- **`sin`, `cos` and `asin` are Go's `math.Sin`, `math.Cos` and
+  `math.Asin`** (Greg, 24 Nov 2026, on DEV-1146: Kogo does not fight
+  Go on floating point). `PI`, `sqrt`, `roundToLong` and the
+  arithmetic are Kotlin's to the bit. `mise run kotlin` keeps the
+  three as a difference, rounding each number in both results to ten
+  significant digits. Of its 250 inputs each, `sin` differed on 71,
+  `cos` on 68, `asin` on 30 and the great-circle case on 242 (its
+  fixed Melbourne to Sydney distance by one unit in the last place).
+  The largest: `asin` 536 units in the last place (7.6e-14 of it),
+  of an argument near 1; `cos` 37 and `sin` 25, of an argument past
+  10^9; one unit for `sin` and `cos` of an ordinary one. So the spec
+  says "in its last digits" where DEV-1146 said "in the last place",
+  from a probe of `sin` and `cos` alone (lead's Ruling, 27 Nov 2026);
+  these figures stay here, since they are one machine's measurement
+  and Go promises no bound. Not taken: Java's tables, or a `sin`
+  written in Go; the measured bound in the spec.
+  Reopens if a program needs more than twelve digits of one of them,
+  or a comparison of a port meets a result that rounds apart.
+- **`PI` is a top-level `external val`**, `var PI = math.Pi` in Go.
+  The checker and the emitter already had the form: a top-level val
+  needs no value when it is external, and a program reads it as it
+  reads any package's val. A Go variable and not a constant, since
+  Go works a constant expression such as `PI / 180.0` out exactly
+  where Kotlin divides two `Double`s. Not taken: a `const val` in the
+  prelude, which reads the same and would let a binding hold a body.
+- **`import kotlin.math.sin` says to import `kogo.math.sin`
+  instead**, as for `java.time`.
+- **`roundToLong` is `floor(d)`, plus one when `d - floor(d)` is at
+  least a half**, then `toLong`'s ends. The subtraction is exact for
+  every `d` but a negative above -1, where its rounding cannot cross
+  the half; `floor(d + 0.5)` is wrong for 0.49999999999999994 and
+  past 2^52, and `math.Round` for a negative tie. No product is
+  followed by an addition. NaN panics with Kotlin's words, `Cannot
+  round NaN value.`
+- **The check's ten new Double edges** (the ties, 0.49999999999999994,
+  1 and the next Double, 2^52 and its neighbours, 2^53 + 2 and the last
+  Double below 2^63) are all in the first inputs' walk, now 43 long.
+
+## real and character(n) (DEV-1296), 27 Nov 2026
+
+- **`real` maps to `Double` and `character(n)` to `String`, read and
+  sent, as spec 10.4 states** (Greg, 27 Nov 2026, on DEV-1290's
+  research). A `Double` out of a `real`'s range is stored as an
+  infinity or 0 where Postgres's cast refuses, as Kotlin's `toFloat()`
+  rounds it, so it is allowed; a `character(n)` is read padded, as
+  JDBC gives it to Kotlin. Not taken: a `kogo check` error on a
+  `real` parameter asking for `$x::float8`, which refuses what Kotlin
+  does silently; migrating such columns to `text` and `double
+  precision`, which suits cusoon2 but not a schema that cannot
+  migrate. Reopens if a program depends on Postgres's refusal for a
+  `real`, or pgx changes how it encodes a `float64` for a float4
+  (`TestRealAndCharacter` would fail).
+
 ## A LocalDate and a LocalTime on the wire (DEV-1302), 27 Nov 2026
 
 - **A `LocalDate` and a `LocalTime` cross the wire, each as its text,

@@ -1251,6 +1251,11 @@ func TestPrelude(t *testing.T) {
 						n++
 					}
 				default:
+					if vs := e.info.Vars[d]; vs != nil { // a top-level val, as PI
+						uses += fmt.Sprintf("var _ %s = %s\n", e.typ(vs[0].Type), e.qualify(vs[0].Pkg, e.names[vs[0]]))
+						n++
+						continue
+					}
 					fun(e.info.Funcs[d])
 				}
 			}

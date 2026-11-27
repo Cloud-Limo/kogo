@@ -22,7 +22,7 @@ fi
 
 # kotlinc reads only .kt: the same bytes, under that name.
 for f in builtins/*.kg; do cp "$f" "_work/$(basename "$f" .kg).kt"; done
-kotlinc -nowarn -cp "$arrow" _work/*.kt main.kt kogo.kt time.kt arrow.kt wire.kt -d _work/kotlin.jar
+kotlinc -nowarn -cp "$arrow" _work/*.kt main.kt kogo.kt time.kt math.kt round.kt arrow.kt wire.kt -d _work/kotlin.jar
 kotlin -cp "_work/kotlin.jar:$arrow" MainKt _work/cases > _work/kotlin
 
 go run ./cases diff _work/cases _work/kogo _work/kotlin

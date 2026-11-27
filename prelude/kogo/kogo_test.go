@@ -67,6 +67,30 @@ func TestAsKotlin(t *testing.T) {
 			t.Errorf("%v.toInt() is %d, want %d", c.d, got, c.want)
 		}
 	}
+	// roundToLong is Java's Math.round, whose edges are where
+	// floor(d + 0.5) and Go's math.Round go wrong.
+	for _, c := range []struct {
+		d    float64
+		want int64
+	}{
+		{2.5, 3}, {-2.5, -2}, {0.5, 1}, {-0.5, 0}, {1.5, 2}, {-1.5, -1}, {2.4, 2}, {-2.6, -3},
+		{0.49999999999999994, 0}, {-0.49999999999999994, 0}, {math.Copysign(0, -1), 0},
+		{1 << 52, 1 << 52}, {1<<52 + 1, 1<<52 + 1}, {1<<52 - 0.5, 1 << 52}, {-(1<<52 - 0.5), -(1<<52 - 1)},
+		{1<<63 - 1024, 1<<63 - 1024}, {1 << 63, math.MaxInt64}, {-(1 << 63), math.MinInt64}, {1e300, math.MaxInt64},
+		{math.Inf(1), math.MaxInt64}, {math.Inf(-1), math.MinInt64},
+	} {
+		if got := Double_RoundToLong(c.d); got != c.want {
+			t.Errorf("%v.roundToLong() is %d, want %d", c.d, got, c.want)
+		}
+	}
+	func() {
+		defer func() {
+			if p := recover(); p != "Cannot round NaN value." {
+				t.Errorf("NaN.roundToLong() panics with %v", p)
+			}
+		}()
+		Double_RoundToLong(math.NaN())
+	}()
 	// Decimal digits come in runs of ten from a zero, which is what
 	// digitToInt counts on.
 	for _, r := range unicode.Nd.R16 {

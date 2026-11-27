@@ -910,6 +910,21 @@ func Double_ToLong(this float64) int64 {
 	return int64(this)
 }
 
+// Double_RoundToLong is Kotlin's roundToLong, Java's Math.round: the
+// nearest Long, a tie toward positive infinity, stopping at the ends
+// of Long, and NaN a panic where Kotlin throws. this - floor(this)
+// loses nothing that decides the answer, where this + 0.5 rounds.
+func Double_RoundToLong(this float64) int64 {
+	if this != this {
+		panic("Cannot round NaN value.")
+	}
+	r := math.Floor(this)
+	if this-r >= 0.5 {
+		r++
+	}
+	return Double_ToLong(r)
+}
+
 // Double_ToInt is Double_ToLong at the ends of Int.
 func Double_ToInt(this float64) int32 {
 	switch {

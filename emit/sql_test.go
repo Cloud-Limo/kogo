@@ -376,6 +376,27 @@ fun text(a: ByteArray): String = "${F("x", a)}"
 `)
 }
 
+// A real is read as a Double, widened exactly, and a Double sent to
+// one is rounded to a float4 as Kotlin's toFloat() rounds it: beyond
+// its range to Infinity and below it to 0, where Postgres's own cast
+// from float8 refuses. A character(n) is read padded with spaces to n,
+// as Postgres sends it (spec.md 10.4).
+func TestRealAndCharacter(t *testing.T) {
+	t.Parallel()
+	expectWith(t, withDB, "defer drop()\n", [][2]string{
+		{`t.Padded(db)`, "[A ]"},
+		{`t.Real(db, 0.1)`, "0.10000000149011612"},
+		{`t.Real(db, 1e39)`, "Infinity"},
+		{`t.Real(db, -1e39)`, "-Infinity"},
+		{`t.Real(db, 5e-324)`, "0.0"},
+	}, `package t
+
+fun padded(db: Db): String = db.tx { tx -> "[" + tx.querySingle<String>(sql"""select 'A'::character(2) as "v!" """) + "]" }
+
+fun real(db: Db, d: Double): Double = db.tx { tx -> tx.querySingle<Double>(sql"""select $d::real as "v!" """) }
+`)
+}
+
 // A read takes each column by the name kogo check saw, so a table
 // whose columns the database served orders otherwise, as after a
 // column is dropped and added again, or which has one more, is read

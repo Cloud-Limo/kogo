@@ -8,9 +8,9 @@ test lines, from counting the Kotlin a piece replaces or from the
 designs' own guesses; nothing was built to measure it. The ops
 site's table marks each piece built, with its PR, or not; Linear holds
 the state of what is not. This file holds the order and the reasons,
-and is rewritten when either moves. Last rewritten 26 Nov 2026
-(DEV-1271), with row 20 built and the ruling's questions answered
-as Greg ruled that day.
+and is rewritten when either moves. Last rewritten 27 Nov 2026
+(DEV-1299), with `kogo.math` and `!in` built, the booker's slices 1
+to 6 merged, and Greg's rule of that day on changing emitted Go.
 
 ## The goal
 
@@ -53,6 +53,10 @@ milestones' dates are hygiene, not deadlines (Greg, 19 Nov 2026).
   transaction's kind: a read with no lock, and whatever calls one,
   takes a `SerializableTx`, as the Kotlin runs it; a one-statement
   write and the list's check stay on a `Tx`.
+- **A change to Go cusoon2 has emitted waits unless a slice needs
+  it** (Greg, 27 Nov 2026): such a change waits for one batch after
+  the port is code complete; one that only adds output for a new
+  form, or mends an emit that is wrong, does not wait.
 - **Piece by piece in dev and CI, one switch at launch** (DEV-930;
   Greg, 26 Nov 2026): Go serves each ported list beside the JVM, on
   one database, one session table and one config file, in dev, CI and
@@ -267,12 +271,15 @@ of row types in `schema.kg` make the area's total.
 | 9 | The lists | `bookings`, `bookingsSummary`, `bookers` | 200 / 160 | 5; the time on the wire as a `LocalDate` and a `LocalTime` |
 | 10 | The pricing, as functions compared by generated cases | none | 330 / 150 | `kogo.math` |
 | 11 | The wizard's quotes | `charges`, `discountedTotal`, `loyaltyProgramDiscount` | 295 / 200 | 5, 10; the time on the wire as a `LocalDate` and a `LocalTime` |
-| 12 | The price and the payment details | `setBookingPrice`, `setPaymentDetails` | 185 / 170 | 6, 10 |
+| 12 | The price and the payment details | `setBookingPrice`, under `admin` (cusoon2's DEV-1298), `setPaymentDetails` | 185 / 170 | 6, 10 |
 | 13 | The journeys and the place search | `ensureJourney`, `bookingStatus`, `placeSuggest` | 280 / 220 | 3; the time on the wire as a `LocalDate` and a `LocalTime`; Google's Directions and Autocomplete |
 | 14 | Submitting and editing a booking | `submitBooking`, `setBookingDetails` | 335 / 260 | 11, 13; `submitBooking` builds its own caller's `ViewerCall` in `call.kg` for `bookingAnswer`, which keeps its signature (DEV-1286's Ruling) |
 | 15 | The customer's logins | `startEmailLogin`, `completeEmailLogin`, `startPasskeyLogin`, `completePasskeyLogin` | 225 / 200 | 2; the login design |
 | 16 | The customer's passkeys | `hasPasskey`, `passkeys`, `startPasskeyRegistration`, `completePasskeyRegistration`, `deletePasskey` | 70 / 80 | 15 |
 | 17 | The profile | `bookerProfile`, `createBooker`, `updateBooker` | 240 / 180 | 15; Stripe's client; Kotlin first in its PR: `bookerProfile` refuses a visitor, so its row is `gatedBy viewer` |
+
+Slices 1 to 6 are merged as of 27 Nov 2026, the last by cusoon2 PR
+1677, and slice 7 is open.
 
 What the answers to DEV-1146 changed in it:
 
@@ -296,9 +303,8 @@ In Kogo, beside it:
 - The prelude's names are built (DEV-1216, PR 189): spec 12's that it
   lacked (G6) and three of Kotlin's four approved (a `Set`'s `+` and
   `-`, `getOrNull`), the rest written the longer way inside the spec.
-  `!in` is not: a port writes `!(x in c)` until Kogo's subset next
-  widens (DEV-1184).
-- `kogo.math` before slice 10, about 25 / 30.
+- `!in` is built (DEV-1283, PR 205).
+- `kogo.math` is built, with `roundToLong` (DEV-1299, PR 210).
 - The keyed call before Stripe's client, 45 / 90.
 - The runner after "Guide DEV-1141": four of its sketch's twelve gaps
   are Greg's, so its design is a sitting, not a run.

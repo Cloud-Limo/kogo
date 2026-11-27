@@ -5371,3 +5371,18 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
 - **The check's ten new Double edges** (the ties, 0.49999999999999994,
   1 and the next Double, 2^52 and its neighbours, 2^53 + 2 and the last
   Double below 2^63) are all in the first inputs' walk, now 43 long.
+
+## real and character(n) (DEV-1296), 27 Nov 2026
+
+- **`real` maps to `Double` and `character(n)` to `String`, read and
+  sent, as spec 10.4 states** (Greg, 27 Nov 2026, on DEV-1290's
+  research). A `Double` out of a `real`'s range is stored as an
+  infinity or 0 where Postgres's cast refuses, as Kotlin's `toFloat()`
+  rounds it, so it is allowed; a `character(n)` is read padded, as
+  JDBC gives it to Kotlin. Not taken: a `kogo check` error on a
+  `real` parameter asking for `$x::float8`, which refuses what Kotlin
+  does silently; migrating such columns to `text` and `double
+  precision`, which suits cusoon2 but not a schema that cannot
+  migrate. Reopens if a program depends on Postgres's refusal for a
+  `real`, or pgx changes how it encodes a `float64` for a float4
+  (`TestRealAndCharacter` would fail).

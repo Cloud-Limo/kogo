@@ -304,7 +304,7 @@ In Kogo, beside it:
   lacked (G6) and three of Kotlin's four approved (a `Set`'s `+` and
   `-`, `getOrNull`), the rest written the longer way inside the spec.
 - `!in` is built (DEV-1283).
-- `kogo.math` is built, with `roundToLong` (DEV-1299, PR NNN).
+- `kogo.math` is built, with `roundToLong` (DEV-1299, PR 210).
 - The keyed call before Stripe's client, 45 / 90.
 - The runner after "Guide DEV-1141": four of its sketch's twelve gaps
   are Greg's, so its design is a sitting, not a run.

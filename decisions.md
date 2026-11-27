@@ -5505,12 +5505,10 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   merge check merges `renew` itself into a PR that is no port only
   when the merge is clean, and a Fix that merges first meets any
   conflict while it can still settle it.
-- **A local Fix does not get the rule.** Its phrase is "Fix DEV-NNN"
-  and nothing after it, and `lin local` reads words after the phrase
-  as model, effort or cap, so there is no brief to carry it; the
-  session reads the Fix step of the shared Workflow, which this issue
-  does not change. A cusoon2 PR it leaves behind gets the merge
-  check's `fix:`, a second run. Not taken: a line in the shared Fix
-  step, which changes `CLAUDE.md` and cusoon2's `AGENTS.md` the same
-  day and is outside this Scope; it is the follow-up if local cusoon2
-  Fixes go behind often.
+- **A local Fix does not get the rule.** Its phrase is "Fix DEV-NNN" and
+  nothing after it, so there is no brief to carry it; the session reads
+  the Fix step of the shared Workflow, which this issue does not change.
+  A port's cusoon2 PR it leaves behind can get the merge check's `fix:`,
+  a second run. Not taken: a line in the shared Fix step, which changes
+  `CLAUDE.md` and cusoon2's `AGENTS.md` the same day and is outside this
+  Scope; it is the follow-up if local cusoon2 Fixes go behind often.

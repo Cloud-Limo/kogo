@@ -123,12 +123,14 @@ queues the rest. Then exit: the run's comment starts the next clerk.
   what is particular to this PR. A port's Review brief names
   `doc/porting.md`'s "Keep the Kotlin's shape".
 - A Fix brief for a cusoon2 PR ends: before you push, `git fetch`
-  and, if `origin/renew` has moved, merge it into the branch; for a
-  port's PR, re-emit `kogo/go/out` with `mise run kogo-emit`, run
-  `kogo/run.sh` at the merged head and leave `kogo/go/go.mod` alone
-  unless this brief says otherwise; say in the `Fixed:` which `renew`
-  you merged. A Kogo PR's Fix needs none: the merge check merges
-  `main` itself.
+  and, if the branch does not hold `origin/renew`, merge it into the
+  branch; for a port's PR, re-emit `kogo/go/out` with `mise run
+  kogo-emit`, run `kogo/run.sh` at the merged head and leave
+  `kogo/go/go.mod` alone unless this brief says otherwise; on a
+  conflict there or in `kogo/pins`, keep the newer Kogo pin of the
+  two, and set a line in `kogo/pins` only for a pinned file whose
+  content changed; say in the `Fixed:` which `renew` you merged. A
+  Kogo PR's Fix needs none: the merge check merges `main` itself.
 - A run clones the repository of its issue's project, Kogo for Kogo
   and cusoon2 for any other. When the PR is in the other one, the
   step is a local run, below.
@@ -156,11 +158,12 @@ label `lead`.
 `lin local DEV-NNN <where> "<phrase>"`, `<where>` as above. It posts
 the `Start:` itself. The phrase is the step's, "Code review DEV-NNN"
 or "Fix DEV-NNN", and nothing after it: a Fix reads the Review and its
-Rulings on the PR, and no `renew` line, so a cusoon2 PR it leaves
-behind gets the merge check's `fix:`. It returns at once, with the model and effort of the
-step's run; then exit, since the session's comment starts the next
-clerk. When it refuses, a clone another issue holds or a session
-already running for the issue, hand on with its line.
+Rulings on the PR, and no `renew` line, so a port's cusoon2 PR it
+leaves behind can get the merge check's `fix:`. It returns at once,
+with the model and effort of the step's run; then exit, since the
+session's comment starts the next clerk. When it refuses, a clone
+another issue holds or a session already running for the issue, hand
+on with its line.
 
 ## On a Review
 

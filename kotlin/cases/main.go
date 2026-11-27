@@ -15,12 +15,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 )
 
 // The edges: empty, one element, negatives, the largest values, and
 // in text a character outside the BMP and what Kotlin and Go treat
-// apart (whitespace, case, digits, a replacement's $ and \).
+// apart (whitespace, case, digits, a replacement's $ and \); in a
+// Double, rounding's ties, 2^52 and above, and asin's domain.
 var (
 	lists = [][]int64{{}, {1}, {-1}, {0, 0}, {1, 2, 3}, {math.MaxInt64}, {math.MinInt64, math.MaxInt64, -1}, {3, 1, 3, 2, 1}}
 	texts = []string{"", "a", " ", "😀", "\t a b\n", "a😀b", "abcabc", "$1", `\`, "٣4", "ABC é", "  x\u001f", "İΣ", "aaa", "$", "bb c", "\u001f", "\u0085", "$9", "${c}$10", "aİ"}
@@ -29,7 +31,8 @@ var (
 	reals = []float64{0, math.Copysign(0, -1), 1.5, -1.5, math.NaN(), math.Inf(1), math.Inf(-1), math.MaxFloat64,
 		1 << 31, -(1 << 31) - 0.5, 1 << 63, 1e7, 0.001, 0.0001, 123456789.125, 1e21, 0.1,
 		1 * tiny, 2 * tiny, 10 * tiny, 12 * tiny, 14 * tiny, 16 * tiny, 18 * tiny, 20 * tiny,
-		-1 * tiny, -2 * tiny, -10 * tiny, -12 * tiny, -14 * tiny, -16 * tiny, -18 * tiny, -20 * tiny}
+		-1 * tiny, -2 * tiny, -10 * tiny, -12 * tiny, -14 * tiny, -16 * tiny, -18 * tiny, -20 * tiny,
+		0.5, 2.5, 0.49999999999999994, 1, 1.0000000000000002, 1 << 52, 1<<52 + 1, 1<<52 - 0.5, 1<<53 + 2, 1<<63 - 1024}
 	tiny    = math.SmallestNonzeroFloat64 // the eight below 1.0E-322 whose shortest digits are one
 	letters = []rune("abcABC 019\t$\\éÉ😀٣ {}")
 )
@@ -37,6 +40,8 @@ var (
 // kept are the differences Kogo means to keep: in a case whose name
 // matches names, both results are rewritten, from to to, and a case
 // that then agrees is counted under why and does not fail the check.
+// A to that begins with % writes each match as that verb writes the
+// number it reads: %.10g rounds a Double to ten digits.
 var kept = []struct{ names, from, to, why string }{
 	{"substringPlus", `[\x{10000}-\x{10FFFF}]`, "\uFFFD\uFFFD", "spec.md section 3: a String never holds half of a surrogate pair"},
 	{"lowercase|lowercaseContains", "ς", "σ", "spec.md section 12: lowercase keeps σ at a word's end"},
@@ -47,6 +52,7 @@ var kept = []struct{ names, from, to, why string }{
 	{"parseOrNull32", `[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}`, "null", "spec.md section 12: Uuid.parseOrNull of 32 hex digits"},
 	{"hSortCalls", `^(\[[^\]]*\]) .*$`, "$1", "spec.md section 12: how often and in what order sortedBy calls its selector"},
 	{"replace", `(no group in ".*" at \d+|No group with name \{.*\}|named capturing group .*)$`, "no such named group", "spec.md section 12: replace with a bad group"},
+	{"sin|cos|asin|greatCircle", `-?\d+\.\d+(E-?\d+)?`, "%.10g", "spec.md section 12: kogo.math's sin, cos and asin are Go's"},
 }
 
 // refused are Kogo's limits (doc/design.md, principle 3): in a case
@@ -99,7 +105,7 @@ func gen(dir string) {
 	defer out.Flush()
 	for i := range 250 {
 		pick := func(k, edges, random int) int { // an edge's index, or -1 for a random value
-			if i < 40 {
+			if i < max(40, len(reals)) { // every Double's edge, the longest list of them
 				return (i*k + i/edges) % edges
 			} else if r.IntN(3) == 0 {
 				return r.IntN(edges)
@@ -189,7 +195,7 @@ func diff(cases, kogo, kotlin string) {
 		x, y, why := a[i], b[i], ""
 		for _, k := range kept {
 			if re := regexp.MustCompile(k.from); regexp.MustCompile("^("+k.names+")$").MatchString(name) && re.MatchString(x+y) {
-				x, y, why = re.ReplaceAllString(x, k.to), re.ReplaceAllString(y, k.to), k.why
+				x, y, why = rewrite(re, x, k.to), rewrite(re, y, k.to), k.why
 			}
 		}
 		if x == y {
@@ -212,6 +218,21 @@ func diff(cases, kogo, kotlin string) {
 	if total > 0 {
 		os.Exit(1)
 	}
+}
+
+// rewrite replaces each match of re in s by to, or when to begins
+// with %, by the number it reads as to writes it.
+func rewrite(re *regexp.Regexp, s, to string) string {
+	if !strings.HasPrefix(to, "%") {
+		return re.ReplaceAllString(s, to)
+	}
+	return re.ReplaceAllStringFunc(s, func(m string) string {
+		f, err := strconv.ParseFloat(m, 64)
+		if err != nil {
+			panic(err)
+		}
+		return fmt.Sprintf(to, f)
+	})
 }
 
 // refusal is why Kogo's result kogo is a limit of refused's, or "".

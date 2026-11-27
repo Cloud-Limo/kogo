@@ -371,7 +371,7 @@ func (c *checker) kotlinFix(from, name string) string {
 	}
 	kogo := "kogo." + from[strings.IndexByte(from, '.')+1:]
 	switch {
-	case (from == "java.time" || from == "kotlin.test") && has(kogo, name):
+	case (from == "java.time" || from == "kotlin.test" || from == "kotlin.math") && has(kogo, name):
 		return fmt.Sprintf("import %s.%s instead", kogo, name)
 	case from == "java.util" && name == "UUID" && has("kogo", "Uuid"):
 		return "Uuid needs no import: remove this one and write Uuid"

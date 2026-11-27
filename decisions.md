@@ -5512,17 +5512,3 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   a second run. Not taken: a line in the shared Fix step, which changes
   `CLAUDE.md` and cusoon2's `AGENTS.md` the same day and is outside this
   Scope; it is the follow-up if local cusoon2 Fixes go behind often.
-
-## A port writes down what it finds in the Kotlin (DEV-1323), 28 Nov 2026
-
-- **"Any other oddity" stays the subject.** The new words follow the
-  sentence they replace, so they speak of the oddity the port keeps;
-  one proposed as a change to the Kotlin is already written in the
-  Handoff's Next step and mended Kotlin first. Not taken: "every
-  oddity, mended or kept", which reaches past the Scope's "in place
-  of 'and moves on'"; the list may still record a mend, as its own
-  rule says.
-- **The example under the rule is left as it is.** `pastPassengers`
-  is what the wizard really does, so it is no oddity and has no entry.
-  Not taken: a third case showing an entry, which adds lines past the
-  Budget and would need a finding of an application to illustrate.

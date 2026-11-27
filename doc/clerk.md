@@ -18,7 +18,8 @@ Auto mode refuses a merge no person approved unless a rule allows it,
 and this rule allows Kogo's PRs only: a cusoon2 PR stays Greg's.
 
 It says it when an issue's newest event becomes `Handoff:`,
-`Review:`, `Ruling:` or `Fixed:`, from a run or a session alike; at a
+`Review:`, `Ruling:` or `Fixed:`, from a run or a session alike, or
+the launcher's `Failed: launcher orphan`, a launch that never ran; at a
 merge, the issue turning Done or, not Done, the cusoon2 PR of its
 newest `Ready to merge:` merging, it runs After a merge itself, and
 says it only when that tidy does not pass, on `fail:`, `hand on:` or
@@ -90,6 +91,7 @@ Take the first row that fits:
 | any | `Held:`, `Released:` or `Walkthrough:` | Greg's walkthrough, the lead's: exit |
 | In Review | `Checked:` | `lin clerk` watches its Cloud CI: exit |
 | any | `Ready to merge:` | Greg's merge: exit |
+| any | `Failed: launcher orphan` | post the newest async `Start:` again with `lin launch`, less its `Reads:` line, which it makes afresh; then exit. Hand on, saying it orphaned twice, when an earlier orphan stands before that `Start:` and after the `Handoff:`, `Review:`, `Ruling:` or `Fixed:` before it, if there is one |
 | any | `Clerk:`, `Failed:` or `Answer:` | the lead's: exit |
 
 ## Launching a run

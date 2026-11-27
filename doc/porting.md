@@ -70,7 +70,14 @@ the change's size and who would see it. The change is made in the
 Kotlin first, as its own small piece with its test, and then ported as
 it stands; never in the port alone, since the side-by-side run is the
 check and a port that differs on purpose has nothing beside it. Any
-other oddity the port keeps, and moves on.
+other oddity the port keeps, and enters in the same PR in the
+application's list of findings (for cusoon2, `doc/plans/port-findings/`):
+what a person meets, where, whether a test pins it, and what the port
+did. None is dropped. One on a path that moves money does not wait: it
+is mended Kotlin first, in the slice's PR when that is a line or two
+with its test, or else in a follow-up parked on the slice's merge. The
+rest are decided one by one, in a sitting after the port is code
+complete.
 
 For one, the storefront's `bookerProfile` answers a visitor null, and
 the page's only use of the null is "No booker. Please log in.": ported

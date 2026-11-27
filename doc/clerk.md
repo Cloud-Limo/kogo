@@ -123,7 +123,8 @@ queues the rest. Then exit: the run's comment starts the next clerk.
   Review and its Rulings are whole, and quote none.
 - The Review and Fix briefs name the step in `AGENTS.md` and add only
   what is particular to this PR. A port's Review brief names
-  `doc/porting.md`'s "Keep the Kotlin's shape".
+  `doc/porting.md`'s "Keep the Kotlin's shape", and asks that each
+  oddity the Handoff names has its entry in the list of findings.
 - A Fix brief for a cusoon2 PR ends: before you push, `git fetch`
   and, if the branch does not hold `origin/renew`, merge it into the
   branch; for a port's PR, re-emit `kogo/go/out` with `mise run

@@ -5443,3 +5443,27 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   of the functions that panic so names it. Not taken: `Instant.plus`
   and `atZone`, the same moment in range, and `long overflow` where
   java.time names the day.
+
+## A ready PR left behind by a merge is caught up (DEV-1310), 28 Nov 2026
+
+- **A `Checked:` is covered as well as a `Ready to merge:`**. `lin
+  clerk`'s CI watch reads only the issue's newest event (`ready` in
+  cusoon2's `mise-tasks/linear-clerk`). So once the catch-up's
+  `Start:` is newest, the watch stops: no `Ready to merge:`, no
+  `Failed:`, and no review request for the old sha. The Fix's
+  `Fixed:` goes to Merging, whose `Checked:` starts a new watch. Not
+  taken: `Ready to merge:` alone, which would leave a PR checked
+  just before the merge to reach Greg's inbox unable to merge.
+- **When GitHub's `mergeable` is `UNKNOWN`, git answers**, with
+  `git merge-tree --write-tree origin/renew origin/<branch>`, which
+  exits 1 on a conflict and needs no wait. Not taken: waiting for
+  GitHub, which costs the clerk a loop for something git knows
+  already. Also not taken: running `lin merge-check` on an unknown
+  PR, which merges `renew` into a PR that is only behind and pushes
+  it, giving it a new sha, a second Cloud CI and a second review
+  request.
+- **Two clerks after one merge start one catch-up.** The poller
+  can start the clerk twice for one merge: once for the `Ready to
+  merge:` whose PR merged and once for the issue turning Done. The
+  second clerk finds the caught-up issue's newest event is now the
+  `Start:`, so it takes nothing.

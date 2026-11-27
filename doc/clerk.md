@@ -23,9 +23,11 @@ merge, the issue turning Done or, not Done, the cusoon2 PR of its
 newest `Ready to merge:` merging, it runs After a merge itself, and
 says it only when that tidy does not pass, on `fail:`, `hand on:` or
 an error, or, with no tidy, when the `Checked:` holds a
-`Waiting on this merge:` line. So a PR without "Fixes
-DEV-NNN" starts no clerk at its merge, and an issue moved to Done by
-hand starts one, which fits no row and is handed on.
+`Waiting on this merge:` line, or, after a cusoon2 merge, though the
+tidy passed, when another open PR into `renew` is at `Ready to merge:`
+or `Checked:`. So a PR without "Fixes DEV-NNN" starts no clerk at its
+merge, and an issue moved to Done by hand starts one, which fits no
+row and is handed on.
 It pulls `~/Dev/kogo` before it starts a clerk, so this file is
 `main`'s, and its first poll records what is there and starts none.
 It runs the clerk for a `Handoff:`, and for a `Review:` that counts a
@@ -298,6 +300,25 @@ Then `LINEAR_PROJECT='Kogo,Cloud Limo Relaunch' lin list backlog`: move
 to Todo each issue whose `Parked:`, or older `Lead:` line, waits on this
 merge, with `lin comment DEV-MMM --state Todo < /dev/null`, which posts
 nothing. The lead starts it from the board.
+
+After a cusoon2 merge, catch up each other ready PR it leaves unable to
+merge, before you hand on any of the tidy's lines. Run `gh pr list -R
+Cloud-Limo/cusoon2 --base renew --json
+number,headRefName,mergeable,files`. Take each PR
+whose issue, `DEV-MMM` from its branch, is not labelled `lead` and has
+as its newest event `Ready to merge:` or `Checked:`. Of those, catch up
+one GitHub calls `CONFLICTING`, and a port's PR (it changes `kogo/` or
+a file `kogo/pins` names) when the merged PR, `gh pr diff <its url>
+--name-only`, changed a path outside `doc/`, `infra/`, `mise-tasks/`,
+`frontend/` and `site/`. Leave every other PR alone. If GitHub says
+`UNKNOWN`, which it does for some seconds after a merge, ask git:
+after `git -C ~/Dev/cusoon2-tasks fetch origin`, `git -C
+~/Dev/cusoon2-tasks merge-tree --write-tree origin/renew
+origin/<branch>` exits 1 on a conflict. For each PR caught up, run
+`lin merge-check DEV-MMM` and do as Merging says for its first line.
+For these that line is `fix:`, and its Fix starts the way DEV-MMM's
+newest `Start:` ran. Start each such Fix and go on; exit, or hand on
+the tidy's lines, only after the last.
 
 ## Handing on
 

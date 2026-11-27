@@ -164,7 +164,9 @@ against the code before passing it on.
   clerk`'s watch requests his review on the PR, which reaches his
   Linear inbox, and posts `Ready to merge:` on the issue as the
   record, with any order the line gave, so the merge is his from
-  there. When CI
+  there, until another merge leaves the PR unable to merge: then the
+  clerk starts its catch-up (`doc/clerk.md`, After a merge), and a
+  new `Ready to merge:` follows. When CI
   fails, its `Failed: <PR> at <sha> · Cloud CI ...` puts `lead` on:
   tell Greg the cause, as for a step that failed.
 - Then take the label off, `lin label DEV-NNN lead --remove`, once

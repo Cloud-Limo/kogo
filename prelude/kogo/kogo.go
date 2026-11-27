@@ -592,6 +592,10 @@ func Map_widen[K, A, B any](m Map[K, A], f func(A) B) Map[K, B] {
 // Map_Keys shares the map's keys, which nothing adds to (ordered).
 func Map_Keys[K, V any](this Map[K, V]) Set[K] { return Set[K]{ordered: this.ordered} }
 
+func Map_Size[K, V any](this Map[K, V]) int32      { return int32(len(this.keys)) }
+func Map_IsEmpty[K, V any](this Map[K, V]) bool    { return len(this.keys) == 0 }
+func Map_IsNotEmpty[K, V any](this Map[K, V]) bool { return len(this.keys) > 0 }
+
 func Pair_First[A, B any](this Pair[A, B]) A  { return this.First }
 func Pair_Second[A, B any](this Pair[A, B]) B { return this.Second }
 

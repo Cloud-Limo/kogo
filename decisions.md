@@ -5470,19 +5470,25 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
 
 ## The names the pricing's port wrote around (DEV-1314), 27 Nov 2026
 
-- **A `List`'s `plus` of one element stays unbound**, though spec 12
-  lists it. A second `plus` on `List` makes the emitter spell both in
-  full (`emit/names.go`), so the `List_Plus` that every program with a
-  `list + list` emits today becomes `ListT_Plus_ListT`: cusoon2's
-  committed Go moves, which needs its re-emit beside this PR, where
-  the issue had one PR adding forms. Kotlin also reads `xs + ys` on a
+- **A `List`'s `plus` of one element stays unbound** (the lead's
+  Ruling on PR 214's Review, item 6), and spec 12 says a `List` takes
+  a `List` after `+`, not yet an element: `xs + listOf(x)` until the
+  element form goes into spec 12 with its binding. A second `plus` on
+  `List` makes the emitter spell both in full (`emit/names.go`), so
+  the `List_Plus` that every program with a `list + list` emits today
+  becomes `ListT_Plus_ListT`: cusoon2's committed Go moves, which
+  needs its re-emit beside this PR, where the issue had one PR adding
+  forms. Kotlin also reads `xs + ys` on a
   `List<List<T>>` as the elements of `ys`, so it needs a check like a
   `Set`'s `set-operand`. Not taken: bind it here and re-emit cusoon2
-  in a second PR. Reopens with an issue that takes the re-emit.
+  in a second PR now, or never bind it and say so in spec 12. The
+  follow-up is DEV-1316, in Backlog until the port is code complete,
+  with the other changes to existing emitted Go.
 - **A `Set` gains `isNotEmpty` with `size` and `isEmpty`**, its
-  sibling on `List`; the other names of spec 12's Collections line
-  that a `List` has and a `Set` or a `Map` lacks (about thirty) are
-  each a line, but together are no line or two and no port calls
+  sibling on `List`, and a `Map` gains the same three (the Review's
+  item 2), each a line over its keys; the other names of spec 12's
+  Collections line that a `List` has and a `Set` lacks (about thirty)
+  are each a line, but together are no line or two and no port calls
   them: they come as a program needs them. Not taken: all of them now.
 - **`Instant`'s `compareTo` gives `java.time`'s `Int`**: the seconds'
   order, else the difference of the nanoseconds, as Kotlin's call

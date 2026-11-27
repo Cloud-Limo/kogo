@@ -1171,8 +1171,9 @@ no import;
 `filterNotNull`, `any`, `all`, `none`, `count`, `sum`, `sumOf`,
 `maxOrNull`, `minOrNull`, `sortedBy`, `sortedByDescending`, `sorted`,
 `reversed`, `distinct`, `distinctBy`, `take`, `drop`, `zip`, a
-`List`'s `plus` (`+`) of an element or a `List`, giving a new `List`,
-a `Set`'s `plus` (`+`) and `minus` (`-`) of an element, a `List` or a
+`List`'s `plus` (`+`) of a `List`, giving a new `List` (an element
+after a `List`'s `+` is not taken yet: write `xs + listOf(x)`), a
+`Set`'s `plus` (`+`) and `minus` (`-`) of an element, a `List` or a
 `Set`, `groupBy`, `associateBy`, `associate`, `toSet`, `toList`,
 `joinToString`, `forEach`, `keys`, `values`, `listOfNotNull`, a
 `Pair`'s `first` and `second`. A `Map` and a `Set` iterate in

@@ -79,6 +79,9 @@ external fun <T> Set<T>.minus(elements: Set<T>): Set<T>
 
 external fun <K, V> Map<K, V>.get(key: K): V?
 external val <K, V> Map<K, V>.keys: Set<K>
+external val <K, V> Map<K, V>.size: Int
+external fun <K, V> Map<K, V>.isEmpty(): Boolean
+external fun <K, V> Map<K, V>.isNotEmpty(): Boolean
 
 external val <A, B> Pair<A, B>.first: A
 external val <A, B> Pair<A, B>.second: B

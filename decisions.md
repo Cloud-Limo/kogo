@@ -758,7 +758,8 @@ Each entry: what was decided, why, and what would reopen it.
     20 Nov), so the comparison is the one the head passed. Not taken: the issue's list of
     the run's inputs (`backend/`, `jooq/`, `kogo/`), which had missed the Gradle build and
     fails open when an input is added; the four fail closed. Reopen when `run.sh` reads
-    under one of them.
+    under one of them. `mise-tasks/` joined them with DEV-1292; `APART` in cusoon2's
+    `mise-tasks/linear-merge-check` is the list.
   - A run's step comment is under its marker line: the rule on a comment's first line was
     false for every run's as written, and one clerk reported a Handoff missing. It
     changes "a step's comment counts only when its first line is the one on the issue"

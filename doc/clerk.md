@@ -91,7 +91,7 @@ Take the first row that fits:
 | any | `Held:`, `Released:` or `Walkthrough:` | Greg's walkthrough, the lead's: exit |
 | In Review | `Checked:` | `lin clerk` watches its Cloud CI: exit |
 | any | `Ready to merge:` | Greg's merge: exit |
-| any | `Failed: launcher orphan` | post the newest async `Start:` again with `lin launch`, less its `Reads:` line, which it makes afresh; then exit. Hand on, saying it orphaned twice, when one already stands between that `Start:` and the `Handoff:`, `Review:`, `Ruling:` or `Fixed:` before it |
+| any | `Failed: launcher orphan` | post the newest async `Start:` again with `lin launch`, less its `Reads:` line, which it makes afresh; then exit. Hand on, saying it orphaned twice, when an earlier orphan stands before that `Start:` and after the `Handoff:`, `Review:`, `Ruling:` or `Fixed:` before it, if there is one |
 | any | `Clerk:`, `Failed:` or `Answer:` | the lead's: exit |
 
 ## Launching a run

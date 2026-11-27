@@ -290,8 +290,17 @@ him, as `doc/clerk.md` says, and you do not wait for it.
   running yet; the clerk starts each later step the same way, in that
   `<where>`. A step that lands in both repositories makes a PR in
   each, both with "Fixes DEV-NNN", so the issue closes at the last
-  merge. A stack's clone is one issue's from Pickup to merge:
-  with both held, `lin local` refuses, and the issue waits in Todo.
+  merge. A Kogo issue whose change moves what the emitter writes for
+  existing programs has two PRs from the start, and its Scope says so:
+  the Kogo PR cannot pass its check alone, which runs cusoon2's
+  `kogo/run.sh` against cusoon2's committed `kogo/go/out`. The cusoon2
+  PR, a local run in `cusoon2-dev-NNN`, pins the Kogo branch's head and
+  commits the re-emit; its Handoff's first line ends `· and <Kogo PR
+  url> at <sha>`. Greg merges it, then the clerk the Kogo PR. A change
+  that only adds a form, as a new prelude name, moves no existing
+  output and needs one PR. A stack's clone is one issue's from Pickup
+  to merge: with both held, `lin local` refuses, and the issue waits
+  in Todo.
   For a cusoon2 step whose folder's `AGENTS.md` lacks the `Workflow,
   shared` markers, the phrase goes on with "Read the Workflow in `git
   show origin/renew:AGENTS.md` first: it overrides this branch's." Delete

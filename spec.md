@@ -100,7 +100,7 @@ import kogo.time.Instant
 | `Unit` | the single value `Unit` |
 | `Nothing` | no value; the type of `raise`, `error` and `return` |
 | `Uuid`, `Instant`, `LocalDate`, `LocalTime`, `ZoneId`, `ZonedDateTime`, `Duration`, `Decimal` | prelude types, section 12 |
-| `List<T>`, `Set<T>`, `Map<K, V>`, `Pair<A, B>` | immutable collections, section 12 |
+| `List<T>`, `Set<T>`, `Map<K, V>`, `Pair<A, B>`, `Collection<T>` | immutable collections, section 12 |
 | `ByteArray` | bytes that are carried and never read: below |
 | `T?` | `T` or `null` |
 | `(A, B) -> R` | function type |
@@ -129,10 +129,11 @@ its two sides must fit where the other's type is wanted (section 5.1),
 `?` aside, so `x == null` passes and `Int == Long` and `String == Int`
 are errors.
 A handle of the prelude's (`Db`, `Tx`, `SerializableTx`, `Http`,
-`Console`, `Clock`, `Request`, `Test`, `Raise`) and a `Regex` are the
-exception: Kotlin compares each by identity, so `==` on one, or on a
-value whose type holds one, is an error where check sees it
-(`handle-equality`, `regex-equality`), as for a `ByteArray` below, and
+`Console`, `Clock`, `Request`, `Test`, `Raise`), a `Regex` and a
+`Collection` are the exception: Kotlin compares each by identity, so
+`==` on one, or on a value whose type holds one, is an error where
+check sees it (`handle-equality`, `regex-equality`,
+`collection-equality`), as for a `ByteArray` below, and
 panics where it does not (section 14).
 
 A value that holds a function is not compared, though Kotlin compares
@@ -1173,7 +1174,10 @@ no import;
 `reversed`, `distinct`, `distinctBy`, `take`, `drop`, `zip`, `plus`
 (`+`), a `Set`'s `plus` (`+`) and `minus` (`-`) of an element, a `List`
 or a `Set`, `groupBy`, `associateBy`, `associate`, `toSet`, `toList`,
-`joinToString`, `forEach`, `keys`, `values`, `listOfNotNull`. A `Map`
+`joinToString`, `forEach`, `keys`, `values`, `listOfNotNull`, a
+`Pair`'s `first` and `second`. A `Map`'s `values` is a `Collection`,
+as Kotlin's is, with `toList()`; `==` on one is refused (section 3).
+A `Map`
 and a `Set` iterate in insertion order and compare keys as `==` does,
 by value, so any type may be a key. A key that is a `String`, an `Int`,
 a `Long`, a `Boolean`, a `Uuid` or an enum is found at once. A key of
@@ -1235,8 +1239,8 @@ and not a promise that it is all:
   `Double`, a `String`, a `Char` or a `Boolean`, or one of these that
   may be null, as Kotlin does. A key of any other type, an enum or a
   time among them, is refused at `kogo check` with `sort-key`, and so
-  is `maxOrNull` of a list of any other type (and of one that may be
-  null, which kotlinc refuses too). The list each sort gives is
+  are `maxOrNull` and `minOrNull` of a list of any other type (and of
+  one that may be null, which kotlinc refuses too). The list each sort gives is
   Kotlin's, equal keys in the order they came; how often and in what
   order it calls the selector is not, and Kotlin promises neither.
 - A `Set`'s `+` or `-` of one element that is itself a `List` or a
@@ -1276,7 +1280,7 @@ nanos)`, `isBefore`, `isAfter`, `plus(duration)`, `minus(duration)`),
 `ofMinutes`, `Duration.ofSeconds(seconds, nanos)`,
 `Duration.between(start, end)`, `seconds`), `Clock.now()`.
 `ofEpochSecond`, `ofSeconds`, `ofDays`, `plus`, `minus`, `atZone`,
-`plusDays` and `ZoneId.of` panic where `java.time`'s throw, with its message:
+`plusDays`, `plusSeconds` and `ZoneId.of` panic where `java.time`'s throw, with its message:
 `Instant exceeds minimum or maximum instant`, `long overflow`, `Invalid
 value for EpochDay` past a `LocalDate`'s years ±999,999,999, or
 `Unknown time-zone ID: X`. `ZoneId.of` takes a region name of the tz
@@ -1613,6 +1617,7 @@ Each of these is valid Kotlin and a compile error in Kogo.
 | `Sequence`, `generateSequence`, `MutableList`, arrays | a `while` loop with a local `var`, or the list functions |
 | `bytes[i]`, `bytes.size`, `byteArrayOf(...)`, `a == b` on a `ByteArray` | none: a `ByteArray` is carried, and a binding reads it (section 3) |
 | `a == b` on a `Regex`, or on a value that holds one (`regex-equality`), which Kotlin compares by identity | compare the patterns, as strings; where check cannot see one, `==` panics (section 3) |
+| `a == b` on a `Map`'s `values`, a `Collection` (`collection-equality`), which Kotlin compares by identity | compare `toList()` of each; where check cannot see one, `==` panics (section 3) |
 | `a == b` on a handle (`Db`, `Clock`, ...), or on a value that holds one (`handle-equality`), which Kotlin compares by identity | compare the other properties; where check cannot see one, `==` panics (section 3) |
 | `java.time.*`, `java.util.UUID`, `BigDecimal` | `kogo.time.*`, `Uuid`, `Decimal` |
 | `kotlin.test.*` | `kogo.test.*` |

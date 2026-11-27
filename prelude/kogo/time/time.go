@@ -68,6 +68,10 @@ func fraction(nanos int32) string {
 
 type LocalDate struct{ Year, Month, Day int32 }
 
+func (d LocalDate) epochDay() int64 {
+	return gotime.Date(int(d.Year), gotime.Month(d.Month), int(d.Day), 0, 0, 0, 0, gotime.UTC).Unix() / 86400
+}
+
 func (d LocalDate) String() string {
 	return fmt.Sprintf("%s-%02d-%02d", year(int(d.Year)), d.Month, d.Day)
 }
@@ -351,11 +355,27 @@ func LocalDate_PlusDays(this LocalDate, daysToAdd int64) LocalDate {
 	if dom := int64(this.Day) + daysToAdd; this.Year == 999999999 && this.Month == 12 && dom > 31 && dom <= 59 {
 		panic("Invalid value for Year (valid values -999999999 - 999999999): 1000000000")
 	}
-	day := gotime.Date(int(this.Year), gotime.Month(this.Month), int(this.Day), 0, 0, 0, 0, gotime.UTC).Unix() / 86400
-	day = addExact(day, daysToAdd)
+	day := addExact(this.epochDay(), daysToAdd)
 	checkEpochDay(day)
 	y, m, d := gotime.Unix(day*86400, 0).UTC().Date()
 	return LocalDate{int32(y), int32(m), int32(d)}
+}
+
+// ZonedDateTime_PlusSeconds adds to the moment and keeps the zone, so
+// the offset is the zone's at the new moment. It takes java.time's
+// steps, adding to the local date and time at the old offset, so that
+// it panics where java.time's does, with its message.
+func ZonedDateTime_PlusSeconds(this ZonedDateTime, seconds int64) ZonedDateTime {
+	t := this.local()
+	_, offset := t.Zone()
+	days, nod := seconds/86400, seconds%86400*1e9+int64(t.Hour()*3600+t.Minute()*60+t.Second())*1e9+int64(t.Nanosecond())
+	if nod < 0 {
+		days, nod = days-1, nod+86400e9
+	} else if nod >= 86400e9 {
+		days, nod = days+1, nod-86400e9
+	}
+	day := LocalDate_PlusDays(ZonedDateTime_ToLocalDate(this), days).epochDay()
+	return Instant_AtZone(Instant_OfEpochSecond(day*86400+nod/1e9-int64(offset), nod%1e9), this.Zone)
 }
 
 func ZonedDateTime_ToLocalDate(this ZonedDateTime) LocalDate {

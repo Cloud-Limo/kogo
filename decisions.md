@@ -5415,3 +5415,31 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   HH:mm:ss or HH:mm:ss.SSS`, where a `Uuid`'s says only `is not a
   Uuid`. Not taken: the `Uuid`'s bare form, which leaves a caller to
   guess which of a time's forms is wanted.
+
+## The pricing's names (DEV-1300), 27 Nov 2026
+
+- **A `Map`'s `values` is a `Collection<V>`, a prelude type of its own
+  with `toList()` alone, and `==` on one is refused**
+  (`collection-equality`), as on a `Regex`. Kotlin's is a `Collection`
+  whose `==` is identity for the maps Kogo makes (a `LinkedHashMap`'s),
+  and which has no `[i]`: a `List` would have taken `values[0]`, which
+  kotlinc refuses, and answered `true` where Kotlin's `==` answers
+  `false`. Not taken: `values: List<V>`, a line shorter and a
+  difference from Kotlin. Its other members (`map`, `sumOf`, a `for`
+  over it) come as a program needs them, `toList()` until then.
+  Reopens if Kogo gains an `Iterable` that a `List` and a `Set` share.
+- **`max` and `min` are an overload each for `Int`, `Long` and
+  `Double`**, in the prelude with no import, as `abs` is, and Go's
+  `max` and `min`, which are Java's `Math.max` and `Math.min`: a NaN
+  wins and `0.0` is above `-0.0`. Not taken: `kogo.math`, which Kotlin
+  has them in, since spec 12 lists them with `abs` under Numbers.
+- **`minOrNull` is `maxOrNull` turned round, but that a NaN wins**, as
+  Kotlin's `minOrNull` of `Double`s is `Math.min`; `compare` alone puts
+  a NaN last. It takes what `maxOrNull` takes (`sort-key`).
+- **`plusSeconds` takes `java.time`'s steps**: the seconds are added to
+  the local date and time at the old offset, which is then read back
+  at the zone's offset for that moment, so it panics where java.time's
+  does with its message (`Invalid value for EpochDay`, `Instant exceeds
+  minimum or maximum instant`). Spec 12's list of the functions that
+  panic so names it. Not taken: `Instant.plus` and `atZone`, the same
+  moment in range, and `long overflow` where java.time names the day.

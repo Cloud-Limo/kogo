@@ -864,3 +864,16 @@ func TestTxRerunsUniqueOnce(t *testing.T) {
 		}
 	}
 }
+
+// A Map's values, which Kotlin compares by identity, panics where
+// kogo check cannot see the == (spec.md 3).
+func TestValuesEqual(t *testing.T) {
+	m := List_AssociateBy(ListOf[int64](1, 2), func(x int64) int64 { return x })
+	defer func() {
+		if p := recover(); p != "a Collection cannot be compared: Kotlin compares it by identity, not by what it holds" {
+			t.Errorf("== on two values panics with %v", p)
+		}
+	}()
+	List_Contains(ListOf(Map_Values(m)), Map_Values(m))
+	t.Error("== on two values answers")
+}

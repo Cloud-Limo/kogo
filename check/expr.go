@@ -1049,12 +1049,14 @@ func (c *checker) funcEquality(at syntax.Node, op string, x, y Type) {
 	for _, t := range []Type{x, y} {
 		where := holdsFunc(t, nil, map[*TypeDecl]bool{})
 		if where == "" {
-			// Nor is a ByteArray, a Regex or a handle, which Kotlin compares
-			// by identity; a handle's name is under kogo, after its package.
+			// Nor is a ByteArray, a Regex, a Map's values or a handle, which
+			// Kotlin compares by identity; a handle's name is under kogo,
+			// after its package.
 			handle := "what it holds: compare the other properties, or what the handle answers"
 			for _, id := range [][3]string{
 				{"ByteArray", "bytes", "its bytes: compare the other properties, or what the bytes were made from"},
 				{"Regex", "regex", "its pattern: compare the patterns, as strings"},
+				{"Collection", "collection", "its elements: compare toList() of each"},
 				{"Db", "handle", handle}, {"Tx", "handle", handle}, {"SerializableTx", "handle", handle},
 				{"Raise", "handle", handle}, {"http.Http", "handle", handle}, {"io.Console", "handle", handle},
 				{"time.Clock", "handle", handle}, {"rpc.Request", "handle", handle}, {"test.Test", "handle", handle},

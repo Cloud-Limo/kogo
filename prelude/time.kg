@@ -19,6 +19,7 @@ external fun ZonedDateTime.toLocalDate(): LocalDate
 external fun LocalDate.plusDays(daysToAdd: Long): LocalDate
 external fun LocalDate.atStartOfDay(zone: ZoneId): ZonedDateTime
 external fun ZonedDateTime.toInstant(): Instant
+external fun ZonedDateTime.plusSeconds(seconds: Long): ZonedDateTime
 
 external object Instant {
     fun ofEpochSecond(epochSecond: Long, nanoAdjustment: Long): Instant

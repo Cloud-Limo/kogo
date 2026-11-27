@@ -297,6 +297,24 @@ func List_MaxOrNull[T any](this List[T]) *T {
 	return rt.Ptr(m)
 }
 
+// List_MinOrNull is the first of the smallest elements, ordered as
+// compare orders, but that a NaN wins, as in Kotlin's Math.min.
+func List_MinOrNull[T any](this List[T]) *T {
+	if len(this) == 0 {
+		return nil
+	}
+	m := this[0]
+	for _, x := range this {
+		if f, ok := any(x).(float64); ok && f != f {
+			return rt.Ptr(x)
+		}
+		if compare(reflect.ValueOf(m), reflect.ValueOf(x)) > 0 {
+			m = x
+		}
+	}
+	return rt.Ptr(m)
+}
+
 // List_SortedBy is stable, and orders keys as Kotlin's compareValues
 // does (compare).
 func List_SortedBy[T, R any](this List[T], selector func(T) R) List[T] {
@@ -559,6 +577,24 @@ func Map_widen[K, A, B any](m Map[K, A], f func(A) B) Map[K, B] {
 
 // Map_Keys shares the map's keys, which nothing adds to (ordered).
 func Map_Keys[K, V any](this Map[K, V]) Set[K] { return Set[K]{ordered: this.ordered} }
+
+// A Collection is a Map's values, in the map's order. Kotlin's ==
+// compares one by identity, which kogo check refuses (spec.md 12).
+type Collection[T any] struct{ elements []T }
+
+func (c Collection[T]) String() string { return rt.ToString(c.elements) }
+
+func Collection_widen[A, B any](c Collection[A], f func(A) B) Collection[B] {
+	return Collection[B]{List_widen(c.elements, f)}
+}
+
+// Map_Values shares the map's values, which nothing adds to; ToList
+// clips them, so a plus on the list copies.
+func Map_Values[K, V any](this Map[K, V]) Collection[V]   { return Collection[V]{this.values} }
+func Collection_ToList[T any](this Collection[T]) List[T] { return slices.Clip(this.elements) }
+
+func Pair_First[A, B any](this Pair[A, B]) A  { return this.First }
+func Pair_Second[A, B any](this Pair[A, B]) B { return this.Second }
 
 // Map_Get is map[k]: the key's value, or null where it has none.
 func Map_Get[K, V any](this Map[K, V], key K) *V {
@@ -892,6 +928,15 @@ func Decimal_ToDouble(this Decimal) float64 {
 	}
 	return f
 }
+
+// max and min are Kotlin's, as Go's are: a NaN wins, and 0.0 is
+// above -0.0.
+func Max_Int_Int(a, b int32) int32           { return max(a, b) }
+func Max_Long_Long(a, b int64) int64         { return max(a, b) }
+func Max_Double_Double(a, b float64) float64 { return max(a, b) }
+func Min_Int_Int(a, b int32) int32           { return min(a, b) }
+func Min_Long_Long(a, b int64) int64         { return min(a, b) }
+func Min_Double_Double(a, b float64) float64 { return min(a, b) }
 
 func Long_CoerceAtLeast(this, minimumValue int64) int64 { return max(this, minimumValue) }
 func Long_CoerceAtMost(this, maximumValue int64) int64  { return min(this, maximumValue) }

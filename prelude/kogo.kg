@@ -7,6 +7,7 @@ external class List<out T>
 external class Pair<out A, out B>
 external class Set<out T>
 external class Map<K, out V>
+external class Collection<out T>
 external class Regex
 external class Uuid
 external class Decimal
@@ -51,6 +52,7 @@ external fun <T> List<T>.plus(elements: List<T>): List<T>
 external fun <T, R> List<T>.mapNotNull(transform: (T) -> R?): List<R>
 external fun <T, R> List<T>.flatMap(transform: (T) -> List<R>): List<R>
 external fun <T> List<T>.maxOrNull(): T?
+external fun <T> List<T>.minOrNull(): T?
 external fun <T, R> List<T>.sortedBy(selector: (T) -> R): List<T>
 external fun <T, R> List<T>.sortedByDescending(selector: (T) -> R): List<T>
 external fun <T> List<T>.distinct(): List<T>
@@ -74,6 +76,11 @@ external fun <T> Set<T>.minus(elements: Set<T>): Set<T>
 
 external fun <K, V> Map<K, V>.get(key: K): V?
 external val <K, V> Map<K, V>.keys: Set<K>
+external val <K, V> Map<K, V>.values: Collection<V>
+external fun <T> Collection<T>.toList(): List<T>
+
+external val <A, B> Pair<A, B>.first: A
+external val <A, B> Pair<A, B>.second: B
 
 external val String.length: Int
 external fun String.plus(other: String): String
@@ -114,6 +121,12 @@ external fun Long.toInt(): Int
 external fun Long.coerceAtLeast(minimumValue: Long): Long
 external fun Long.coerceAtMost(maximumValue: Long): Long
 external fun abs(n: Long): Long
+external fun max(a: Int, b: Int): Int
+external fun max(a: Long, b: Long): Long
+external fun max(a: Double, b: Double): Double
+external fun min(a: Int, b: Int): Int
+external fun min(a: Long, b: Long): Long
+external fun min(a: Double, b: Double): Double
 external fun Double.toLong(): Long
 external fun Double.roundToLong(): Long
 external fun Double.toInt(): Int

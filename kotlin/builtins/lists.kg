@@ -47,11 +47,14 @@ fun lists(f: String, xs: List<Long>, ys: List<Long>, n: Int, m: Int): String? = 
     "distinct" -> "${xs.distinct()} ${(xs + ys).distinct()} ${(xs + ys).map { it % 3L }.distinct()} ${listOf<Long>().distinct()}"
     "flatMap" -> "${xs.flatMap { listOf(it, it * m) }} ${xs.flatMap { x -> ys.filter { it > x } }} ${ys.flatMap { listOf<Long>() }}"
     "maxOrNull" -> "${xs.maxOrNull()} ${(xs + ys).maxOrNull()} ${listOf<Long>().maxOrNull()} ${xs.map { it.toInt() + n }.maxOrNull()} ${xs.map { it > n }.maxOrNull()} ${ys.map { "$it" }.maxOrNull()}"
+    "minOrNull" -> "${xs.minOrNull()} ${(xs + ys).minOrNull()} ${listOf<Long>().minOrNull()} ${xs.map { it.toInt() + n }.minOrNull()} ${xs.map { it > n }.minOrNull()} ${ys.map { "$it" }.minOrNull()}"
     "sortedByDescending" -> "${xs.sortedByDescending { it % 3L }} ${ys.sortedByDescending { "$it" }} ${(xs + ys).sortedByDescending { if (it > n) null else -it }} ${xs.sortedByDescending { it > m }}"
     "sortedByDescendingDouble" -> "${(xs + ys).sortedByDescending { it.toDouble() / n.toLong().toDouble() }} ${(xs + ys).map { it.toDouble() / m.toLong().toDouble() }.sortedByDescending { -it }}"
     "associateBy" -> "${xs.associateBy { it % 3L }} ${(xs + ys).associateBy { it > n }} ${ys.associateBy { if (it > m) null else it / 2L }} ${xs.associateBy { it % 3L }[ys.firstOrNull() ?: 0L]}"
     "associate" -> "${xs.associate { it % 3L to it * m }} ${(xs + ys).associate { "$it" to (it > n) }} ${listOf<Long>().associate { it to it }} ${xs.associate { it to it } == xs.reversed().associate { it to it }}"
     "keys" -> keys(xs, ys, n)
+    "values" -> values(xs, ys, n)
+    "pair" -> "${(n to xs).first} ${(n to xs).second} ${xs.zip(ys).map { it.first - it.second }} ${(xs to ys.zip(xs)).second.map { it.second }}"
     "setPlus" -> "${xs.toSet() + n.toLong()} ${xs.toSet() + ys} ${xs.toSet() + ys.toSet()} ${setOf<Long>() + xs} ${xs.toSet() + xs} ${xs.toSet() + ys == ys.toSet() + xs}"
     "setMinus" -> "${xs.toSet() - n.toLong()} ${xs.toSet() - ys} ${xs.toSet() - ys.toSet()} ${xs.toSet() - listOf<Long>()} ${setOf<Long>() - xs} ${(xs + ys).toSet() - xs - ys}"
     "setNoneAll" -> "${setOf(1, 2).none { it > 2 }} ${setOf<Long>().none { it > 0L }} ${xs.toSet().none { it > n }} ${setOf<Long>().all { it > 0L }} ${ys.toSet().all { it % 2L == 0L }}"
@@ -89,6 +92,15 @@ fun keys(xs: List<Long>, ys: List<Long>, n: Int): String {
     val more = m.keys + ys
     val less = m.keys - xs.take(n)
     return "${m.keys} $more $less $m ${m.keys == ys.groupBy { it % 3L }.keys} ${xs.associateBy { it > n }.keys}"
+}
+
+// A map's values, in its order, and a list made from them, leave the
+// map as it was.
+fun values(xs: List<Long>, ys: List<Long>, n: Int): String {
+    val m = xs.groupBy { it % 3L }
+    val vs = m.values.toList()
+    val more = vs + listOf(ys)
+    return "${m.values} $vs $more $m ${xs.associateBy { it > n }.values} ${ys.associate { it to it * 2L }.values.toList()} ${listOf<Long>().associateBy { it }.values}"
 }
 
 // Two lists built from one must not share what each added.

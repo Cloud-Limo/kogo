@@ -21,7 +21,7 @@ func (e *emitter) sql(x *syntax.Call) string {
 	sel := x.Fun.(*syntax.Select)
 	q := e.info.SQL[x.Args[0].Value.(*syntax.SQL)]
 	kogo := e.use(preludePath + "kogo")
-	args := []string{e.expr(sel.X), strconv.Quote(q.Stmt.SQL)}
+	args := []string{e.expr(sel.X), e.statement(q.Stmt.SQL, x.At().Line)}
 	var known []string // the types the driver must be told of
 	for i, p := range q.Stmt.Params {
 		if enums(p.Type) {
@@ -53,6 +53,24 @@ func (e *emitter) sql(x *syntax.Call) string {
 		args = append(args, e.expr(a))
 	}
 	return kogo + ".Tx_" + export(sel.Name) + "(" + strings.Join(args, ", ") + ")"
+}
+
+// statement writes it as a Go raw string where it can sit in
+// one unchanged, which keeps its quoted names free of escapes: no
+// backtick, no \r, which Go drops from one, nor anything else Go
+// refuses in its source, such as a byte order mark. Else it is quoted.
+// After a raw string that runs over several lines, a directive puts
+// what follows back on the call's line: in a write, the rest of the
+// call; in a read, the start of the reader, whose lines carry their
+// own directives.
+func (e *emitter) statement(sql string, line int) string {
+	if !strconv.CanBackquote(strings.ReplaceAll(sql, "\n", "")) {
+		return strconv.Quote(sql)
+	}
+	if !strings.Contains(sql, "\n") {
+		return "`" + sql + "`"
+	}
+	return fmt.Sprintf("`%s`/*line %s:%d*/", sql, e.path, line)
 }
 
 // enums reports whether a value of the type t is, or holds in a

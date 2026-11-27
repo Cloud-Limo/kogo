@@ -7,7 +7,8 @@
 // Nobody reads the Go. Each line of it begins with a /*line*/
 // directive, so that a Go panic's trace names the Kogo file and line,
 // padded so that the code starts at one column, and is indented a tab
-// for each block or closure it is in.
+// for each block or closure it is in; except the later lines of a
+// statement's raw string, which hold no code.
 package emit
 
 import (

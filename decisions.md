@@ -5300,3 +5300,33 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   neither, and the issue asks for `all` where a `Set` lacks one a
   `List` has. A `List` has no `any`, so neither gets one. Not taken:
   `none` alone.
+
+## SQL as Go raw strings (DEV-1284), 26 Nov 2026
+
+- **A statement is emitted as a Go raw string whenever
+  `strconv.CanBackquote` takes it with its newlines removed**, and
+  quoted as before otherwise. That call refuses a backtick, a `\r`
+  (Go drops it from a raw string), a byte order mark and a NUL (Go
+  refuses both anywhere in its source; checked, `invalid BOM in the
+  middle of the file`), invalid UTF-8 and other control characters.
+  Not taken: `strings.ContainsAny(sql, "`\r")` as the issue had it,
+  which lets a byte order mark through into Go that does not build.
+  All 36 statements in `examples/` now come out raw, with
+  the same bytes as before, compared literal by literal.
+- **A statement with newlines is raw too, and a `/*line*/` directive
+  after its closing backtick names the call's line again.** Every
+  read has a newline, since the wrap ends its statement with `\n) _`
+  (sqlpass), so quoting multi-line statements would have left the
+  issue's own example quoted. Go counts the newlines inside a raw
+  string, so without the directive the parameters after it, and the
+  call's close, would be traced to a later line (`TestLine` checks
+  one). That holds for a write; in a read the reader comes between
+  the directive and the call's close, and its lines carry their own
+  directives. The lines after the first start at column 0, with no
+  directive, which no position needs: they are inside the string.
+  gofmt parses the result and leaves the string as it is. Not taken:
+  quoting multi-line statements, which keeps every read escaped; a
+  concatenation of one raw string per line, which adds an operator
+  and a directive per line of SQL. Reopens if a trace names a line
+  that is wrong around a statement, or the emitted Go is run through
+  a tool that moves comments inside a call.

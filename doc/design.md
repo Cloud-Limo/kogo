@@ -58,7 +58,8 @@ constraints) is worth typing.
 5. **Go is a backend, not a source language.** Nobody reads the emitted
    Go, but line directives map it back to the source, written at the
    start of each line: `/*line ../../src/a.kg:26*/`, padded so that
-   the code starts at one column, then indented a tab a level.
+   the code starts at one column, then indented a tab a level; except
+   the later lines of a statement's raw string, which hold no code.
 6. **Small enough to hold in a prompt.** One way to do each thing; the
    spec replaces training data.
 7. **Precise errors.** Errors are machine-readable (file, line,

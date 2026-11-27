@@ -61,7 +61,7 @@ var kept = []struct{ names, from, to, why string }{
 // Such a case is counted under why and does not fail the check; a
 // limit on any other input is a difference.
 var refused = []struct{ names, input, id, limit, why string }{
-	{"atZone|plusDays|atZoneEra|atStartOfDay|dateParts|hourMinute", "zoneId", offsetID, zoneLimit, "spec.md section 12: ZoneId.of takes a region name"},
+	{"atZone|plusDays|atZoneEra|atStartOfDay|dateParts|hourMinute|plusSeconds", "zoneId", offsetID, zoneLimit, "spec.md section 12: ZoneId.of takes a region name"},
 	{"offsetOf", "offsetId", offsetID, zoneLimit, "spec.md section 12: ZoneId.of takes a region name"},
 }
 

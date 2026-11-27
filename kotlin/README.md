@@ -11,8 +11,8 @@ must refuse. It needs a JVM and is not part of `go test ./...`.
   (kotlinc is given the same bytes under a `.kt` name, `time.kt`,
   which names `java.time`'s types `kogo.time`'s, `kogo.kt`, which
   names Kotlin's `Uuid` Kogo's, `math.kt`, which names `kotlin.math`'s
-  functions `kogo.math`'s, `round.kt`, which gives `roundToLong` the
-  import kotlinc needs and Kogo does not, and `arrow.kt`,
+  functions `kogo.math`'s, `round.kt`, which gives `roundToLong`, `max`
+  and `min` the import kotlinc needs and Kogo does not, and `arrow.kt`,
   which gives Arrow's `Either` the names Kogo's prelude needs no
   import for; the task fetches Arrow's jar once). Each branch of
   a `when` is one case, calling prelude functions singly or in a short

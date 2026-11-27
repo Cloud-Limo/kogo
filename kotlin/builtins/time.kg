@@ -25,6 +25,8 @@ fun time(f: String, s: String, t: String, x: Long, y: Long, n: Int, m: Int): Str
     "atStartOfDay" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().atStartOfDay(ZoneId.of(zone(n * 10 + m)))} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().atStartOfDay(ZoneId.of(zone(n * 10 + m))).toInstant()}"
     "dateParts" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().year} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().monthValue} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().dayOfMonth} ${Instant.ofEpochSecond(x % 100000000000L, 0L).atZone(ZoneId.of("UTC")).toLocalDate().year}"
     "hourMinute" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).hour} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).minute} ${Instant.ofEpochSecond(changeAt(m) + x % 7200L, 0L).atZone(ZoneId.of(changeZone(m))).hour}"
+    "plusSeconds" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).plusSeconds(y)} ${instant(x, n).atZone(ZoneId.of(zone(n * 10 + m))).plusSeconds(y)}"
+    "plusSecondsChange" -> "${Instant.ofEpochSecond(sydneyChange(m) - x % 7200L, n.toLong()).atZone(ZoneId.of("Australia/Sydney")).plusSeconds(y % 14400L)} ${Instant.ofEpochSecond(changeAt(m) - x % 7200L, 0L).atZone(ZoneId.of(changeZone(m))).plusSeconds(y % 14400L).hour}"
     "fraction" -> "${Instant.ofEpochSecond(x % 100000000000L, n.toLong() % 1000L * 1000000L)} ${Instant.ofEpochSecond(x % 100000000000L, n.toLong() % 1000L * 1000L + 1000000L)}"
     "startOfChangedDay" -> "${Instant.ofEpochSecond(changeAt(m), 0L).atZone(ZoneId.of(changeZone(m))).toLocalDate().atStartOfDay(ZoneId.of(changeZone(m)))}"
     "ofDays" -> "${Duration.ofDays(n.toLong())} ${Duration.ofDays(n.toLong()).seconds}"
@@ -54,6 +56,10 @@ fun changeZone(m: Int): String =
 
 fun changeAt(m: Int): Long =
     listOf(1647183600L, 1667746800L, 1662908400L, 243961200L, 1541343600L)[(m % 5 + 5) % 5]
+
+// The moments Sydney's offset changes in 2026: to +10:00 at 03:00 on
+// 5 April, and to +11:00 at 02:00 on 4 October.
+fun sydneyChange(m: Int): Long = listOf(1775318400L, 1791043200L)[(m % 2 + 2) % 2]
 
 // Offsets, which Kogo refuses (spec 12), in each form ZoneOffset.of
 // reads and malformed, with characters of one UTF-16 unit and two.

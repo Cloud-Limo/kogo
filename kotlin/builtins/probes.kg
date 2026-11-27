@@ -8,6 +8,8 @@ fun probes(f: String, xs: List<Long>, ys: List<Long>, s: String, t: String, n: I
     "setList" -> "${setOf(xs, ys, xs.take(n))} ${setOf(xs to ys, xs to ys)} ${setOf(xs).contains(ys)}"
     "setEq" -> "${(xs + ys).toSet() == (ys + xs).toSet()} ${xs.toSet() == xs.take(n).toSet()}"
     "maxOrNullDouble" -> "${listOf(d, 0.0, -0.0).maxOrNull()} ${listOf(-0.0, d).maxOrNull()} ${listOf(-0.0, 0.0).maxOrNull()} ${(xs.map { it.toDouble() } + listOf(d)).maxOrNull()} ${listOf<Double>().maxOrNull()}"
+    "minOrNullDouble" -> "${listOf(d, 0.0, -0.0).minOrNull()} ${listOf(0.0, d).minOrNull()} ${listOf(0.0, -0.0).minOrNull()} ${listOf(-0.0, 0.0).minOrNull()} ${(xs.map { it.toDouble() } + listOf(d)).minOrNull()} ${(listOf(d) + ys.map { it.toDouble() }).minOrNull()} ${listOf<Double>().minOrNull()}"
+    "minOrNullString" -> "${listOf(s, t).minOrNull()} ${s.map { it }.minOrNull()} ${(s.map { "$it" } + t.map { "$it" }).minOrNull()}"
     "maxOrNullString" -> "${listOf(s, t).maxOrNull()} ${s.map { it }.maxOrNull()} ${(s.map { "$it" } + t.map { "$it" }).maxOrNull()}"
     "setPlusDouble" -> "${setOf(d, 0.0) + listOf(-0.0, d)} ${setOf(d, 0.0, -0.0) - d} ${setOf(d, -0.0) - setOf(0.0)} ${setOf(xs, ys) + setOf(ys)} ${setOf(xs, ys) - setOf(xs)} ${setOf(xs.toSet()) + setOf(ys.toSet())}"
     "associateString" -> "${listOf(s, t, s).associateBy { it.length }} ${listOf(s, t).associate { it to it.length }.keys} ${listOf(d, -0.0, 0.0, d).associateBy { it }}"

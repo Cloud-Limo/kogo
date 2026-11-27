@@ -1173,11 +1173,12 @@ no import;
 `reversed`, `distinct`, `distinctBy`, `take`, `drop`, `zip`, `plus`
 (`+`), a `Set`'s `plus` (`+`) and `minus` (`-`) of an element, a `List`
 or a `Set`, `groupBy`, `associateBy`, `associate`, `toSet`, `toList`,
-`joinToString`, `forEach`, `keys`, `values`, `listOfNotNull`. A `Map`
-and a `Set` iterate in insertion order and compare keys as `==` does,
-by value, so any type may be a key. A key that is a `String`, an `Int`,
-a `Long`, a `Boolean`, a `Uuid` or an enum is found at once. A key of
-any other type, a `T?` among them, is found by walking the keys: a
+`joinToString`, `forEach`, `keys`, `values`, `listOfNotNull`, a
+`Pair`'s `first` and `second`. A `Map` and a `Set` iterate in
+insertion order and compare keys as `==` does, by value, so any type
+may be a key. A key that is a `String`, an `Int`, a `Long`, a
+`Boolean`, a `Uuid` or an enum is found at once. A key of any other
+type, a `T?` among them, is found by walking the keys: a
 lookup costs the size of the collection and building one its square,
 so think hard before keying a large `Set` or `Map` (or a `distinct`,
 `distinctBy`, `groupBy`, `associate` or `associateBy`) by anything
@@ -1235,10 +1236,11 @@ and not a promise that it is all:
   `Double`, a `String`, a `Char` or a `Boolean`, or one of these that
   may be null, as Kotlin does. A key of any other type, an enum or a
   time among them, is refused at `kogo check` with `sort-key`, and so
-  is `maxOrNull` of a list of any other type (and of one that may be
-  null, which kotlinc refuses too). The list each sort gives is
-  Kotlin's, equal keys in the order they came; how often and in what
-  order it calls the selector is not, and Kotlin promises neither.
+  are `maxOrNull` and `minOrNull` of a list of any other type (and of
+  one that may be null, which kotlinc refuses too). The list each sort
+  gives is Kotlin's, equal keys in the order they came; how often and
+  in what order it calls the selector is not, and Kotlin promises
+  neither.
 - A `Set`'s `+` or `-` of one element that is itself a `List` or a
   `Set` is refused at `kogo check` with `set-operand`: Kotlin takes a
   `List` or a `Set` there as the elements to add or remove, and gives
@@ -1276,10 +1278,11 @@ nanos)`, `isBefore`, `isAfter`, `plus(duration)`, `minus(duration)`),
 `ofMinutes`, `Duration.ofSeconds(seconds, nanos)`,
 `Duration.between(start, end)`, `seconds`), `Clock.now()`.
 `ofEpochSecond`, `ofSeconds`, `ofDays`, `plus`, `minus`, `atZone`,
-`plusDays` and `ZoneId.of` panic where `java.time`'s throw, with its message:
-`Instant exceeds minimum or maximum instant`, `long overflow`, `Invalid
-value for EpochDay` past a `LocalDate`'s years ±999,999,999, or
-`Unknown time-zone ID: X`. `ZoneId.of` takes a region name of the tz
+`plusDays`, `plusSeconds` and `ZoneId.of` panic where `java.time`'s
+throw, with its message: `Instant exceeds minimum or maximum
+instant`, `long overflow`, `Invalid value for EpochDay` past a
+`LocalDate`'s years ±999,999,999, or `Unknown time-zone ID: X`.
+`ZoneId.of` takes a region name of the tz
 database (`Australia/Melbourne`, `UTC`), and an unknown or malformed one
 panics with `java.time`'s message. An offset ID (`Z`, `+05:30`,
 `GMT+1`, `UTC+10`) is outside Kogo's subset of `java.time` and panics

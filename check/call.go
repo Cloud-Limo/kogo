@@ -184,9 +184,9 @@ func (c *checker) regexPattern(e *syntax.Call, f *Func) {
 }
 
 // sortKey refuses the prelude's sortedBy and sortedByDescending on a
-// key, and maxOrNull on an element, whose type Kogo does not order
-// (spec.md 12), where Kotlin orders any Comparable and refuses the
-// rest at compile time. maxOrNull's element may not be null, as in
+// key, and maxOrNull and minOrNull on an element, whose type Kogo does
+// not order (spec.md 12), where Kotlin orders any Comparable and refuses
+// the rest at compile time. Their element may not be null, as in
 // Kotlin, where a T? is not Comparable.
 func (c *checker) sortKey(e *syntax.Call, call *Call) {
 	f := call.Func
@@ -199,8 +199,8 @@ func (c *checker) sortKey(e *syntax.Call, call *Call) {
 	switch {
 	case (f.Name == "sortedBy" || f.Name == "sortedByDescending") && len(call.TypeArgs) == 2 && len(e.Args) == 1:
 		k, at = nonNull(call.TypeArgs[1]), e.Args[0].Value
-	case f.Name == "maxOrNull" && len(call.TypeArgs) == 1 && len(e.Args) == 0:
-		k, at, what, orders, may, fix = call.TypeArgs[0], e.Fun, "list's element", "finds the largest only of", "", "map the list to one of these first, as mapNotNull does to drop a null"
+	case (f.Name == "maxOrNull" || f.Name == "minOrNull") && len(call.TypeArgs) == 1 && len(e.Args) == 0:
+		k, at, what, orders, may, fix = call.TypeArgs[0], e.Fun, "list's element", "finds the "+map[string]string{"maxOrNull": "largest", "minOrNull": "smallest"}[f.Name]+" only of", "", "map the list to one of these first, as mapNotNull does to drop a null"
 	default:
 		return
 	}

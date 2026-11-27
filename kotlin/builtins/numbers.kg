@@ -13,6 +13,8 @@ fun numbers(f: String, x: Long, y: Long, d: Double, n: Int): String? = when (f) 
     "roundTrip" -> "${x.toDouble().toLong()} ${d.toLong().toDouble()} ${d.toInt().toLong()}"
     "longToInt" -> "${x.toInt()} ${(x * 4096L).toInt()} ${y.toInt() + n}"
     "clamp" -> "${n.toLong().coerceAtLeast(x).coerceAtMost(y)} ${d.toLong().coerceAtMost(x)}"
+    "maxMin" -> "${max(n, y.toInt())} ${min(y.toInt(), n)} ${max(x, y)} ${min(x, y)} ${max(n, 0)} ${min(x, 0L)}"
+    "maxMinDouble" -> "${max(d, -d)} ${min(d, -d)} ${max(-d, d)} ${min(-d, d)} ${max(d, 0.0)} ${min(0.0, d)} ${max(x.toDouble(), d)} ${min(d, y.toDouble())}"
     else -> null
 }
 

@@ -255,6 +255,7 @@ func TestNames(t *testing.T) {
 		// maxOrNull takes the largest of these, and none that may be null, as Kotlin's.
 		{"fun f(xs: List<Long?>): Long? = xs.‸maxOrNull()\n---\npackage kogo\nexternal fun <T> List<T>.maxOrNull(): T?", "sort-key", "this list's element is a Long?, and maxOrNull finds the largest only of an Int, a Long, a Double, a String, a Char or a Boolean: map the list to one of these first, as mapNotNull does to drop a null (spec 12)"},
 		{"enum class E { a }\nfun f(xs: List<E>): E? = xs.‸maxOrNull()\n---\npackage kogo\nexternal fun <T> List<T>.maxOrNull(): T?", "sort-key", "this list's element is a E"},
+		{"fun f(xs: List<Int?>): Int? = xs.‸minOrNull()\n---\npackage kogo\nexternal fun <T> List<T>.minOrNull(): T?", "sort-key", "this list's element is a Int?, and minOrNull finds the smallest only of"},
 		// A Set's + or - of one element that is a collection: Kotlin
 		// reads it as the elements to add or remove.
 		{"fun f(s: Set<List<Int>>, xs: List<Int>): Set<List<Int>> = s ‸- xs\n---\npackage kogo\nexternal class Set<out T>\nexternal fun <T> Set<T>.minus(element: T): Set<T>\nexternal fun <T> Set<T>.minus(elements: List<T>): Set<T>", "set-operand", "this is a List<Int>, and Kotlin takes a List or a Set after a Set's + or - as the elements to add or remove: write setOf(...) around it to add or remove it whole (spec 12)"},

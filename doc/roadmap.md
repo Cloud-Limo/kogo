@@ -238,10 +238,10 @@ In cusoon2, in this order:
 4. Slices 5 to 8, with the pricing (slice 10) beside them.
 5. Kotlin first, one PR with the frontend: a time on the wire as a
    `LocalDate` and a `LocalTime` (Kogo's DEV-1302), so the reader's
-   own 400 covers one that does not read; `bookingStatus`'s 500; and the Kotlin's
-   `bookingTime` onto `pickup()`, which ends the port's deviation
-   from DEV-1178. It lands before slice 9, the first to read a time
-   from a caller.
+   own 400 covers one that does not read; `bookingStatus`'s 500; and
+   the Kotlin's `bookingTime` onto `pickup()`, which ends the port's
+   deviation from DEV-1178. It lands before slice 9, the first to
+   read a time from a caller.
 6. Slice 9, with Google's Directions and Autocomplete beside it.
 7. Slices 11 to 14.
 8. Stripe's client; the login design's sitting with Greg, at any time

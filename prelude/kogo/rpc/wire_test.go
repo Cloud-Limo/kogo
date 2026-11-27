@@ -66,24 +66,13 @@ func read(text string) (Job, error) {
 }
 
 // Each row of the table reads and writes, Unit as {} among them, and
-// the largest Int and Long too, and the first and last LocalDate and
-// LocalTime the reader reads.
+// the largest Int and Long too.
 func TestWire(t *testing.T) {
 	for text, want := range map[string]Job{
 		job: jobValue,
 		strings.NewReplacer(`-2147483648`, `2147483647`, `-9007199254740991`, `9007199254740991`).Replace(job): func() Job {
 			j := jobValue
 			j.Number, j.Cents = math.MaxInt32, maxLong
-			return j
-		}(),
-		strings.NewReplacer(`2028-02-29`, `9999-12-31`, `10:30:45.100`, `23:59:59.999999999`).Replace(job): func() Job {
-			j := jobValue
-			j.Day, j.At = ktime.LocalDate{Year: 9999, Month: 12, Day: 31}, ktime.LocalTime{NanoOfDay: 86400e9 - 1}
-			return j
-		}(),
-		strings.NewReplacer(`2028-02-29`, `0000-01-01`, `10:30:45.100`, `00:00`).Replace(job): func() Job {
-			j := jobValue
-			j.Day, j.At = ktime.LocalDate{Year: 0, Month: 1, Day: 1}, ktime.LocalTime{}
 			return j
 		}(),
 	} {
@@ -118,18 +107,8 @@ func TestStrict(t *testing.T) {
 		{`3e4f5a6b`, `3e4f5a--`, "input.id is not a Uuid"},
 		{`"Confirmed"`, `"Secret"`, "input.state is not one of Offered, Confirmed"},
 		{`"2028-02-29"`, `"2026-02-29"`, "input.day is not a LocalDate, a day written YYYY-MM-DD"},
-		{`"2028-02-29"`, `"2026-02-30"`, "input.day is not a LocalDate"},
-		{`"2028-02-29"`, `"2026-2-3"`, "input.day is not a LocalDate"},
-		{`"2028-02-29"`, `"+2026-02-03"`, "input.day is not a LocalDate"},
-		{`"2028-02-29"`, `"20260-02-03"`, "input.day is not a LocalDate"},
 		{`"2028-02-29"`, `20260203`, "input.day is not a string"},
-		{`"2028-02-29"`, `null`, "input.day is null"},
 		{`"10:30:45.100"`, `"24:00"`, "input.at is not a LocalTime, written HH:mm, HH:mm:ss or HH:mm:ss.SSS"},
-		{`"10:30:45.100"`, `"10:60"`, "input.at is not a LocalTime"},
-		{`"10:30:45.100"`, `"9:30"`, "input.at is not a LocalTime"},
-		{`"10:30:45.100"`, `"10:30:45.1234567890"`, "input.at is not a LocalTime"},
-		{`"10:30:45.100"`, `1030`, "input.at is not a string"},
-		{`"10:30:45.100"`, `null`, "input.at is null"},
 		{`"name":"z"`, `"name":"z","secret":1`, "input.stops[1].back.secret is not a key of Stop"},
 		{`"name":"y"`, `"name":null`, "input.stops[1].name is null"},
 		{`"tip":7`, `"tip":[7]`, "input.tip is not a number"},

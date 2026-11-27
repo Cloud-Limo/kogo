@@ -299,6 +299,24 @@ to Todo each issue whose `Parked:`, or older `Lead:` line, waits on this
 merge, with `lin comment DEV-MMM --state Todo < /dev/null`, which posts
 nothing. The lead starts it from the board.
 
+After a cusoon2 merge, catch up each other ready PR it leaves unable to
+merge, before you hand on any of the tidy's lines. Run `gh pr list -R
+Cloud-Limo/cusoon2 --base renew --json
+number,headRefName,mergeable,files`. Take each PR
+whose issue, `DEV-MMM` from its branch, is not labelled `lead` and has
+as its newest event `Ready to merge:` or `Checked:`. Of those, catch up
+one GitHub calls `CONFLICTING`, and a port's PR (it changes `kogo/` or
+a file `kogo/pins` names) when the merged PR, `gh pr diff <its url>
+--name-only`, changed a path outside `doc/`, `infra/`, `mise-tasks/`,
+`frontend/` and `site/`. Leave every other PR alone. If GitHub says
+`UNKNOWN`, which it does for some seconds after a merge, ask git:
+after `git -C ~/Dev/cusoon2-tasks fetch origin`, `git -C
+~/Dev/cusoon2-tasks merge-tree --write-tree origin/renew
+origin/<branch>` exits 1 on a conflict. For each PR caught up, run
+`lin merge-check DEV-MMM` and do as Merging says for its first line.
+For these that line is `fix:`, and its Fix starts the way DEV-MMM's
+newest `Start:` ran.
+
 ## Handing on
 
 Post one `Clerk:` comment with `lin step DEV-NNN < clerk.md`, which

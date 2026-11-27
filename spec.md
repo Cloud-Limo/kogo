@@ -904,9 +904,10 @@ as numbers, and a zero keeps its scale: `0.00`. An empty `List` is sent as an
 empty array, never as `NULL`, and a `ByteArray` of no bytes as an empty
 `bytea`. A `real` is read as a `Double`, widened exactly: 0.1 is read as
 0.10000000149011612. A `Double` sent to a `real` is rounded to one, as
-Kotlin's `toFloat()` rounds it: beyond ±3.4e38 it is stored as an
-infinity of its sign, and below 7e-46 as 0, where Postgres's cast from a
-`double precision` refuses with an overflow or an underflow. A
+Kotlin's `toFloat()` rounds it: a value beyond a `real`'s range, about
+±3.4e38, is stored as an infinity of its sign, and one nearer 0 than
+about 7e-46 as 0, where Postgres's cast from a `double precision`
+refuses with an overflow or an underflow. A
 `character(n)` is read as Postgres sends it, padded with spaces to n:
 `'A'::character(2)` is read as `"A "`. A `String` sent to one is
 Postgres's to take: compared with a `character(n)` column, a parameter is

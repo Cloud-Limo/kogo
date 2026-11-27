@@ -5335,20 +5335,14 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
 ## real and character(n) (DEV-1296), 27 Nov 2026
 
 - **`real` maps to `Double` and `character(n)` to `String`, read and
-  sent, with no rule of Kogo's own** (Greg, 27 Nov 2026, on DEV-1290's
-  research). A `real` is read widened exactly, and a `Double` sent to
-  one is rounded to a float4 by pgx as Postgres rounds a `::float8`
-  cast, except at the ends: beyond ±3.4e38 pgx stores an infinity and
-  below 7e-46 a 0, where Postgres refuses. That is Kotlin's
-  `Double.toFloat()`, so it is stated in spec 10.4, not refused. A
-  `character(n)` is read padded to n, as Postgres sends it and JDBC
-  gives it to Kotlin; what a sent `String` compares equal to is
-  Postgres's rule. Two `scalars` entries in `sqlpass`; nothing in
-  `emit`, `rt` or the prelude changed. Not taken: a `kogo check` error
-  on a `real` parameter telling the author to write `$x::float8`
-  (DEV-1290's design), which refuses what Kotlin does silently; and
-  migrating such columns to `text` and `double precision`, which suits
-  cusoon2 but not a schema that cannot migrate. Reopens if a program
-  is found to depend on Postgres's overflow refusal for a `real`, or
-  if pgx changes how it encodes a `float64` for a float4 parameter
+  sent, as spec 10.4 states** (Greg, 27 Nov 2026, on DEV-1290's
+  research). A `Double` out of a `real`'s range is stored as an
+  infinity or 0 where Postgres's cast refuses, as Kotlin's `toFloat()`
+  rounds it, so it is allowed; a `character(n)` is read padded, as
+  JDBC gives it to Kotlin. Not taken: a `kogo check` error on a
+  `real` parameter asking for `$x::float8`, which refuses what Kotlin
+  does silently; migrating such columns to `text` and `double
+  precision`, which suits cusoon2 but not a schema that cannot
+  migrate. Reopens if a program depends on Postgres's refusal for a
+  `real`, or pgx changes how it encodes a `float64` for a float4
   (`TestRealAndCharacter` would fail).

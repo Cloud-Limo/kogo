@@ -5537,5 +5537,6 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   change of offset near it is found without walking the zone's rules.
   Two changes inside those 36 hours would be missed; a scan of the tz
   database's zones from 1850 to 2040 found none, and past that each
-  zone's rule changes at most twice a year. Not taken: Go's `time.Date`, which in the hour a
-  change skips or repeats does not say which offset it takes.
+  zone's rule changes at most twice a year. Not taken: Go's
+  `time.Date`, which in the hour a change skips or repeats does not
+  say which offset it takes.

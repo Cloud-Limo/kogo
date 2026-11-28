@@ -42,5 +42,16 @@ external fun Instant.minus(amountToSubtract: Duration): Instant
 external val LocalDate.year: Int
 external val LocalDate.monthValue: Int
 external val LocalDate.dayOfMonth: Int
+external val LocalDate.dayOfWeek: DayOfWeek
 external val ZonedDateTime.hour: Int
 external val ZonedDateTime.minute: Int
+external fun ZonedDateTime.withHour(hour: Int): ZonedDateTime
+external fun ZonedDateTime.withMinute(minute: Int): ZonedDateTime
+external fun ZonedDateTime.withSecond(second: Int): ZonedDateTime
+external fun ZonedDateTime.withNano(nanoOfSecond: Int): ZonedDateTime
+external val Instant.epochSecond: Long
+
+// java.time's DayOfWeek, spelt as it spells its constants.
+enum class DayOfWeek { MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY }
+
+external val DayOfWeek.value: Int

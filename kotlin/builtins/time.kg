@@ -5,6 +5,7 @@
 package builtins
 
 import kogo.Uuid
+import kogo.time.DayOfWeek
 import kogo.time.Duration
 import kogo.time.Instant
 import kogo.time.ZoneId
@@ -35,6 +36,22 @@ fun time(f: String, s: String, t: String, x: Long, y: Long, n: Int, m: Int): Str
     "between" -> "${Duration.between(instant(x, n), instant(y, m))} ${Duration.between(instant(y, m), instant(x, n))}"
     "betweenSeconds" -> "${Duration.between(instant(x, n), instant(y, m)).seconds} ${Duration.between(instant(x, n), instant(x, n))}"
     "durationSeconds" -> "${Duration.ofSeconds(x, y).seconds} ${Duration.ofSeconds(x, m.toLong()).seconds}"
+    "dayOfWeek" -> "${era(x, y, n).atZone(ZoneId.of("UTC")).toLocalDate().dayOfWeek} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).toLocalDate().dayOfWeek.value} ${leap(m).atZone(ZoneId.of("UTC")).toLocalDate().dayOfWeek} ${leap(m).atZone(ZoneId.of("UTC")).toLocalDate().dayOfWeek.value} ${Instant.ofEpochSecond(0L, -1L).atZone(ZoneId.of("UTC")).toLocalDate().dayOfWeek}"
+    "dayOfWeekEquals" -> "${day(n)} ${day(n).value} ${day(n) == day(m)} ${day(m) == DayOfWeek.SUNDAY} ${era(x, y, n).atZone(ZoneId.of("UTC")).toLocalDate().dayOfWeek == day(m)} ${DayOfWeek.MONDAY.value} ${DayOfWeek.SUNDAY.value}"
+    "nextSunday" -> "${era(x, y, n).atZone(ZoneId.of("UTC")).toLocalDate().plusDays((7 - era(x, y, n).atZone(ZoneId.of("UTC")).toLocalDate().dayOfWeek.value).toLong() + 1L)}"
+    "dayOfWeekName" -> "${day(n).name} ${DayOfWeek.entries} ${DayOfWeek.valueOf("SUNDAY") == DayOfWeek.SUNDAY} ${DayOfWeek.valueOf(day(m).name) == day(m)}"
+    "dayOfWeekValueOf" -> "${DayOfWeek.valueOf(s)}"
+    "withFields" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).withHour((m % 24 + 24) % 24)} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).withMinute((n % 60 + 60) % 60)} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).withSecond(((y % 60L + 60L) % 60L).toInt())} ${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).withNano(((x % 1000000000L + 1000000000L) % 1000000000L).toInt())}"
+    "withAll" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).withHour((m % 24 + 24) % 24).withMinute(0).withSecond(0).withNano(0)} ${era(x, y, n).atZone(ZoneId.of(changeZone(m))).withHour(23).withMinute(59).withSecond(59).withNano(999999999)} ${Instant.ofEpochSecond(changeAt(m), 0L).atZone(ZoneId.of(changeZone(m))).withHour(0)} ${Instant.ofEpochSecond(changeAt(m), 0L).atZone(ZoneId.of(changeZone(m))).withHour(0).withMinute(30)}"
+    "withHourBack" -> "${Instant.ofEpochSecond(clockBack(m) - 3600L + (x % 3600L + 3600L) % 3600L, 0L).atZone(ZoneId.of(clockZone(m))).withHour(repeated(m) + (n % 3 + 3) % 3 - 1)} ${Instant.ofEpochSecond(clockBack(m) + (x % 3600L + 3600L) % 3600L, 0L).atZone(ZoneId.of(clockZone(m))).withHour(repeated(m) + (n % 3 + 3) % 3 - 1)} ${Instant.ofEpochSecond(clockBack(m) - 3600L + (x % 3600L + 3600L) % 3600L, 0L).atZone(ZoneId.of(clockZone(m))).withMinute((n % 60 + 60) % 60)} ${Instant.ofEpochSecond(clockBack(m) + (x % 3600L + 3600L) % 3600L, 0L).atZone(ZoneId.of(clockZone(m))).withSecond(7).withNano(5)} ${Instant.ofEpochSecond(clockBack(m) - 5400L, 0L).atZone(ZoneId.of(clockZone(m))).withHour(repeated(m))} ${Instant.ofEpochSecond(clockBack(m) + 10800L, 0L).atZone(ZoneId.of(clockZone(m))).withHour(repeated(m))}"
+    "withHourForward" -> "${Instant.ofEpochSecond(clockForward(m) - 5400L + (x % 3600L + 3600L) % 3600L, 0L).atZone(ZoneId.of(clockZone(m))).withHour(2)} ${Instant.ofEpochSecond(clockForward(m) + 10800L + (x % 3600L + 3600L) % 3600L, n.toLong()).atZone(ZoneId.of(clockZone(m))).withHour(2)} ${Instant.ofEpochSecond(clockForward(m) - 1L, 0L).atZone(ZoneId.of(clockZone(m))).withHour(2 + (n % 2 + 2) % 2)} ${Instant.ofEpochSecond(clockForward(m) + 3600L, 0L).atZone(ZoneId.of(clockZone(m))).withHour(1 + (n % 3 + 3) % 3).withMinute(0).withSecond(0).withNano(0)}"
+    "withHourAt" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).withHour(n)}"
+    "withMinuteAt" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).withMinute(m * 10)}"
+    "withSecondAt" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).withSecond(n * 10)}"
+    "withNanoAt" -> "${era(x, y, n).atZone(ZoneId.of(zone(n * 10 + m))).withNano(m)}"
+    "withHour24" -> "${era(x, y, n).atZone(ZoneId.of("UTC")).withHour(24)}"
+    "withNanoBillion" -> "${era(x, y, n).atZone(ZoneId.of("UTC")).withNano(1000000000)}"
+    "epochSecond" -> "${instant(x, n).epochSecond} ${Instant.ofEpochSecond(0L, -1L).epochSecond} ${Instant.ofEpochSecond(x % 100000L, y).epochSecond} ${era(x, y, n).atZone(ZoneId.of("UTC")).toInstant().epochSecond}"
     "parseOrNull" -> "${Uuid.parseOrNull(uuid(n))} ${Uuid.parseOrNull(s + uuid(m))} ${Uuid.parseOrNull("${Uuid.parseOrNull(uuid(n))}") == Uuid.parseOrNull(uuid(n))}"
     "parseOrNull32" -> "${Uuid.parseOrNull("01934f2abcde7f0189abcdef0123456" + s)}"
     else -> null
@@ -61,6 +78,24 @@ fun changeAt(m: Int): Long =
 // The moments Sydney's offset changes in 2026: to +10:00 at 03:00 on
 // 5 April, and to +11:00 at 02:00 on 4 October.
 fun sydneyChange(m: Int): Long = listOf(1775318400L, 1791043200L)[(m % 2 + 2) % 2]
+
+// 29 February of 2000, 1904 and 1600.
+fun leap(m: Int): Instant = Instant.ofEpochSecond(listOf(951782400L, -2077747200L, -11670998400L)[(m % 3 + 3) % 3], 0L)
+
+fun day(n: Int): DayOfWeek =
+    listOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)[(n % 7 + 7) % 7]
+
+// Two zones whose clocks change at different hours: in 2026 Sydney's
+// 02:00 to 03:00 comes twice from 5 April, at clockBack, and is skipped
+// on 4 October, at clockForward; New York's 01:00 to 02:00 comes twice
+// on 1 November and its 02:00 to 03:00 is skipped on 8 March.
+fun clockZone(m: Int): String = listOf("Australia/Sydney", "America/New_York")[(m % 2 + 2) % 2]
+
+fun clockBack(m: Int): Long = listOf(1775318400L, 1793512800L)[(m % 2 + 2) % 2]
+
+fun clockForward(m: Int): Long = listOf(1791043200L, 1772953200L)[(m % 2 + 2) % 2]
+
+fun repeated(m: Int): Int = listOf(2, 1)[(m % 2 + 2) % 2]
 
 // Offsets, which Kogo refuses (spec 12), in each form ZoneOffset.of
 // reads and malformed, with characters of one UTF-16 unit and two.

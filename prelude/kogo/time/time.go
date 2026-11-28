@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	gotime "time"
@@ -498,3 +499,73 @@ func LocalDate_DayOfMonth(this LocalDate) int32 { return this.Day }
 // zone, at the offset in force at the instant.
 func ZonedDateTime_Hour(this ZonedDateTime) int32   { return int32(this.local().Hour()) }
 func ZonedDateTime_Minute(this ZonedDateTime) int32 { return int32(this.local().Minute()) }
+
+func Instant_EpochSecond(this Instant) int64 { return this.Seconds }
+
+// DayOfWeek is prelude/time.kg's, written here as the emitter would
+// write it.
+type DayOfWeek string
+
+const (
+	DayOfWeek_MONDAY    DayOfWeek = "MONDAY"
+	DayOfWeek_TUESDAY   DayOfWeek = "TUESDAY"
+	DayOfWeek_WEDNESDAY DayOfWeek = "WEDNESDAY"
+	DayOfWeek_THURSDAY  DayOfWeek = "THURSDAY"
+	DayOfWeek_FRIDAY    DayOfWeek = "FRIDAY"
+	DayOfWeek_SATURDAY  DayOfWeek = "SATURDAY"
+	DayOfWeek_SUNDAY    DayOfWeek = "SUNDAY"
+)
+
+var DayOfWeek_entries = []DayOfWeek{DayOfWeek_MONDAY, DayOfWeek_TUESDAY, DayOfWeek_WEDNESDAY, DayOfWeek_THURSDAY, DayOfWeek_FRIDAY, DayOfWeek_SATURDAY, DayOfWeek_SUNDAY}
+
+// DayOfWeek_Value is java.time's: 1 for Monday to 7 for Sunday.
+func DayOfWeek_Value(this DayOfWeek) int32 { return int32(slices.Index(DayOfWeek_entries, this)) + 1 }
+
+// LocalDate_DayOfWeek counts from 1970-01-01, a Thursday.
+func LocalDate_DayOfWeek(this LocalDate) DayOfWeek {
+	return DayOfWeek_entries[((this.epochDay()+3)%7+7)%7]
+}
+
+func ZonedDateTime_WithHour(this ZonedDateTime, hour int32) ZonedDateTime {
+	return this.with(0, "HourOfDay", 23, hour)
+}
+
+func ZonedDateTime_WithMinute(this ZonedDateTime, minute int32) ZonedDateTime {
+	return this.with(1, "MinuteOfHour", 59, minute)
+}
+
+func ZonedDateTime_WithSecond(this ZonedDateTime, second int32) ZonedDateTime {
+	return this.with(2, "SecondOfMinute", 59, second)
+}
+
+func ZonedDateTime_WithNano(this ZonedDateTime, nanoOfSecond int32) ZonedDateTime {
+	return this.with(3, "NanoOfSecond", 999999999, nanoOfSecond)
+}
+
+// with sets part i of the time of day, the hour, minute, second or
+// nanosecond, to v, panicking with java.time's message where v is out
+// of range. It finds the moment as java.time does, from the local date
+// and time: at the old offset where that is still one of the zone's
+// there, at the earlier of the two in an hour that comes twice, and
+// moved on by the gap in an hour a change skips.
+func (z ZonedDateTime) with(i int, field string, most, v int32) ZonedDateTime {
+	if v < 0 || v > most {
+		panic(fmt.Sprintf("Invalid value for %s (valid values 0 - %d): %d", field, most, v))
+	}
+	t := z.local()
+	_, old := t.Zone()
+	parts := [4]int64{int64(t.Hour()), int64(t.Minute()), int64(t.Second()), int64(t.Nanosecond())}
+	parts[i] = int64(v)
+	local := ZonedDateTime_ToLocalDate(z).epochDay()*86400 + parts[0]*3600 + parts[1]*60 + parts[2]
+	offsetAt := func(second int64) int64 { _, o := gotime.Unix(second, 0).In(z.Zone.loc).Zone(); return int64(o) }
+	// An offset is within 18 hours, so these are the offsets before
+	// and after any change near the local time.
+	before, after := offsetAt(local-18*3600), offsetAt(local+18*3600)
+	offset := before // in a gap: the local time moved on by it
+	for _, o := range []int64{after, before, int64(old)} {
+		if offsetAt(local-o) == o {
+			offset = o
+		}
+	}
+	return ZonedDateTime{Instant{local - offset, int32(parts[3])}, z.Zone}
+}

@@ -380,7 +380,7 @@ func (c *checker) wire(id *syntax.Ident, what string, whole Type, w *reach) {
 			bad(t, path, "and no sealed interface or variant of one crosses the wire: send a data class, with an enum that says which case it is")
 		case d.Kind == "data object":
 			bad(t, path, "which does not cross the wire: send an enum, or Unit as the whole input or answer")
-		case d.Kind != "enum class" && d.Kind != "data class":
+		case d.Kind != "enum class" && d.Kind != "data class", d.Pkg == "kogo.time": // DayOfWeek is an enum
 			bad(t, path, "which does not cross the wire: send text the server has formatted")
 		case reply(n) != nil:
 			bad(t, path, "and only an ungated operation answers with a Reply, its whole answer: answer the value, and set cookies from an ungated operation")

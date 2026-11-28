@@ -7,3 +7,4 @@ typealias Duration = java.time.Duration
 typealias ZoneId = java.time.ZoneId
 typealias ZonedDateTime = java.time.ZonedDateTime
 typealias LocalDate = java.time.LocalDate
+typealias DayOfWeek = java.time.DayOfWeek

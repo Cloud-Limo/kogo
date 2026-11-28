@@ -1273,11 +1273,17 @@ arithmetic in v0. Its `==` is Java's `equals`, which counts the scale:
 
 **Time** (`kogo.time`). `Instant` (`Instant.ofEpochSecond(seconds,
 nanos)`, `isBefore`, `isAfter`, `< <= > >=` (`compareTo`),
-`plus(duration)`, `minus(duration)`),
+`plus(duration)`, `minus(duration)`, `epochSecond`, the floor of a
+moment with a fraction: `-1` a nanosecond before 1970),
 `LocalDate` (`plusDays`, `year`, `monthValue`, `dayOfMonth`,
-`atStartOfDay(zone): ZonedDateTime`), `LocalTime`, `ZoneId.of(name)`,
+`dayOfWeek`, `atStartOfDay(zone): ZonedDateTime`), `DayOfWeek`, an
+enum (section 3.3) of `java.time`'s constants as it spells them,
+`MONDAY` to `SUNDAY`, with `value`, 1 for Monday to 7 for Sunday, and
+no arithmetic (`valueOf`'s message names `kogo.time.DayOfWeek`),
+`LocalTime`, `ZoneId.of(name)`,
 `ZonedDateTime` (`instant.atZone(zone)`, `hour`, `minute`,
-`toLocalDate`, `plusSeconds`, `toInstant`), `Duration` (`ofDays`,
+`toLocalDate`, `plusSeconds`, `toInstant`, `withHour`, `withMinute`,
+`withSecond`, `withNano`), `Duration` (`ofDays`,
 `ofMinutes`, `Duration.ofSeconds(seconds, nanos)`,
 `Duration.between(start, end)`, `seconds`), `Clock.now()`.
 `ofEpochSecond`, `ofSeconds`, `ofDays`, `plus`, `minus`, `atZone`,
@@ -1285,6 +1291,10 @@ nanos)`, `isBefore`, `isAfter`, `< <= > >=` (`compareTo`),
 throw, with its message: `Instant exceeds minimum or maximum
 instant`, `long overflow`, `Invalid value for EpochDay` past a
 `LocalDate`'s years ±999,999,999, or `Unknown time-zone ID: X`.
+`withHour`, `withMinute`, `withSecond` and `withNano` panic on a value
+out of range, as `java.time`'s do: `Invalid value for HourOfDay (valid
+values 0 - 23): 24`, and so for `MinuteOfHour` and `SecondOfMinute` (0
+to 59) and `NanoOfSecond` (0 to 999999999).
 `ZoneId.of` takes a region name of the tz
 database (`Australia/Melbourne`, `UTC`), and an unknown or malformed one
 panics with `java.time`'s message. An offset ID (`Z`, `+05:30`,
@@ -1294,6 +1304,14 @@ are not supported (spec 12)`; on a string literal, `kogo check` refuses
 it with that message and code `zone-offset`. There is no default zone: every
 conversion names its zone. `atStartOfDay(zone)` is the day's earliest
 time in the zone: where midnight is skipped, the end of the gap.
+`withHour`, `withMinute`, `withSecond` and `withNano` each set one
+field of the local date and time, in the same zone, and keep the old
+offset where it is still one of that time's: so in an hour that comes
+twice, 02:30 at +11:00 in Sydney set to hour 2 stays at +11:00 and at
++10:00 stays at +10:00, and a time earlier or later that day keeps
+its own offset, +11:00 before the change and +10:00 after it.
+A time a change skips moves on by the gap: in New York, 01:30 on 8
+March 2026 set to hour 2 is 03:30-04:00.
 Each writes itself as `java.time` does, in a template too: an
 `Instant` as `2026-11-15T14:30:00.120Z`, with the fraction in groups
 of three digits and none when it is zero; a `LocalDate` as

@@ -5512,3 +5512,31 @@ on PR 184 the same day, as below; DEV-1153's entries and the one of `T` or `T?` 
   a second run. Not taken: a line in the shared Fix step, which changes
   `CLAUDE.md` and cusoon2's `AGENTS.md` the same day and is outside this
   Scope; it is the follow-up if local cusoon2 Fixes go behind often.
+
+## The `java.time` names of Google's routes (DEV-1329), 28 Nov 2026
+
+- **`DayOfWeek` is an enum of the prelude**, `prelude/time.kg`, whose
+  Go is written by hand beside the rest of `kogo.time` as `SameSite`'s
+  is beside `kogo.rpc`: `==`, a `when` over it and its text come as
+  any enum's do, and so do `name`, `entries` and `valueOf` (spec 3.3),
+  which mean what Kotlin's do on `java.time`'s enum, but for
+  `valueOf`'s message, which names `kogo.time.DayOfWeek` where
+  Kotlin's names `java.time.DayOfWeek`: a `kept` difference in the
+  check against Kotlin. Not taken: an external class with constants on
+  its object, which the checker has no form for and which would lose
+  the exhaustive `when` that Kotlin gives a Java enum.
+- **A `DayOfWeek` does not cross the wire.** As an enum the checker
+  would let it on, and `kogo ts` has no TypeScript for a `kogo.time`
+  type other than the two dates, so the checker refuses it as spec
+  15.4 already says of any other type of `kogo.time`: one line. Not
+  taken: let it cross as its constant's name, which needs `kogo ts`
+  and the server's table of enums to learn a prelude enum, for no
+  program that asks.
+- **`withHour` and its three find the moment by the offsets 18 hours
+  either side of the local time**, the bounds of any offset, so a
+  change of offset near it is found without walking the zone's rules.
+  Two changes inside those 36 hours would be missed; a scan of the tz
+  database's zones from 1850 to 2040 found none, and past that each
+  zone's rule changes at most twice a year. Not taken: Go's
+  `time.Date`, which in the hour a change skips or repeats does not
+  say which offset it takes.

@@ -52,6 +52,7 @@ var kept = []struct{ names, from, to, why string }{
 	{"parseOrNull32", `[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}`, "null", "spec.md section 12: Uuid.parseOrNull of 32 hex digits"},
 	{"hSortCalls", `^(\[[^\]]*\]) .*$`, "$1", "spec.md section 12: how often and in what order sortedBy calls its selector"},
 	{"replace", `(no group in ".*" at \d+|No group with name \{.*\}|named capturing group .*)$`, "no such named group", "spec.md section 12: replace with a bad group"},
+	{"dayOfWeekValueOf", `java\.time\.DayOfWeek`, "kogo.time.DayOfWeek", "spec.md section 12: DayOfWeek.valueOf names Kogo's package"},
 	{"sin|cos|asin|greatCircle", `-?\d+\.\d+(E-?\d+)?`, "%.10g", "spec.md section 12: kogo.math's sin, cos and asin are Go's"},
 }
 
@@ -61,7 +62,7 @@ var kept = []struct{ names, from, to, why string }{
 // Such a case is counted under why and does not fail the check; a
 // limit on any other input is a difference.
 var refused = []struct{ names, input, id, limit, why string }{
-	{"atZone|plusDays|atZoneEra|atStartOfDay|dateParts|hourMinute|plusSeconds", "zoneId", offsetID, zoneLimit, "spec.md section 12: ZoneId.of takes a region name"},
+	{"atZone|plusDays|atZoneEra|atStartOfDay|dateParts|hourMinute|plusSeconds|dayOfWeek|withFields|withAll|withHourAt|withMinuteAt|withSecondAt|withNanoAt", "zoneId", offsetID, zoneLimit, "spec.md section 12: ZoneId.of takes a region name"},
 	{"offsetOf", "offsetId", offsetID, zoneLimit, "spec.md section 12: ZoneId.of takes a region name"},
 }
 

@@ -62,6 +62,8 @@ func TestOperations(t *testing.T) {
 			"wire", "f's input holds In.at: Instant, which does not cross the wire: send text the server has formatted"},
 		{rpc("import kogo.time.Duration\n") + "api ops unchecked { ‸f ungated }\n" + op("Unit", "List<Duration>") + time,
 			"wire", "f's answer holds a Duration, which does not cross the wire"},
+		{rpc("import kogo.time.DayOfWeek\n") + "api ops unchecked { ‸f ungated }\n" + op("Unit", "DayOfWeek") + "\n---\npackage kogo.time\nenum class DayOfWeek { MONDAY }",
+			"wire", "f's answer is a DayOfWeek, which does not cross the wire: send text the server has formatted"},
 		// Only kogo.time's: another package's LocalDate is an external class like any other.
 		{rpc("import kogo.other.LocalDate\n") + "api ops unchecked { ‸f ungated }\n" + op("LocalDate", "Unit") + "\n---\npackage kogo.other\nexternal class LocalDate",
 			"wire", "f's input is a LocalDate, which does not cross the wire"},
